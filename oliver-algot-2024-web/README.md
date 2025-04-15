@@ -1,5 +1,7 @@
 ## Getting Started
 
+Install mongodb to run locally: https://www.mongodb.com/docs/manual/tutorial/install-mongodb-on-ubuntu/
+
 Use correct version of `node`:
 
 ```bash
