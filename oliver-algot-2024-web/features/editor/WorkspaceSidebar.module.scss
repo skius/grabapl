@@ -1,0 +1,92 @@
+/* Copyright 2022-2023 Theo Weidmann. All rights reserved. */
+.column {
+  display: flex;
+  flex-direction: column;
+}
+
+.indent {
+  margin-top: 5px;
+  margin-left: 25px;
+}
+
+.info {
+  padding: 0 20px;
+}
+
+.heading {
+  padding: 0 var(--space-4);
+  font-size: var(--font-s);
+  font-weight: bold;
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.noOperations {
+  padding: 0 var(--space-4);
+  font-size: var(--font-s);
+  color: var(--interaction-gray);
+  margin: var(--space-4);
+  line-height: 1.5;
+}
+
+.addButtons {
+  padding: var(--space-4) 0;
+  display: flex;
+  justify-content: center;
+  gap: var(--space-3);
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(to bottom, transparent 0%, var(--background-gray));
+}
+
+.leftContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.descriptionInput {
+  border: 2px solid #d0d0d0;
+  padding: 10px 10px;
+  width: 100%;
+  height: 3.5rem;
+  border-radius: 5px;
+  resize: none;
+}
+
+.descriptionInput:focus {
+  border-color: #a0a0a0;
+  outline: none;
+}
+
+.operationDescription {
+  font-size: var(--font-xs);
+  margin-top: var(--space-3);
+  margin-bottom: var(--space-3);
+  line-height: 1.375;
+}
+
+.testSidebar {
+  display: flex;
+  flex: 1 1 80%;
+}
+
+.minimizeButton {
+  margin-left: auto;
+
+  color: var(--text-gray);
+  background-color: var(--border-gray);
+
+  border-bottom-left-radius: 20%;
+
+  z-index: 200;
+}
+
+.description {
+  color: var(--text-gray);
+  font-size: var(--font-xs);
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-3);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+}

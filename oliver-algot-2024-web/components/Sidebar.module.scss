@@ -1,0 +1,55 @@
+/* Copyright 2022-2023 Theo Weidmann. All rights reserved. */
+.sidebar {
+  background-color: var(--background-gray);
+  overflow: auto;
+  flex-grow: 1;
+  flex-shrink: 0;
+  flex-basis: 0;
+
+  &.left {
+    border-right: 1px solid var(--border-gray);
+  }
+
+  &:not(.left) {
+    border-left: 1px solid var(--border-gray);
+  }
+}
+
+.tabbar {
+  position: sticky;
+  background-color: var(--background-gray);
+  z-index: 100;
+  top: 0;
+  display: flex;
+  justify-content: space-around;
+  height: var(--top-bar-height);
+  border-bottom: 1px solid var(--border-gray);
+}
+
+.tabbarBorderTop {
+  border-top: 1px solid var(--border-gray);
+}
+
+.tab {
+  font-size: var(--font-xs);
+  color: var(--interaction-gray);
+  margin: 0px 8px 0px 8px;
+
+  :global(.material-icons-outlined), :global(.material-icons) {
+    font-size: var(--font-md);
+    vertical-align: -4px;
+    margin-right: 7px;
+  }
+
+  &Active {
+    color: var(--interact-tint);
+  }
+
+  &Invisible {
+    display: none;
+  }
+}
+
+.tabContent {
+  padding: 0 var(--sidebar-padding);
+}

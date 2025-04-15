@@ -1,0 +1,15 @@
+.expandButton {
+  position: relative;
+  left: 0;
+  top: 50%;
+  cursor: pointer;
+  z-index: 1;
+
+  color: var(--interaction-gray);
+  background-color: var(--border-gray);
+
+  border-top-right-radius: 5px;
+  border-bottom-right-radius: 5px;
+
+  transform: scaleY(1.5)
+}

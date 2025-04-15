@@ -1,0 +1,55 @@
+/* Copyright 2022-2023 Theo Weidmann and others. All rights reserved. */
+.debugNode {
+  display: inline-block;
+  position: relative;
+}
+
+.image {
+  position: absolute;
+  left: -61px;
+  top: -60px;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.someValue {
+  font-size: var(--font-s);
+  text-align: center;
+  color: var(--blue);
+  margin-right: auto;
+  margin-bottom: auto;
+  margin-left: auto;
+  font-weight: bold;
+  z-index: 1000;
+  background-color: white;
+  width: fit-content;
+  padding-top: 1px;
+  padding-bottom: 2px;
+}
+
+.maybe, .input, .nameField {
+  font-size: var(--font-xs);
+  position: absolute;
+  width: fit-content;
+  min-width: 16px;
+  height: 16px;
+  line-height: 16px;
+  border-radius: 50%;
+  text-align: center;
+}
+
+.maybe {
+  top: 0;
+  left: 0;
+  background-color: var(--red);
+}
+
+.input, .nameField {
+  top: 0;
+  right: 0;
+  background-color: var(--green);
+}
+
+.input {
+  cursor: pointer;
+}

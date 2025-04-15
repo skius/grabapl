@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="34px" height="35px" viewBox="0 0 34 35" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>Group 3</title>
+    <g id="Programming" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Desktop-Copy-2" transform="translate(-356.000000, -162.000000)">
+            <g id="Group-3" transform="translate(356.000000, 162.000000)">
+                <g id="Group-2-Copy" transform="translate(11.000000, 0.000000)">
+                    <circle id="Oval" fill="#FFFFFF" cx="11.5" cy="11.5" r="11.5"></circle>
+                    <text id="cancel" font-family="MaterialIcons-Regular, Material Icons" font-size="21" font-weight="normal" fill="#4F528C">
+                        <tspan x="1" y="22">cancel</tspan>
+                    </text>
+                </g>
+                <g id="Group-2" transform="translate(0.000000, 12.000000)">
+                    <circle id="Oval" fill="#FFFFFF" cx="11.5" cy="11.5" r="11.5"></circle>
+                    <text id="check_circle_outline" font-family="MaterialIcons-Regular, Material Icons" font-size="21" font-weight="normal" fill="#4F528C">
+                        <tspan x="1" y="22">check_circle_outline</tspan>
+                    </text>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

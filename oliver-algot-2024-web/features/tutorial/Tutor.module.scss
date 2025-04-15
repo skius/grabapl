@@ -1,0 +1,66 @@
+/* Copyright 2022-2023 Theo Weidmann and others. All rights reserved. */
+.tutor {
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  width: 340px;
+  height: 270px;
+  z-index: 100;
+  background-color: white;
+  border-radius: var(--small-radius);
+  box-shadow: 0 0 2px 1px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+}
+
+.inner {
+  padding: 0.75rem 1rem;
+  overflow-y: auto;
+  position: absolute;
+  top: 48px;
+  bottom: 62px;
+  left: 0;
+  right: 0;
+  font-size: var(--font-sm);
+  line-height: 1.25;
+  white-space: pre-line;
+}
+
+.progressbar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  right: 0;
+}
+
+.progressbarBar {
+  height: 3px;
+  background-color: var(--query);
+}
+
+.buttonBar {
+  padding: 0 0.75rem;
+  position: absolute;
+  bottom: 1rem;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.button {
+  width: auto;
+  margin-right: 0;
+  margin-left:auto;
+}
+
+.success {
+  color: var(--success-color);
+  font-size: var(--font-sm);
+  font-weight: 500;
+
+  :global(.material-icons) {
+    vertical-align: -7px;
+    margin-right: 5px;
+  }
+}

@@ -1,0 +1,128 @@
+/* Copyright 2022-2023 Theo Weidmann. All rights reserved. */
+.tool {
+  text-align: left;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: var(--space-2) var(--sidebar-padding);
+
+  &Active {
+    background-color: var(--selected);
+  }
+
+  &:hover:not(&Active):not(&Disabled) {
+    background-color: var(--hovered);
+  }
+
+  &Disabled {
+    cursor: not-allowed;
+  }
+}
+
+.searchInput {
+  width: 80%;
+  height: 1.5rem;
+  margin: 1.5rem 0rem 0rem 1rem;
+}
+
+.category {
+  padding: 0 var(--sidebar-padding);
+  font-size: var(--font-xs);
+  font-weight: bold;
+  color: var(--text-gray);
+  margin-top: var(--space-5);
+  margin-bottom: var(--space-3);
+}
+
+.toolName {
+  margin-left: var(--space-4);
+  font-size: var(--font-xs);
+}
+
+.info {
+  padding: 0 var(--space-5);
+}
+
+.toolsList {
+  overflow: hidden;
+  flex-direction: column;
+  flex: 1;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tabPanels {
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 50px);
+}
+
+.documentation {
+  border-top: 1px solid var(--border-gray);
+  padding: var(--sidebar-padding);
+  font-size: var(--font-sm);
+  line-height: 1.25;
+  height: 125px;
+
+  overflow-y: scroll;
+
+  &H3 {
+    font-weight: bold;
+    margin-bottom: var(--space-4);
+  }
+}
+
+.toolWrapper {
+  position: relative;
+}
+
+.toolHotkey {
+  margin-left: auto;
+  font-size: var(--font-xs);
+  padding: var(--space-1);
+  color: var(--text-gray);
+}
+
+.button {
+  background-color: var(--blue);
+  color: var(--background-gray);
+
+  border-radius: var(--medium-radius);
+
+  font-size: var(--font-std);
+  padding: var(--space-5);
+  margin: var(--space-5);
+}
+
+.patternContainer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.patternOps {
+  margin-bottom: var(--sidebar-padding);
+  // flex: 1;
+}
+
+.patternEditorContainer {
+  border-top: 1px solid var(--border-gray);
+  flex: 1;
+}
+
+.patterneditor {
+  margin-top: var(--sidebar-padding);
+  border-top: 1px solid var(--border-gray);
+
+  overflow-y: scroll;
+
+  flex: 1;
+
+  display: flex;
+  flex-direction: column;
+  overscroll-behavior: contain;
+}

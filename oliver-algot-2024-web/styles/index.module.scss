@@ -1,0 +1,32 @@
+/* Copyright 2022-2023 Theo Weidmann. All rights reserved. */
+.wrapper {
+  padding: var(--space-7);
+}
+
+.h {
+  font-size: 36px;
+  font-weight: 500;
+  margin: 0.75em 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  column-gap: 32px;
+}
+
+.logo {
+  margin: 0 auto;
+  margin-top: 3rem;
+  margin-bottom: 2.5rem;
+  display: block;
+}
+
+.container {
+  margin: 0 auto;
+  max-width: 450px;
+}
+
+.workspaces {
+  margin-top: 3rem;
+}
