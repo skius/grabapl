@@ -12,7 +12,7 @@ export async function initResvg() {
         renderSvg: async (svgString) => {
           try {
             // Convert text elements to paths to ensure text is always visible
-            svgString = await inlineTextAsPaths(svgString);
+            // svgString = await inlineTextAsPaths(svgString);
             
             // Create Resvg instance with improved font options
             const resvg = new Resvg(svgString, {
@@ -20,16 +20,16 @@ export async function initResvg() {
                 loadSystemFonts: true,  // Try to load system fonts
                 fontFiles: [],          // Additional font files if needed
                 fontDirs: [],           // Additional font directories if needed
-                defaultFontFamily: 'Arial, Helvetica, sans-serif',
+                defaultFontFamily: 'Times, Arial, Helvetica, sans-serif',
                 defaultFontSize: 12,
               },
-              imageRendering: 1,       // High quality
-              shapeRendering: 0,       // Optimized for quality
-              textRendering: 0,        // Optimized for quality
+              imageRendering: 0,       // High quality
+              shapeRendering: 1,       // Optimized for quality
+              textRendering: 1,        // Optimized for quality
               fitTo: {
                 mode: 'original',
               },
-              dpi: 300,
+              dpi: 96,
               background: 'white',     // Ensure white background
             });
             
@@ -68,7 +68,7 @@ async function inlineTextAsPaths(svgString) {
     
     // Process each text element
     textElements.forEach(textEl => {
-        console.log('Processing text element:', textEl);
+        // console.log('Processing text element:', textEl);
       // Ensure text has font attributes
       if (!textEl.hasAttribute('font-family')) {
         textEl.setAttribute('font-family', 'Arial, Helvetica, sans-serif');

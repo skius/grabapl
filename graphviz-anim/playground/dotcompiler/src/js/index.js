@@ -63,7 +63,9 @@ async function init() {
 
 function initGraphviz() {
   graphvizInstance = d3.select("#graph").graphviz()
-    .logEvents(true)
+    .logEvents(false)
+    .width(1000)
+    .height(800)
     .on("initEnd", () => {
       console.log("Graphviz initialized");
       statusEl.textContent = 'Graphviz initialized';
@@ -347,31 +349,31 @@ async function convertSvgsToPngs(svgFrames) {
       }
       
       // Process text elements to ensure they'll be visible
-      const textElements = doc.querySelectorAll('text');
-      textElements.forEach(text => {
-        // Ensure text has proper attributes
-        if (!text.hasAttribute('font-family')) {
-          text.setAttribute('font-family', 'Arial, sans-serif');
-        }
-        if (!text.hasAttribute('font-size')) {
-          text.setAttribute('font-size', '14px');
-        }
-        if (!text.hasAttribute('fill') || text.getAttribute('fill') === 'none') {
-          text.setAttribute('fill', 'black');
-        }
+    //   const textElements = doc.querySelectorAll('text');
+    //   textElements.forEach(text => {
+    //     // Ensure text has proper attributes
+    //     if (!text.hasAttribute('font-family')) {
+    //       text.setAttribute('font-family', 'Arial, sans-serif');
+    //     }
+    //     if (!text.hasAttribute('font-size')) {
+    //       text.setAttribute('font-size', '14px');
+    //     }
+    //     if (!text.hasAttribute('fill') || text.getAttribute('fill') === 'none') {
+    //       text.setAttribute('fill', 'black');
+    //     }
         
-        // Create a rectangle behind the text to improve visibility
-        const bbox = text.getBBox?.() || {x: 0, y: 0, width: 0, height: 0};
-        const padding = 1;
-        const textBg = doc.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        textBg.setAttribute('x', String(bbox.x - padding));
-        textBg.setAttribute('y', String(bbox.y - padding));
-        textBg.setAttribute('width', String(bbox.width + 2*padding));
-        textBg.setAttribute('height', String(bbox.height + 2*padding));
-        textBg.setAttribute('fill', 'white');
-        textBg.setAttribute('fill-opacity', '0.7');
-        text.parentNode.insertBefore(textBg, text);
-      });
+    //     // Create a rectangle behind the text to improve visibility
+    //     const bbox = text.getBBox?.() || {x: 0, y: 0, width: 0, height: 0};
+    //     const padding = 1;
+    //     const textBg = doc.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    //     textBg.setAttribute('x', String(bbox.x - padding));
+    //     textBg.setAttribute('y', String(bbox.y - padding));
+    //     textBg.setAttribute('width', String(bbox.width + 2*padding));
+    //     textBg.setAttribute('height', String(bbox.height + 2*padding));
+    //     textBg.setAttribute('fill', 'white');
+    //     textBg.setAttribute('fill-opacity', '0.7');
+    //     text.parentNode.insertBefore(textBg, text);
+    //   });
       
       // Convert back to string
       svgString = serializer.serializeToString(doc);
