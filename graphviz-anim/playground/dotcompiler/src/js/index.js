@@ -2,15 +2,18 @@ import * as d3 from 'd3';
 import { graphviz } from 'd3-graphviz';
 import JSZip from 'jszip';
 import { initFFmpeg } from './ffmpeg.js';
-import { initResvg } from './resvg-handler.js';
+import { initResvg } from './resvg.js';
 import { exampleDots } from './examples.js';
 
 // Configuration
 let config = {
   frameRate: 30,
-  transitionDuration: 1500,
+  transitionDuration: 333,
   outputFilename: 'graph-animation',
-  isRecording: false
+  isRecording: false,
+  videoWidth: 1280,  // Higher resolution default width
+  videoHeight: 720,  // Higher resolution default height
+  preserveAspectRatio: true  // Maintain aspect ratio of SVGs
 };
 
 // State variables
@@ -87,6 +90,29 @@ function setupEventListeners() {
   outputFilenameEl.addEventListener('change', (e) => {
     config.outputFilename = e.target.value;
   });
+  
+  // Add event listeners for video size inputs
+  const videoWidthEl = document.getElementById('videoWidth');
+  const videoHeightEl = document.getElementById('videoHeight');
+  const preserveAspectRatioEl = document.getElementById('preserveAspectRatio');
+  
+  if (videoWidthEl) {
+    videoWidthEl.addEventListener('change', (e) => {
+      config.videoWidth = parseInt(e.target.value);
+    });
+  }
+  
+  if (videoHeightEl) {
+    videoHeightEl.addEventListener('change', (e) => {
+      config.videoHeight = parseInt(e.target.value);
+    });
+  }
+  
+  if (preserveAspectRatioEl) {
+    preserveAspectRatioEl.addEventListener('change', (e) => {
+      config.preserveAspectRatio = e.target.checked;
+    });
+  }
 }
 
 function loadExampleDots() {
@@ -291,37 +317,69 @@ async function convertSvgsToPngs(svgFrames) {
       }
       
       let svgString = svgFrames[i];
-      if (false) {
+      
+      // Process the SVG to ensure text is preserved
+      const parser = new DOMParser();
+      const serializer = new XMLSerializer();
+      const doc = parser.parseFromString(svgString, 'image/svg+xml');
+      
       // Add proper viewBox if missing
-      if (!svgString.includes('viewBox')) {
-        // Extract width and height
-        const widthMatch = svgString.match(/width="([^"]+)"/);
-        const heightMatch = svgString.match(/height="([^"]+)"/);
-        
-        if (widthMatch && heightMatch) {
-          const width = parseFloat(widthMatch[1]);
-          const height = parseFloat(heightMatch[1]);
-          
-          // Insert viewBox attribute
-          svgString = svgString.replace('<svg', `<svg viewBox="0 0 ${width} ${height}"`);
+      const svgElement = doc.querySelector('svg');
+      if (!svgElement.hasAttribute('viewBox')) {
+        const width = svgElement.getAttribute('width');
+        const height = svgElement.getAttribute('height');
+        if (width && height) {
+          svgElement.setAttribute('viewBox', `0 0 ${parseFloat(width)} ${parseFloat(height)}`);
         }
       }
       
-      // Add a white background if needed to avoid alpha issues
-      if (!svgString.includes('<rect fill="white"')) {
-        // svgString = svgString.replace(
-        //   '<svg',
-        //   '<svg xmlns:xlink="http://www.w3.org/1999/xlink"'
-        // );
+      // Add a white background if needed
+      const hasBackground = Array.from(svgElement.children).some(
+        child => child.tagName === 'rect' && child.getAttribute('width') === '100%' && child.getAttribute('height') === '100%'
+      );
+      
+      if (!hasBackground) {
+        const rect = doc.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('width', '100%');
+        rect.setAttribute('height', '100%');
+        rect.setAttribute('fill', 'white');
+        svgElement.insertBefore(rect, svgElement.firstChild);
+      }
+      
+      // Process text elements to ensure they'll be visible
+      const textElements = doc.querySelectorAll('text');
+      textElements.forEach(text => {
+        // Ensure text has proper attributes
+        if (!text.hasAttribute('font-family')) {
+          text.setAttribute('font-family', 'Arial, sans-serif');
+        }
+        if (!text.hasAttribute('font-size')) {
+          text.setAttribute('font-size', '14px');
+        }
+        if (!text.hasAttribute('fill') || text.getAttribute('fill') === 'none') {
+          text.setAttribute('fill', 'black');
+        }
         
-        // Find where to insert the background rectangle
-        const insertPos = svgString.indexOf('>') + 1;
-        svgString = svgString.slice(0, insertPos) + 
-          '<rect fill="white" width="100%" height="100%"/>' + 
-          svgString.slice(insertPos);
+        // Create a rectangle behind the text to improve visibility
+        const bbox = text.getBBox?.() || {x: 0, y: 0, width: 0, height: 0};
+        const padding = 1;
+        const textBg = doc.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        textBg.setAttribute('x', String(bbox.x - padding));
+        textBg.setAttribute('y', String(bbox.y - padding));
+        textBg.setAttribute('width', String(bbox.width + 2*padding));
+        textBg.setAttribute('height', String(bbox.height + 2*padding));
+        textBg.setAttribute('fill', 'white');
+        textBg.setAttribute('fill-opacity', '0.7');
+        text.parentNode.insertBefore(textBg, text);
+      });
+      
+      // Convert back to string
+      svgString = serializer.serializeToString(doc);
+      
+      // Additional fix: Add XHTML namespace for better text handling
+      if (!svgString.includes('xmlns:xlink="http://www.w3.org/1999/xlink"')) {
+        svgString = svgString.replace('<svg', '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
       }
-      }
-
       
       console.log(`Converting SVG frame ${i}`);
       const pngData = await resvg.renderSvg(svgString);

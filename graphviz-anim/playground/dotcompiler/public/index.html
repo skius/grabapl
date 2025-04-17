@@ -47,11 +47,25 @@
           </div>
           <div class="form-group">
             <label for="transitionDuration">Transition Duration (ms):</label>
-            <input type="number" id="transitionDuration" min="100" max="5000" value="1500">
+            <input type="number" id="transitionDuration" min="100" max="5000" value="150">
           </div>
           <div class="form-group">
             <label for="outputFilename">Output Filename:</label>
             <input type="text" id="outputFilename" value="graph-animation">
+          </div>
+          <div class="form-group">
+            <label for="videoWidth">Video Width (px):</label>
+            <input type="number" id="videoWidth" min="320" max="3840" value="1280">
+          </div>
+          <div class="form-group">
+            <label for="videoHeight">Video Height (px):</label>
+            <input type="number" id="videoHeight" min="240" max="2160" value="720">
+          </div>
+          <div class="form-group">
+            <label for="preserveAspectRatio">
+              <input type="checkbox" id="preserveAspectRatio" checked>
+              Preserve Aspect Ratio
+            </label>
           </div>
         </div>
         
