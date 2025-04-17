@@ -8,6 +8,10 @@ export async function initResvg() {
     try {
       // Note: In production, you'd want to provide the correct path to the wasm file
       await initWasm(fetch('/node_modules/@resvg/resvg-wasm/index_bg.wasm'));
+
+      // Load custom fonts
+      const fontFiles = await loadCustomFonts();
+
       resvgModule = {
         renderSvg: async (svgString) => {
           try {
@@ -15,13 +19,10 @@ export async function initResvg() {
             // svgString = await inlineTextAsPaths(svgString);
             
             // Create Resvg instance with improved font options
+            debugger;
             const resvg = new Resvg(svgString, {
               font: {
-                loadSystemFonts: true,  // Try to load system fonts
-                fontFiles: [],          // Additional font files if needed
-                fontDirs: [],           // Additional font directories if needed
-                defaultFontFamily: 'Times, Arial, Helvetica, sans-serif',
-                defaultFontSize: 12,
+                fontBuffers: fontFiles, 
               },
               imageRendering: 0,       // High quality
               shapeRendering: 1,       // Optimized for quality
@@ -32,7 +33,7 @@ export async function initResvg() {
               dpi: 96,
               background: 'white',     // Ensure white background
             });
-            
+            debugger;
             const pngData = resvg.render();
             return pngData.asPng();
           } catch (error) {
@@ -49,6 +50,41 @@ export async function initResvg() {
   
   return resvgModule;
 }
+
+/**
+ * Load custom font files as Uint8Arrays
+ */
+async function loadCustomFonts() {
+    try {
+      const fontFiles = [];
+      
+      // Load Times New Roman font file
+      const timesResponse = await fetch('/fonts/times.ttf');
+      if (timesResponse.ok) {
+        console.log(timesResponse);
+        const timesArrayBuffer = await timesResponse.arrayBuffer();
+        fontFiles.push(new Uint8Array(timesArrayBuffer));
+        console.log('Successfully loaded Times New Roman font');
+      } else {
+        console.error('Failed to load Times New Roman font:', timesResponse.statusText);
+      }
+
+      const pacificoUrl = "https://raw.githubusercontent.com/thx/resvg-js/f4fbff0633549bd4737db3bd05d88dd1eca2b940/wasm/fonts/Pacifico-Regular.woff2";
+    const pacificoResponse = await fetch(pacificoUrl);
+    if (pacificoResponse.ok) {
+        const pacificoArrayBuffer = await pacificoResponse.arrayBuffer();
+        fontFiles.push(new Uint8Array(pacificoArrayBuffer));
+        console.log('Successfully loaded Pacifico font');
+    } else {
+        console.error('Failed to load Pacifico font:', pacificoResponse.statusText);
+    }
+      
+      return fontFiles;
+    } catch (error) {
+      console.error('Error loading custom fonts:', error);
+      return []; // Return empty array if font loading fails
+    }
+  }
 
 /**
  * Convert SVG text elements to path elements to ensure they render correctly
