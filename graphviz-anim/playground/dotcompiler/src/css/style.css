@@ -1,0 +1,196 @@
+/* Main Styles */
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.6;
+  color: #333;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  background-color: #f5f5f5;
+}
+
+.container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+}
+
+h1 {
+  text-align: center;
+  color: #2c3e50;
+  margin-bottom: 30px;
+}
+
+h2 {
+  color: #3498db;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+  margin-top: 30px;
+}
+
+/* Control Panel */
+.control-panel {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (min-width: 768px) {
+  .control-panel {
+    grid-template-columns: 1fr 1fr;
+  }
+  
+  .output-section {
+    grid-column: span 2;
+  }
+}
+
+/* Input Section */
+.input-section {
+  padding: 15px;
+  background-color: #f9f9f9;
+  border-radius: 6px;
+}
+
+.dot-input {
+  margin-bottom: 15px;
+}
+
+textarea#dotInput {
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px;
+  font-family: monospace;
+  resize: vertical;
+}
+
+/* Graph Section */
+.graph-container {
+  width: 100%;
+  min-height: 400px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #fff;
+  margin-bottom: 15px;
+  overflow: auto;
+  text-align: center;
+}
+
+.animation-controls {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+/* Buttons */
+button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+button:hover {
+  background-color: #2980b9;
+}
+
+button:disabled {
+  background-color: #95a5a6;
+  cursor: not-allowed;
+}
+
+#loadExample {
+  background-color: #27ae60;
+}
+
+#loadExample:hover {
+  background-color: #219653;
+}
+
+#startRecording {
+  background-color: #e74c3c;
+}
+
+#startRecording:hover {
+  background-color: #c0392b;
+}
+
+/* Forms */
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.form-group input, .form-group select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+/* Progress Bar */
+.progress-bar {
+  height: 15px;
+  background-color: #ecf0f1;
+  border-radius: 10px;
+  margin: 15px 0;
+  overflow: hidden;
+  display: none;
+}
+
+.progress-inner {
+  height: 100%;
+  background-color: #2ecc71;
+  width: 0%;
+  transition: width 0.3s;
+}
+
+.status-message {
+  text-align: center;
+  font-weight: 500;
+  color: #7f8c8d;
+  min-height: 20px;
+}
+
+/* Output Container */
+.output-container {
+  margin-top: 30px;
+  text-align: center;
+}
+
+#outputVideo {
+  max-width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #000;
+  display: none;
+  margin-bottom: 15px;
+}
+
+.download-button {
+  display: inline-block;
+  background-color: #3498db;
+  color: white;
+  padding: 10px 20px;
+  margin: 10px;
+  border-radius: 4px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
+
+.download-button:hover {
+  background-color: #2980b9;
+}

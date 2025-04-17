@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<body>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://unpkg.com/@hpcc-js/wasm@2.20.0/dist/graphviz.umd.js"></script>
+<script src="https://unpkg.com/d3-graphviz@5.6.0/build/d3-graphviz.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<div id="graph" style="text-align: center;"></div>
+<button id="start">Start Recording</button>
+
+<!-- <script src="https://cdn.jsdelivr.net/npm/ccapture.js@1.1.0/build/CCapture.all.min.js"></script> -->
+<script>
+var dots = [
+    [
+        'digraph  {',
+        '    node [style="filled"]',
+        '    a [fillcolor="#d62728"]',
+        '    b [fillcolor="#1f77b4"]',
+        '    a -> b',
+        '}'
+    ],
+    [
+        'digraph  {',
+        '    node [style="filled"]',
+        '    a [fillcolor="#d62728"]',
+        '    c [fillcolor="#2ca02c"]',
+        '    b [fillcolor="#1f77b4"]',
+        '    a -> b',
+        '    a -> c',
+        '}'
+    ],
+    [
+        'digraph  {',
+        '    node [style="filled"]',
+        '    a [fillcolor="#d62728"]',
+        '    b [fillcolor="#1f77b4"]',
+        '    c [fillcolor="#2ca02c"]',
+        '    a -> b',
+        '    a -> c',
+        '}'
+    ],
+    [
+        'digraph  {',
+        '    node [style="filled"]',
+        '    a [fillcolor="#d62728", shape="box"]',
+        '    b [fillcolor="#1f77b4", shape="parallelogram"]',
+        '    c [fillcolor="#2ca02c", shape="pentagon"]',
+        '    a -> b',
+        '    a -> c',
+        '    b -> c',
+        '}'
+    ],
+    [
+        'digraph  {',
+        '    node [style="filled"]',
+        '    a [fillcolor="yellow", shape="star"]',
+        '    b [fillcolor="yellow", shape="star"]',
+        '    c [fillcolor="yellow", shape="star"]',
+        '    a -> b',
+        '    a -> c',
+        '    b -> c',
+        '}'
+    ],
+    [
+        'digraph  {',
+        '    node [style="filled"]',
+        '    a [fillcolor="#d62728", shape="triangle"]',
+        '    b [fillcolor="#1f77b4", shape="diamond"]',
+        '    c [fillcolor="#2ca02c", shape="trapezium"]',
+        '    a -> b',
+        '    a -> c',
+        '    b -> c',
+        '}'
+    ],
+    [
+        'digraph  {',
+        '    node [style="filled"]',
+        '    a [fillcolor="#d62728", shape="box"]',
+        '    b [fillcolor="#1f77b4", shape="parallelogram"]',
+        '    c [fillcolor="#2ca02c", shape="pentagon"]',
+        '    a -> b',
+        '    a -> c',
+        '    b -> c',
+        '}'
+    ],
+    [
+        'digraph  {',
+        '    node [style="filled"]',
+        '    a [fillcolor="#d62728"]',
+        '    b [fillcolor="#1f77b4"]',
+        '    c [fillcolor="#2ca02c"]',
+        '    a -> b',
+        '    a -> c',
+        '    c -> b',
+        '}'
+    ],
+    [
+        'digraph  {',
+        '    node [style="filled"]',
+        '    b [fillcolor="#1f77b4"]',
+        '    c [fillcolor="#2ca02c"]',
+        '    c -> b',
+        '}'
+    ],
+    [
+        'digraph  {',
+        '    node [style="filled"]',
+        '    b [fillcolor="#1f77b4"]',
+        '}'
+    ],
+];
+const FPS = 30;
+const FRAME_INTERVAL = 1000 / FPS;
+const TRANSITION_DURATION = 1500;
+const FRAMES_PER_STEP = Math.ceil((TRANSITION_DURATION + 500) / FRAME_INTERVAL); // extra buffer
+const TOTAL_FRAMES = dots.length * FRAMES_PER_STEP;
+
+let frameCount = 0;
+let svgFrames = [];
+let zip = new JSZip();
+
+var graphvizInitEnd = false;
+
+var graphviz = d3.select("#graph").graphviz()
+    .transition(function () {
+        return d3.transition("main")
+            .ease(d3.easeLinear)
+            .delay(500)
+            .duration(1500);
+    })
+    .logEvents(true)
+    .on("initEnd", () => {
+        graphvizInitEnd = true;
+        console.log("Graphviz initialized");
+    });
+
+
+
+document.getElementById("start").addEventListener("click", async () => {
+    console.log("Graphviz initialized, starting capture...");
+    console.log(graphvizInitEnd);
+    await captureSequence();
+    await downloadZip();
+});
+
+function getSvgString() {
+    const svg = document.querySelector("#graph svg");
+    return new XMLSerializer().serializeToString(svg);
+}
+
+async function captureFrame(i) {
+    const svgText = getSvgString();
+    const filename = `frame_${String(i).padStart(4, '0')}.svg`;
+    zip.file(filename, svgText);
+}
+
+async function captureSequence() {
+    const MAX_DOTS = 3;
+    // const MAX_DOTS = dots.length;
+    for (let i = 0; i < MAX_DOTS; i++) {
+        const dot = dots[i].join('');
+        let promise = new Promise(resolve => {
+            graphviz.renderDot(dot).on("end", resolve);
+        });
+
+        // Wait a bit to let the transition begin
+        // await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Capture multiple frames during transition
+        for (let j = 0; j < FRAMES_PER_STEP; j++) {
+            await captureFrame(frameCount++);
+            await new Promise(resolve => setTimeout(resolve, FRAME_INTERVAL));
+        }
+        // wait for the transition to finish
+        await promise;
+    }
+}
+
+async function downloadZip() {
+    const blob = await zip.generateAsync({ type: "blob" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "graph-frames.zip";
+    a.click();
+}
+
+
+</script>
+

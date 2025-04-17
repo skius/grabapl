@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DOT Graph Animator</title>
+  <link rel="stylesheet" href="../src/css/styles.css">
+  <!-- D3.js and Graphviz libraries -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://unpkg.com/@hpcc-js/wasm@2.20.0/dist/graphviz.umd.js"></script>
+  <script src="https://unpkg.com/d3-graphviz@5.6.0/build/d3-graphviz.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>DOT Graph Animation to WebM Converter</h1>
+    
+    <div class="control-panel">
+      <div class="input-section">
+        <h2>DOT Input</h2>
+        <div class="input-options">
+          <div class="dot-input">
+            <label for="dotInput">Enter DOT Graph Sequence (one per frame, separate with "===" on its own line):</label>
+            <textarea id="dotInput" rows="10" placeholder="Enter DOT code here..."></textarea>
+          </div>
+          <button id="loadExample">Load Example</button>
+          <button id="renderGraph">Render Graph</button>
+        </div>
+      </div>
+
+      <div class="graph-section">
+        <h2>Graph Visualization</h2>
+        <div id="graph" class="graph-container"></div>
+        <div class="animation-controls">
+          <button id="animateGraph">Animate Graph</button>
+          <button id="startRecording">Start Recording</button>
+          <button id="stopRecording">Stop Recording</button>
+        </div>
+      </div>
+
+      <div class="output-section">
+        <h2>Conversion Options</h2>
+        <div class="options-form">
+          <div class="form-group">
+            <label for="frameRate">Frame Rate (fps):</label>
+            <input type="number" id="frameRate" min="1" max="60" value="30">
+          </div>
+          <div class="form-group">
+            <label for="transitionDuration">Transition Duration (ms):</label>
+            <input type="number" id="transitionDuration" min="100" max="5000" value="1500">
+          </div>
+          <div class="form-group">
+            <label for="outputFilename">Output Filename:</label>
+            <input type="text" id="outputFilename" value="graph-animation">
+          </div>
+        </div>
+        
+        <div class="action-buttons">
+          <button id="convertToWebM">Convert to WebM</button>
+          <div id="progress" class="progress-bar">
+            <div id="progress-inner" class="progress-inner"></div>
+          </div>
+          <div id="status" class="status-message"></div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="outputContainer" class="output-container">
+      <h2>Video Output</h2>
+      <video id="outputVideo" controls></video>
+      <div class="download-section">
+        <a id="downloadLink" class="download-button" style="display: none;">Download WebM</a>
+        <a id="downloadFramesLink" class="download-button" style="display: none;">Download SVG Frames</a>
+      </div>
+    </div>
+  </div>
+  <script src="../src/js/index.js" type="module"></script>
+</body>
+</html>
