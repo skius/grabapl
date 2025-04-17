@@ -251,7 +251,10 @@ async function convertToWebM() {
   progressEl.style.width = '0%';
   
   try {
+    console.log(`Starting conversion of ${svgFrames.length} SVG frames to PNG...`);
     const pngFrames = await convertSvgsToPngs(svgFrames);
+    console.log(`Successfully converted ${pngFrames.length} frames to PNG`);
+    
     statusEl.textContent = 'Converting PNGs to WebM...';
     progressEl.style.width = '50%';
     
@@ -277,19 +280,73 @@ async function convertToWebM() {
 
 async function convertSvgsToPngs(svgFrames) {
   const pngFrames = [];
+  let validFrameCount = 0;
   
   for (let i = 0; i < svgFrames.length; i++) {
     try {
-      const pngData = await resvg.renderSvg(svgFrames[i]);
-      pngFrames.push(pngData);
+      // Make sure we have a valid SVG
+      if (!svgFrames[i] || !svgFrames[i].includes('<svg')) {
+        console.warn(`Frame ${i} is not a valid SVG, skipping`);
+        continue;
+      }
+      
+      let svgString = svgFrames[i];
+      if (false) {
+      // Add proper viewBox if missing
+      if (!svgString.includes('viewBox')) {
+        // Extract width and height
+        const widthMatch = svgString.match(/width="([^"]+)"/);
+        const heightMatch = svgString.match(/height="([^"]+)"/);
+        
+        if (widthMatch && heightMatch) {
+          const width = parseFloat(widthMatch[1]);
+          const height = parseFloat(heightMatch[1]);
+          
+          // Insert viewBox attribute
+          svgString = svgString.replace('<svg', `<svg viewBox="0 0 ${width} ${height}"`);
+        }
+      }
+      
+      // Add a white background if needed to avoid alpha issues
+      if (!svgString.includes('<rect fill="white"')) {
+        // svgString = svgString.replace(
+        //   '<svg',
+        //   '<svg xmlns:xlink="http://www.w3.org/1999/xlink"'
+        // );
+        
+        // Find where to insert the background rectangle
+        const insertPos = svgString.indexOf('>') + 1;
+        svgString = svgString.slice(0, insertPos) + 
+          '<rect fill="white" width="100%" height="100%"/>' + 
+          svgString.slice(insertPos);
+      }
+      }
+
+      
+      console.log(`Converting SVG frame ${i}`);
+      const pngData = await resvg.renderSvg(svgString);
+      
+      if (pngData && pngData.buffer) {
+        pngFrames.push(pngData);
+        validFrameCount++;
+      } else {
+        console.warn(`Frame ${i} rendered to invalid PNG, skipping`);
+      }
       
       // Update progress
       const progress = Math.floor((i / svgFrames.length) * 50);
       progressEl.style.width = `${progress}%`;
     } catch (err) {
       console.error(`Error converting SVG frame ${i}:`, err);
-      throw err;
+      console.log(`Problematic SVG:`, svgFrames[i].substring(0, 100) + '...');
+      // Skip this frame but continue with others
     }
+  }
+  
+  console.log(`Successfully converted ${validFrameCount} out of ${svgFrames.length} frames`);
+  
+  if (pngFrames.length === 0) {
+    throw new Error('Failed to convert any SVG frames to PNG');
   }
   
   return pngFrames;
@@ -297,10 +354,17 @@ async function convertSvgsToPngs(svgFrames) {
 
 async function convertPngsToWebM(pngFrames) {
   try {
+    // Make sure we have frames to convert
+    if (pngFrames.length === 0) {
+      throw new Error('No PNG frames to convert');
+    }
+    
+    console.log(`Starting WebM conversion with ${pngFrames.length} PNG frames`);
+    
     // Write PNG frames to FFmpeg virtual filesystem
     for (let i = 0; i < pngFrames.length; i++) {
       const filename = `frame_${String(i).padStart(4, '0')}.png`;
-      ffmpeg.writeFile(filename, pngFrames[i]);
+      await ffmpeg.writeFile(filename, pngFrames[i]);
       
       // Update progress (50% to 75%)
       const progress = 50 + Math.floor((i / pngFrames.length) * 25);
@@ -308,19 +372,22 @@ async function convertPngsToWebM(pngFrames) {
     }
     
     // Run FFmpeg to convert PNGs to WebM
-    const result = await ffmpeg.runCommand([
+    // Using simpler vp8 codec instead of vp9 for better compatibility
+    console.log('Running FFmpeg command to generate WebM video...');
+    await ffmpeg.runCommand([
       '-framerate', String(config.frameRate),
       '-i', 'frame_%04d.png',
-      '-c:v', 'libvpx-vp9',
+      '-c:v', 'vp8',
       '-b:v', '2M',
-      '-crf', '30',
-      '-pix_fmt', 'yuva420p',
+      '-auto-alt-ref', '0',
       'output.webm'
     ]);
     
     // Read the resulting WebM file
     progressEl.style.width = '90%';
+    console.log('Reading output WebM file...');
     const webmData = await ffmpeg.readFile('output.webm');
+    console.log('Successfully read WebM file, size:', webmData.byteLength);
     
     // Create a Blob from the WebM data
     const webmBlob = new Blob([webmData], { type: 'video/webm' });
@@ -328,7 +395,7 @@ async function convertPngsToWebM(pngFrames) {
     return webmBlob;
   } catch (err) {
     console.error('FFmpeg error:', err);
-    throw new Error('FFmpeg processing failed: ' + err.message);
+    throw new Error(`FFmpeg processing failed: ${err.message || 'Unknown error'}`);
   }
 }
 
