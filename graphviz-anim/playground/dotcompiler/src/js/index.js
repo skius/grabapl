@@ -41,6 +41,8 @@ const statusEl = document.getElementById('status');
 const outputVideoEl = document.getElementById('outputVideo');
 const downloadLinkEl = document.getElementById('downloadLink');
 const downloadFramesLinkEl = document.getElementById('downloadFramesLink');
+const videoWidthEl = document.getElementById('videoWidth');
+const videoHeightEl = document.getElementById('videoHeight');
 
 // Initialize application
 async function init() {
@@ -64,12 +66,19 @@ async function init() {
 function initGraphviz() {
   graphvizInstance = d3.select("#graph").graphviz()
     .logEvents(false)
-    .width(1000)
+    .width(config.videoWidth)
+    .height(config.videoHeight)
     .height(800)
     .on("initEnd", () => {
       console.log("Graphviz initialized");
       statusEl.textContent = 'Graphviz initialized';
     });
+}
+
+function updateGraphvizSize() {
+    graphvizInstance = graphvizInstance
+        .width(config.videoWidth)
+        .height(config.videoHeight);
 }
 
 function setupEventListeners() {
@@ -83,37 +92,41 @@ function setupEventListeners() {
   frameRateEl.addEventListener('change', (e) => {
     config.frameRate = parseInt(e.target.value);
   });
+  config.frameRate = parseInt(frameRateEl.value);
   
+
   transitionDurationEl.addEventListener('change', (e) => {
     config.transitionDuration = parseInt(e.target.value);
     updateGraphvizTransition();
   });
-  
+    config.transitionDuration = parseInt(transitionDurationEl.value);
+  updateGraphvizTransition();
+
   outputFilenameEl.addEventListener('change', (e) => {
     config.outputFilename = e.target.value;
   });
+    config.outputFilename = outputFilenameEl.value;
   
   // Add event listeners for video size inputs
   const videoWidthEl = document.getElementById('videoWidth');
   const videoHeightEl = document.getElementById('videoHeight');
-  const preserveAspectRatioEl = document.getElementById('preserveAspectRatio');
   
   if (videoWidthEl) {
     videoWidthEl.addEventListener('change', (e) => {
       config.videoWidth = parseInt(e.target.value);
+    updateGraphvizSize();
     });
+    config.videoWidth = parseInt(videoWidthEl.value);
+    updateGraphvizSize();
   }
   
   if (videoHeightEl) {
     videoHeightEl.addEventListener('change', (e) => {
       config.videoHeight = parseInt(e.target.value);
+    updateGraphvizSize();
     });
-  }
-  
-  if (preserveAspectRatioEl) {
-    preserveAspectRatioEl.addEventListener('change', (e) => {
-      config.preserveAspectRatio = e.target.checked;
-    });
+    config.videoHeight = parseInt(videoHeightEl.value);
+    updateGraphvizSize();
   }
 }
 
@@ -132,7 +145,7 @@ function parseDotInput() {
   }
   
   // Split by separator or empty lines
-  dotGraphs = dotText.split(/\n\s*---\s*\n|\n{2,}/)
+  dotGraphs = dotText.split(/\n\s*---\s*\n/)
     .filter(graph => graph.trim())
     .map(graph => graph.trim().split('\n'));
   

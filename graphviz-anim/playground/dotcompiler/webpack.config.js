@@ -31,6 +31,7 @@ module.exports = {
         type: 'asset/resource',
       },
     ],
+    exprContextCritical: false,
   },
   plugins: [
     new HtmlWebpackPlugin({
