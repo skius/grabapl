@@ -7,4 +7,4 @@ edition = "2024"
 name = "grabapl"
 
 [dependencies]
-petgraph = "0.7.1"
+petgraph = { git = "https://github.com/petgraph/petgraph.git", rev = "e2b28e59d0c37a8db9037997e84cc483ca94afc9"}

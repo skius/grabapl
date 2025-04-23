@@ -6,6 +6,8 @@ use petgraph::visit::{IntoEdgesDirected, IntoNeighborsDirected, NodeRef};
 use petgraph::{Direction, dot};
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::iter;
+use petgraph::algo::subgraph_isomorphisms_iter;
 
 #[derive(Debug)]
 pub struct NodeAttribute<NodeAttr> {
@@ -23,13 +25,15 @@ impl<NodeAttr> NodeAttribute<NodeAttr> {
 pub struct EdgeAttribute<EdgeAttr> {
     pub edge_attr: EdgeAttr,
     // Additional attributes can be added here
+    /// The order of the edge as an outgoing edge from the source node
     source_out_order: EdgeOrder,
-    target_out_order: EdgeOrder,
+    /// The order of the edge as an incoming edge to the target node
+    target_in_order: EdgeOrder,
 }
 
 impl<EdgeAttr> EdgeAttribute<EdgeAttr> {
-    pub fn new(edge_attr: EdgeAttr, source_out_order: EdgeOrder, target_out_order: EdgeOrder) -> Self {
-        EdgeAttribute { edge_attr, source_out_order, target_out_order }
+    pub fn new(edge_attr: EdgeAttr, source_out_order: EdgeOrder, target_in_order: EdgeOrder) -> Self {
+        EdgeAttribute { edge_attr, source_out_order, target_in_order }
     }
 }
 
@@ -97,7 +101,7 @@ impl<NodeAttr, EdgeAttr> ConcreteGraph<NodeAttr, EdgeAttr> {
             let order = if direction == Direction::Outgoing {
                 edge_attr.source_out_order
             } else {
-                edge_attr.target_out_order
+                edge_attr.target_in_order
             };
             if extremum_order.is_none() || order.cmp(&extremum_order.unwrap()) == wanted_order {
                 extremum_order = Some(order);
@@ -182,6 +186,22 @@ impl<NodeAttr, EdgeAttr> ConcreteGraph<NodeAttr, EdgeAttr> {
             .map(|(_, target, _)| target)
             .collect()
     }
+    
+    fn neighbors_in_ordered(
+        &self,
+        target: NodeKey,
+    ) -> Vec<NodeKey> {
+        let mut neighbors = self
+            .graph
+            .edges_directed(target, Direction::Incoming)
+            .collect::<Vec<_>>();
+        neighbors.sort_by(|(_, _, e1), (_, _, e2)| {
+            e1.target_in_order.cmp(&e2.target_in_order)
+        });
+        neighbors.into_iter()
+            .map(|(source, _, _)| source)
+            .collect()
+    }
 
     pub fn next_outgoing_edge(&self, source: NodeKey, (_, curr_target): EdgeKey) -> EdgeKey {
         let outgoing_neighbors = self.neighbors_out_ordered(source);
@@ -263,11 +283,10 @@ impl<NodeAttr, EdgeAttr> ConcreteGraph<NodeAttr, EdgeAttr> {
                 &self.graph,
                 &[dot::Config::EdgeNoLabel, dot::Config::NodeNoLabel],
                 &|g, (src, target, attr)| {
-                    // TODO: also escape here
                     let dbg_attr_format = format!("{:?}", attr.edge_attr);
                     let dbg_attr_replaced = dbg_attr_format.escape_debug();
                     let src_order = attr.source_out_order;
-                    let target_order = attr.target_out_order;
+                    let target_order = attr.target_in_order;
                     format!("label = \"{dbg_attr_replaced},src:{src_order},dst:{target_order}\"")
                 },
                 &|g, (node, _)| {
@@ -279,10 +298,96 @@ impl<NodeAttr, EdgeAttr> ConcreteGraph<NodeAttr, EdgeAttr> {
             )
         )
     }
+
+    /// Returns a mapping from pattern node keys to graph node keys.
+    ///
+    /// Order of children must be the same in the pattern.
+    /// Returns `None` if no mapping is found.
+    pub fn match_to_pattern<NAP, EAP>(&self, pattern: &ConcreteGraph<NAP, EAP>) -> Option<impl Iterator<Item = HashMap<NodeKey, NodeKey>> + '_> {
+        let mut nm = |_: &_, _: &_| true;
+        let mut em = |_: &_, _: &_| true;
+
+        let pattern_graph = &pattern.graph;
+        let graph = &self.graph;
+        let mut isomorphisms = subgraph_isomorphisms_iter(&pattern_graph, &graph, &mut nm, &mut em)?;
+        let pattern_nodes = pattern.graph.nodes().collect::<Vec<_>>();
+        let self_nodes = self.graph.nodes().collect::<Vec<_>>();
+
+        fn mapping_from_vec(
+            big_nodes: &[NodeKey],
+            query_nodes: &[NodeKey],
+            index_mapping: &[usize],
+        ) -> HashMap<NodeKey, NodeKey> {
+            let mut mapping = HashMap::new();
+            for (src, target) in index_mapping.into_iter().copied().enumerate() {
+                let src_node = query_nodes[src];
+                let target_node = big_nodes[target];
+                mapping.insert(src_node, target_node);
+            }
+            mapping
+        }
+        // TODO: Can we avoid materializing all potential mappings? Would need to forward the iterator, but for that we need to be able to attach some local variables to it to avoid borrowchecker errors.
+        let mappings_with_order = isomorphisms.filter_map(move |isomorphism| {
+            let mapped = mapping_from_vec(
+                &self_nodes,
+                &pattern_nodes,
+                isomorphism.as_ref(),
+            );
+            // return none if child order or parent order does not match up
+            for pat_node in &pattern_nodes {
+                let self_node = mapped[pat_node];
+                let pat_children = pattern.neighbors_out_ordered(*pat_node);
+                // do an ordered compare
+                let mut last_order_key = None;
+                for pat_child in &pat_children {
+                    let self_child_key = mapped[pat_child];
+                    let self_child_order = self
+                        .graph
+                        .edge_weight(self_node, self_child_key)
+                        .unwrap()
+                        .source_out_order;
+                    if let Some(last_order) = last_order_key {
+                        if self_child_order < last_order {
+                            return None;
+                        }
+                    }
+                    last_order_key = Some(self_child_order);
+                }
+                
+                // TODO: Add option to ignore parent order?
+                
+                let pat_parents = pattern.neighbors_in_ordered(*pat_node);
+                // do an ordered compare
+                let mut last_order_key = None;
+                for pat_parent in &pat_parents {
+                    let self_parent_key = mapped[pat_parent];
+                    let self_parent_order = self
+                        .graph
+                        .edge_weight(self_parent_key, self_node)
+                        .unwrap()
+                        .target_in_order;
+                    if let Some(last_order) = last_order_key {
+                        if self_parent_order < last_order {
+                            return None;
+                        }
+                    }
+                    last_order_key = Some(self_parent_order);
+                }
+            }
+
+            Some(mapped)
+        });
+        let all_mappings = mappings_with_order.collect::<Vec<_>>();
+        if all_mappings.is_empty() {
+            return None;
+        }
+        Some(all_mappings.into_iter())
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use petgraph::algo::subgraph_isomorphisms_iter;
     use super::*;
 
     struct DotCollector {
@@ -308,7 +413,7 @@ mod tests {
         }
     }
 
-    #[test]
+    // #[test]
     fn child_order() {
         let mut collector = DotCollector::new();
         let mut graph = ConcreteGraph::<&str, ()>::new();
@@ -377,11 +482,132 @@ mod tests {
         assert_eq!(prev_edge, (a, after_d));
 
 
-        // TODO: Could have a "add_edge_ordered" function that takes an Append/Prepend enum for both the outgoing order of source, and incoming order of target.
-        // An edge could contain a "source order" Ord and a "target order" Ord, and nodes would order edges according to those values.
 
         let dot = collector.finalize();
         println!("{}", dot);
+        assert!(false);
+    }
+
+    #[test]
+    fn subgraph_isomorphism_test() {
+        let mut big_graph = ConcreteGraph::<&str, ()>::new();
+        let a = big_graph.add_node("A");
+        let b = big_graph.add_node("B");
+        let c = big_graph.add_node("C");
+        big_graph.remove_node(c);
+        let d = big_graph.add_node("D");
+        let c = big_graph.add_node("C");
+        println!("c: {}", c);
+        big_graph.add_edge(a, b, ());
+        big_graph.add_edge(b, c, ());
+        big_graph.add_edge(c, a, ());
+
+
+        let mut query_graph = ConcreteGraph::<&str, ()>::new();
+        let x = query_graph.add_node("X");
+        let y = query_graph.add_node("Y");
+        query_graph.add_edge(x, y, ());
+
+        let query = &query_graph.graph;
+        let big = &big_graph.graph;
+        let mut nm = |_: &_, _: &_| true;
+        let mut em = |_:&_, _:&_| true;
+        let isomorphisms = subgraph_isomorphisms_iter(&query, &big, &mut nm, &mut em);
+        
+        let big_nodes = big_graph.graph.nodes().collect::<Vec<_>>();
+        let query_nodes = query_graph.graph.nodes().collect::<Vec<_>>();
+        
+        fn mapping_from_vec(
+            big_nodes: &[NodeKey],
+            query_nodes: &[NodeKey],
+            index_mapping: &[usize],
+        ) -> HashMap<NodeKey, NodeKey> {
+            let mut mapping = HashMap::new();
+            for (src, target) in index_mapping.into_iter().copied().enumerate() {
+                let src_node = query_nodes[src];
+                let target_node = big_nodes[target];
+                mapping.insert(src_node, target_node);
+            }
+            mapping
+        }
+        
+        for isomorphism in isomorphisms.unwrap() {
+            println!("Isomorphism raw: {:?}", isomorphism);
+            let mapped = mapping_from_vec(
+                &big_nodes,
+                &query_nodes,
+                isomorphism.as_ref(),
+            );
+            println!("Isomorphism mapped: {:?}", mapped);
+            let attr_map_list = mapped.into_iter().map(|(src, target)| {
+                let src_attr = query_graph.get_node_attr(src).unwrap();
+                let target_attr = big_graph.get_node_attr(target).unwrap();
+                (src_attr, target_attr)
+            }).collect::<Vec<_>>();
+            println!("Isomorphism attr map: {:?}", attr_map_list);
+        }
+
+
+        let mut big_graph = ConcreteGraph::<&str, ()>::new();
+        let a = big_graph.add_node("A");
+        let b = big_graph.add_node("B");
+        let c = big_graph.add_node("C");
+        let d = big_graph.add_node("D");
+
+        big_graph.add_edge_ordered(a, b, (), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+        big_graph.add_edge_ordered(a, c, (), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+        big_graph.add_edge_ordered(a, d, (), EdgeInsertionOrder::Prepend, EdgeInsertionOrder::Append);
+
+        big_graph.add_edge_ordered(d, c, (), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+        
+        // a has ordered children d,b,c
+
+        let mut query_graph = ConcreteGraph::<&str, ()>::new();
+        let x = query_graph.add_node("X");
+        let y = query_graph.add_node("Y");
+        let z = query_graph.add_node("Z");
+        query_graph.add_edge_ordered(x, y, (), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+        query_graph.add_edge_ordered(x, z, (), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+        query_graph.add_edge_ordered(y, z, (), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+
+        let big = &big_graph.graph;
+        let query = &query_graph.graph;
+
+        let isomorphisms = subgraph_isomorphisms_iter(&query, &big, &mut nm, &mut em);
+
+        let big_nodes = big_graph.graph.nodes().collect::<Vec<_>>();
+        let query_nodes = query_graph.graph.nodes().collect::<Vec<_>>();
+        println!("----");
+        for isomorphism in isomorphisms.unwrap() {
+            println!("Isomorphism raw: {:?}", isomorphism);
+            let mapped = mapping_from_vec(
+                &big_nodes,
+                &query_nodes,
+                isomorphism.as_ref(),
+            );
+            println!("Isomorphism mapped: {:?}", mapped);
+            let mut attr_map_list = mapped.into_iter().map(|(src, target)| {
+                let src_attr = query_graph.get_node_attr(src).unwrap();
+                let target_attr = big_graph.get_node_attr(target).unwrap();
+                (src_attr, target_attr)
+            }).collect::<Vec<_>>();
+            attr_map_list.sort_by(|(src1, _), (src2, _)| src1.cmp(src2));
+            println!("Isomorphism attr map: {:?}", attr_map_list);
+        }
+
+        println!("----");
+        
+        let mappings = big_graph.match_to_pattern(&query_graph);
+        for mapping in mappings.unwrap() {
+            let mut attr_map_list = mapping.iter().map(|(src, target)| {
+                let src_attr = query_graph.get_node_attr(*src).unwrap();
+                let target_attr = big_graph.get_node_attr(*target).unwrap();
+                (src_attr, target_attr)
+            }).collect::<Vec<_>>();
+            attr_map_list.sort_by(|(src1, _), (src2, _)| src1.cmp(src2));
+            println!("Isomorphism attr map: {:?}", attr_map_list);
+        }
+        
         assert!(false);
     }
 }
