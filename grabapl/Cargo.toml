@@ -3,4 +3,8 @@ name = "grabapl"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "grabapl"
+
 [dependencies]
+petgraph = "0.7.1"
