@@ -1,145 +1,127 @@
 use std::collections::HashMap;
 use petgraph::Direction;
-use petgraph::prelude::{DiGraphMap, StableDiGraph};
+use petgraph::prelude::{DiGraphMap, GraphMap, StableDiGraph};
 use petgraph::stable_graph::{EdgeIndex, NodeIndex};
-use petgraph::visit::NodeRef;
+use petgraph::visit::{IntoEdgesDirected, IntoNeighborsDirected, NodeRef};
 
 pub struct NodeAttribute<NodeAttr> {
     pub node_attr: NodeAttr,
     // Additional attributes can be added here
-    node_idx: NodeIndex,
 }
 
 impl<NodeAttr> NodeAttribute<NodeAttr> {
-    pub fn new(node_attr: NodeAttr, node_idx: NodeIndex) -> Self {
-        NodeAttribute { node_attr, node_idx }
+    pub fn new(node_attr: NodeAttr) -> Self {
+        NodeAttribute { node_attr }
     }
 }
 
 pub struct EdgeAttribute<EdgeAttr> {
     pub edge_attr: EdgeAttr,
     // Additional attributes can be added here
-    edge_idx: EdgeIndex,
 }
 
 impl<EdgeAttr> EdgeAttribute<EdgeAttr> {
-    pub fn new(edge_attr: EdgeAttr, edge_index: EdgeIndex) -> Self {
-        EdgeAttribute { edge_attr, edge_idx: edge_index }
+    pub fn new(edge_attr: EdgeAttr) -> Self {
+        EdgeAttribute { edge_attr }
     }
 }
 
 type NodeKey = u32;
-type EdgeKey = u32;
+type EdgeKey = (NodeKey, NodeKey);
 
 pub struct ConcreteGraph<NodeAttr, EdgeAttr> {
-    graph: StableDiGraph<NodeKey, EdgeKey>,
+    graph: DiGraphMap<NodeKey, EdgeAttribute<EdgeAttr>>,
     max_node_key: NodeKey,
     node_attr_map: HashMap<NodeKey, NodeAttribute<NodeAttr>>,
-    max_edge_key: EdgeKey,
-    edge_attr_map: HashMap<EdgeKey, EdgeAttribute<EdgeAttr>>,
 }
 
 impl<NodeAttr, EdgeAttr> ConcreteGraph<NodeAttr, EdgeAttr> {
     pub fn new() -> Self {
         ConcreteGraph {
-            graph: StableDiGraph::new(),
+            graph: GraphMap::new(),
             max_node_key: 0,
             node_attr_map: HashMap::new(),
-            max_edge_key: 0,
-            edge_attr_map: HashMap::new(),
         }
     }
 
     pub fn add_node(&mut self, node_attr: NodeAttr) -> NodeKey {
         let node_key = self.max_node_key;
-        let idx = self.graph.add_node(node_key);
-        self.node_attr_map.insert(node_key, NodeAttribute::new(node_attr, idx));
+        let node_key = self.graph.add_node(node_key);
+        self.node_attr_map.insert(node_key, NodeAttribute::new(node_attr));
         self.max_node_key += 1;
         node_key
     }
-    
-    pub fn add_edge(&mut self, source: NodeKey, target: NodeKey, edge_attr: EdgeAttr) -> NodeKey {
-        let edge_key = self.max_edge_key;
-        let source_idx = self.node_attr_map.get(&source).expect("Source node not found").node_idx;
-        let target_idx = self.node_attr_map.get(&target).expect("Target node not found").node_idx;
-        let edge_idx = self.graph.add_edge(source_idx, target_idx, edge_key);
-        self.edge_attr_map.insert(edge_key, EdgeAttribute::new(edge_attr, edge_idx));
-        self.max_edge_key += 1;
-        edge_key
+
+    /// Returns the old `EdgeAttr` if it exists, otherwise returns `None`.
+    pub fn add_edge(&mut self, source: NodeKey, target: NodeKey, edge_attr: EdgeAttr) -> Option<EdgeAttr> {
+        let old_attr = self.graph.add_edge(source, target, EdgeAttribute::new(edge_attr));
+        old_attr.map(|attr| attr.edge_attr)
     }
     
-    fn outgoing_edge_keys_sorted(&self, source: NodeKey) -> Vec<EdgeKey> {
-        let source_idx = self.node_attr_map.get(&source).expect("Source node not found").node_idx;
-        let mut keys = self.graph.edges_directed(source_idx, Direction::Outgoing)
-            .map(|edge| *edge.weight())
-            .collect::<Vec<_>>();
-        keys.sort_unstable();
-        keys
+
+    pub fn next_outgoing_edge(&self, source: NodeKey, (_, curr_target): EdgeKey) -> EdgeKey {
+        let mut take_next = false;
+        for target in self.graph.neighbors_directed(source, Direction::Outgoing).cycle() {
+            if take_next {
+                return (source, target);
+            }
+            if target == curr_target {
+                take_next = true;
+            }
+        }
+        unreachable!("No edges found")
     }
-    
-    pub fn next_outgoing_edge(&self, source: NodeKey, curr_edge: EdgeKey) -> EdgeKey {
-        let all_edge_keys = self.outgoing_edge_keys_sorted(source);
-        let curr_edge_key_idx = all_edge_keys.iter().position(|&x| x == curr_edge).unwrap();
-        let next_edge_key_idx = curr_edge_key_idx + 1 % all_edge_keys.len();
-        all_edge_keys[next_edge_key_idx]
+
+    pub fn prev_outgoing_edge(&self, source: NodeKey, (_, curr_target): EdgeKey) -> EdgeKey {
+        let mut take_idx = None;
+        let neighbor_count = self.graph.neighbors_directed(source, Direction::Outgoing).count();
+        for (idx, target) in self.graph.neighbors_directed(source, Direction::Outgoing).enumerate().cycle() {
+            if take_idx == Some(idx) {
+                return (source, target);
+            }
+            if target == curr_target {
+                take_idx = Some((idx - 1 + neighbor_count) % neighbor_count);
+            }
+        }
+        unreachable!("No edges found")
     }
-    
-    pub fn prev_outgoing_edge(&self, source: NodeKey, curr_edge: EdgeKey) -> EdgeKey {
-        let all_edge_keys = self.outgoing_edge_keys_sorted(source);
-        let curr_edge_key_idx = all_edge_keys.iter().position(|&x| x == curr_edge).unwrap();
-        let prev_edge_key_idx = (curr_edge_key_idx + all_edge_keys.len() - 1) % all_edge_keys.len();
-        all_edge_keys[prev_edge_key_idx]
-    }
-    
+
     pub fn remove_node(&mut self, node_key: NodeKey) -> Option<NodeAttr> {
         if let Some(node_attr) = self.node_attr_map.remove(&node_key) {
-            for dir in [Direction::Incoming, Direction::Outgoing] {
-                for edge in self.graph.edges_directed(node_attr.node_idx, dir) {
-                    let key = edge.weight();
-                    self.edge_attr_map.remove(key);
-                }
-                self.graph.remove_node(node_attr.node_idx);
-            }
+            self.graph.remove_node(node_key);
             Some(node_attr.node_attr)
         } else {
             None
         }
     }
-    
+
     pub fn remove_edge_between(&mut self, source: NodeKey, target: NodeKey) -> Option<EdgeAttr> {
-        let source_idx = self.node_attr_map.get(&source).expect("Source node not found").node_idx;
-        let target_idx = self.node_attr_map.get(&target).expect("Target node not found").node_idx;
-        if let Some(edge_idx) = self.graph.find_edge(source_idx, target_idx) {
-            let edge_key = self.graph.edge_weight(edge_idx).expect("Edge not found");
-            self.remove_edge(*edge_key)
-        } else {
-            None
-        }
+        self.remove_edge((source, target))
     }
-    
-    pub fn remove_edge(&mut self, edge_key: EdgeKey) -> Option<EdgeAttr> {
-        if let Some(edge_attr) = self.edge_attr_map.remove(&edge_key) {
-            self.graph.remove_edge(edge_attr.edge_idx);
-            Some(edge_attr.edge_attr)
-        } else {
-            None
-        }
+
+    pub fn remove_edge(&mut self, (src, target): EdgeKey) -> Option<EdgeAttr> {
+        self.graph.remove_edge(src, target)
+            .map(|attr| attr.edge_attr)
     }
-    
-    pub fn get_edge_attr(&self, edge_key: EdgeKey) -> Option<&EdgeAttr> {
-        self.edge_attr_map.get(&edge_key).map(|attr| &attr.edge_attr)
+
+    pub fn get_edge_attr(&self, (src, target): EdgeKey) -> Option<&EdgeAttr> {
+        self.graph
+            .edge_weight(src, target)
+            .map(|attr| &attr.edge_attr)
     }
-    
-    pub fn get_mut_edge_attr(&mut self, edge_key: EdgeKey) -> Option<&mut EdgeAttr> {
-        self.edge_attr_map.get_mut(&edge_key).map(|attr| &mut attr.edge_attr)
+
+    pub fn get_mut_edge_attr(&mut self, (src, target): EdgeKey) -> Option<&mut EdgeAttr> {
+        self.graph
+            .edge_weight_mut(src, target)
+            .map(|attr| &mut attr.edge_attr)
     }
-    
+
     pub fn get_node_attr(&self, node_key: NodeKey) -> Option<&NodeAttr> {
         self.node_attr_map.get(&node_key).map(|attr| &attr.node_attr)
     }
-    
+
     pub fn get_mut_node_attr(&mut self, node_key: NodeKey) -> Option<&mut NodeAttr> {
         self.node_attr_map.get_mut(&node_key).map(|attr| &mut attr.node_attr)
     }
-    
+
 }
