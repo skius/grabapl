@@ -1,13 +1,123 @@
 use std::cmp::Ordering;
 use petgraph::dot::Dot;
 use petgraph::prelude::{DiGraphMap, GraphMap, StableDiGraph};
-use petgraph::stable_graph::{EdgeIndex, NodeIndex};
 use petgraph::visit::{IntoEdgesDirected, IntoNeighborsDirected, NodeRef};
 use petgraph::{Direction, dot};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::iter;
 use petgraph::algo::subgraph_isomorphisms_iter;
+
+pub trait PatternAttribute {
+    type Attr;
+    type Pattern;
+
+    fn matches(attr: &Self::Attr, pattern: &Self::Pattern) -> bool;
+}
+
+/// A marker for substitution in the graph.
+///
+/// Useful for programmatically defined operations to know the substitution of their input pattern.
+pub type SubstMarker = u32;
+
+pub struct WithSubstMarker<T> {
+    marker: SubstMarker,
+    value: T,
+}
+
+pub enum PatternKind {
+    Input,
+    Derived,
+}
+
+pub struct PatternWrapper<P> {
+    pattern: P,
+    marker: SubstMarker,
+    kind: PatternKind,
+}
+
+// TODO: maybe we could have an input builder? basically we want to have one connected component per input.
+// then we allow building an input graph with the builder, but the finalize method checks that we have exactly one input node
+// (actually we could enforce that statically via it being the entry point) and that it is in fact weakly connected (ie ignoring edge direction)
+// The input pattern for the Operation would then instead be a Vec of those input connected component patterns.
+
+// TODO: What if two separate connected components overlap in the substitution? this leads to 'node references' to some degree.
+// Probably only really bad if the 'shape' of that node changes while another reference to it expects something else. eg deleting the node or changing its type
+
+impl<P> PatternWrapper<P> {
+    pub fn new_input(pattern: P, marker: SubstMarker) -> Self {
+        PatternWrapper { pattern, marker, kind: PatternKind::Input }
+    }
+
+    pub fn new_derived(pattern: P, marker: SubstMarker) -> Self {
+        PatternWrapper { pattern, marker, kind: PatternKind::Derived }
+    }
+
+    pub fn get_pattern(&self) -> &P {
+        &self.pattern
+    }
+
+    pub fn get_marker(&self) -> SubstMarker {
+        self.marker
+    }
+
+    pub fn get_kind(&self) -> &PatternKind {
+        &self.kind
+    }
+}
+
+impl<T> WithSubstMarker<T> {
+    pub fn new(marker: SubstMarker, value: T) -> Self {
+        WithSubstMarker { marker, value }
+    }
+
+    pub fn get_value(&self) -> &T {
+        &self.value
+    }
+}
+
+/// A trait for graph operations.
+///
+/// The operation requires graphs with the given node and edge attribute types.
+pub trait Operation<NPA: PatternAttribute, EPA: PatternAttribute> {
+    /// The pattern to match against the graph.
+    fn input_pattern(&self) -> ConcreteGraph<WithSubstMarker<NPA::Pattern>, EPA::Pattern>;
+    fn apply(&mut self, graph: &mut ConcreteGraph<NPA::Attr, EPA::Attr>, subst: &HashMap<SubstMarker, NodeKey>) -> Result<(), String>;
+}
+
+impl<NA, EA> ConcreteGraph<NA, EA> {
+    pub fn run_operation<O, NPA, EPA>(&mut self, op: &mut O) -> Result<(), String>
+    where
+        O: Operation<NPA, EPA>,
+        NPA: PatternAttribute<Attr = NA>,
+        EPA: PatternAttribute<Attr = EA>,
+    {
+        let subst = {
+            let pattern = op.input_pattern();
+            let mut nm = |a: &NodeKey, b: &NodeKey| {
+                let a_attr = pattern.get_node_attr(*a).unwrap();
+                let b_attr = self.get_node_attr(*b).unwrap();
+                NPA::matches(b_attr, &a_attr.value)
+            };
+            let mut em = |a: &EdgeAttribute<EPA::Pattern>, b: &EdgeAttribute<EA>| {
+                EPA::matches(&b.edge_attr, &a.edge_attr)
+            };
+            let Some(mut mappings) = self.match_to_pattern(&pattern, &mut nm, &mut em) else {
+                return Err("No matching pattern found".to_string());
+            };
+            let mapping = mappings
+                .next()
+                .ok_or("Internal Error: No mapping found")?;
+            mapping
+                .iter()
+                .map(|(src, target)| (pattern.get_node_attr(*src).unwrap().marker, *target))
+                .collect::<HashMap<_, _>>()
+        };
+
+        op.apply(self, &subst)?;
+        Ok(())
+    }
+}
 
 #[derive(Debug)]
 pub struct NodeAttribute<NodeAttr> {
@@ -39,8 +149,8 @@ impl<EdgeAttr> EdgeAttribute<EdgeAttr> {
 
 type EdgeOrder = i32;
 
-type NodeKey = u32;
-type EdgeKey = (NodeKey, NodeKey);
+pub type NodeKey = u32;
+pub type EdgeKey = (NodeKey, NodeKey);
 
 #[derive(Debug, Copy, Clone)]
 pub enum EdgeInsertionOrder {
@@ -186,7 +296,7 @@ impl<NodeAttr, EdgeAttr> ConcreteGraph<NodeAttr, EdgeAttr> {
             .map(|(_, target, _)| target)
             .collect()
     }
-    
+
     fn neighbors_in_ordered(
         &self,
         target: NodeKey,
@@ -303,13 +413,17 @@ impl<NodeAttr, EdgeAttr> ConcreteGraph<NodeAttr, EdgeAttr> {
     ///
     /// Order of children must be the same in the pattern.
     /// Returns `None` if no mapping is found.
-    pub fn match_to_pattern<NAP, EAP>(&self, pattern: &ConcreteGraph<NAP, EAP>) -> Option<impl Iterator<Item = HashMap<NodeKey, NodeKey>> + '_> {
-        let mut nm = |_: &_, _: &_| true;
-        let mut em = |_: &_, _: &_| true;
+    pub fn match_to_pattern<NAP, EAP, NM, EM>(&self, pattern: &ConcreteGraph<NAP, EAP>, nm: &mut NM, em: &mut EM) -> Option<impl Iterator<Item = HashMap<NodeKey, NodeKey>> + '_>
+    where
+        NM: FnMut(&NodeKey, &NodeKey) -> bool,
+        EM: FnMut(&EdgeAttribute<EAP>, &EdgeAttribute<EdgeAttr>) -> bool,
+    {
+        // let mut nm = |_: &_, _: &_| true;
+        // let mut em = |_: &_, _: &_| true;
 
         let pattern_graph = &pattern.graph;
         let graph = &self.graph;
-        let mut isomorphisms = subgraph_isomorphisms_iter(&pattern_graph, &graph, &mut nm, &mut em)?;
+        let mut isomorphisms = subgraph_isomorphisms_iter(&pattern_graph, &graph, nm, em)?;
         let pattern_nodes = pattern.graph.nodes().collect::<Vec<_>>();
         let self_nodes = self.graph.nodes().collect::<Vec<_>>();
 
@@ -353,9 +467,9 @@ impl<NodeAttr, EdgeAttr> ConcreteGraph<NodeAttr, EdgeAttr> {
                     }
                     last_order_key = Some(self_child_order);
                 }
-                
+
                 // TODO: Add option to ignore parent order?
-                
+
                 let pat_parents = pattern.neighbors_in_ordered(*pat_node);
                 // do an ordered compare
                 let mut last_order_key = None;
@@ -385,33 +499,34 @@ impl<NodeAttr, EdgeAttr> ConcreteGraph<NodeAttr, EdgeAttr> {
     }
 }
 
+
+pub struct DotCollector {
+    dot: String,
+}
+
+impl DotCollector {
+    pub fn new() -> Self {
+        DotCollector {
+            dot: String::new(),
+        }
+    }
+
+    pub fn collect<NA: Debug, EA: Debug>(&mut self, graph: &ConcreteGraph<NA, EA>) {
+        if !self.dot.is_empty() {
+            self.dot.push_str("\n---\n");
+        }
+        self.dot.push_str(&graph.dot());
+    }
+
+    pub fn finalize(&self) -> String {
+        self.dot.clone()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use petgraph::algo::subgraph_isomorphisms_iter;
     use super::*;
-
-    struct DotCollector {
-        dot: String,
-    }
-
-    impl DotCollector {
-        fn new() -> Self {
-            DotCollector {
-                dot: String::new(),
-            }
-        }
-
-        fn collect(&mut self, graph: &ConcreteGraph<&str, ()>) {
-            if !self.dot.is_empty() {
-                self.dot.push_str("\n---\n");
-            }
-            self.dot.push_str(&graph.dot());
-        }
-
-        fn finalize(&self) -> String {
-            self.dot.clone()
-        }
-    }
 
     // #[test]
     fn child_order() {
@@ -559,7 +674,7 @@ mod tests {
         big_graph.add_edge_ordered(a, d, (), EdgeInsertionOrder::Prepend, EdgeInsertionOrder::Append);
 
         big_graph.add_edge_ordered(d, c, (), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
-        
+
         // a has ordered children d,b,c
 
         let mut query_graph = ConcreteGraph::<&str, ()>::new();
@@ -596,8 +711,8 @@ mod tests {
         }
 
         println!("----");
-        
-        let mappings = big_graph.match_to_pattern(&query_graph);
+
+        let mappings = big_graph.match_to_pattern(&query_graph, &mut nm, &mut em);
         for mapping in mappings.unwrap() {
             let mut attr_map_list = mapping.iter().map(|(src, target)| {
                 let src_attr = query_graph.get_node_attr(*src).unwrap();
