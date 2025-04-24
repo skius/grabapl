@@ -8,3 +8,10 @@ name = "grabapl"
 
 [dependencies]
 petgraph = { git = "https://github.com/petgraph/petgraph.git", rev = "e2b28e59d0c37a8db9037997e84cc483ca94afc9"}
+
+[dev-dependencies]
+criterion = "0.5.1"
+
+[[bench]]
+name = "isomorphism_find_single_node"
+harness = false
