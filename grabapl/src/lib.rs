@@ -1,3 +1,5 @@
+mod pattern_match;
+
 use std::cmp::Ordering;
 use petgraph::dot::Dot;
 use petgraph::prelude::{DiGraphMap, GraphMap, StableDiGraph};

@@ -1,8 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use petgraph::algo::subgraph_isomorphisms_iter;
+use petgraph::algo::{general_subgraph_monomorphisms_iter, subgraph_isomorphisms_iter};
 use petgraph::prelude::DiGraphMap;
 use std::hash::RandomState;
-use petgraph::algo::isomorphism::subgraph_isomorphisms_iter_with_partial_mapping;
+use petgraph::algo::isomorphism::general_subgraph_monomorphisms_iter_with_partial_mapping;
 use petgraph::data::{Build, DataMap};
 use petgraph::Direction;
 use petgraph::visit::{Data, EdgeCount, GetAdjacencyMatrix, GraphBase, GraphProp, GraphRef, IntoEdgeReferences, IntoEdges, IntoEdgesDirected, IntoNeighbors, IntoNeighborsDirected, NodeCompactIndexable, NodeCount, NodeIndexable};
@@ -150,19 +150,19 @@ impl<'a> IntoEdgesDirected for OneNodeReindexedGraph<'a> {
     }
 }
 
-fn match_with_input_mapping(query: &G, graph: &G, query_input_idx: u32, graph_input_idx: u32) {
-    let mut nm = |a: &u32, b: &u32| {
-        // if *a == query_input_idx {
-        //     // We only match the designed input node to the user specified graph input node
-        //     *b == graph_input_idx
-        // } else {
-        //     true
-        // }
-        true
+fn match_with_input_mapping<'a>(query: &'a G, graph: &'a G, query_input_idx: u32, graph_input_idx: u32, gen_all: bool) {
+    let mut nm = move |a: &u32, b: &u32| {
+        if *a == query_input_idx {
+            // We only match the designed input node to the user specified graph input node
+            *b == graph_input_idx
+        } else {
+            true
+        }
+        // true
     };
     let mut em = |_a: &(), _b: &()| true;
 
-    // let partial_mapping = [(query_input_idx, graph_input_idx)];
+    let partial_mapping = [(query_input_idx, graph_input_idx)];
     // let isos = subgraph_isomorphisms_iter_with_partial_mapping(&query, &graph, &mut nm, &mut em, &partial_mapping);
 
     // let query_wrapped = OneNodeReindexedGraph::new(query, query_input_idx as usize, 0);
@@ -170,12 +170,23 @@ fn match_with_input_mapping(query: &G, graph: &G, query_input_idx: u32, graph_in
     let query_wrapped = query;
     let graph_wrapped = graph;
 
-    let isos = subgraph_isomorphisms_iter(&query_wrapped, &graph_wrapped, &mut nm, &mut em);
+    // let isos = general_subgraph_monomorphisms_iter(&query_wrapped, &graph_wrapped, &mut nm, &mut em);
+    let isos = general_subgraph_monomorphisms_iter_with_partial_mapping(&query_wrapped, &graph_wrapped, &mut nm, &mut em, &partial_mapping);
     let mut isos = isos.unwrap();
-    black_box(isos.next().unwrap());
+    if gen_all {
+        let all = isos.collect::<Vec<_>>();
+        assert!(all.len() > 0);
+        black_box(all);
+    } else {
+        let first = isos.next().unwrap();
+        black_box(first);
+    }
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
+    let mut c = c.benchmark_group("group_with_config");
+    c.sample_size(10);
+
     let mut single_node_query = G::new();
     single_node_query.add_node(0);
 
@@ -195,10 +206,15 @@ fn criterion_benchmark(c: &mut Criterion) {
         c.bench_with_input(
             BenchmarkId::new("match_single_node", graph_input_idx), &graph_input_idx,
             |b, i| b.iter(|| {
-                match_with_input_mapping(black_box(&single_node_query), black_box(&graph), black_box(0), black_box(*i))
+                match_with_input_mapping(black_box(&single_node_query), black_box(&graph), black_box(0), black_box(*i), false)
             }),
         );
     }
+
+    // TODO: write a benchmark that compares with partial_mapping and without.
+    // In particular, make it check that a gen_all run immediately skips and does not try other input node mappings.
+    // Also make sure that the out edges etc are correctly stored in the state.
+    // Maybe remove the &mut from the state for all function that don't need it.
 
 
     let mut three_children_query_high_input = G::new();
@@ -215,23 +231,26 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     // uuuh do we need induced subgraphs?
     // OOPS! we do!!
-    three_children_query_high_input.add_edge(0, 1, ());
-    three_children_query_high_input.add_edge(1, 2, ());
-    three_children_query_high_input.add_edge(2, 0, ());
-    three_children_query_high_input.add_edge(0, 3, ());
-    three_children_query_high_input.add_edge(1, 3, ());
-    three_children_query_high_input.add_edge(2, 3, ());
-    three_children_query_high_input.add_edge(0, 2, ());
-    three_children_query_high_input.add_edge(2, 1, ());
-    three_children_query_high_input.add_edge(1, 0, ());
+    // three_children_query_high_input.add_edge(0, 1, ());
+    // three_children_query_high_input.add_edge(1, 2, ());
+    // three_children_query_high_input.add_edge(2, 0, ());
+    // three_children_query_high_input.add_edge(0, 3, ());
+    // three_children_query_high_input.add_edge(1, 3, ());
+    // three_children_query_high_input.add_edge(2, 3, ());
+    // three_children_query_high_input.add_edge(0, 2, ());
+    // three_children_query_high_input.add_edge(2, 1, ());
+    // three_children_query_high_input.add_edge(1, 0, ());
 
-    for graph_input_idx in [0, 10, 20, 50, 70, 99] {
-        c.bench_with_input(
-            BenchmarkId::new("match_three_children_high_query_input", graph_input_idx), &graph_input_idx,
-            |b, i| b.iter(|| {
-                match_with_input_mapping(black_box(&three_children_query_high_input), black_box(&graph), black_box(3), black_box(*i))
-            }),
-        );
+    for gen_all in [false, true] {
+        for graph_input_idx in [0, 10, 20, 50, 70, 99] {
+            let input = (gen_all, graph_input_idx);
+            c.bench_with_input(
+                BenchmarkId::new("match_three_children_high_query_input", format!("{:?}", input)), &input,
+                |b, (gen_all, i)| b.iter(|| {
+                    match_with_input_mapping(black_box(&three_children_query_high_input), black_box(&graph), black_box(3), black_box(*i), *gen_all)
+                }),
+            );
+        }
     }
 
     let mut three_children_query_low_input = G::new();
@@ -250,7 +269,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         c.bench_with_input(
             BenchmarkId::new("match_three_children_low_query_input", graph_input_idx), &graph_input_idx,
             |b, i| b.iter(|| {
-                match_with_input_mapping(black_box(&three_children_query_low_input), black_box(&graph), black_box(0), black_box(*i))
+                match_with_input_mapping(black_box(&three_children_query_low_input), black_box(&graph), black_box(0), black_box(*i), false)
             }),
         );
     }
@@ -283,7 +302,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         c.bench_with_input(
             BenchmarkId::new("match_path_10_high_query_input", graph_input_idx), &graph_input_idx,
             |b, i| b.iter(|| {
-                match_with_input_mapping(black_box(&path_10_high_query_input), black_box(&graph), black_box(9), black_box(*i))
+                match_with_input_mapping(black_box(&path_10_high_query_input), black_box(&graph), black_box(9), black_box(*i), false)
             }),
         );
     }
@@ -316,7 +335,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         c.bench_with_input(
             BenchmarkId::new("match_path_10_low_query_input", graph_input_idx), &graph_input_idx,
             |b, i| b.iter(|| {
-                match_with_input_mapping(black_box(&path_10_low_query_input), black_box(&graph), black_box(0), black_box(*i))
+                match_with_input_mapping(black_box(&path_10_low_query_input), black_box(&graph), black_box(0), black_box(*i), false)
             }),
         );
     }

@@ -16,3 +16,12 @@ criterion = "0.5.1"
 [[bench]]
 name = "isomorphism_find_single_node"
 harness = false
+
+[[bench]]
+name = "isomorphism_2"
+harness = false
+
+[[example]]
+name = "isomorphisms_partial"
+path = "examples/isomorphisms_partial.rs"
+
