@@ -2,11 +2,13 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::RandomState;
-use petgraph::{dot, Direction};
+use petgraph::{Direction};
 use petgraph::algo::{general_subgraph_monomorphisms_iter, subgraph_isomorphisms_iter};
 use petgraph::dot::Dot;
 use petgraph::graphmap::{DiGraphMap, GraphMap};
 use crate::{InputPattern, PatternAttributeMatcher};
+
+mod dot;
 
 #[derive(Debug, Clone)]
 pub struct NodeAttribute<NodeAttr> {
@@ -273,33 +275,6 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
             .map(|attr| &mut attr.node_attr)
     }
 
-    pub fn dot(&self) -> String
-    where
-        EdgeAttr: Debug,
-        NodeAttr: Debug,
-    {
-        format!(
-            "{:?}",
-            Dot::with_attr_getters(
-                &self.graph,
-                &[dot::Config::EdgeNoLabel, dot::Config::NodeNoLabel],
-                &|g, (src, target, attr)| {
-                    let dbg_attr_format = format!("{:?}", attr.edge_attr);
-                    let dbg_attr_replaced = dbg_attr_format.escape_debug();
-                    let src_order = attr.source_out_order;
-                    let target_order = attr.target_in_order;
-                    format!("label = \"{dbg_attr_replaced},src:{src_order},dst:{target_order}\"")
-                },
-                &|g, (node, _)| {
-                    let node_attr = self.node_attr_map.get(&node).unwrap();
-                    let dbg_attr_format = format!("{:?}", node_attr.node_attr);
-                    let dbg_attr_replaced = dbg_attr_format.escape_debug();
-                    format!("label = \"{node}|{dbg_attr_replaced}\"")
-                }
-            )
-        )
-    }
-
     /// Attempts to match the pattern to the graph on the specified inputs.
     ///
     /// `inputs` is the ordered list of concrete nodes from `self` that need to match up with `pattern.parameter_nodes`.
@@ -315,8 +290,8 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
     where
         NAP: PatternAttributeMatcher<Attr = NodeAttr>,
         EAP: PatternAttributeMatcher<Attr = EdgeAttr>,
-        // NM: FnMut(&NodeKey, &NodeKey) -> bool,
-        // EM: FnMut(&EdgeAttribute<EAP::Pattern>, &EdgeAttribute<EdgeAttr>) -> bool,
+    // NM: FnMut(&NodeKey, &NodeKey) -> bool,
+    // EM: FnMut(&EdgeAttribute<EAP::Pattern>, &EdgeAttribute<EdgeAttr>) -> bool,
     {
         let mut expected_input_mapping = HashMap::new();
         for (&param_marker, &input_node) in pattern

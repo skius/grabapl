@@ -1,6 +1,7 @@
 mod pattern_match;
 mod graph;
 
+
 use std::cmp::Ordering;
 use petgraph::dot::Dot;
 use petgraph::prelude::{DiGraphMap, GraphMap, StableDiGraph};
@@ -146,28 +147,7 @@ impl<NA: Clone, EA: Clone> Graph<NA, EA> {
 }
 
 
-pub struct DotCollector {
-    dot: String,
-}
 
-impl DotCollector {
-    pub fn new() -> Self {
-        DotCollector {
-            dot: String::new(),
-        }
-    }
-
-    pub fn collect<NA: Debug, EA: Debug>(&mut self, graph: &Graph<NA, EA>) {
-        if !self.dot.is_empty() {
-            self.dot.push_str("\n---\n");
-        }
-        self.dot.push_str(&graph.dot());
-    }
-
-    pub fn finalize(&self) -> String {
-        self.dot.clone()
-    }
-}
 
 #[cfg(test)]
 mod tests {
