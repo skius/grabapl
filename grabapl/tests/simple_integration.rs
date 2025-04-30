@@ -8,7 +8,7 @@ enum EdgePattern {
 
 struct EdgeMatcher;
 
-impl PatternAttribute for EdgeMatcher {
+impl PatternAttributeMatcher for EdgeMatcher {
     type Attr = String;
     type Pattern = EdgePattern;
 
@@ -21,7 +21,7 @@ impl PatternAttribute for EdgeMatcher {
 }
 
 struct I32Matcher;
-impl PatternAttribute for I32Matcher {
+impl PatternAttributeMatcher for I32Matcher {
     type Attr = i32;
     type Pattern = ();
 
@@ -38,17 +38,17 @@ enum BuiltinOperation {
 }
 
 impl Operation<I32Matcher, EdgeMatcher> for BuiltinOperation {
-    fn input_pattern(&self) -> ConcreteGraph<WithSubstMarker<()>, EdgePattern> {
+    fn input_pattern(&self) -> Graph<WithSubstMarker<()>, EdgePattern> {
         match self {
-            BuiltinOperation::AddNode => ConcreteGraph::new(),
+            BuiltinOperation::AddNode => Graph::new(),
             BuiltinOperation::AppendChild => {
                 // Expects a child
-                let mut g = ConcreteGraph::new();
+                let mut g = Graph::new();
                 g.add_node(WithSubstMarker::new(0, ()));
                 g
             },
             BuiltinOperation::IndexCycle => {
-                let mut g = ConcreteGraph::new();
+                let mut g = Graph::new();
                 let a = g.add_node(WithSubstMarker::new(0, ()));
                 let b = g.add_node(WithSubstMarker::new(1, ()));
                 let c = g.add_node(WithSubstMarker::new(2, ()));
@@ -62,7 +62,7 @@ impl Operation<I32Matcher, EdgeMatcher> for BuiltinOperation {
     
     fn apply(
         &mut self,
-        graph: &mut ConcreteGraph<i32, String>,
+        graph: &mut Graph<i32, String>,
         subst: &HashMap<SubstMarker, NodeKey>
     ) -> Result<(), String> {
         match self {
@@ -93,7 +93,7 @@ impl Operation<I32Matcher, EdgeMatcher> for BuiltinOperation {
 fn simple_integration() {
     let mut collector = DotCollector::new();
 
-    let mut graph: ConcreteGraph<i32, String> = ConcreteGraph::new();
+    let mut graph: Graph<i32, String> = Graph::new();
     collector.collect(&graph);
     
     let mut op = BuiltinOperation::AddNode;
