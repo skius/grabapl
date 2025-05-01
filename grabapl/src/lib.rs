@@ -17,6 +17,12 @@ pub use graph::Graph;
 pub use graph::EdgeInsertionOrder;
 pub use graph::NodeKey;
 pub use graph::EdgeKey;
+pub use graph::DotCollector;
+pub use graph::OperationContext;
+pub use graph::OperationId;
+pub use graph::Semantics;
+pub use graph::operation::TrueMatcher;
+
 
 pub trait PatternAttributeMatcher {
     type Attr;

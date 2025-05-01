@@ -1,9 +1,77 @@
+use std::collections::HashMap;
+use std::marker::PhantomData;
+use crate::{Graph, PatternAttributeMatcher};
+
+// TODO: move pattern matching around?
+
+pub struct TrueMatcher<A, P> {
+    phantom_data: PhantomData<(A, P)>,
+}
+
+impl<A, P> TrueMatcher<A, P> {
+    pub fn new() -> Self {
+        TrueMatcher {
+            phantom_data: PhantomData,
+        }
+    }
+}
+
+impl<A, P> PatternAttributeMatcher for TrueMatcher<A, P> {
+    type Attr = A;
+    type Pattern = P;
+
+    fn matches(_attr: &Self::Attr, _pattern: &Self::Pattern) -> bool {
+        true
+    }
+}
+
+/// Contains available operations
+pub struct OperationContext<B> {
+    builtins: HashMap<OperationId, B>,
+    custom: HashMap<OperationId, UserDefinedOperation>,
+}
+
+/// Defines the semantics of a client implementation.
+pub trait Semantics {
+    /// A data graph's nodes contain values of this type.
+    type NodeAttribute;
+    /// An operation can define patterns for nodes using this type.
+    type NodePattern;
+    /// A data graph's edges contain values of this type.
+    type EdgeAttribute;
+    /// An operation can define patterns for edges using this type.
+    type EdgePattern;
+    /// The specific matching process for nodes.
+    type NodeAttributeMatcher: PatternAttributeMatcher<Attr = Self::NodeAttribute, Pattern = Self::NodePattern>;
+    /// The specific matching process for edges.
+    type EdgeAttributeMatcher: PatternAttributeMatcher<Attr = Self::EdgeAttribute, Pattern = Self::EdgePattern>;
+
+    /// Builtin operations are of this type.
+    type BuiltinOperation;
+
+}
+
+pub fn new_data_graph<S: Semantics>() -> Graph<S::NodeAttribute, S::EdgeAttribute> {
+    Graph::new()
+}
+
+
+enum Operation<B> {
+    Builtin(B),
+    Custom(UserDefinedOperation),
+}
+
+// TODO: Builtin operations should be a trait that follows some generic pattern of mutating the graph
+// also, 
+
+
+
 // A 'custom'/user-defined operation
-struct Function {
+struct UserDefinedOperation {
     instructions: Vec<Instruction>
 }
 
-type OperationId = u32;
+pub type OperationId = u32;
 
 enum Instruction {
     Operation(OperationId),
@@ -34,10 +102,17 @@ struct QueryTaken {
 //  2. ExpectEdge(Parent, Child)
 // But "Parent" is a free variable here, hence must somehow come from the query input. Unsure how yet.
 enum PatternChange {
-    ExpectNode(NodePattern),
-    ExpectEdge(EdgePattern),
+    ExpectNode(NodeChangePattern),
+    ExpectEdge(EdgeChangePattern),
 }
 
-enum NodePattern {
+enum NodeChangePattern {
+    // TODO: data to name the new node? And do we need a default node attr?
     NewNode,
 }
+
+enum EdgeChangePattern {
+    // TODO: data to refer to which nodes get connected? And do we need a default edge attr?
+    NewEdge,
+}
+

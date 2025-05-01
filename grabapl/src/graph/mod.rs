@@ -10,8 +10,12 @@ use petgraph::visit::NodeIndexable;
 use crate::{InputPattern, PatternAttributeMatcher};
 
 mod dot;
-mod operation;
-mod gemini;
+pub(crate) mod operation;
+
+pub use dot::DotCollector;
+pub use operation::OperationContext;
+pub use operation::OperationId;
+pub use operation::Semantics;
 
 #[derive(Debug, Clone)]
 pub struct NodeAttribute<NodeAttr> {
