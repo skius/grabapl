@@ -6,9 +6,12 @@ use petgraph::{Direction};
 use petgraph::algo::{general_subgraph_monomorphisms_iter, subgraph_isomorphisms_iter};
 use petgraph::dot::Dot;
 use petgraph::graphmap::{DiGraphMap, GraphMap};
+use petgraph::visit::NodeIndexable;
 use crate::{InputPattern, PatternAttributeMatcher};
 
 mod dot;
+mod operation;
+mod gemini;
 
 #[derive(Debug, Clone)]
 pub struct NodeAttribute<NodeAttr> {
@@ -330,14 +333,11 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
             &mut em,
         )?;
 
-        let pattern_nodes = pattern.pattern_graph.graph.nodes().collect::<Vec<_>>();
-        let self_nodes = self.graph.nodes().collect::<Vec<_>>();
-
         let mapping_from_vec = |index_mapping: &[usize]| {
             let mut mapping = HashMap::new();
             for (src, target) in index_mapping.iter().copied().enumerate() {
-                let src_node = pattern_nodes[src];
-                let target_node = self_nodes[target];
+                let src_node = pattern.pattern_graph.graph.from_index(src);
+                let target_node = self.graph.from_index(target);
                 mapping.insert(src_node, target_node);
             }
             mapping
