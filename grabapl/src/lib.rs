@@ -24,6 +24,25 @@ pub use graph::Semantics;
 pub use graph::operation::TrueMatcher;
 
 
+// TODO: should we instead have an 'AbstractAttribute' as well, and the pattern matcher works on that?
+// From every concrete graph you can get its abstract graph. That should be like the type. 
+// so a concrete i32 attr node (say '5') would for example get mapped into a 'i32' node.
+// Hmm. Then you would have operations acting on both concrete values but also abstract values.
+// For example, an operation might take i32 i32 ANY as input, and turn it into i32 i32 i32. (this is the example of arg3 <- arg1 + arg2)
+// this should be statically describable?
+// But queries also need a place here. A pattern query definitely returns a node with abstract values, since that's
+// the same 'language' that operation inputs speak where patterns are also used, but how do we do a query like "has equal values"?
+// such a query would need to be on the concrete level.
+// Aah - this does not matter. Queries at runtime typically dont result in value changes, instead they influence the control flow.
+// So, 'concrete' queries and 'pattern' queries are unified:
+// 1. statically, a query takes as input some abstract graph. This needs to match its expected pattern, so it works exactly like operations.
+//    * then, it can produce static changes to the abstract graph, per branch.
+//    * This is 'typed', so like a match arm in rust.
+// 2. at runtime, these inputs are then replaced by concrete values.
+//    * the concrete values decide where the control flow goes and in case of match-arms, which concrete
+//      values to bind.
+// In other words, a query needs both a concrete and an abstract implementation. I think this is the same as operations: they need the concrete changes, and the abstract pattern + if they change any types
+
 pub trait PatternAttributeMatcher {
     type Attr;
     type Pattern;
