@@ -1,4 +1,4 @@
-use crate::{Graph, PatternAttributeMatcher};
+use crate::{Graph, NodeKey, OperationInput, PatternAttributeMatcher};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
@@ -66,7 +66,10 @@ pub fn new_data_graph<S: Semantics>() -> Graph<S::NodeAttribute, S::EdgeAttribut
 pub fn run_operation<S: Semantics>(
     g: &mut Graph<S::NodeAttribute, S::EdgeAttribute>,
     op_ctx: &OperationContext<S::BuiltinOperation>,
+    op: OperationId,
+    selected_inputs: Vec<NodeKey>,
 ) {
+    
 }
 
 enum Operation<B> {
