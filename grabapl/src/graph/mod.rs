@@ -1,13 +1,13 @@
-use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::hash::RandomState;
-use petgraph::{Direction};
+use crate::{InputPattern, PatternAttributeMatcher};
+use petgraph::Direction;
 use petgraph::algo::{general_subgraph_monomorphisms_iter, subgraph_isomorphisms_iter};
 use petgraph::dot::Dot;
 use petgraph::graphmap::{DiGraphMap, GraphMap};
 use petgraph::visit::NodeIndexable;
-use crate::{InputPattern, PatternAttributeMatcher};
+use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::hash::RandomState;
 
 mod dot;
 pub mod operation;
@@ -40,8 +40,16 @@ pub struct EdgeAttribute<EdgeAttr> {
 }
 
 impl<EdgeAttr> EdgeAttribute<EdgeAttr> {
-    pub fn new(edge_attr: EdgeAttr, source_out_order: EdgeOrder, target_in_order: EdgeOrder) -> Self {
-        EdgeAttribute { edge_attr, source_out_order, target_in_order }
+    pub fn new(
+        edge_attr: EdgeAttr,
+        source_out_order: EdgeOrder,
+        target_in_order: EdgeOrder,
+    ) -> Self {
+        EdgeAttribute {
+            edge_attr,
+            source_out_order,
+            target_in_order,
+        }
     }
 }
 
@@ -120,34 +128,21 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
         extremum_order
     }
 
-    fn max_out_edge_order_key(
-        &self,
-        source: NodeKey,
-    ) -> Option<EdgeOrder> {
+    fn max_out_edge_order_key(&self, source: NodeKey) -> Option<EdgeOrder> {
         self.extremum_out_edge_order_key(source, Ordering::Greater, Direction::Outgoing)
     }
 
-    fn min_out_edge_order_key(
-        &self,
-        source: NodeKey,
-    ) -> Option<EdgeOrder> {
+    fn min_out_edge_order_key(&self, source: NodeKey) -> Option<EdgeOrder> {
         self.extremum_out_edge_order_key(source, Ordering::Less, Direction::Outgoing)
     }
 
-    fn max_in_edge_order_key(
-        &self,
-        target: NodeKey,
-    ) -> Option<EdgeOrder> {
+    fn max_in_edge_order_key(&self, target: NodeKey) -> Option<EdgeOrder> {
         self.extremum_out_edge_order_key(target, Ordering::Greater, Direction::Incoming)
     }
 
-    fn min_in_edge_order_key(
-        &self,
-        target: NodeKey,
-    ) -> Option<EdgeOrder> {
+    fn min_in_edge_order_key(&self, target: NodeKey) -> Option<EdgeOrder> {
         self.extremum_out_edge_order_key(target, Ordering::Less, Direction::Incoming)
     }
-
 
     pub fn add_edge_ordered(
         &mut self,
@@ -157,60 +152,39 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
         source_out_order: EdgeInsertionOrder,
         target_in_order: EdgeInsertionOrder,
     ) -> Option<EdgeAttr> {
-
         let new_out_order = match source_out_order {
-            EdgeInsertionOrder::Append => {
-                self.max_out_edge_order_key(source).unwrap_or(0) + 1
-            }
-            EdgeInsertionOrder::Prepend => {
-                self.min_out_edge_order_key(source).unwrap_or(0) - 1
-            }
+            EdgeInsertionOrder::Append => self.max_out_edge_order_key(source).unwrap_or(0) + 1,
+            EdgeInsertionOrder::Prepend => self.min_out_edge_order_key(source).unwrap_or(0) - 1,
         };
         let new_in_order = match target_in_order {
-            EdgeInsertionOrder::Append => {
-                self.max_in_edge_order_key(target).unwrap_or(0) + 1
-            }
-            EdgeInsertionOrder::Prepend => {
-                self.min_in_edge_order_key(target).unwrap_or(0) - 1
-            }
+            EdgeInsertionOrder::Append => self.max_in_edge_order_key(target).unwrap_or(0) + 1,
+            EdgeInsertionOrder::Prepend => self.min_in_edge_order_key(target).unwrap_or(0) - 1,
         };
 
-        let old_attr = self
-            .graph
-            .add_edge(source, target, EdgeAttribute::new(edge_attr, new_out_order, new_in_order));
+        let old_attr = self.graph.add_edge(
+            source,
+            target,
+            EdgeAttribute::new(edge_attr, new_out_order, new_in_order),
+        );
         old_attr.map(|attr| attr.edge_attr)
     }
 
-    fn neighbors_out_ordered(
-        &self,
-        source: NodeKey,
-    ) -> Vec<NodeKey> {
+    fn neighbors_out_ordered(&self, source: NodeKey) -> Vec<NodeKey> {
         let mut neighbors = self
             .graph
             .edges_directed(source, Direction::Outgoing)
             .collect::<Vec<_>>();
-        neighbors.sort_by(|(_, _, e1), (_, _, e2)| {
-            e1.source_out_order.cmp(&e2.source_out_order)
-        });
-        neighbors.into_iter()
-            .map(|(_, target, _)| target)
-            .collect()
+        neighbors.sort_by(|(_, _, e1), (_, _, e2)| e1.source_out_order.cmp(&e2.source_out_order));
+        neighbors.into_iter().map(|(_, target, _)| target).collect()
     }
 
-    fn neighbors_in_ordered(
-        &self,
-        target: NodeKey,
-    ) -> Vec<NodeKey> {
+    fn neighbors_in_ordered(&self, target: NodeKey) -> Vec<NodeKey> {
         let mut neighbors = self
             .graph
             .edges_directed(target, Direction::Incoming)
             .collect::<Vec<_>>();
-        neighbors.sort_by(|(_, _, e1), (_, _, e2)| {
-            e1.target_in_order.cmp(&e2.target_in_order)
-        });
-        neighbors.into_iter()
-            .map(|(source, _, _)| source)
-            .collect()
+        neighbors.sort_by(|(_, _, e1), (_, _, e2)| e1.target_in_order.cmp(&e2.target_in_order));
+        neighbors.into_iter().map(|(source, _, _)| source).collect()
     }
 
     pub fn next_outgoing_edge(&self, source: NodeKey, (_, curr_target): EdgeKey) -> EdgeKey {
@@ -297,15 +271,11 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
     where
         NAP: PatternAttributeMatcher<Attr = NodeAttr>,
         EAP: PatternAttributeMatcher<Attr = EdgeAttr>,
-    // NM: FnMut(&NodeKey, &NodeKey) -> bool,
-    // EM: FnMut(&EdgeAttribute<EAP::Pattern>, &EdgeAttribute<EdgeAttr>) -> bool,
+        // NM: FnMut(&NodeKey, &NodeKey) -> bool,
+        // EM: FnMut(&EdgeAttribute<EAP::Pattern>, &EdgeAttribute<EdgeAttr>) -> bool,
     {
         let mut expected_input_mapping = HashMap::new();
-        for (&param_marker, &input_node) in pattern
-            .parameter_nodes
-            .iter()
-            .zip(inputs.iter())
-        {
+        for (&param_marker, &input_node) in pattern.parameter_nodes.iter().zip(inputs.iter()) {
             let param_node = pattern
                 .subst_to_node_keys
                 .get(&param_marker)
@@ -318,24 +288,24 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
                 return *expected_data == *data_node;
             }
 
-            let pat_attr = &pattern.pattern_graph.get_node_attr(*pat_node).unwrap().value;
+            let pat_attr = &pattern
+                .pattern_graph
+                .get_node_attr(*pat_node)
+                .unwrap()
+                .value;
             let data_attr = self.get_node_attr(*data_node).unwrap();
             NAP::matches(&data_attr, &pat_attr)
         };
 
-        let mut em = |pat_edge: &EdgeAttribute<EAP::Pattern>, data_edge: &EdgeAttribute<EdgeAttr>| {
+        let mut em = |pat_edge: &EdgeAttribute<EAP::Pattern>,
+                      data_edge: &EdgeAttribute<EdgeAttr>| {
             EAP::matches(&data_edge.edge_attr, &pat_edge.edge_attr)
         };
 
         let self_ref = &self.graph;
         let pattern_ref = &pattern.pattern_graph.graph;
 
-        let isos = general_subgraph_monomorphisms_iter(
-            &pattern_ref,
-            &self_ref,
-            &mut nm,
-            &mut em,
-        )?;
+        let isos = general_subgraph_monomorphisms_iter(&pattern_ref, &self_ref, &mut nm, &mut em)?;
 
         let mapping_from_vec = |index_mapping: &[usize]| {
             let mut mapping = HashMap::new();
@@ -359,9 +329,9 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-    use petgraph::algo::subgraph_isomorphisms_iter;
     use super::*;
+    use petgraph::algo::subgraph_isomorphisms_iter;
+    use std::collections::HashMap;
 
     #[test]
     fn subgraph_isomorphism_test() {
@@ -377,7 +347,6 @@ mod tests {
         big_graph.add_edge(b, c, ());
         big_graph.add_edge(c, a, ());
 
-
         let mut query_graph = Graph::<&str, ()>::new();
         let x = query_graph.add_node("X");
         let y = query_graph.add_node("Y");
@@ -386,7 +355,7 @@ mod tests {
         let query = &query_graph.graph;
         let big = &big_graph.graph;
         let mut nm = |_: &_, _: &_| true;
-        let mut em = |_:&_, _:&_| true;
+        let mut em = |_: &_, _: &_| true;
         let isomorphisms = subgraph_isomorphisms_iter(&query, &big, &mut nm, &mut em);
 
         let big_nodes = big_graph.graph.nodes().collect::<Vec<_>>();
@@ -408,20 +377,18 @@ mod tests {
 
         for isomorphism in isomorphisms.unwrap() {
             println!("Isomorphism raw: {:?}", isomorphism);
-            let mapped = mapping_from_vec(
-                &big_nodes,
-                &query_nodes,
-                isomorphism.as_ref(),
-            );
+            let mapped = mapping_from_vec(&big_nodes, &query_nodes, isomorphism.as_ref());
             println!("Isomorphism mapped: {:?}", mapped);
-            let attr_map_list = mapped.into_iter().map(|(src, target)| {
-                let src_attr = query_graph.get_node_attr(src).unwrap();
-                let target_attr = big_graph.get_node_attr(target).unwrap();
-                (src_attr, target_attr)
-            }).collect::<Vec<_>>();
+            let attr_map_list = mapped
+                .into_iter()
+                .map(|(src, target)| {
+                    let src_attr = query_graph.get_node_attr(src).unwrap();
+                    let target_attr = big_graph.get_node_attr(target).unwrap();
+                    (src_attr, target_attr)
+                })
+                .collect::<Vec<_>>();
             println!("Isomorphism attr map: {:?}", attr_map_list);
         }
-
 
         let mut big_graph = Graph::<&str, ()>::new();
         let a = big_graph.add_node("A");
@@ -429,11 +396,35 @@ mod tests {
         let c = big_graph.add_node("C");
         let d = big_graph.add_node("D");
 
-        big_graph.add_edge_ordered(a, b, (), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
-        big_graph.add_edge_ordered(a, c, (), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
-        big_graph.add_edge_ordered(a, d, (), EdgeInsertionOrder::Prepend, EdgeInsertionOrder::Append);
+        big_graph.add_edge_ordered(
+            a,
+            b,
+            (),
+            EdgeInsertionOrder::Append,
+            EdgeInsertionOrder::Append,
+        );
+        big_graph.add_edge_ordered(
+            a,
+            c,
+            (),
+            EdgeInsertionOrder::Append,
+            EdgeInsertionOrder::Append,
+        );
+        big_graph.add_edge_ordered(
+            a,
+            d,
+            (),
+            EdgeInsertionOrder::Prepend,
+            EdgeInsertionOrder::Append,
+        );
 
-        big_graph.add_edge_ordered(d, c, (), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+        big_graph.add_edge_ordered(
+            d,
+            c,
+            (),
+            EdgeInsertionOrder::Append,
+            EdgeInsertionOrder::Append,
+        );
 
         // a has ordered children d,b,c
 
@@ -441,9 +432,27 @@ mod tests {
         let x = query_graph.add_node("X");
         let y = query_graph.add_node("Y");
         let z = query_graph.add_node("Z");
-        query_graph.add_edge_ordered(x, y, (), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
-        query_graph.add_edge_ordered(x, z, (), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
-        query_graph.add_edge_ordered(y, z, (), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+        query_graph.add_edge_ordered(
+            x,
+            y,
+            (),
+            EdgeInsertionOrder::Append,
+            EdgeInsertionOrder::Append,
+        );
+        query_graph.add_edge_ordered(
+            x,
+            z,
+            (),
+            EdgeInsertionOrder::Append,
+            EdgeInsertionOrder::Append,
+        );
+        query_graph.add_edge_ordered(
+            y,
+            z,
+            (),
+            EdgeInsertionOrder::Append,
+            EdgeInsertionOrder::Append,
+        );
 
         let big = &big_graph.graph;
         let query = &query_graph.graph;
@@ -455,17 +464,16 @@ mod tests {
         println!("----");
         for isomorphism in isomorphisms.unwrap() {
             println!("Isomorphism raw: {:?}", isomorphism);
-            let mapped = mapping_from_vec(
-                &big_nodes,
-                &query_nodes,
-                isomorphism.as_ref(),
-            );
+            let mapped = mapping_from_vec(&big_nodes, &query_nodes, isomorphism.as_ref());
             println!("Isomorphism mapped: {:?}", mapped);
-            let mut attr_map_list = mapped.into_iter().map(|(src, target)| {
-                let src_attr = query_graph.get_node_attr(src).unwrap();
-                let target_attr = big_graph.get_node_attr(target).unwrap();
-                (src_attr, target_attr)
-            }).collect::<Vec<_>>();
+            let mut attr_map_list = mapped
+                .into_iter()
+                .map(|(src, target)| {
+                    let src_attr = query_graph.get_node_attr(src).unwrap();
+                    let target_attr = big_graph.get_node_attr(target).unwrap();
+                    (src_attr, target_attr)
+                })
+                .collect::<Vec<_>>();
             attr_map_list.sort_by(|(src1, _), (src2, _)| src1.cmp(src2));
             println!("Isomorphism attr map: {:?}", attr_map_list);
         }
@@ -474,11 +482,14 @@ mod tests {
 
         let mappings = big_graph.match_to_pattern(&query_graph, &mut nm, &mut em);
         for mapping in mappings.unwrap() {
-            let mut attr_map_list = mapping.iter().map(|(src, target)| {
-                let src_attr = query_graph.get_node_attr(*src).unwrap();
-                let target_attr = big_graph.get_node_attr(*target).unwrap();
-                (src_attr, target_attr)
-            }).collect::<Vec<_>>();
+            let mut attr_map_list = mapping
+                .iter()
+                .map(|(src, target)| {
+                    let src_attr = query_graph.get_node_attr(*src).unwrap();
+                    let target_attr = big_graph.get_node_attr(*target).unwrap();
+                    (src_attr, target_attr)
+                })
+                .collect::<Vec<_>>();
             attr_map_list.sort_by(|(src1, _), (src2, _)| src1.cmp(src2));
             println!("Isomorphism attr map: {:?}", attr_map_list);
         }

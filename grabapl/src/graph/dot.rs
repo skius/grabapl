@@ -1,7 +1,7 @@
-use std::fmt::Debug;
+use crate::Graph;
 use petgraph::dot;
 use petgraph::dot::Dot;
-use crate::Graph;
+use std::fmt::Debug;
 
 impl<NA: Debug, EA: Debug> Graph<NA, EA> {
     pub fn dot(&self) -> String
@@ -38,9 +38,7 @@ pub struct DotCollector {
 
 impl DotCollector {
     pub fn new() -> Self {
-        DotCollector {
-            dot: String::new(),
-        }
+        DotCollector { dot: String::new() }
     }
 
     pub fn collect<NA: Debug, EA: Debug>(&mut self, graph: &Graph<NA, EA>) {

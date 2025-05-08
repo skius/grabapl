@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use grabapl::*;
+use std::collections::HashMap;
 
 enum EdgePattern {
     Wildcard,
@@ -46,7 +46,7 @@ impl Operation<I32Matcher, EdgeMatcher> for BuiltinOperation {
                 let mut g = Graph::new();
                 g.add_node(WithSubstMarker::new(0, ()));
                 g
-            },
+            }
             BuiltinOperation::IndexCycle => {
                 let mut g = Graph::new();
                 let a = g.add_node(WithSubstMarker::new(0, ()));
@@ -59,11 +59,11 @@ impl Operation<I32Matcher, EdgeMatcher> for BuiltinOperation {
             }
         }
     }
-    
+
     fn apply(
         &mut self,
         graph: &mut Graph<i32, String>,
-        subst: &HashMap<SubstMarker, NodeKey>
+        subst: &HashMap<SubstMarker, NodeKey>,
     ) -> Result<(), String> {
         match self {
             BuiltinOperation::AddNode => {
@@ -95,19 +95,18 @@ fn simple_integration() {
 
     let mut graph: Graph<i32, String> = Graph::new();
     collector.collect(&graph);
-    
+
     let mut op = BuiltinOperation::AddNode;
     graph.run_operation(&mut op).unwrap();
     collector.collect(&graph);
-    
+
     let mut op = BuiltinOperation::AddNode;
     graph.run_operation(&mut op).unwrap();
     collector.collect(&graph);
-    
+
     let mut op = BuiltinOperation::AppendChild;
     graph.run_operation(&mut op).unwrap();
 
-    
     // TODO: oops. Probably need to add another wrapper for the pattern that defines actual "input" nodes.
     // Run operation would then take input nodes explicitly. We could probably leverage the 'node matcher'
     // functionality to require matching inputs in the pattern to the passed inputs.

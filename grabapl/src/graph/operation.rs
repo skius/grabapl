@@ -1,6 +1,6 @@
+use crate::{Graph, PatternAttributeMatcher};
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use crate::{Graph, PatternAttributeMatcher};
 
 // TODO: move pattern matching around?
 
@@ -57,15 +57,16 @@ pub trait Semantics {
 
     /// Builtin operations are of this type.
     type BuiltinOperation;
-
 }
 
 pub fn new_data_graph<S: Semantics>() -> Graph<S::NodeAttribute, S::EdgeAttribute> {
     Graph::new()
 }
 
-pub fn run_operation<S: Semantics>(g: &mut Graph<S::NodeAttribute, S::EdgeAttribute>, op_ctx: &OperationContext<S::BuiltinOperation>) {
-    
+pub fn run_operation<S: Semantics>(
+    g: &mut Graph<S::NodeAttribute, S::EdgeAttribute>,
+    op_ctx: &OperationContext<S::BuiltinOperation>,
+) {
 }
 
 enum Operation<B> {
@@ -74,13 +75,11 @@ enum Operation<B> {
 }
 
 // TODO: Builtin operations should be a trait that follows some generic pattern of mutating the graph
-// also, 
-
-
+// also,
 
 // A 'custom'/user-defined operation
 struct UserDefinedOperation {
-    instructions: Vec<Instruction>
+    instructions: Vec<Instruction>,
 }
 
 pub type OperationId = u32;
@@ -127,4 +126,3 @@ enum EdgeChangePattern {
     // TODO: data to refer to which nodes get connected? And do we need a default edge attr?
     NewEdge,
 }
-

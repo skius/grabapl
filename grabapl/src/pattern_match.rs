@@ -1,8 +1,5 @@
 use std::num::NonZeroI32;
 
-
-
-
 type LocalEdgeId = u32;
 
 struct Edge {

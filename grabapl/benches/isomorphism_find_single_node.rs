@@ -1,11 +1,15 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use petgraph::algo::{general_subgraph_monomorphisms_iter, subgraph_isomorphisms_iter};
-use petgraph::prelude::DiGraphMap;
-use std::hash::RandomState;
-use petgraph::algo::isomorphism::general_subgraph_monomorphisms_iter_with_partial_mapping;
-use petgraph::data::{Build, DataMap};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use petgraph::Direction;
-use petgraph::visit::{Data, EdgeCount, GetAdjacencyMatrix, GraphBase, GraphProp, GraphRef, IntoEdgeReferences, IntoEdges, IntoEdgesDirected, IntoNeighbors, IntoNeighborsDirected, NodeCompactIndexable, NodeCount, NodeIndexable};
+use petgraph::algo::isomorphism::general_subgraph_monomorphisms_iter_with_partial_mapping;
+use petgraph::algo::{general_subgraph_monomorphisms_iter, subgraph_isomorphisms_iter};
+use petgraph::data::{Build, DataMap};
+use petgraph::prelude::DiGraphMap;
+use petgraph::visit::{
+    Data, EdgeCount, GetAdjacencyMatrix, GraphBase, GraphProp, GraphRef, IntoEdgeReferences,
+    IntoEdges, IntoEdgesDirected, IntoNeighbors, IntoNeighborsDirected, NodeCompactIndexable,
+    NodeCount, NodeIndexable,
+};
+use std::hash::RandomState;
 
 type G = DiGraphMap<u32, (), RandomState>;
 
@@ -91,7 +95,12 @@ impl<'a> GetAdjacencyMatrix for OneNodeReindexedGraph<'a> {
         self.g.adjacency_matrix()
     }
 
-    fn is_adjacent(self: &Self, matrix: &Self::AdjMatrix, a: Self::NodeId, b: Self::NodeId) -> bool {
+    fn is_adjacent(
+        self: &Self,
+        matrix: &Self::AdjMatrix,
+        a: Self::NodeId,
+        b: Self::NodeId,
+    ) -> bool {
         <G as GetAdjacencyMatrix>::is_adjacent(self.g, matrix, a, b)
     }
 }
@@ -104,10 +113,7 @@ impl<'a> GraphProp for OneNodeReindexedGraph<'a> {
     }
 }
 
-
-impl<'a> GraphRef for OneNodeReindexedGraph<'a> {
-
-}
+impl<'a> GraphRef for OneNodeReindexedGraph<'a> {}
 
 impl<'a> IntoEdgeReferences for OneNodeReindexedGraph<'a> {
     type EdgeRef = <&'a G as IntoEdgeReferences>::EdgeRef;
@@ -150,7 +156,13 @@ impl<'a> IntoEdgesDirected for OneNodeReindexedGraph<'a> {
     }
 }
 
-fn match_with_input_mapping<'a>(query: &'a G, graph: &'a G, query_input_idx: u32, graph_input_idx: u32, gen_all: bool) {
+fn match_with_input_mapping<'a>(
+    query: &'a G,
+    graph: &'a G,
+    query_input_idx: u32,
+    graph_input_idx: u32,
+    gen_all: bool,
+) {
     let mut nm = move |a: &u32, b: &u32| {
         if *a == query_input_idx {
             // We only match the designed input node to the user specified graph input node
@@ -171,7 +183,13 @@ fn match_with_input_mapping<'a>(query: &'a G, graph: &'a G, query_input_idx: u32
     let graph_wrapped = graph;
 
     // let isos = general_subgraph_monomorphisms_iter(&query_wrapped, &graph_wrapped, &mut nm, &mut em);
-    let isos = general_subgraph_monomorphisms_iter_with_partial_mapping(&query_wrapped, &graph_wrapped, &mut nm, &mut em, &partial_mapping);
+    let isos = general_subgraph_monomorphisms_iter_with_partial_mapping(
+        &query_wrapped,
+        &graph_wrapped,
+        &mut nm,
+        &mut em,
+        &partial_mapping,
+    );
     let mut isos = isos.unwrap();
     if gen_all {
         let all = isos.collect::<Vec<_>>();
@@ -204,10 +222,19 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     for graph_input_idx in [0, 10, 20, 50, 70, 99] {
         c.bench_with_input(
-            BenchmarkId::new("match_single_node", graph_input_idx), &graph_input_idx,
-            |b, i| b.iter(|| {
-                match_with_input_mapping(black_box(&single_node_query), black_box(&graph), black_box(0), black_box(*i), false)
-            }),
+            BenchmarkId::new("match_single_node", graph_input_idx),
+            &graph_input_idx,
+            |b, i| {
+                b.iter(|| {
+                    match_with_input_mapping(
+                        black_box(&single_node_query),
+                        black_box(&graph),
+                        black_box(0),
+                        black_box(*i),
+                        false,
+                    )
+                })
+            },
         );
     }
 
@@ -215,7 +242,6 @@ fn criterion_benchmark(c: &mut Criterion) {
     // In particular, make it check that a gen_all run immediately skips and does not try other input node mappings.
     // Also make sure that the out edges etc are correctly stored in the state.
     // Maybe remove the &mut from the state for all function that don't need it.
-
 
     let mut three_children_query_high_input = G::new();
     // children of the input node
@@ -245,10 +271,22 @@ fn criterion_benchmark(c: &mut Criterion) {
         for graph_input_idx in [0, 10, 20, 50, 70, 99] {
             let input = (gen_all, graph_input_idx);
             c.bench_with_input(
-                BenchmarkId::new("match_three_children_high_query_input", format!("{:?}", input)), &input,
-                |b, (gen_all, i)| b.iter(|| {
-                    match_with_input_mapping(black_box(&three_children_query_high_input), black_box(&graph), black_box(3), black_box(*i), *gen_all)
-                }),
+                BenchmarkId::new(
+                    "match_three_children_high_query_input",
+                    format!("{:?}", input),
+                ),
+                &input,
+                |b, (gen_all, i)| {
+                    b.iter(|| {
+                        match_with_input_mapping(
+                            black_box(&three_children_query_high_input),
+                            black_box(&graph),
+                            black_box(3),
+                            black_box(*i),
+                            *gen_all,
+                        )
+                    })
+                },
             );
         }
     }
@@ -267,10 +305,19 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     for graph_input_idx in [0, 10, 20, 50, 70, 99] {
         c.bench_with_input(
-            BenchmarkId::new("match_three_children_low_query_input", graph_input_idx), &graph_input_idx,
-            |b, i| b.iter(|| {
-                match_with_input_mapping(black_box(&three_children_query_low_input), black_box(&graph), black_box(0), black_box(*i), false)
-            }),
+            BenchmarkId::new("match_three_children_low_query_input", graph_input_idx),
+            &graph_input_idx,
+            |b, i| {
+                b.iter(|| {
+                    match_with_input_mapping(
+                        black_box(&three_children_query_low_input),
+                        black_box(&graph),
+                        black_box(0),
+                        black_box(*i),
+                        false,
+                    )
+                })
+            },
         );
     }
 
@@ -300,10 +347,19 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     for graph_input_idx in [0, 10, 20, 50, 70, 99] {
         c.bench_with_input(
-            BenchmarkId::new("match_path_10_high_query_input", graph_input_idx), &graph_input_idx,
-            |b, i| b.iter(|| {
-                match_with_input_mapping(black_box(&path_10_high_query_input), black_box(&graph), black_box(9), black_box(*i), false)
-            }),
+            BenchmarkId::new("match_path_10_high_query_input", graph_input_idx),
+            &graph_input_idx,
+            |b, i| {
+                b.iter(|| {
+                    match_with_input_mapping(
+                        black_box(&path_10_high_query_input),
+                        black_box(&graph),
+                        black_box(9),
+                        black_box(*i),
+                        false,
+                    )
+                })
+            },
         );
     }
 
@@ -333,10 +389,19 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     for graph_input_idx in [0, 10, 20, 50, 70, 99] {
         c.bench_with_input(
-            BenchmarkId::new("match_path_10_low_query_input", graph_input_idx), &graph_input_idx,
-            |b, i| b.iter(|| {
-                match_with_input_mapping(black_box(&path_10_low_query_input), black_box(&graph), black_box(0), black_box(*i), false)
-            }),
+            BenchmarkId::new("match_path_10_low_query_input", graph_input_idx),
+            &graph_input_idx,
+            |b, i| {
+                b.iter(|| {
+                    match_with_input_mapping(
+                        black_box(&path_10_low_query_input),
+                        black_box(&graph),
+                        black_box(0),
+                        black_box(*i),
+                        false,
+                    )
+                })
+            },
         );
     }
 }

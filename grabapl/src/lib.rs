@@ -1,31 +1,29 @@
-pub mod pattern_match;
 pub mod graph;
+pub mod pattern_match;
 
-
-use std::cmp::Ordering;
+use crate::graph::*;
+use petgraph::algo::subgraph_isomorphisms_iter;
 use petgraph::dot::Dot;
 use petgraph::prelude::{DiGraphMap, GraphMap, StableDiGraph};
 use petgraph::visit::{IntoEdgesDirected, IntoNeighborsDirected, NodeRef};
 use petgraph::{Direction, dot};
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::iter;
-use petgraph::algo::subgraph_isomorphisms_iter;
-use crate::graph::*;
 
-pub use graph::Graph;
-pub use graph::EdgeInsertionOrder;
-pub use graph::NodeKey;
-pub use graph::EdgeKey;
 pub use graph::DotCollector;
+pub use graph::EdgeInsertionOrder;
+pub use graph::EdgeKey;
+pub use graph::Graph;
+pub use graph::NodeKey;
 pub use graph::OperationContext;
 pub use graph::OperationId;
 pub use graph::Semantics;
 pub use graph::operation::TrueMatcher;
 
-
 // TODO: should we instead have an 'AbstractAttribute' as well, and the pattern matcher works on that?
-// From every concrete graph you can get its abstract graph. That should be like the type. 
+// From every concrete graph you can get its abstract graph. That should be like the type.
 // so a concrete i32 attr node (say '5') would for example get mapped into a 'i32' node.
 // Hmm. Then you would have operations acting on both concrete values but also abstract values.
 // For example, an operation might take i32 i32 ANY as input, and turn it into i32 i32 i32. (this is the example of arg3 <- arg1 + arg2)
@@ -81,11 +79,19 @@ pub struct PatternWrapper<P> {
 
 impl<P> PatternWrapper<P> {
     pub fn new_input(pattern: P, marker: SubstMarker) -> Self {
-        PatternWrapper { pattern, marker, kind: PatternKind::Input }
+        PatternWrapper {
+            pattern,
+            marker,
+            kind: PatternKind::Input,
+        }
     }
 
     pub fn new_derived(pattern: P, marker: SubstMarker) -> Self {
-        PatternWrapper { pattern, marker, kind: PatternKind::Derived }
+        PatternWrapper {
+            pattern,
+            marker,
+            kind: PatternKind::Derived,
+        }
     }
 
     pub fn get_pattern(&self) -> &P {
@@ -128,11 +134,19 @@ pub struct OperationInput<NA, EA> {
 pub trait Operation<NPA: PatternAttributeMatcher, EPA: PatternAttributeMatcher> {
     /// The pattern to match against the graph.
     fn input_pattern(&self) -> InputPattern<NPA, EPA>;
-    fn apply(&mut self, input: &mut OperationInput<NPA::Attr, EPA::Attr>, subst: &HashMap<SubstMarker, NodeKey>) -> Result<(), String>;
+    fn apply(
+        &mut self,
+        input: &mut OperationInput<NPA::Attr, EPA::Attr>,
+        subst: &HashMap<SubstMarker, NodeKey>,
+    ) -> Result<(), String>;
 }
 
 impl<NA: Clone, EA: Clone> Graph<NA, EA> {
-    pub fn run_operation<O, NPA, EPA>(&mut self, selected_inputs: Vec<NodeKey>, op: &mut O) -> Result<(), String>
+    pub fn run_operation<O, NPA, EPA>(
+        &mut self,
+        selected_inputs: Vec<NodeKey>,
+        op: &mut O,
+    ) -> Result<(), String>
     where
         O: Operation<NPA, EPA>,
         NPA: PatternAttributeMatcher<Attr = NA>,
@@ -151,9 +165,7 @@ impl<NA: Clone, EA: Clone> Graph<NA, EA> {
             let Some(mut mappings) = self.match_to_pattern(&pattern, &mut nm, &mut em) else {
                 return Err("No matching pattern found".to_string());
             };
-            let mapping = mappings
-                .next()
-                .ok_or("Internal Error: No mapping found")?;
+            let mapping = mappings.next().ok_or("Internal Error: No mapping found")?;
             mapping
                 .iter()
                 .map(|(src, target)| (pattern.get_node_attr(*src).unwrap().marker, *target))
@@ -171,19 +183,15 @@ impl<NA: Clone, EA: Clone> Graph<NA, EA> {
     }
 }
 
-
-
-
 #[cfg(test)]
 mod tests {
-    use petgraph::algo::subgraph_isomorphisms_iter;
     use super::*;
+    use petgraph::algo::subgraph_isomorphisms_iter;
 
     // #[test]
     fn child_order() {
         let mut collector = DotCollector::new();
         let mut graph = Graph::<&str, ()>::new();
-
 
         macro_rules! c {
             () => {
@@ -200,54 +208,64 @@ mod tests {
         graph.add_edge(a, b, ());
         c!();
 
-        let next_edge = graph.next_outgoing_edge(a, (a,b));
+        let next_edge = graph.next_outgoing_edge(a, (a, b));
         assert_eq!(next_edge, (a, b));
 
-        let prev_edge = graph.prev_outgoing_edge(a, (a,b));
+        let prev_edge = graph.prev_outgoing_edge(a, (a, b));
         assert_eq!(prev_edge, (a, b));
 
         let c = graph.add_node("foo");
         c!();
         graph.add_edge(a, c, ());
         c!();
-        let next_edge = graph.next_outgoing_edge(a, (a,b));
+        let next_edge = graph.next_outgoing_edge(a, (a, b));
         assert_eq!(next_edge, (a, c));
-        let prev_edge = graph.prev_outgoing_edge(a, (a,c));
+        let prev_edge = graph.prev_outgoing_edge(a, (a, c));
         assert_eq!(prev_edge, (a, b));
-        let prev_edge = graph.prev_outgoing_edge(a, (a,b));
+        let prev_edge = graph.prev_outgoing_edge(a, (a, b));
         assert_eq!(prev_edge, (a, c));
 
         let d = graph.add_node("bar");
         c!();
         graph.add_edge(a, d, ());
         c!();
-        let next_edge = graph.next_outgoing_edge(a, (a,c));
+        let next_edge = graph.next_outgoing_edge(a, (a, c));
         assert_eq!(next_edge, (a, d));
-        let next_edge = graph.next_outgoing_edge(a, (a,d));
+        let next_edge = graph.next_outgoing_edge(a, (a, d));
         assert_eq!(next_edge, (a, b));
-        let prev_edge = graph.prev_outgoing_edge(a, (a,b));
+        let prev_edge = graph.prev_outgoing_edge(a, (a, b));
         assert_eq!(prev_edge, (a, d));
 
         let before_b = graph.add_node("before_b");
         c!();
-        graph.add_edge_ordered(a, before_b, (), EdgeInsertionOrder::Prepend, EdgeInsertionOrder::Append);
+        graph.add_edge_ordered(
+            a,
+            before_b,
+            (),
+            EdgeInsertionOrder::Prepend,
+            EdgeInsertionOrder::Append,
+        );
         c!();
 
         let after_d = graph.add_node("after_d");
         c!();
-        graph.add_edge_ordered(a, after_d, (), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+        graph.add_edge_ordered(
+            a,
+            after_d,
+            (),
+            EdgeInsertionOrder::Append,
+            EdgeInsertionOrder::Append,
+        );
         c!();
 
-        let next_edge = graph.next_outgoing_edge(a, (a,b));
+        let next_edge = graph.next_outgoing_edge(a, (a, b));
         assert_eq!(next_edge, (a, c));
-        let prev_edge = graph.prev_outgoing_edge(a, (a,b));
+        let prev_edge = graph.prev_outgoing_edge(a, (a, b));
         assert_eq!(prev_edge, (a, before_b));
-        let next_edge = graph.next_outgoing_edge(a, (a,d));
+        let next_edge = graph.next_outgoing_edge(a, (a, d));
         assert_eq!(next_edge, (a, after_d));
-        let prev_edge = graph.prev_outgoing_edge(a, (a,before_b));
+        let prev_edge = graph.prev_outgoing_edge(a, (a, before_b));
         assert_eq!(prev_edge, (a, after_d));
-
-
 
         let dot = collector.finalize();
         println!("{}", dot);

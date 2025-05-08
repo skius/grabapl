@@ -1,12 +1,19 @@
-use std::hash::RandomState;
-use criterion::{black_box, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, black_box};
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::algo::isomorphism::general_subgraph_monomorphisms_iter_with_partial_mapping;
 use petgraph::graphmap::DiGraphMap;
+use std::hash::RandomState;
 
 type G = DiGraphMap<u32, (), RandomState>;
 
-fn match_with_input_mapping<'a>(query: &'a G, graph: &'a G, query_input_idx: u32, graph_input_idx: u32, gen_all: bool, partial: bool) {
+fn match_with_input_mapping<'a>(
+    query: &'a G,
+    graph: &'a G,
+    query_input_idx: u32,
+    graph_input_idx: u32,
+    gen_all: bool,
+    partial: bool,
+) {
     let mut nm = move |a: &u32, b: &u32| {
         if *a == query_input_idx {
             // We only match the designed input node to the user specified graph input node
@@ -34,14 +41,21 @@ fn match_with_input_mapping<'a>(query: &'a G, graph: &'a G, query_input_idx: u32
                 println!("First mapping:\n{:?}", first);
                 black_box(first);
             }
-        }
+        };
     }
 
     if partial {
-        let isos = general_subgraph_monomorphisms_iter_with_partial_mapping(&query_wrapped, &graph_wrapped, &mut nm, &mut em, &partial_mapping);
+        let isos = general_subgraph_monomorphisms_iter_with_partial_mapping(
+            &query_wrapped,
+            &graph_wrapped,
+            &mut nm,
+            &mut em,
+            &partial_mapping,
+        );
         handle_iter!(isos.unwrap());
     } else {
-        let isos = general_subgraph_monomorphisms_iter(&query_wrapped, &graph_wrapped, &mut nm, &mut em);
+        let isos =
+            general_subgraph_monomorphisms_iter(&query_wrapped, &graph_wrapped, &mut nm, &mut em);
         handle_iter!(isos.unwrap());
     };
 }
@@ -70,7 +84,6 @@ fn main() {
         query_low.add_node(2);
         query_low.add_node(3);
 
-
         query_low.add_edge(0, 1, ());
         query_low.add_edge(0, 2, ());
         query_low.add_edge(0, 3, ());
@@ -81,7 +94,10 @@ fn main() {
         for partial in [false, true] {
             for gen_all in [true] {
                 for graph_input_idx in [99] {
-                    println!("Running: {},gidx:{},p:{},ga:{}", qkind, graph_input_idx, partial, gen_all);
+                    println!(
+                        "Running: {},gidx:{},p:{},ga:{}",
+                        qkind, graph_input_idx, partial, gen_all
+                    );
                     // Generate the data graph. It is a complete graph, except for the input node which only has the desired amount of children.
                     // That means the number of expected output mappings should just be the number of permutations on 3 children.
 
@@ -118,10 +134,16 @@ fn main() {
                         assert!(g.edge_weight(99, 3).is_none());
                     }
 
-                    match_with_input_mapping(black_box(&qg), black_box(&g), black_box(qi), black_box(graph_input_idx), gen_all, partial);
+                    match_with_input_mapping(
+                        black_box(&qg),
+                        black_box(&g),
+                        black_box(qi),
+                        black_box(graph_input_idx),
+                        gen_all,
+                        partial,
+                    );
                 }
             }
         }
     }
-
 }

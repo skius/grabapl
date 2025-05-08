@@ -1,6 +1,6 @@
-use std::hash::RandomState;
 use petgraph::algo::isomorphism::subgraph_isomorphisms_iter_with_partial_mapping;
 use petgraph::graphmap::DiGraphMap;
+use std::hash::RandomState;
 
 type G = DiGraphMap<u32, (), RandomState>;
 
@@ -28,21 +28,23 @@ fn iso_partial_mapping() {
             }
         }
     }
-    
+
     // We want node '3' in query to map to '50' in target.
     let mut partial_mapping = [(3, 50)];
-    
-    let mut nm = |_:&_, _:&_| {
-        true
-    };
-    let mut em = |_:&_, _:&_| {
-        true
-    };
-    
+
+    let mut nm = |_: &_, _: &_| true;
+    let mut em = |_: &_, _: &_| true;
+
     let query_ref = &query;
     let target_ref = &target;
-    
-    let isos = subgraph_isomorphisms_iter_with_partial_mapping(&query_ref, &target_ref, &mut nm, &mut em, &partial_mapping);
+
+    let isos = subgraph_isomorphisms_iter_with_partial_mapping(
+        &query_ref,
+        &target_ref,
+        &mut nm,
+        &mut em,
+        &partial_mapping,
+    );
     let mut isos = isos.unwrap();
     let first = isos.next();
     let first = first.unwrap();

@@ -1,5 +1,5 @@
-use grabapl::{DotCollector, Semantics, TrueMatcher};
 use grabapl::graph::operation::new_data_graph;
+use grabapl::{DotCollector, Semantics, TrueMatcher};
 
 struct SampleSemantics;
 
@@ -41,15 +41,10 @@ enum BuiltinOperation {
 #[test]
 fn test() {
     let mut dot_collector = DotCollector::new();
-    
+
     let mut g = new_data_graph::<SampleSemantics>();
     dot_collector.collect(&g);
     let a = g.add_node(1);
     let b = g.add_node(2);
     g.add_edge(a, b, "edge".to_string());
-    
-    
-    
-    
-    
 }
