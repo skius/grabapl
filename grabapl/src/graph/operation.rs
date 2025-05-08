@@ -31,15 +31,24 @@ pub struct OperationContext<B> {
     custom: HashMap<OperationId, UserDefinedOperation>,
 }
 
+/// Returns the corresponding abstract value/type for a given concrete value.
+pub trait ToAbstract<B> {
+    fn to_abstract(&self) -> B;
+}
+
 /// Defines the semantics of a client implementation.
 pub trait Semantics {
     /// A data graph's nodes contain values of this type.
-    type NodeAttribute;
+    /// PL analogy: values.
+    type NodeAttribute: ToAbstract<Self::NodePattern>;
     /// An operation can define patterns for nodes using this type.
+    /// PL analogy: types.
     type NodePattern;
     /// A data graph's edges contain values of this type.
-    type EdgeAttribute;
+    /// PL analogy: values.
+    type EdgeAttribute: ToAbstract<Self::EdgePattern>;
     /// An operation can define patterns for edges using this type.
+    /// PL analogy: types.
     type EdgePattern;
     /// The specific matching process for nodes.
     type NodeAttributeMatcher: PatternAttributeMatcher<Attr = Self::NodeAttribute, Pattern = Self::NodePattern>;
@@ -55,6 +64,9 @@ pub fn new_data_graph<S: Semantics>() -> Graph<S::NodeAttribute, S::EdgeAttribut
     Graph::new()
 }
 
+pub fn run_operation<S: Semantics>(g: &mut Graph<S::NodeAttribute, S::EdgeAttribute>, op_ctx: &OperationContext<S::BuiltinOperation>) {
+    
+}
 
 enum Operation<B> {
     Builtin(B),

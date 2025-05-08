@@ -1,5 +1,5 @@
-mod pattern_match;
-mod graph;
+pub mod pattern_match;
+pub mod graph;
 
 
 use std::cmp::Ordering;

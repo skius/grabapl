@@ -10,7 +10,7 @@ use petgraph::visit::NodeIndexable;
 use crate::{InputPattern, PatternAttributeMatcher};
 
 mod dot;
-pub(crate) mod operation;
+pub mod operation;
 
 pub use dot::DotCollector;
 pub use operation::OperationContext;
