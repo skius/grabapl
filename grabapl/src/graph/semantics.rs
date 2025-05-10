@@ -3,12 +3,12 @@ use crate::Graph;
 use crate::graph::{EdgeAttribute, NodeAttribute};
 use crate::graph::operation::BuiltinOperation;
 
-/// Returns the corresponding abstract value/type for a given concrete value.
-pub trait ToAbstract {
-    type Abstract;
-
-    fn to_abstract(&self) -> Self::Abstract;
-}
+// /// Returns the corresponding abstract value/type for a given concrete value.
+// pub trait ToAbstract {
+//     type Abstract;
+// 
+//     fn to_abstract(&self) -> Self::Abstract;
+// }
 
 /// This matcher always returns true.
 #[derive(Default)]
@@ -37,13 +37,13 @@ pub trait AbstractMatcher {
 pub trait Semantics {
     /// A data graph's nodes contain values of this type.
     /// PL analogy: values.
-    type NodeConcrete: ToAbstract<Abstract = Self::NodeAbstract>;
+    type NodeConcrete;
     /// An operation can define patterns for nodes using this type.
     /// PL analogy: types.
     type NodeAbstract;
     /// A data graph's edges contain values of this type.
     /// PL analogy: values.
-    type EdgeConcrete: ToAbstract<Abstract = Self::EdgeAbstract>;
+    type EdgeConcrete;
     /// An operation can define patterns for edges using this type.
     /// PL analogy: types.
     type EdgeAbstract;

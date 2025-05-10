@@ -27,6 +27,30 @@ pub struct OperationContext<B> {
     custom: HashMap<OperationId, UserDefinedOperation>,
 }
 
+impl<B> OperationContext<B> {
+    pub fn new() -> Self {
+        OperationContext {
+            builtins: HashMap::new(),
+            custom: HashMap::new(),
+        }
+    }
+    
+    pub fn from_builtins(builtins: HashMap<OperationId, B>) -> Self {
+        OperationContext {
+            builtins,
+            custom: HashMap::new(),
+        }
+    }
+
+    pub fn add_builtin_operation(&mut self, id: OperationId, op: B) {
+        self.builtins.insert(id, op);
+    }
+
+    pub fn add_custom_operation(&mut self, id: OperationId, op: UserDefinedOperation) {
+        self.custom.insert(id, op);
+    }
+}
+
 enum Operation<B> {
     Builtin(B),
     Custom(UserDefinedOperation),
