@@ -19,8 +19,7 @@ pub use graph::Graph;
 pub use graph::NodeKey;
 pub use graph::OperationContext;
 pub use graph::OperationId;
-pub use graph::Semantics;
-pub use graph::operation::TrueMatcher;
+pub use graph::semantics::Semantics;
 
 // TODO: should we instead have an 'AbstractAttribute' as well, and the pattern matcher works on that?
 // From every concrete graph you can get its abstract graph. That should be like the type.
@@ -40,13 +39,11 @@ pub use graph::operation::TrueMatcher;
 //    * the concrete values decide where the control flow goes and in case of match-arms, which concrete
 //      values to bind.
 // In other words, a query needs both a concrete and an abstract implementation. I think this is the same as operations: they need the concrete changes, and the abstract pattern + if they change any types
+//
+//  ** UPDATE: **
+// Because we'll want to work abstractly with a pattern graph, we'll want the pattern type to be the type that pattern matches against.
+// In other words, we want the pattern type to be the analogue of the PL-"type", with subtyping. eg. a wildcard is just the analogue of the Top type
 
-pub trait PatternAttributeMatcher {
-    type Attr;
-    type Pattern;
-
-    fn matches(attr: &Self::Attr, pattern: &Self::Pattern) -> bool;
-}
 
 /// A marker for substitution in the graph.
 ///
@@ -58,6 +55,7 @@ pub struct WithSubstMarker<T> {
     value: T,
 }
 
+// TODO: figure out what to do for PatternKind/PatternWrapper
 pub enum PatternKind {
     Input,
     Derived,
@@ -117,71 +115,71 @@ impl<T> WithSubstMarker<T> {
     }
 }
 
-pub struct InputPattern<NPA: PatternAttributeMatcher, EPA: PatternAttributeMatcher> {
-    pub parameter_nodes: Vec<SubstMarker>,
-    pub pattern_graph: Graph<WithSubstMarker<NPA::Pattern>, EPA::Pattern>,
-    subst_to_node_keys: HashMap<SubstMarker, NodeKey>,
-}
-
-pub struct OperationInput<NA, EA> {
-    pub selected_inputs: Vec<NodeKey>,
-    pub graph: Graph<NA, EA>,
-}
-
-/// A trait for graph operations.
-///
-/// The operation requires graphs with the given node and edge attribute types.
-pub trait Operation<NPA: PatternAttributeMatcher, EPA: PatternAttributeMatcher> {
-    /// The pattern to match against the graph.
-    fn input_pattern(&self) -> InputPattern<NPA, EPA>;
-    fn apply(
-        &mut self,
-        input: &mut OperationInput<NPA::Attr, EPA::Attr>,
-        subst: &HashMap<SubstMarker, NodeKey>,
-    ) -> Result<(), String>;
-}
-
-impl<NA: Clone, EA: Clone> Graph<NA, EA> {
-    pub fn run_operation<O, NPA, EPA>(
-        &mut self,
-        selected_inputs: Vec<NodeKey>,
-        op: &mut O,
-    ) -> Result<(), String>
-    where
-        O: Operation<NPA, EPA>,
-        NPA: PatternAttributeMatcher<Attr = NA>,
-        EPA: PatternAttributeMatcher<Attr = EA>,
-    {
-        let subst = {
-            let pattern = op.input_pattern(); // TODO: rename a to pattern b to data or similar...
-            let mut nm = |a: &NodeKey, b: &NodeKey| {
-                let a_attr = pattern.get_node_attr(*a).unwrap();
-                let b_attr = self.get_node_attr(*b).unwrap();
-                NPA::matches(b_attr, &a_attr.value)
-            };
-            let mut em = |a: &EdgeAttribute<EPA::Pattern>, b: &EdgeAttribute<EA>| {
-                EPA::matches(&b.edge_attr, &a.edge_attr)
-            };
-            let Some(mut mappings) = self.match_to_pattern(&pattern, &mut nm, &mut em) else {
-                return Err("No matching pattern found".to_string());
-            };
-            let mapping = mappings.next().ok_or("Internal Error: No mapping found")?;
-            mapping
-                .iter()
-                .map(|(src, target)| (pattern.get_node_attr(*src).unwrap().marker, *target))
-                .collect::<HashMap<_, _>>()
-        };
-
-        let mut op_input = OperationInput {
-            selected_inputs,
-            // TODO: get rid of clone
-            graph: self.clone(),
-        };
-
-        op.apply(&mut op_input, &subst)?;
-        Ok(())
-    }
-}
+// pub struct InputPattern<NPA: PatternAttributeMatcher, EPA: PatternAttributeMatcher> {
+//     pub parameter_nodes: Vec<SubstMarker>,
+//     pub pattern_graph: Graph<WithSubstMarker<NPA::Pattern>, EPA::Pattern>,
+//     subst_to_node_keys: HashMap<SubstMarker, NodeKey>,
+// }
+//
+// pub struct OperationInput<NA, EA> {
+//     pub selected_inputs: Vec<NodeKey>,
+//     pub graph: Graph<NA, EA>,
+// }
+//
+// /// A trait for graph operations.
+// ///
+// /// The operation requires graphs with the given node and edge attribute types.
+// pub trait Operation<NPA: PatternAttributeMatcher, EPA: PatternAttributeMatcher> {
+//     /// The pattern to match against the graph.
+//     fn input_pattern(&self) -> InputPattern<NPA, EPA>;
+//     fn apply(
+//         &mut self,
+//         input: &mut OperationInput<NPA::Attr, EPA::Attr>,
+//         subst: &HashMap<SubstMarker, NodeKey>,
+//     ) -> Result<(), String>;
+// }
+//
+// impl<NA: Clone, EA: Clone> Graph<NA, EA> {
+//     pub fn run_operation<O, NPA, EPA>(
+//         &mut self,
+//         selected_inputs: Vec<NodeKey>,
+//         op: &mut O,
+//     ) -> Result<(), String>
+//     where
+//         O: Operation<NPA, EPA>,
+//         NPA: PatternAttributeMatcher<Attr = NA>,
+//         EPA: PatternAttributeMatcher<Attr = EA>,
+//     {
+//         let subst = {
+//             let pattern = op.input_pattern(); // TODO: rename a to pattern b to data or similar...
+//             let mut nm = |a: &NodeKey, b: &NodeKey| {
+//                 let a_attr = pattern.get_node_attr(*a).unwrap();
+//                 let b_attr = self.get_node_attr(*b).unwrap();
+//                 NPA::matches(b_attr, &a_attr.value)
+//             };
+//             let mut em = |a: &EdgeAttribute<EPA::Pattern>, b: &EdgeAttribute<EA>| {
+//                 EPA::matches(&b.edge_attr, &a.edge_attr)
+//             };
+//             let Some(mut mappings) = self.match_to_pattern(&pattern, &mut nm, &mut em) else {
+//                 return Err("No matching pattern found".to_string());
+//             };
+//             let mapping = mappings.next().ok_or("Internal Error: No mapping found")?;
+//             mapping
+//                 .iter()
+//                 .map(|(src, target)| (pattern.get_node_attr(*src).unwrap().marker, *target))
+//                 .collect::<HashMap<_, _>>()
+//         };
+//
+//         let mut op_input = OperationInput {
+//             selected_inputs,
+//             // TODO: get rid of clone
+//             graph: self.clone(),
+//         };
+//
+//         op.apply(&mut op_input, &subst)?;
+//         Ok(())
+//     }
+// }
 
 #[cfg(test)]
 mod tests {

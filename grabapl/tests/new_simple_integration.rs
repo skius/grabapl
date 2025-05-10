@@ -1,5 +1,5 @@
-use grabapl::graph::operation::new_data_graph;
-use grabapl::{DotCollector, Semantics, TrueMatcher};
+use grabapl::graph::semantics::{AbstractMatcher, AnyMatcher, Semantics};
+use grabapl::{DotCollector};
 
 struct SampleSemantics;
 
@@ -9,25 +9,24 @@ enum EdgePattern {
 }
 
 struct EdgeMatcher;
-impl grabapl::PatternAttributeMatcher for EdgeMatcher {
-    type Attr = String;
-    type Pattern = EdgePattern;
-
-    fn matches(attr: &Self::Attr, pattern: &Self::Pattern) -> bool {
-        match pattern {
-            EdgePattern::Wildcard => true,
-            EdgePattern::Exact(p) => attr == p,
+impl AbstractMatcher for EdgeMatcher {
+    type Abstract = EdgePattern;
+    fn matches(arg: &Self::Abstract, parameter: &Self::Abstract) -> bool {
+        match (arg, parameter) {
+            (_, EdgePattern::Wildcard) => true,
+            (EdgePattern::Exact(a), EdgePattern::Exact(b)) => a == b,
+            (_, _) => false,
         }
     }
 }
 
 impl Semantics for SampleSemantics {
-    type NodeAttribute = i32;
-    type NodePattern = ();
-    type EdgeAttribute = String;
-    type EdgePattern = EdgePattern;
-    type NodeAttributeMatcher = TrueMatcher<Self::NodeAttribute, Self::NodePattern>;
-    type EdgeAttributeMatcher = EdgeMatcher;
+    type NodeConcrete = i32;
+    type NodeAbstract = ();
+    type EdgeConcrete = String;
+    type EdgeAbstract = EdgePattern;
+    type NodeMatcher = AnyMatcher<()>;
+    type EdgeMatcher = EdgeMatcher;
     type BuiltinOperation = ();
 }
 
@@ -42,7 +41,7 @@ enum BuiltinOperation {
 fn test() {
     let mut dot_collector = DotCollector::new();
 
-    let mut g = new_data_graph::<SampleSemantics>();
+    let mut g = SampleSemantics::new_concrete_graph();
     dot_collector.collect(&g);
     let a = g.add_node(1);
     let b = g.add_node(2);
