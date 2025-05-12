@@ -12,7 +12,7 @@ pub trait BuiltinOperation {
 
     /// The pattern to match against the graph.
     fn parameter(&self) -> OperationParameter<Self::S>;
-    
+
     // TODO: needs an apply_abstract operation that applies the changes to the abstract graph.
     // For example, "add node" adds the node.
     // In general, we still need a way to refer to new changes, e.g., how do we refer
@@ -55,11 +55,21 @@ impl<B> OperationContext<B> {
     pub fn add_custom_operation(&mut self, id: OperationId, op: UserDefinedOperation) {
         self.custom.insert(id, op);
     }
+
+    pub fn get(&self, id: OperationId) -> Option<Operation<B>> {
+        if let Some(builtin) = self.builtins.get(&id) {
+            return Some(Operation::Builtin(builtin));
+        }
+        if let Some(custom) = self.custom.get(&id) {
+            return Some(Operation::Custom(custom));
+        }
+        None
+    }
 }
 
-enum Operation<B> {
-    Builtin(B),
-    Custom(UserDefinedOperation),
+enum Operation<'a, B> {
+    Builtin(&'a B),
+    Custom(&'a UserDefinedOperation),
 }
 
 // TODO: Builtin operations should be a trait that follows some generic pattern of mutating the graph
@@ -73,6 +83,7 @@ struct UserDefinedOperation {
 pub type OperationId = u32;
 
 enum Instruction {
+    // TODO: add inputs
     Operation(OperationId),
     Query(Query),
 }
@@ -184,10 +195,13 @@ pub fn run_operation<S: SemanticsClone>(
     op: OperationId,
     selected_inputs: Vec<NodeKey>,
 ) -> Option<()> {
-    if let Some(builtin) = op_ctx.builtins.get(&op) {
-        run_builtin_operation::<S>(g, builtin, selected_inputs)
-    } else {
-        panic!("Operation not found")
+    match op_ctx.get(op).expect("Invalid operation ID") {
+        Operation::Builtin(builtin) => {
+            run_builtin_operation::<S>(g, builtin, selected_inputs)
+        }
+        Operation::Custom(custom) => {
+            panic!("Custom operations not implemented yet")
+        }
     }
 }
 
