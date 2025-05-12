@@ -12,6 +12,12 @@ pub trait BuiltinOperation {
 
     /// The pattern to match against the graph.
     fn parameter(&self) -> OperationParameter<Self::S>;
+    
+    // TODO: needs an apply_abstract operation that applies the changes to the abstract graph.
+    // For example, "add node" adds the node.
+    // In general, we still need a way to refer to new changes, e.g., how do we refer
+    // to a new node added by an operation?
+    // In a frontend that's easy, the user 'sees' the node and can just select it.
 
     fn apply(
         &self,
