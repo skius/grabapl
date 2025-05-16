@@ -4,19 +4,15 @@ use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 extern "C" {
-    fn alert(s: &str);
-}
+    fn prompt(s: &str) -> String;
 
-#[wasm_bindgen]
-pub fn greet() {
-    let x: fn(&str) = alert;
-
-    x("Hello, wasm-game-of-life!");
 }
 
 
 #[diplomat::bridge]
 mod ffi {
+    use crate::{prompt};
+
     pub struct MyFFIStruct {
         pub a: i32,
         pub b: bool,
@@ -31,7 +27,10 @@ mod ffi {
         }
 
         pub fn do_a_thing(self) {
-            println!("doing thing {:?}", self.b);
+
+            let x = prompt("Doing a thing");
+
+            log::error!("doing thing {:?}", self.b);
         }
     }
 }

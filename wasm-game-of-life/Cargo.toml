@@ -19,8 +19,10 @@ wasm-bindgen = "0.2.84"
 # code size when deploying.
 console_error_panic_hook = { version = "0.1.7", optional = true }
 
-diplomat = "0.11"
-diplomat-runtime = "0.11"
+diplomat = "0.10"
+diplomat-runtime = { version = "0.10", features = ["log"] }
+
+log = "0.4"
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.34"

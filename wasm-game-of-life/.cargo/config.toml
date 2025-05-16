@@ -1,0 +1,2 @@
+[build]
+rustflags = "-Zwasm-c-abi=spec"
