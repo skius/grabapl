@@ -29,6 +29,7 @@ mod ffi {
         pub fn do_a_thing(self) {
 
             let x = prompt("Doing a thing");
+            panic!("test {}", x);
 
             log::error!("doing thing {:?}", self.b);
         }
