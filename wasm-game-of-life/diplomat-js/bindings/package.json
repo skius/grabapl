@@ -1,0 +1,24 @@
+{
+  "name": "diplomat-js",
+  "type": "module",
+  "collaborators": [
+    "Niels Saurer <me@nielssaurer.com>"
+  ],
+  "version": "0.1.0",
+  "files": [
+    "diplomat-runtime.d.ts",
+    "diplomat.config.mjs",
+    "diplomat-runtime.mjs",
+    "diplomat-wasm.mjs",
+    "index.d.ts",
+    "index.mjs",
+    "MyFFIStruct.d.ts",
+    "MyFFIStruct.mjs"
+  ],
+  "main": "index.mjs",
+  "types": "index.d.ts",
+  "sideEffects": [
+    "./index.mjs",
+    "./snippets/*"
+  ]
+}
