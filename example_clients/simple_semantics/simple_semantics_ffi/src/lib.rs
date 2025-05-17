@@ -27,8 +27,12 @@ mod ffi {
             Box::new(ConcreteGraph(SimpleSemantics::new_concrete_graph()))
         }
 
-        pub fn add_node(&mut self, value: i32) {
-            self.0.add_node(value);
+        pub fn add_node(&mut self, value: i32) -> u32 {
+            self.0.add_node(value)
+        }
+        
+        pub fn add_edge(&mut self, from: u32, to: u32, value: &str) {
+            self.0.add_edge(from, to, value.to_string());
         }
 
         // just for testing

@@ -8,11 +8,30 @@ const svgContainer = document.querySelector("#svgContainer")
 let dotCollector = DotCollector.create()
 let concrete = ConcreteGraph.create()
 
+const showGraph = () => {
+    let dc = DotCollector.create()
+    dc.collect(concrete)
+    let dot = dc.getDot()
+    let svg = graphviz.dot(dot);
+    svgContainer.innerHTML = svg;
+}
+
+const updateDotCollector = () => {
+    dotCollector.collect(concrete)
+    let dot = dotCollector.getDot()
+    p.innerHTML = dot
+}
+
+const onChange = () => {
+    showGraph()
+    updateDotCollector()
+}
+
 document.querySelector("#btnReset").addEventListener("click", (event) => {
     console.log("Reset clicked!");
-    p.innerHTML = "";
     dotCollector = DotCollector.create()
     concrete = ConcreteGraph.create()
+    onChange()
 })
 
 document.querySelector("#btnDotCollector").addEventListener("click", (event) => {
@@ -28,8 +47,7 @@ document.querySelector("#btnShowCurrent").addEventListener("click", (event) => {
     let dc = DotCollector.create()
     dc.collect(concrete)
     let dot = dc.getDot()
-    let svg = graphviz.dot(dot);
-    svgContainer.innerHTML = svg;
+    showGraph(dot)
 })
 
 document.querySelector("#btnAddNode").addEventListener("click", (event) => {
@@ -40,7 +58,25 @@ document.querySelector("#btnAddNode").addEventListener("click", (event) => {
     }
     console.log("Adding node with value: " + desiredInt);
     concrete.addNode(desiredInt);
-    dotCollector.collect(concrete)
+    onChange()
+})
+
+document.querySelector("#btnAddEdge").addEventListener("click", (event) => {
+    let input = prompt("Enter an edge (start,end,value):");
+    if (!input) {
+        alert("Please enter a valid edge.");
+        return;
+    }
+    let parts = input.split(",");
+    if (parts.length !== 3) {
+        alert("Please enter a valid edge.");
+        return;
+    }
+    let start = parseInt(parts[0]);
+    let end = parseInt(parts[1]);
+    let value = parts[2];
+    concrete.addEdge(start, end, value);
+    onChange()
 })
 
 

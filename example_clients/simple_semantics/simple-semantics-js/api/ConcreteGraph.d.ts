@@ -9,7 +9,9 @@ export class ConcreteGraph {
 
     static create(): ConcreteGraph;
 
-    addNode(value: number): void;
+    addNode(value: number): number;
+
+    addEdge(from: number, to: number, value: string): void;
 
     sayHi(): void;
 }

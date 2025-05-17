@@ -47,11 +47,28 @@ export class ConcreteGraph {
     }
 
     addNode(value) {
-    wasm.ConcreteGraph_add_node(this.ffiValue, value);
+
+        const result = wasm.ConcreteGraph_add_node(this.ffiValue, value);
+
+        try {
+            return result;
+        }
+
+        finally {
+        }
+    }
+
+    addEdge(from, to, value) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const valueSlice = diplomatRuntime.DiplomatBuf.str8(wasm, value);
+    wasm.ConcreteGraph_add_edge(this.ffiValue, from, to, ...valueSlice.splat());
 
         try {}
 
         finally {
+            functionCleanupArena.free();
+
         }
     }
 

@@ -3,7 +3,8 @@
 export const memory: WebAssembly.Memory;
 export const AbstractGraph_destroy: (a: number) => void;
 export const ConcreteGraph_create: () => number;
-export const ConcreteGraph_add_node: (a: number, b: number) => void;
+export const ConcreteGraph_add_node: (a: number, b: number) => number;
+export const ConcreteGraph_add_edge: (a: number, b: number, c: number, d: number, e: number) => void;
 export const ConcreteGraph_say_hi: (a: number) => void;
 export const ConcreteGraph_destroy: (a: number) => void;
 export const DotCollector_create: () => number;
