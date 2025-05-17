@@ -1,6 +1,10 @@
 import {AbstractGraph, ConcreteGraph, DotCollector} from "simple-semantics";
+import {Graphviz} from "@hpcc-js/wasm";
+
+const graphviz = await Graphviz.load();
 
 const p = document.querySelector("#main")
+const svgContainer = document.querySelector("#svgContainer")
 let dotCollector = DotCollector.create()
 let concrete = ConcreteGraph.create()
 
@@ -18,6 +22,14 @@ document.querySelector("#btnDotCollector").addEventListener("click", (event) => 
 
 document.querySelector("#btn").addEventListener("click", (event) => {
 
+})
+
+document.querySelector("#btnShowCurrent").addEventListener("click", (event) => {
+    let dc = DotCollector.create()
+    dc.collect(concrete)
+    let dot = dc.getDot()
+    let svg = graphviz.dot(dot);
+    svgContainer.innerHTML = svg;
 })
 
 document.querySelector("#btnAddNode").addEventListener("click", (event) => {
