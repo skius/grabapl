@@ -29,9 +29,14 @@ mod ffi {
         pub fn do_a_thing(self) {
 
             let x = prompt("Doing a thing");
-            panic!("test {}", x);
+            // panic!("test {}", x);
 
-            log::error!("doing thing {:?}", self.b);
+            // TODO: Get logging/panicking to work. Prompt works so why the rest not?
+            // panic gets "RuntimeError: unreachable executed"
+            
+            // it works now? no idea why.
+            
+            log::error!("doing thing {:?}, {x}", self.b);
         }
     }
 }
