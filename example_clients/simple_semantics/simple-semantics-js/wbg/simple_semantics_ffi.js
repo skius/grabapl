@@ -1,3 +1,4 @@
+
 let wasm;
 
 const cachedTextDecoder = (typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { ignoreBOM: true, fatal: true }) : { decode: () => { throw Error('TextDecoder not available') } } );
@@ -153,7 +154,7 @@ function __wbg_finalize_init(instance, module) {
     return wasm;
 }
 
-function initSync(module) {
+function initSync(imports, module) {
     if (wasm !== undefined) return wasm;
 
 
@@ -165,7 +166,6 @@ function initSync(module) {
         }
     }
 
-    const imports = __wbg_get_imports();
 
     __wbg_init_memory(imports);
 
