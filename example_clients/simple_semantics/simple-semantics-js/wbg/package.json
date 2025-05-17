@@ -1,0 +1,15 @@
+{
+  "name": "simple_semantics_ffi",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "simple_semantics_ffi_bg.wasm",
+    "simple_semantics_ffi.js",
+    "simple_semantics_ffi.d.ts"
+  ],
+  "main": "simple_semantics_ffi.js",
+  "types": "simple_semantics_ffi.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
