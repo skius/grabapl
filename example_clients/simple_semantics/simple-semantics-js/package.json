@@ -4,10 +4,7 @@
     "description": "Simple grabapl",
     "main": "./api/index.mjs",
     "exports": {
-        ".": {
-            "import": "./api/index.mjs",
-            "types": "./api/index.d.ts"
-        }
+        ".": "./api/index.mjs"
     },
     "author": "Niels Saurer",
     "dependencies": {
