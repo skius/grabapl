@@ -24,6 +24,8 @@ mod ffi {
 
     impl ConcreteGraph {
         pub fn create() -> Box<ConcreteGraph> {
+            // TODO: have init function for panic hook
+            console_error_panic_hook::set_once();
             Box::new(ConcreteGraph(SimpleSemantics::new_concrete_graph()))
         }
 

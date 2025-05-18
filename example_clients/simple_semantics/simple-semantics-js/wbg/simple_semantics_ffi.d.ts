@@ -24,9 +24,10 @@ export interface InitOutput {
   readonly diplomat_alloc: (a: number, b: number) => number;
   readonly diplomat_free: (a: number, b: number, c: number) => void;
   readonly diplomat_is_str: (a: number, b: number) => number;
+  readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
-  readonly __wbindgen_export_2: WebAssembly.Table;
+  readonly __wbindgen_export_3: WebAssembly.Table;
   readonly __wbindgen_start: () => void;
 }
 
