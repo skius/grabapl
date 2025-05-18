@@ -15,7 +15,6 @@ Changes to the node.js application don't require any further build steps apart f
 
 
 # Immediate next TODOS:
-* better panic handler. Try and figure out why twice addEdge(1,2,...) panics.
 * Have support for running operation (export some default OpCtx)
 * Have one operation use the prompt (maybe as generic on SimpleSemantics?)
 * Show in browser if succeeded or not
