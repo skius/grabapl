@@ -15,8 +15,6 @@ Changes to the node.js application don't require any further build steps apart f
 
 
 # Immediate next TODOS:
-* Have support for running operation (export some default OpCtx)
-* Have one operation use the prompt (maybe as generic on SimpleSemantics?)
 * Show in browser if succeeded or not
 * See if we can have grabapl define some diplomat FFI and then can we use that in simplesemantics?
   * If so, make it a TODO to have some macro that automatically generates some basic FFI for eg concretized Semantics graphs?

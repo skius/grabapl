@@ -33,8 +33,11 @@ mod ffi {
 
             // TODO: Get logging/panicking to work. Prompt works so why the rest not?
             // panic gets "RuntimeError: unreachable executed"
-            
+
             // it works now? no idea why.
+            if x == "panic" {
+                panic!("test {}", x);
+            }
             
             log::error!("doing thing {:?}, {x}", self.b);
         }
