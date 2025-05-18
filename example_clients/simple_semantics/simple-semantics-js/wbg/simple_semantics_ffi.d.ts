@@ -15,6 +15,11 @@ export interface InitOutput {
   readonly DotCollector_collect: (a: number, b: number) => void;
   readonly DotCollector_get_dot: (a: number, b: number) => void;
   readonly DotCollector_destroy: (a: number) => void;
+  readonly OpCtx_create: () => number;
+  readonly OpCtx_destroy: (a: number) => void;
+  readonly Runner_create: () => number;
+  readonly Runner_run: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+  readonly Runner_destroy: (a: number) => void;
   readonly diplomat_init: () => void;
   readonly diplomat_simple_write: (a: number, b: number, c: number) => void;
   readonly diplomat_buffer_write_create: (a: number) => number;
@@ -24,10 +29,9 @@ export interface InitOutput {
   readonly diplomat_alloc: (a: number, b: number) => number;
   readonly diplomat_free: (a: number, b: number, c: number) => void;
   readonly diplomat_is_str: (a: number, b: number) => number;
-  readonly __wbindgen_free: (a: number, b: number, c: number) => void;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
-  readonly __wbindgen_export_3: WebAssembly.Table;
+  readonly __wbindgen_export_2: WebAssembly.Table;
   readonly __wbindgen_start: () => void;
 }
 

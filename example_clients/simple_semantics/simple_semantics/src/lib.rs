@@ -64,6 +64,7 @@ pub enum BuiltinOperation {
     /// Labels nodes of a three-cycle with 1,2,3, and requires the edge between 3 and 1 to be labelled "cycle"
     /// Only the first node is used as explicit input, the others are inferred.
     IndexCycle,
+    SetValue(Box<dyn Fn() -> i32>),
 }
 
 impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
@@ -104,6 +105,15 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                     subst_to_node_keys: HashMap::from([(0, a), (1, b), (2, c)]),
                 }
             }
+            BuiltinOperation::SetValue(_) => {
+                let mut g = grabapl::graph::Graph::new();
+                let a = g.add_node(WithSubstMarker::new(0, ()));
+                OperationParameter {
+                    explicit_input_nodes: vec![0],
+                    parameter_graph: g,
+                    subst_to_node_keys: HashMap::from([(0, a)]),
+                }
+            }
         }
     }
 
@@ -129,6 +139,10 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 *graph.get_mut_node_attr(a).unwrap() = 1;
                 *graph.get_mut_node_attr(b).unwrap() = 2;
                 *graph.get_mut_node_attr(c).unwrap() = 3;
+            }
+            BuiltinOperation::SetValue(f) => {
+                let a = substitution.mapping[&0];
+                *graph.get_mut_node_attr(a).unwrap() = f();
             }
         }
     }

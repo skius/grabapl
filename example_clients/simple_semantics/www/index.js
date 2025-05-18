@@ -1,4 +1,4 @@
-import {AbstractGraph, ConcreteGraph, DotCollector} from "simple-semantics";
+import {AbstractGraph, ConcreteGraph, DotCollector, OpCtx, Runner} from "simple-semantics";
 import {Graphviz} from "@hpcc-js/wasm";
 
 const graphviz = await Graphviz.load();
@@ -7,6 +7,10 @@ const p = document.querySelector("#main")
 const svgContainer = document.querySelector("#svgContainer")
 let dotCollector = DotCollector.create()
 let concrete = ConcreteGraph.create()
+
+
+const runner = Runner.create();
+let opCtx = OpCtx.create();
 
 const showGraph = () => {
     let dc = DotCollector.create()
@@ -76,6 +80,29 @@ document.querySelector("#btnAddEdge").addEventListener("click", (event) => {
     let end = parseInt(parts[1]);
     let value = parts[2];
     concrete.addEdge(start, end, value);
+    onChange()
+})
+
+document.querySelector("#btn").addEventListener("click", (event) => {
+
+})
+
+document.querySelector("#btnRunOp").addEventListener("click", (event) => {
+    let input = prompt("Enter an operation input (id,inp1,inp2,...):");
+    if (!input) {
+        alert("Please enter a valid operation input.");
+        return;
+    }
+    let parts = input.split(",");
+    if (parts.length < 1) {
+        alert("Please enter a valid operation input.");
+        return;
+    }
+    let id = parseInt(parts[0]);
+    let inputs = parts.slice(1).map(x => parseInt(x));
+    console.log("Adding operation with id: " + id + " and inputs: " + inputs);
+
+    runner.run(concrete, opCtx, id, inputs)
     onChange()
 })
 
