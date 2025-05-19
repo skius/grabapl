@@ -12,6 +12,7 @@ For changes to Rust files, run `bash build.sh` to build the WASM binary and Java
 Changes to the node.js application don't require any further build steps apart from running using `npm run start`.
 
 # TODO: figure out if combining wasm-bindgen and diplomat like this is fine.
+* Open discussion post on diplomat
 
 
 # Immediate next TODOS:
