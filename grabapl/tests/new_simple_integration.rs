@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use grabapl::graph::semantics::{AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, Semantics};
+use grabapl::graph::semantics::{AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, Semantics};
 use grabapl::{DotCollector, EdgeInsertionOrder, OperationContext, WithSubstMarker};
 use grabapl::graph::operation::run_operation;
-use grabapl::graph::pattern::{OperationArgument, OperationParameter};
+use grabapl::graph::pattern::{OperationArgument, OperationParameter, ParameterSubstition};
 
 struct SampleSemantics;
 
@@ -103,6 +103,26 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                     parameter_graph: g,
                     subst_to_node_keys: HashMap::from([(0, a), (1, b), (2, c)]),
                 }
+            }
+        }
+    }
+
+    fn apply_abstract(&self, g: &mut AbstractGraph<Self::S>, argument: OperationArgument, substitution: &ParameterSubstition) {
+        match self {
+            BuiltinOperation::AddNode => {
+                g.add_node(());
+            }
+            BuiltinOperation::AppendChild => {
+                let parent = substitution.mapping[&0];
+                let child = g.add_node(());
+                // TODO: this EdgePattern is weird.
+                //  On the one hand, we know for a fact this is an exact "" that will be added, so in type-theory, we correctly add the most precise type (Exact instead of Wildcard)
+                //  But if this ever used as a _pattern_ (parameter), it is a *decision* we're making here. Exact will permit fewer matches.
+                //  Realistically this is not a problem, because we don't run builtin operations on parameters. But we should be careful.
+                g.add_edge_ordered(parent, child, EdgePattern::Exact("".to_string()), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+            }
+            BuiltinOperation::IndexCycle => {
+                // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
             }
         }
     }

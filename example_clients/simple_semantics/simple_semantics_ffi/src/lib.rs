@@ -23,7 +23,7 @@ mod ffi {
     pub struct DotCollector(grabapl::DotCollector);
 
     #[diplomat::opaque]
-    pub struct OpCtx(grabapl::OperationContext<BuiltinOperation>);
+    pub struct OpCtx(grabapl::OperationContext<SimpleSemantics>);
 
     impl OpCtx {
         pub fn create() -> Box<OpCtx> {

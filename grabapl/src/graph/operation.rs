@@ -10,6 +10,8 @@ use crate::graph::operation::user_defined::UserDefinedOperation;
 use crate::graph::pattern::{OperationArgument, OperationParameter, ParameterSubstition};
 use crate::graph::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics, SemanticsClone};
 
+// TODO: We might want to be able to supply additional data to builtin operations. For example, a Set Value operation should be 'generic' over its value without
+//  needing to store a separate operation in the OpCtx for every value...
 pub trait BuiltinOperation {
     type S: Semantics;
 
@@ -21,6 +23,14 @@ pub trait BuiltinOperation {
     // In general, we still need a way to refer to new changes, e.g., how do we refer
     // to a new node added by an operation?
     // In a frontend that's easy, the user 'sees' the node and can just select it.
+
+    /// *If the operation argument matches*, what happens to the abstract graph?
+    fn apply_abstract(
+        &self,
+        g: &mut AbstractGraph<Self::S>,
+        argument: OperationArgument,
+        substitution: &ParameterSubstition,
+    );
 
     fn apply(
         &self,
@@ -154,7 +164,7 @@ pub fn run_operation<S: SemanticsClone>(
             run_builtin_operation::<S>(g, builtin, selected_inputs)
         }
         Operation::Custom(custom) => {
-            run_custom_operation::<S>(g, custom, selected_inputs)
+            run_custom_operation::<S>(g, op_ctx, custom, selected_inputs)
         }
     }
 }
@@ -177,6 +187,7 @@ fn run_builtin_operation<S: SemanticsClone>(
 
 fn run_custom_operation<S: SemanticsClone>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
+    op_ctx: &OperationContext<S>,
     op: &UserDefinedOperation<S>,
     selected_inputs: Vec<NodeKey>,
 ) -> Option<()>
@@ -185,8 +196,8 @@ fn run_custom_operation<S: SemanticsClone>(
     let param = &op.parameter;
     let abstract_g = S::concrete_to_abstract(&g);
     let subst = get_substitution(&abstract_g, param, &selected_inputs)?;
-    
-    op.apply(g, OperationArgument { selected_input_nodes: selected_inputs }, &subst);
+
+    op.apply(op_ctx, g, OperationArgument { selected_input_nodes: selected_inputs }, &subst);
 
     Some(())
 }

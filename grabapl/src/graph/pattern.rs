@@ -26,3 +26,7 @@ pub struct OperationArgument {
     pub selected_input_nodes: Vec<NodeKey>,
 }
 
+pub struct OperationOutput {
+    pub new_nodes: HashMap<SubstMarker, NodeKey>,
+}
+

@@ -1,28 +1,68 @@
+use std::collections::HashMap;
+use std::rc::Rc;
 use crate::graph::pattern::{OperationArgument, OperationParameter, ParameterSubstition};
-use crate::{OperationId, Semantics, SubstMarker};
-use crate::graph::semantics::ConcreteGraph;
+use crate::{NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
+use crate::graph::operation::run_operation;
+use crate::graph::semantics::{ConcreteGraph, SemanticsClone};
+
+/// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
+pub type AbstractOutputId = &'static str;
+
+#[derive(Copy, Clone)]
+pub enum AbstractNodeId {
+    ParameterSubstMarker(SubstMarker),
+    DynamicOutputSubstMarker(AbstractOutputId, SubstMarker),
+}
 
 // A 'custom'/user-defined operation
 pub struct UserDefinedOperation<S: Semantics> {
     pub parameter: OperationParameter<S>,
-    pub instructions: Vec<Instruction<S>>,
+    pub instructions: Vec<(AbstractOutputId, Instruction<S>)>,
 }
 
-impl<S: Semantics> UserDefinedOperation<S> {
+impl<S: SemanticsClone> UserDefinedOperation<S> {
     pub(crate) fn apply(
         &self,
+        op_ctx: &OperationContext<S>,
         g: &mut ConcreteGraph<S>,
         argument: OperationArgument,
         subst: &ParameterSubstition,
     ) {
-        // TODO:
+        let mut output_map: HashMap<AbstractOutputId, HashMap<SubstMarker, NodeKey>> = HashMap::new();
+
+        for (abstract_output_id, instruction) in &self.instructions {
+            match instruction {
+                Instruction::Operation(op_id, args) => {
+                    let mut new_args = vec![];
+                    for arg in args {
+                        match arg {
+                            AbstractNodeId::ParameterSubstMarker(subst_marker) => {
+                                new_args.push(subst.mapping[subst_marker]);
+                            }
+                            AbstractNodeId::DynamicOutputSubstMarker(output_id, subst_marker) => {
+                                let output_map = output_map.get_mut(output_id).unwrap();
+                                new_args.push(output_map[subst_marker]);
+                            }
+                        }
+                    }
+                    run_operation::<S>(
+                        g,
+                        op_ctx,
+                        *op_id,
+                        new_args,
+                    ).unwrap();
+                }
+                Instruction::Query(query) => {
+                    todo!("implement query");
+                }
+            }
+        }
     }
 }
 
 
 pub enum Instruction<S: Semantics> {
-    // TODO: add inputs
-    Operation(OperationId),
+    Operation(OperationId, Vec<AbstractNodeId>),
     Query(Query<S>),
 }
 
