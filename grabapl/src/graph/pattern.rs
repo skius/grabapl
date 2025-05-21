@@ -27,6 +27,7 @@ pub struct OperationArgument {
 }
 
 pub struct OperationOutput {
+    // TODO: use OutputMarker instead of SubstMarker?
     pub new_nodes: HashMap<SubstMarker, NodeKey>,
 }
 

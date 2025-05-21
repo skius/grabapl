@@ -23,13 +23,13 @@ fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemantics> 
     instructions.push(("second_child", Instruction::Operation(1, vec![input_node])));
     instructions.push(("third_child", Instruction::Operation(1, vec![input_node])));
     instructions.push(("fourth_child", Instruction::Operation(1, vec![input_node])));
-    
+
     // Should not work, since there are no edges between those three and the second->fourth edge is not labelled 'cycle'
-    instructions.push(("TODO ignore me", Instruction::Operation(2, vec![
-        AbstractNodeId::DynamicOutputSubstMarker("fourth_child", 0),
-        AbstractNodeId::DynamicOutputSubstMarker("third_child", 0),
-        AbstractNodeId::DynamicOutputSubstMarker("second_child", 0),
-    ])));
+    // instructions.push(("TODO ignore me", Instruction::Operation(2, vec![
+    //     AbstractNodeId::DynamicOutputSubstMarker("fourth_child", 0),
+    //     AbstractNodeId::DynamicOutputSubstMarker("third_child", 0),
+    //     AbstractNodeId::DynamicOutputSubstMarker("second_child", 0),
+    // ])));
 
     UserDefinedOperation {
         parameter: param,
@@ -39,7 +39,7 @@ fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemantics> 
 
 fn main() {
     let user_defined_op = get_sample_user_defined_operation();
-    
+
     let operation_ctx = HashMap::from([
         (0, BuiltinOperation::AddNode),
         (1, BuiltinOperation::AppendChild),
@@ -47,7 +47,7 @@ fn main() {
     ]);
     let mut operation_ctx = OperationContext::from_builtins(operation_ctx);
     operation_ctx.add_custom_operation(3, user_defined_op);
-    
+
     let mut dot_collector = DotCollector::new();
 
     let mut g = SimpleSemantics::new_concrete_graph();
@@ -94,10 +94,11 @@ fn main() {
     // run cycle operation
     run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 2, vec![4]).unwrap();
     dot_collector.collect(&g);
-    
+
     // run user defined op
     let new_start = g.add_node(99);
     run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 3, vec![new_start]).unwrap();
+    dot_collector.collect(&g);
 
 
 

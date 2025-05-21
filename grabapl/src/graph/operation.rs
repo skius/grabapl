@@ -7,7 +7,7 @@ use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
 use crate::graph::EdgeAttribute;
 use crate::graph::operation::user_defined::UserDefinedOperation;
-use crate::graph::pattern::{OperationArgument, OperationParameter, ParameterSubstition};
+use crate::graph::pattern::{OperationArgument, OperationOutput, OperationParameter, ParameterSubstition};
 use crate::graph::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics, SemanticsClone};
 
 // TODO: We might want to be able to supply additional data to builtin operations. For example, a Set Value operation should be 'generic' over its value without
@@ -32,12 +32,13 @@ pub trait BuiltinOperation {
         substitution: &ParameterSubstition,
     );
 
+    // TODO: OperationOutput returned here should only represent Abstract changes. Basically the guaranteed new nodes so that other ops can refer to it.
     fn apply(
         &self,
         g: &mut ConcreteGraph<Self::S>,
         argument: OperationArgument,
         substitution: &ParameterSubstition,
-    );
+    ) -> OperationOutput;
 }
 
 /// Contains available operations
@@ -158,7 +159,7 @@ pub fn run_operation<S: SemanticsClone>(
     op_ctx: &OperationContext<S>,
     op: OperationId,
     selected_inputs: Vec<NodeKey>,
-) -> Option<()> {
+) -> Option<OperationOutput> {
     match op_ctx.get(op).expect("Invalid operation ID") {
         Operation::Builtin(builtin) => {
             run_builtin_operation::<S>(g, builtin, selected_inputs)
@@ -173,16 +174,16 @@ fn run_builtin_operation<S: SemanticsClone>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
     op: &S::BuiltinOperation,
     selected_inputs: Vec<NodeKey>,
-) -> Option<()>
+) -> Option<OperationOutput>
 {
     // can we run it?
     let param = op.parameter();
     let abstract_g = S::concrete_to_abstract(&g);
     let subst = get_substitution(&abstract_g, &param, &selected_inputs)?;
 
-    op.apply(g, OperationArgument { selected_input_nodes: selected_inputs }, &subst);
+    let output = op.apply(g, OperationArgument { selected_input_nodes: selected_inputs }, &subst);
 
-    Some(())
+    Some(output)
 }
 
 fn run_custom_operation<S: SemanticsClone>(
@@ -190,16 +191,16 @@ fn run_custom_operation<S: SemanticsClone>(
     op_ctx: &OperationContext<S>,
     op: &UserDefinedOperation<S>,
     selected_inputs: Vec<NodeKey>,
-) -> Option<()>
+) -> Option<OperationOutput>
 {
     // can we run it?
     let param = &op.parameter;
     let abstract_g = S::concrete_to_abstract(&g);
     let subst = get_substitution(&abstract_g, param, &selected_inputs)?;
 
-    op.apply(op_ctx, g, OperationArgument { selected_input_nodes: selected_inputs }, &subst);
+    let output = op.apply(op_ctx, g, OperationArgument { selected_input_nodes: selected_inputs }, &subst);
 
-    Some(())
+    Some(output)
 }
 
 

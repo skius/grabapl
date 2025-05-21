@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use grabapl::graph::semantics::{AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, Semantics};
 use grabapl::{DotCollector, EdgeInsertionOrder, OperationContext, WithSubstMarker};
 use grabapl::graph::operation::run_operation;
-use grabapl::graph::pattern::{OperationArgument, OperationParameter, ParameterSubstition};
+use grabapl::graph::pattern::{OperationArgument, OperationOutput, OperationParameter, ParameterSubstition};
 
 pub struct SimpleSemantics;
 
@@ -145,15 +145,18 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
         graph: &mut ConcreteGraph<SimpleSemantics>,
         argument: OperationArgument,
         substitution: &ParameterSubstition,
-    ) {
+    ) -> OperationOutput {
+        let mut new_nodes = HashMap::new();
         match self {
             BuiltinOperation::AddNode => {
-                graph.add_node(0);
+                let new_concrete_node = graph.add_node(0);
+                new_nodes.insert(0, new_concrete_node);
             }
             BuiltinOperation::AppendChild => {
                 let parent = substitution.mapping[&0];
                 let child = graph.add_node(0);
                 graph.add_edge_ordered(parent, child, "".to_string(), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+                new_nodes.insert(0, child);
             }
             BuiltinOperation::IndexCycle => {
                 let a = substitution.mapping[&0];
@@ -167,6 +170,10 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 let a = substitution.mapping[&0];
                 *graph.get_mut_node_attr(a).unwrap() = f();
             }
+        }
+        
+        OperationOutput {
+            new_nodes,
         }
     }
 }

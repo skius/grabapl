@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::rc::Rc;
-use crate::graph::pattern::{OperationArgument, OperationParameter, ParameterSubstition};
+use crate::graph::pattern::{OperationArgument, OperationOutput, OperationParameter, ParameterSubstition};
 use crate::{NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
 use crate::graph::operation::run_operation;
 use crate::graph::semantics::{ConcreteGraph, SemanticsClone};
@@ -27,7 +27,9 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
         g: &mut ConcreteGraph<S>,
         argument: OperationArgument,
         subst: &ParameterSubstition,
-    ) {
+    ) -> OperationOutput {
+        let mut our_output_map: HashMap<SubstMarker, NodeKey> = HashMap::new();
+
         let mut output_map: HashMap<AbstractOutputId, HashMap<SubstMarker, NodeKey>> = HashMap::new();
 
         for (abstract_output_id, instruction) in &self.instructions {
@@ -45,17 +47,26 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
                             }
                         }
                     }
-                    run_operation::<S>(
+                    // TODO: make fallible
+                    let output = run_operation::<S>(
                         g,
                         op_ctx,
                         *op_id,
                         new_args,
                     ).unwrap();
+
+                    output_map.insert(abstract_output_id, output.new_nodes);
                 }
                 Instruction::Query(query) => {
                     todo!("implement query");
                 }
             }
+        }
+
+        // TODO: How to define a g ood output here?
+        //  probably should be part of the UserDefinedOperation struct. AbstractNodeId should be used, and then we get the actual node key based on what's happening.
+        OperationOutput {
+            new_nodes: our_output_map,
         }
     }
 }
