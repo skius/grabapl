@@ -33,6 +33,7 @@ pub trait BuiltinOperation {
     );
 
     // TODO: OperationOutput returned here should only represent Abstract changes. Basically the guaranteed new nodes so that other ops can refer to it.
+    //  Maybe we could have something be returned in apply_abstract (just a Vec<SubstMarker>?) to indicate _which_ nodes are guaranteed to be added, and apply then returns a map with those substmarkers as keys?
     fn apply(
         &self,
         g: &mut ConcreteGraph<Self::S>,
@@ -99,6 +100,7 @@ fn get_substitution<S: Semantics>(
     selected_inputs: &[NodeKey],
 ) -> Option<ParameterSubstition> {
     if param.explicit_input_nodes.len() != selected_inputs.len() {
+        eprintln!("WARNING: get_substitution called with wrong number of inputs");
         return None;
     }
 
@@ -153,7 +155,7 @@ fn get_substitution<S: Semantics>(
     }).next().map(ParameterSubstition::new)
 }
 
-
+// TODO: return result instead
 pub fn run_operation<S: SemanticsClone>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
     op_ctx: &OperationContext<S>,

@@ -65,6 +65,8 @@ pub enum BuiltinOperation {
     /// Only the first node is used as explicit input, the others are inferred.
     IndexCycle,
     SetValue(Box<dyn Fn() -> i32>),
+    AddEdge,
+    SetEdgeValueToCycle,
 }
 
 impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
@@ -114,6 +116,27 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                     subst_to_node_keys: HashMap::from([(0, a)]),
                 }
             }
+            BuiltinOperation::AddEdge => {
+                let mut g = grabapl::graph::Graph::new();
+                let a = g.add_node(WithSubstMarker::new(0, ()));
+                let b = g.add_node(WithSubstMarker::new(1, ()));
+                OperationParameter {
+                    explicit_input_nodes: vec![0, 1],
+                    parameter_graph: g,
+                    subst_to_node_keys: HashMap::from([(0, a), (1, b)]),
+                }
+            }
+            BuiltinOperation::SetEdgeValueToCycle => {
+                let mut g = grabapl::graph::Graph::new();
+                let a = g.add_node(WithSubstMarker::new(0, ()));
+                let b = g.add_node(WithSubstMarker::new(1, ()));
+                g.add_edge(a, b, EdgePattern::Wildcard);
+                OperationParameter {
+                    explicit_input_nodes: vec![0, 1],
+                    parameter_graph: g,
+                    subst_to_node_keys: HashMap::from([(0, a), (1, b)]),
+                }
+            }
         }
     }
 
@@ -136,6 +159,16 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
             }
             BuiltinOperation::SetValue(_) => {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
+            }
+            BuiltinOperation::AddEdge => {
+                let a = substitution.mapping[&0];
+                let b = substitution.mapping[&1];
+                g.add_edge_ordered(a, b, EdgePattern::Exact("".to_string()), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+            }
+            BuiltinOperation::SetEdgeValueToCycle => {
+                let a = substitution.mapping[&0];
+                let b = substitution.mapping[&1];
+                *g.get_mut_edge_attr((a, b)).unwrap() = EdgePattern::Exact("cycle".to_string());
             }
         }
     }
@@ -170,8 +203,19 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 let a = substitution.mapping[&0];
                 *graph.get_mut_node_attr(a).unwrap() = f();
             }
+            BuiltinOperation::AddEdge => {
+                let a = substitution.mapping[&0];
+                let b = substitution.mapping[&1];
+                graph.add_edge_ordered(a, b, "".to_string(), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+            }
+            // TODO: make this generic over its value
+            BuiltinOperation::SetEdgeValueToCycle => {
+                let a = substitution.mapping[&0];
+                let b = substitution.mapping[&1];
+                *graph.get_mut_edge_attr((a, b)).unwrap() = "cycle".to_string();
+            }
         }
-        
+
         OperationOutput {
             new_nodes,
         }

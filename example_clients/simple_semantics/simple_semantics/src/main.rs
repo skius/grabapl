@@ -24,12 +24,20 @@ fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemantics> 
     instructions.push(("third_child", Instruction::Operation(1, vec![input_node])));
     instructions.push(("fourth_child", Instruction::Operation(1, vec![input_node])));
 
-    // Should not work, since there are no edges between those three and the second->fourth edge is not labelled 'cycle'
-    // instructions.push(("TODO ignore me", Instruction::Operation(2, vec![
-    //     AbstractNodeId::DynamicOutputSubstMarker("fourth_child", 0),
-    //     AbstractNodeId::DynamicOutputSubstMarker("third_child", 0),
-    //     AbstractNodeId::DynamicOutputSubstMarker("second_child", 0),
-    // ])));
+    let second_id = AbstractNodeId::DynamicOutputSubstMarker("second_child", 0);
+    let third_id = AbstractNodeId::DynamicOutputSubstMarker("third_child", 0);
+    let fourth_id = AbstractNodeId::DynamicOutputSubstMarker("fourth_child", 0);
+
+    instructions.push(("TODO ignore", Instruction::Operation(4, vec![fourth_id, third_id])));
+    instructions.push(("TODO ignore", Instruction::Operation(4, vec![third_id, second_id])));
+    instructions.push(("TODO ignore", Instruction::Operation(4, vec![second_id, fourth_id])));
+    // TODO cycle label?
+    instructions.push(("TODO ignore", Instruction::Operation(5, vec![second_id, fourth_id])));
+
+
+    instructions.push(("TODO ignore me", Instruction::Operation(2, vec![
+        fourth_id
+    ])));
 
     UserDefinedOperation {
         parameter: param,
@@ -44,6 +52,8 @@ fn main() {
         (0, BuiltinOperation::AddNode),
         (1, BuiltinOperation::AppendChild),
         (2, BuiltinOperation::IndexCycle),
+        (4, BuiltinOperation::AddEdge),
+        (5, BuiltinOperation::SetEdgeValueToCycle),
     ]);
     let mut operation_ctx = OperationContext::from_builtins(operation_ctx);
     operation_ctx.add_custom_operation(3, user_defined_op);

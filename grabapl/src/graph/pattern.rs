@@ -12,6 +12,7 @@ pub struct OperationParameter<S: Semantics> {
 }
 
 /// The result of trying to bind an abstract graph to a parameter graph.
+#[derive(Debug)]
 pub struct ParameterSubstition {
     pub mapping: HashMap<SubstMarker, NodeKey>,
 }
