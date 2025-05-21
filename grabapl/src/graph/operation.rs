@@ -1,9 +1,12 @@
+pub mod user_defined;
+
 use crate::{Graph, NodeKey, SubstMarker};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
 use crate::graph::EdgeAttribute;
+use crate::graph::operation::user_defined::UserDefinedOperation;
 use crate::graph::pattern::{OperationArgument, OperationParameter, ParameterSubstition};
 use crate::graph::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics, SemanticsClone};
 
@@ -28,12 +31,12 @@ pub trait BuiltinOperation {
 }
 
 /// Contains available operations
-pub struct OperationContext<B> {
-    builtins: HashMap<OperationId, B>,
-    custom: HashMap<OperationId, UserDefinedOperation>,
+pub struct OperationContext<S: Semantics> {
+    builtins: HashMap<OperationId, S::BuiltinOperation>,
+    custom: HashMap<OperationId, UserDefinedOperation<S>>,
 }
 
-impl<B> OperationContext<B> {
+impl<S: Semantics> OperationContext<S> {
     pub fn new() -> Self {
         OperationContext {
             builtins: HashMap::new(),
@@ -41,22 +44,22 @@ impl<B> OperationContext<B> {
         }
     }
     
-    pub fn from_builtins(builtins: HashMap<OperationId, B>) -> Self {
+    pub fn from_builtins(builtins: HashMap<OperationId, S::BuiltinOperation>) -> Self {
         OperationContext {
             builtins,
             custom: HashMap::new(),
         }
     }
 
-    pub fn add_builtin_operation(&mut self, id: OperationId, op: B) {
+    pub fn add_builtin_operation(&mut self, id: OperationId, op: S::BuiltinOperation) {
         self.builtins.insert(id, op);
     }
 
-    pub fn add_custom_operation(&mut self, id: OperationId, op: UserDefinedOperation) {
+    pub fn add_custom_operation(&mut self, id: OperationId, op: UserDefinedOperation<S>) {
         self.custom.insert(id, op);
     }
 
-    pub fn get(&self, id: OperationId) -> Option<Operation<B>> {
+    pub fn get(&self, id: OperationId) -> Option<Operation<S>> {
         if let Some(builtin) = self.builtins.get(&id) {
             return Some(Operation::Builtin(builtin));
         }
@@ -67,64 +70,15 @@ impl<B> OperationContext<B> {
     }
 }
 
-enum Operation<'a, B> {
-    Builtin(&'a B),
-    Custom(&'a UserDefinedOperation),
+enum Operation<'a, S: Semantics> {
+    Builtin(&'a S::BuiltinOperation),
+    Custom(&'a UserDefinedOperation<S>),
 }
 
 // TODO: Builtin operations should be a trait that follows some generic pattern of mutating the graph
 // also,
 
-// A 'custom'/user-defined operation
-struct UserDefinedOperation {
-    instructions: Vec<Instruction>,
-}
-
 pub type OperationId = u32;
-
-enum Instruction {
-    // TODO: add inputs
-    Operation(OperationId),
-    Query(Query),
-}
-
-struct Query {
-    taken: QueryTaken,
-    not_taken: Vec<Instruction>,
-}
-
-// What happens when the query results in true.
-//
-// Analogy in Rust:
-// ```
-// if let Pattern(_) = query { block }
-// ```
-struct QueryTaken {
-    // The pattern changes are applied to the abstract graph in sequence. Analogy: the "let Pattern" part
-    pattern_changes: Vec<PatternChange>,
-    // With the new abstract graph, run these instructions. Analogy: the "block" part
-    instructions: Vec<Instruction>,
-}
-
-// These may refer to the original query input somehow.
-// For example, we may have a "Has child?" query that:
-//  1. ExpectNode(Child)
-//  2. ExpectEdge(Parent, Child)
-// But "Parent" is a free variable here, hence must somehow come from the query input. Unsure how yet.
-enum PatternChange {
-    ExpectNode(NodeChangePattern),
-    ExpectEdge(EdgeChangePattern),
-}
-
-enum NodeChangePattern {
-    // TODO: data to name the new node? And do we need a default node attr?
-    NewNode,
-}
-
-enum EdgeChangePattern {
-    // TODO: data to refer to which nodes get connected? And do we need a default edge attr?
-    NewEdge,
-}
 
 
 /// Returns the pattern subst to input graph node key mapping, if the operation is applicable.
@@ -191,7 +145,7 @@ fn get_substitution<S: Semantics>(
 
 pub fn run_operation<S: SemanticsClone>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
-    op_ctx: &OperationContext<S::BuiltinOperation>,
+    op_ctx: &OperationContext<S>,
     op: OperationId,
     selected_inputs: Vec<NodeKey>,
 ) -> Option<()> {
@@ -200,7 +154,7 @@ pub fn run_operation<S: SemanticsClone>(
             run_builtin_operation::<S>(g, builtin, selected_inputs)
         }
         Operation::Custom(custom) => {
-            panic!("Custom operations not implemented yet")
+            run_custom_operation::<S>(g, custom, selected_inputs)
         }
     }
 }
@@ -221,6 +175,21 @@ fn run_builtin_operation<S: SemanticsClone>(
     Some(())
 }
 
+fn run_custom_operation<S: SemanticsClone>(
+    g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
+    op: &UserDefinedOperation<S>,
+    selected_inputs: Vec<NodeKey>,
+) -> Option<()>
+{
+    // can we run it?
+    let param = &op.parameter;
+    let abstract_g = S::concrete_to_abstract(&g);
+    let subst = get_substitution(&abstract_g, param, &selected_inputs)?;
+    
+    op.apply(g, OperationArgument { selected_input_nodes: selected_inputs }, &subst);
+
+    Some(())
+}
 
 
 
