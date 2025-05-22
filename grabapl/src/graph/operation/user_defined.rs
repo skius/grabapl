@@ -3,7 +3,7 @@ use std::rc::Rc;
 use derive_more::with_trait::From;
 use crate::graph::pattern::{AbstractOutputNodeMarker, OperationArgument, OperationOutput, OperationParameter, ParameterSubstition};
 use crate::{NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
-use crate::graph::operation::run_operation;
+use crate::graph::operation::{run_builtin_operation, run_operation};
 use crate::graph::semantics::{ConcreteGraph, SemanticsClone};
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
@@ -41,27 +41,39 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
 
         for (abstract_output_id, instruction) in &self.instructions {
             match instruction {
-                Instruction::Operation(op_id, args) => {
-                    let mut new_args = vec![];
+                oplike@(Instruction::Operation(_, args) | Instruction::Builtin(_, args)) => {
+                    let mut concrete_args = vec![];
                     for arg in args {
                         match arg {
                             AbstractNodeId::ParameterMarker(subst_marker) => {
-                                new_args.push(subst.mapping[subst_marker]);
+                                concrete_args.push(subst.mapping[subst_marker]);
                             }
                             AbstractNodeId::DynamicOutputMarker(output_id, output_marker) => {
                                 let output_map = output_map.get_mut(output_id).unwrap();
-                                new_args.push(output_map[output_marker]);
+                                concrete_args.push(output_map[output_marker]);
                             }
                         }
                     }
                     // TODO: make fallible
                     // TODO: How do we support mutually recursive user defined operations?
-                    let output = run_operation::<S>(
-                        g,
-                        op_ctx,
-                        *op_id,
-                        new_args,
-                    ).unwrap();
+                    let output = match oplike {
+                        Instruction::Operation(op_id, _) => {
+                            run_operation::<S>(
+                                g,
+                                op_ctx,
+                                *op_id,
+                                concrete_args,
+                            ).unwrap()
+                        }
+                        Instruction::Builtin(op, _) => {
+                            run_builtin_operation::<S>(
+                                g,
+                                op,
+                                concrete_args,
+                            ).unwrap()
+                        }
+                        Instruction::Query(_) => unreachable!()
+                    };
 
                     output_map.insert(*abstract_output_id, output.new_nodes);
                 }
@@ -81,6 +93,7 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
 
 
 pub enum Instruction<S: Semantics> {
+    Builtin(S::BuiltinOperation, Vec<AbstractNodeId>),
     Operation(OperationId, Vec<AbstractNodeId>),
     Query(Query<S>),
 }

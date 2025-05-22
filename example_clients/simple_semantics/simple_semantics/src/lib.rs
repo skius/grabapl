@@ -67,6 +67,7 @@ pub enum BuiltinOperation {
     SetValue(Box<dyn Fn() -> i32>),
     AddEdge,
     SetEdgeValueToCycle,
+    SetEdgeValue(String),
 }
 
 impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
@@ -143,6 +144,18 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                     node_keys_to_subst: HashMap::from([(a, 0), (b, 1)]),
                 }
             }
+            BuiltinOperation::SetEdgeValue(_) => {
+                let mut g = grabapl::graph::Graph::new();
+                let a = g.add_node(());
+                let b = g.add_node(());
+                g.add_edge(a, b, EdgePattern::Wildcard);
+                OperationParameter {
+                    explicit_input_nodes: vec![0, 1],
+                    parameter_graph: g,
+                    subst_to_node_keys: HashMap::from([(0, a), (1, b)]),
+                    node_keys_to_subst: HashMap::from([(a, 0), (b, 1)]),
+                }
+            }
         }
     }
 
@@ -175,6 +188,11 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 let a = substitution.mapping[&0];
                 let b = substitution.mapping[&1];
                 *g.get_mut_edge_attr((a, b)).unwrap() = EdgePattern::Exact("cycle".to_string());
+            }
+            BuiltinOperation::SetEdgeValue(val) => {
+                let a = substitution.mapping[&0];
+                let b = substitution.mapping[&1];
+                *g.get_mut_edge_attr((a, b)).unwrap() = EdgePattern::Exact(val.clone());
             }
         }
     }
@@ -219,6 +237,11 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 let a = substitution.mapping[&0];
                 let b = substitution.mapping[&1];
                 *graph.get_mut_edge_attr((a, b)).unwrap() = "cycle".to_string();
+            }
+            BuiltinOperation::SetEdgeValue(val) => {
+                let a = substitution.mapping[&0];
+                let b = substitution.mapping[&1];
+                *graph.get_mut_edge_attr((a, b)).unwrap() = val.clone();
             }
         }
 

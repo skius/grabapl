@@ -10,6 +10,7 @@ pub struct OperationParameter<S: Semantics> {
     // TODO: do we need WithSubstMarker? cant we just use the hashmap?
     pub parameter_graph: AbstractGraph<S>,
     // TODO: Use a BidiHashMap
+    // TODO: Actually, because an operation may accept the same node multiple times, we may want to to have the inverse actually be a multimap? so NodeKey -> Vec<SubstMarker>
     /// Maps the user-defined substitution markers to the node keys in the pattern graph.
     pub subst_to_node_keys: HashMap<SubstMarker, NodeKey>,
     /// Maps node keys in the pattern graph to the user-defined substitution markers.

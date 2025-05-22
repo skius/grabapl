@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
+use thiserror::Error;
 use crate::graph::EdgeAttribute;
 use crate::graph::operation::user_defined::UserDefinedOperation;
 use crate::graph::pattern::{OperationArgument, OperationOutput, OperationParameter, ParameterSubstition};
@@ -98,12 +99,17 @@ fn get_substitution<S: Semantics>(
     g: &AbstractGraph<S>,
     param: &OperationParameter<S>,
     selected_inputs: &[NodeKey],
-) -> Option<ParameterSubstition> {
+) -> Result<ParameterSubstition> {
     if param.explicit_input_nodes.len() != selected_inputs.len() {
-        eprintln!("WARNING: get_substitution called with wrong number of inputs");
-        return None;
+        // TODO: decide if we want this to be actually reachable? Or if all preprocessing we do should catch this
+        return Err(OperationError::InvalidOperationArgumentCount {
+            expected: param.explicit_input_nodes.len(),
+            actual: selected_inputs.len(),
+        });
     }
 
+    // TODO: this won't work if the user selects the same node multiple times. We cannot have a subgraph where two nodes of the subgraph actually match to just a single one in the input graph.
+    //  A fix might be to split the isomorphism finding to per-explicitly-selected node?
     let enforced_param_to_arg_node_key_mapping = param
         .explicit_input_nodes
         .iter()
@@ -135,7 +141,7 @@ fn get_substitution<S: Semantics>(
     let isos = general_subgraph_monomorphisms_iter(&param_ref, &arg_ref,
         &mut nm,
         &mut em,
-    )?;
+    ).ok_or(OperationError::ArgumentDoesNotMatchParameter)?;
 
     isos.filter_map(|iso| {
         // TODO: handle edge orderedness
@@ -151,7 +157,7 @@ fn get_substitution<S: Semantics>(
             .collect::<HashMap<_, _>>();
         
         Some(mapping)
-    }).next().map(ParameterSubstition::new)
+    }).next().map(ParameterSubstition::new).ok_or(OperationError::ArgumentDoesNotMatchParameter)
 }
 
 // TODO: return result instead
@@ -160,7 +166,7 @@ pub fn run_operation<S: SemanticsClone>(
     op_ctx: &OperationContext<S>,
     op: OperationId,
     selected_inputs: Vec<NodeKey>,
-) -> Option<OperationOutput> {
+) -> Result<OperationOutput> {
     match op_ctx.get(op).expect("Invalid operation ID") {
         Operation::Builtin(builtin) => {
             run_builtin_operation::<S>(g, builtin, selected_inputs)
@@ -175,16 +181,17 @@ fn run_builtin_operation<S: SemanticsClone>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
     op: &S::BuiltinOperation,
     selected_inputs: Vec<NodeKey>,
-) -> Option<OperationOutput>
+) -> Result<OperationOutput>
 {
     // can we run it?
     let param = op.parameter();
     let abstract_g = S::concrete_to_abstract(&g);
     let subst = get_substitution(&abstract_g, &param, &selected_inputs)?;
 
+    // TODO: we probably dont need to pass the OperationArgument down. Might just cause confusion.
     let output = op.apply(g, OperationArgument { selected_input_nodes: selected_inputs }, &subst);
 
-    Some(output)
+    Ok(output)
 }
 
 fn run_custom_operation<S: SemanticsClone>(
@@ -192,22 +199,33 @@ fn run_custom_operation<S: SemanticsClone>(
     op_ctx: &OperationContext<S>,
     op: &UserDefinedOperation<S>,
     selected_inputs: Vec<NodeKey>,
-) -> Option<OperationOutput>
+) -> Result<OperationOutput>
 {
     // can we run it?
     let param = &op.parameter;
     let abstract_g = S::concrete_to_abstract(&g);
     let subst = get_substitution(&abstract_g, param, &selected_inputs)?;
 
+    // TODO: we probably dont need to pass the OperationArgument down. Might just cause confusion.
     let output = op.apply(op_ctx, g, OperationArgument { selected_input_nodes: selected_inputs }, &subst);
 
-    Some(output)
+    Ok(output)
 }
 
+pub type Result<T> = std::result::Result<T, OperationError>;
 
-
-
-
+#[derive(Error, Debug)]
+pub enum OperationError {
+    #[error("operation {0} not found")]
+    InvalidOperationId(OperationId),
+    #[error("invalid operation argument count: expected {expected}, got {actual}")]
+    InvalidOperationArgumentCount {
+        expected: usize,
+        actual: usize,
+    },
+    #[error("operation argument does not match parameter")]
+    ArgumentDoesNotMatchParameter,
+}
 
 
 

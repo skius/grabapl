@@ -19,22 +19,22 @@ fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemantics> 
     let input_node = AbstractNodeId::ParameterMarker(0);
 
     let mut instructions = vec![];
-    instructions.push(("first_child".into(), Instruction::Operation(1, vec![input_node])));
-    instructions.push(("second_child".into(), Instruction::Operation(1, vec![input_node])));
-    instructions.push(("third_child".into(), Instruction::Operation(1, vec![input_node])));
-    instructions.push(("fourth_child".into(), Instruction::Operation(1, vec![input_node])));
+    instructions.push(("first_child".into(), Instruction::Builtin(BuiltinOperation::AppendChild, vec![input_node])));
+    instructions.push(("second_child".into(), Instruction::Builtin(BuiltinOperation::AppendChild, vec![input_node])));
+    instructions.push(("third_child".into(), Instruction::Builtin(BuiltinOperation::AppendChild, vec![input_node])));
+    instructions.push(("fourth_child".into(), Instruction::Builtin(BuiltinOperation::AppendChild, vec![input_node])));
 
     let second_id = AbstractNodeId::DynamicOutputMarker("second_child".into(), "child".into());
     let third_id = AbstractNodeId::DynamicOutputMarker("third_child".into(), "child".into());
     let fourth_id = AbstractNodeId::DynamicOutputMarker("fourth_child".into(), "child".into());
 
-    instructions.push(("TODO ignore".into(), Instruction::Operation(4, vec![fourth_id, third_id])));
-    instructions.push(("TODO ignore".into(), Instruction::Operation(4, vec![third_id, second_id])));
-    instructions.push(("TODO ignore".into(), Instruction::Operation(4, vec![second_id, fourth_id])));
-    instructions.push(("TODO ignore".into(), Instruction::Operation(5, vec![second_id, fourth_id])));
+    instructions.push(("TODO ignore".into(), Instruction::Builtin(BuiltinOperation::AddEdge, vec![fourth_id, third_id])));
+    instructions.push(("TODO ignore".into(), Instruction::Builtin(BuiltinOperation::AddEdge, vec![third_id, second_id])));
+    instructions.push(("TODO ignore".into(), Instruction::Builtin(BuiltinOperation::AddEdge, vec![second_id, fourth_id])));
+    instructions.push(("TODO ignore".into(), Instruction::Builtin(BuiltinOperation::SetEdgeValue("cycle".to_string()), vec![second_id, fourth_id])));
 
 
-    instructions.push(("TODO ignore me".into(), Instruction::Operation(2, vec![
+    instructions.push(("TODO ignore me".into(), Instruction::Builtin(BuiltinOperation::IndexCycle, vec![
         fourth_id
     ])));
 
