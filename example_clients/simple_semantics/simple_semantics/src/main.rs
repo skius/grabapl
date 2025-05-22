@@ -8,34 +8,33 @@ use simple_semantics::{BuiltinOperation, SimpleSemantics};
 fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemantics> {
     // Expects a child
     let mut g = grabapl::graph::Graph::new();
-    let a = g.add_node(WithSubstMarker::new(0, ()));
+    let a = g.add_node(());
     let param = OperationParameter {
         explicit_input_nodes: vec![0],
         parameter_graph: g,
         subst_to_node_keys: HashMap::from([(0, a)]),
+        node_keys_to_subst: HashMap::from([(a, 0)]),
     };
 
     let input_node = AbstractNodeId::ParameterSubstMarker(0);
 
     let mut instructions = vec![];
-    // TODO: How do I access the node key that represents that new child?
-    instructions.push(("first_child", Instruction::Operation(1, vec![input_node])));
-    instructions.push(("second_child", Instruction::Operation(1, vec![input_node])));
-    instructions.push(("third_child", Instruction::Operation(1, vec![input_node])));
-    instructions.push(("fourth_child", Instruction::Operation(1, vec![input_node])));
+    instructions.push(("first_child".into(), Instruction::Operation(1, vec![input_node])));
+    instructions.push(("second_child".into(), Instruction::Operation(1, vec![input_node])));
+    instructions.push(("third_child".into(), Instruction::Operation(1, vec![input_node])));
+    instructions.push(("fourth_child".into(), Instruction::Operation(1, vec![input_node])));
 
-    let second_id = AbstractNodeId::DynamicOutputSubstMarker("second_child", 0);
-    let third_id = AbstractNodeId::DynamicOutputSubstMarker("third_child", 0);
-    let fourth_id = AbstractNodeId::DynamicOutputSubstMarker("fourth_child", 0);
+    let second_id = AbstractNodeId::DynamicOutputSubstMarker("second_child".into(), 0);
+    let third_id = AbstractNodeId::DynamicOutputSubstMarker("third_child".into(), 0);
+    let fourth_id = AbstractNodeId::DynamicOutputSubstMarker("fourth_child".into(), 0);
 
-    instructions.push(("TODO ignore", Instruction::Operation(4, vec![fourth_id, third_id])));
-    instructions.push(("TODO ignore", Instruction::Operation(4, vec![third_id, second_id])));
-    instructions.push(("TODO ignore", Instruction::Operation(4, vec![second_id, fourth_id])));
-    // TODO cycle label?
-    instructions.push(("TODO ignore", Instruction::Operation(5, vec![second_id, fourth_id])));
+    instructions.push(("TODO ignore".into(), Instruction::Operation(4, vec![fourth_id, third_id])));
+    instructions.push(("TODO ignore".into(), Instruction::Operation(4, vec![third_id, second_id])));
+    instructions.push(("TODO ignore".into(), Instruction::Operation(4, vec![second_id, fourth_id])));
+    instructions.push(("TODO ignore".into(), Instruction::Operation(5, vec![second_id, fourth_id])));
 
 
-    instructions.push(("TODO ignore me", Instruction::Operation(2, vec![
+    instructions.push(("TODO ignore me".into(), Instruction::Operation(2, vec![
         fourth_id
     ])));
 

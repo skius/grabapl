@@ -80,24 +80,26 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                     explicit_input_nodes: vec![],
                     parameter_graph: g,
                     subst_to_node_keys: HashMap::new(),
+                    node_keys_to_subst: HashMap::new(),
                 }
             }
             BuiltinOperation::AppendChild => {
                 // Expects a child
                 let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(WithSubstMarker::new(0, ()));
+                let a = g.add_node(());
                 OperationParameter {
                     explicit_input_nodes: vec![0],
                     parameter_graph: g,
                     // TODO: this is scary, because NodeKeys are not a newtype yet, and neither are SubstMarkers.
                     subst_to_node_keys: HashMap::from([(0, a)]),
+                    node_keys_to_subst: HashMap::from([(a, 0)]),
                 }
             }
             BuiltinOperation::IndexCycle => {
                 let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(WithSubstMarker::new(0, ()));
-                let b = g.add_node(WithSubstMarker::new(1, ()));
-                let c = g.add_node(WithSubstMarker::new(2, ()));
+                let a = g.add_node(());
+                let b = g.add_node(());
+                let c = g.add_node(());
                 g.add_edge(a, b, EdgePattern::Wildcard);
                 g.add_edge(b, c, EdgePattern::Wildcard);
                 g.add_edge(c, a, EdgePattern::Exact("cycle".to_string()));
@@ -105,36 +107,40 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                     explicit_input_nodes: vec![0],
                     parameter_graph: g,
                     subst_to_node_keys: HashMap::from([(0, a), (1, b), (2, c)]),
+                    node_keys_to_subst: HashMap::from([(a, 0), (b, 1), (c, 2)]),
                 }
             }
             BuiltinOperation::SetValue(_) => {
                 let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(WithSubstMarker::new(0, ()));
+                let a = g.add_node(());
                 OperationParameter {
                     explicit_input_nodes: vec![0],
                     parameter_graph: g,
                     subst_to_node_keys: HashMap::from([(0, a)]),
+                    node_keys_to_subst: HashMap::from([(a, 0)]),
                 }
             }
             BuiltinOperation::AddEdge => {
                 let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(WithSubstMarker::new(0, ()));
-                let b = g.add_node(WithSubstMarker::new(1, ()));
+                let a = g.add_node(());
+                let b = g.add_node(());
                 OperationParameter {
                     explicit_input_nodes: vec![0, 1],
                     parameter_graph: g,
                     subst_to_node_keys: HashMap::from([(0, a), (1, b)]),
+                    node_keys_to_subst: HashMap::from([(a, 0), (b, 1)]),
                 }
             }
             BuiltinOperation::SetEdgeValueToCycle => {
                 let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(WithSubstMarker::new(0, ()));
-                let b = g.add_node(WithSubstMarker::new(1, ()));
+                let a = g.add_node(());
+                let b = g.add_node(());
                 g.add_edge(a, b, EdgePattern::Wildcard);
                 OperationParameter {
                     explicit_input_nodes: vec![0, 1],
                     parameter_graph: g,
                     subst_to_node_keys: HashMap::from([(0, a), (1, b)]),
+                    node_keys_to_subst: HashMap::from([(a, 0), (b, 1)]),
                 }
             }
         }

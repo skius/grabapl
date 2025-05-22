@@ -123,7 +123,7 @@ fn get_substitution<S: Semantics>(
         }
         let param_attr = param.parameter_graph.get_node_attr(*param_node).unwrap();
         let arg_attr = g.get_node_attr(*arg_node).unwrap();
-        S::NodeMatcher::matches(arg_attr, &param_attr.value)
+        S::NodeMatcher::matches(arg_attr, &param_attr)
     };
 
     let mut em = |param_attr_wrapper: &EdgeAttribute<S::EdgeAbstract>, arg_attr_wrapper: &EdgeAttribute<S::EdgeAbstract>| {
@@ -146,8 +146,7 @@ fn get_substitution<S: Semantics>(
             .map(|(param_idx, &arg_idx)| {
                 let param_node_key = param_ref.from_index(param_idx);
                 let arg_node_key = arg_ref.from_index(arg_idx);
-                let param_subst = param.parameter_graph.get_node_attr(param_node_key).unwrap();
-                (param_subst.marker, arg_node_key)
+                (param.node_keys_to_subst[&param_node_key], arg_node_key)
             })
             .collect::<HashMap<_, _>>();
         

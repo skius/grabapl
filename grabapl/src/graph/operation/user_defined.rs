@@ -1,23 +1,30 @@
 use std::collections::HashMap;
 use std::rc::Rc;
+use derive_more::with_trait::From;
 use crate::graph::pattern::{OperationArgument, OperationOutput, OperationParameter, ParameterSubstition};
 use crate::{NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
 use crate::graph::operation::run_operation;
 use crate::graph::semantics::{ConcreteGraph, SemanticsClone};
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
-pub type AbstractOutputId = &'static str;
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, From)]
+pub struct AbstractOperationResultMarker(pub &'static str);
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, From)]
+pub struct AbstractOutputNodeMarker(pub &'static str);
 
+/// Identifies a node in the user defined operation view.
 #[derive(Copy, Clone)]
 pub enum AbstractNodeId {
+    /// A node in the parameter graph.
     ParameterSubstMarker(SubstMarker),
-    DynamicOutputSubstMarker(AbstractOutputId, SubstMarker),
+    /// A node that was created as a result of another operation.
+    DynamicOutputSubstMarker(AbstractOperationResultMarker, SubstMarker),
 }
 
 // A 'custom'/user-defined operation
 pub struct UserDefinedOperation<S: Semantics> {
     pub parameter: OperationParameter<S>,
-    pub instructions: Vec<(AbstractOutputId, Instruction<S>)>,
+    pub instructions: Vec<(AbstractOperationResultMarker, Instruction<S>)>,
 }
 
 impl<S: SemanticsClone> UserDefinedOperation<S> {
@@ -30,7 +37,7 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
     ) -> OperationOutput {
         let mut our_output_map: HashMap<SubstMarker, NodeKey> = HashMap::new();
 
-        let mut output_map: HashMap<AbstractOutputId, HashMap<SubstMarker, NodeKey>> = HashMap::new();
+        let mut output_map: HashMap<AbstractOperationResultMarker, HashMap<SubstMarker, NodeKey>> = HashMap::new();
 
         for (abstract_output_id, instruction) in &self.instructions {
             match instruction {
@@ -48,6 +55,7 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
                         }
                     }
                     // TODO: make fallible
+                    // TODO: How do we support mutually recursive user defined operations?
                     let output = run_operation::<S>(
                         g,
                         op_ctx,
@@ -55,7 +63,7 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
                         new_args,
                     ).unwrap();
 
-                    output_map.insert(abstract_output_id, output.new_nodes);
+                    output_map.insert(*abstract_output_id, output.new_nodes);
                 }
                 Instruction::Query(query) => {
                     todo!("implement query");

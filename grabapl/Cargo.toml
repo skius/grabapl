@@ -9,6 +9,7 @@ name = "grabapl"
 [dependencies]
 #petgraph = { git = "https://github.com/petgraph/petgraph.git", rev = "e2b28e59d0c37a8db9037997e84cc483ca94afc9"}
 petgraph = { path = "../playground/petgraph" }
+derive_more = { version = "2.0.1", features = ["from"]}
 
 [dev-dependencies]
 criterion = "0.5.1"
