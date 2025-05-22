@@ -189,13 +189,13 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
         match self {
             BuiltinOperation::AddNode => {
                 let new_concrete_node = graph.add_node(0);
-                new_nodes.insert(0, new_concrete_node);
+                new_nodes.insert("new".into(), new_concrete_node);
             }
             BuiltinOperation::AppendChild => {
                 let parent = substitution.mapping[&0];
                 let child = graph.add_node(0);
                 graph.add_edge_ordered(parent, child, "".to_string(), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
-                new_nodes.insert(0, child);
+                new_nodes.insert("child".into(), child);
             }
             BuiltinOperation::IndexCycle => {
                 let a = substitution.mapping[&0];

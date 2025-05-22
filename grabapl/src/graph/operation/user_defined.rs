@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 use derive_more::with_trait::From;
-use crate::graph::pattern::{OperationArgument, OperationOutput, OperationParameter, ParameterSubstition};
+use crate::graph::pattern::{AbstractOutputNodeMarker, OperationArgument, OperationOutput, OperationParameter, ParameterSubstition};
 use crate::{NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
 use crate::graph::operation::run_operation;
 use crate::graph::semantics::{ConcreteGraph, SemanticsClone};
@@ -9,21 +9,21 @@ use crate::graph::semantics::{ConcreteGraph, SemanticsClone};
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, From)]
 pub struct AbstractOperationResultMarker(pub &'static str);
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, From)]
-pub struct AbstractOutputNodeMarker(pub &'static str);
+
 
 /// Identifies a node in the user defined operation view.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, From)]
 pub enum AbstractNodeId {
     /// A node in the parameter graph.
-    ParameterSubstMarker(SubstMarker),
+    ParameterMarker(SubstMarker),
     /// A node that was created as a result of another operation.
-    DynamicOutputSubstMarker(AbstractOperationResultMarker, SubstMarker),
+    DynamicOutputMarker(AbstractOperationResultMarker, AbstractOutputNodeMarker),
 }
 
 // A 'custom'/user-defined operation
 pub struct UserDefinedOperation<S: Semantics> {
     pub parameter: OperationParameter<S>,
+    // TODO: add preprocessing (checking) step to see if the instructions make sense and are well formed wrt which nodes they access statically.
     pub instructions: Vec<(AbstractOperationResultMarker, Instruction<S>)>,
 }
 
@@ -35,9 +35,9 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
         argument: OperationArgument,
         subst: &ParameterSubstition,
     ) -> OperationOutput {
-        let mut our_output_map: HashMap<SubstMarker, NodeKey> = HashMap::new();
+        let mut our_output_map: HashMap<AbstractOutputNodeMarker, NodeKey> = HashMap::new();
 
-        let mut output_map: HashMap<AbstractOperationResultMarker, HashMap<SubstMarker, NodeKey>> = HashMap::new();
+        let mut output_map: HashMap<AbstractOperationResultMarker, HashMap<AbstractOutputNodeMarker, NodeKey>> = HashMap::new();
 
         for (abstract_output_id, instruction) in &self.instructions {
             match instruction {
@@ -45,12 +45,12 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
                     let mut new_args = vec![];
                     for arg in args {
                         match arg {
-                            AbstractNodeId::ParameterSubstMarker(subst_marker) => {
+                            AbstractNodeId::ParameterMarker(subst_marker) => {
                                 new_args.push(subst.mapping[subst_marker]);
                             }
-                            AbstractNodeId::DynamicOutputSubstMarker(output_id, subst_marker) => {
+                            AbstractNodeId::DynamicOutputMarker(output_id, output_marker) => {
                                 let output_map = output_map.get_mut(output_id).unwrap();
-                                new_args.push(output_map[subst_marker]);
+                                new_args.push(output_map[output_marker]);
                             }
                         }
                     }
@@ -71,7 +71,7 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
             }
         }
 
-        // TODO: How to define a g ood output here?
+        // TODO: How to define a good output here?
         //  probably should be part of the UserDefinedOperation struct. AbstractNodeId should be used, and then we get the actual node key based on what's happening.
         OperationOutput {
             new_nodes: our_output_map,

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use derive_more::From;
 use crate::{Graph, NodeKey, Semantics, SubstMarker, WithSubstMarker};
 use crate::graph::semantics::AbstractGraph;
 
@@ -31,8 +32,11 @@ pub struct OperationArgument {
     pub selected_input_nodes: Vec<NodeKey>,
 }
 
+#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, From)]
+pub struct AbstractOutputNodeMarker(pub &'static str);
+
 pub struct OperationOutput {
     // TODO: use OutputMarker instead of SubstMarker?
-    pub new_nodes: HashMap<SubstMarker, NodeKey>,
+    pub new_nodes: HashMap<AbstractOutputNodeMarker, NodeKey>,
 }
 
