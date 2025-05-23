@@ -4,6 +4,7 @@ use derive_more::with_trait::From;
 use crate::graph::pattern::{AbstractOutputNodeMarker, OperationArgument, OperationOutput, OperationParameter, ParameterSubstition};
 use crate::{NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
 use crate::graph::operation::{run_builtin_operation, run_operation};
+use crate::graph::operation::query::{run_builtin_query, BuiltinQuery};
 use crate::graph::semantics::{ConcreteGraph, SemanticsClone};
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
@@ -20,11 +21,13 @@ pub enum AbstractNodeId {
     DynamicOutputMarker(AbstractOperationResultMarker, AbstractOutputNodeMarker),
 }
 
+pub type InstructionWithResultMarker<S> = (AbstractOperationResultMarker, Instruction<S>);
+
 // A 'custom'/user-defined operation
 pub struct UserDefinedOperation<S: Semantics> {
     pub parameter: OperationParameter<S>,
     // TODO: add preprocessing (checking) step to see if the instructions make sense and are well formed wrt which nodes they access statically.
-    pub instructions: Vec<(AbstractOperationResultMarker, Instruction<S>)>,
+    pub instructions: Vec<InstructionWithResultMarker<S>>,
 }
 
 impl<S: SemanticsClone> UserDefinedOperation<S> {
@@ -37,51 +40,16 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
     ) -> OperationOutput {
         let mut our_output_map: HashMap<AbstractOutputNodeMarker, NodeKey> = HashMap::new();
 
-        let mut output_map: HashMap<AbstractOperationResultMarker, HashMap<AbstractOutputNodeMarker, NodeKey>> = HashMap::new();
+        let mut previous_results: HashMap<AbstractOperationResultMarker, HashMap<AbstractOutputNodeMarker, NodeKey>> = HashMap::new();
 
-        for (abstract_output_id, instruction) in &self.instructions {
-            match instruction {
-                oplike@(Instruction::Operation(_, args) | Instruction::Builtin(_, args)) => {
-                    let mut concrete_args = vec![];
-                    for arg in args {
-                        match arg {
-                            AbstractNodeId::ParameterMarker(subst_marker) => {
-                                concrete_args.push(subst.mapping[subst_marker]);
-                            }
-                            AbstractNodeId::DynamicOutputMarker(output_id, output_marker) => {
-                                let output_map = output_map.get_mut(output_id).unwrap();
-                                concrete_args.push(output_map[output_marker]);
-                            }
-                        }
-                    }
-                    // TODO: make fallible
-                    // TODO: How do we support mutually recursive user defined operations?
-                    let output = match oplike {
-                        Instruction::Operation(op_id, _) => {
-                            run_operation::<S>(
-                                g,
-                                op_ctx,
-                                *op_id,
-                                concrete_args,
-                            ).unwrap()
-                        }
-                        Instruction::Builtin(op, _) => {
-                            run_builtin_operation::<S>(
-                                g,
-                                op,
-                                concrete_args,
-                            ).unwrap()
-                        }
-                        Instruction::Query(_) => unreachable!()
-                    };
-
-                    output_map.insert(*abstract_output_id, output.new_nodes);
-                }
-                Instruction::Query(query) => {
-                    todo!("implement query");
-                }
-            }
-        }
+        run_instructions(
+            g,
+            &mut previous_results,
+            &mut our_output_map,
+            op_ctx,
+            &self.instructions,
+            subst,
+        );
 
         // TODO: How to define a good output here?
         //  probably should be part of the UserDefinedOperation struct. AbstractNodeId should be used, and then we get the actual node key based on what's happening.
@@ -91,16 +59,95 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
     }
 }
 
+fn run_instructions<S: SemanticsClone>(
+    g: &mut ConcreteGraph<S>,
+    previous_results: &mut HashMap<AbstractOperationResultMarker, HashMap<AbstractOutputNodeMarker, NodeKey>>,
+    our_output_map: &mut HashMap<AbstractOutputNodeMarker, NodeKey>,
+    op_ctx: &OperationContext<S>,
+    instructions: &[InstructionWithResultMarker<S>],
+    subst: &ParameterSubstition,
+) {
+    for (abstract_output_id, instruction) in instructions {
+        match instruction {
+            oplike@(Instruction::Operation(_, args) | Instruction::Builtin(_, args)) => {
+                let mut concrete_args = vec![];
+                for arg in args {
+                    match arg {
+                        AbstractNodeId::ParameterMarker(subst_marker) => {
+                            concrete_args.push(subst.mapping[subst_marker]);
+                        }
+                        AbstractNodeId::DynamicOutputMarker(output_id, output_marker) => {
+                            let output_map = previous_results.get_mut(output_id).unwrap();
+                            concrete_args.push(output_map[output_marker]);
+                        }
+                    }
+                }
+                // TODO: make fallible
+                // TODO: How do we support mutually recursive user defined operations?
+                let output = match oplike {
+                    Instruction::Operation(op_id, _) => {
+                        run_operation::<S>(
+                            g,
+                            op_ctx,
+                            *op_id,
+                            concrete_args,
+                        ).unwrap()
+                    }
+                    Instruction::Builtin(op, _) => {
+                        run_builtin_operation::<S>(
+                            g,
+                            op,
+                            concrete_args,
+                        ).unwrap()
+                    }
+                    Instruction::BuiltinQuery(..) => unreachable!()
+                };
+
+                previous_results.insert(*abstract_output_id, output.new_nodes);
+            }
+            Instruction::BuiltinQuery(query, args, query_instr) => {
+                let mut concrete_args = vec![];
+                for arg in args {
+                    match arg {
+                        AbstractNodeId::ParameterMarker(subst_marker) => {
+                            concrete_args.push(subst.mapping[subst_marker]);
+                        }
+                        AbstractNodeId::DynamicOutputMarker(output_id, output_marker) => {
+                            let output_map = previous_results.get_mut(output_id).unwrap();
+                            concrete_args.push(output_map[output_marker]);
+                        }
+                    }
+                }
+                let result = run_builtin_query::<S>(g, query, concrete_args).unwrap();
+                let next_instr = if result.taken {
+                    &query_instr.taken
+                } else {
+                    &query_instr.not_taken
+                };
+                // TODO: don't use function stack (ie, dont recurse), instead use explicit stack
+                run_instructions(
+                    g,
+                    previous_results,
+                    our_output_map,
+                    op_ctx,
+                    next_instr,
+                    subst,
+                )
+            }
+        }
+    }
+}
+
 
 pub enum Instruction<S: Semantics> {
     Builtin(S::BuiltinOperation, Vec<AbstractNodeId>),
     Operation(OperationId, Vec<AbstractNodeId>),
-    Query(Query<S>),
+    BuiltinQuery(S::BuiltinQuery, Vec<AbstractNodeId>, QueryInstructions<S>),
 }
 
-pub struct Query<S: Semantics> {
-    taken: QueryTaken<S>,
-    not_taken: Vec<Instruction<S>>,
+pub struct QueryInstructions<S: Semantics> {
+    pub taken: Vec<InstructionWithResultMarker<S>>,
+    pub not_taken: Vec<InstructionWithResultMarker<S>>,
 }
 
 // What happens when the query results in true.
@@ -111,9 +158,9 @@ pub struct Query<S: Semantics> {
 // ```
 pub struct QueryTaken<S: Semantics> {
     // The pattern changes are applied to the abstract graph in sequence. Analogy: the "let Pattern" part
-    pattern_changes: Vec<PatternChange<S>>,
+    // pub pattern_changes: Vec<PatternChange<S>>,
     // With the new abstract graph, run these instructions. Analogy: the "block" part
-    instructions: Vec<Instruction<S>>,
+    pub instructions: Vec<Instruction<S>>,
 }
 
 // These may refer to the original query input somehow.

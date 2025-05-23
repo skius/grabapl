@@ -1,3 +1,4 @@
+use grabapl::graph::operation::query::{AbstractQueryChange, AbstractQueryOutput, BuiltinQuery as BuiltinQueryTrait, ConcreteQueryOutput, EdgeChange, NodeChange};
 use std::collections::HashMap;
 use grabapl::graph::semantics::{AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, Semantics};
 use grabapl::{DotCollector, EdgeInsertionOrder, OperationContext, WithSubstMarker};
@@ -44,6 +45,77 @@ impl ConcreteToAbstract for EdgeConcreteToAbstract {
     }
 }
 
+pub enum BuiltinQuery {
+    HasChild,
+    IsValueGt(i32),
+}
+
+impl BuiltinQueryTrait for BuiltinQuery {
+    type S = SimpleSemantics;
+
+    fn parameter(&self) -> OperationParameter<Self::S> {
+        match self {
+            BuiltinQuery::HasChild => {
+                let mut g = grabapl::graph::Graph::new();
+                let a = g.add_node(());
+                OperationParameter {
+                    explicit_input_nodes: vec![0],
+                    parameter_graph: g,
+                    subst_to_node_keys: HashMap::from([(0, a)]),
+                    node_keys_to_subst: HashMap::from([(a, 0)]),
+                }
+            }
+            BuiltinQuery::IsValueGt(_) => {
+                let mut g = grabapl::graph::Graph::new();
+                let a = g.add_node(());
+                OperationParameter {
+                    explicit_input_nodes: vec![0],
+                    parameter_graph: g,
+                    subst_to_node_keys: HashMap::from([(0, a)]),
+                    node_keys_to_subst: HashMap::from([(a, 0)]),
+                }
+            }
+        }
+    }
+
+    fn abstract_changes(&self, g: &mut AbstractGraph<Self::S>, argument: OperationArgument, substitution: &ParameterSubstition) -> AbstractQueryOutput<Self::S> {
+        let mut changes = vec![];
+        match self {
+            BuiltinQuery::HasChild => {
+                let parent = substitution.mapping[&0];
+                let child = g.add_node(());
+                g.add_edge_ordered(parent, child, EdgePattern::Wildcard, EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+                changes.push(AbstractQueryChange::ExpectNode(NodeChange::NewNode(1, ())));
+                changes.push(AbstractQueryChange::ExpectEdge(EdgeChange::ChangeEdgeValue {
+                    from: 0,
+                    to: 1,
+                    edge: EdgePattern::Wildcard,
+                }));
+            }
+            BuiltinQuery::IsValueGt(val) => {
+                // No abstract changes if the value is equal, since our type system cannot represent exact values.
+            }
+        }
+        AbstractQueryOutput { changes }
+    }
+
+    fn query(&self, g: &mut ConcreteGraph<Self::S>, argument: OperationArgument, substitution: &ParameterSubstition) -> ConcreteQueryOutput {
+        let mut taken = false;
+        match self {
+            BuiltinQuery::HasChild => {
+                todo!("TODO: how to handle this? we need a notion of the current 'known' graph in order to tell whether there really is a new child or not")
+            }
+            BuiltinQuery::IsValueGt(val) => {
+                let a = substitution.mapping[&0];
+                if *g.get_node_attr(a).unwrap() > *val {
+                    taken = true;
+                }
+            }
+        }
+        ConcreteQueryOutput { taken }
+    }
+}
+
 impl Semantics for SimpleSemantics {
     type NodeConcrete = i32;
     type NodeAbstract = ();
@@ -56,6 +128,7 @@ impl Semantics for SimpleSemantics {
     type EdgeConcreteToAbstract = EdgeConcreteToAbstract;
 
     type BuiltinOperation = BuiltinOperation;
+    type BuiltinQuery = BuiltinQuery;
 }
 
 pub enum BuiltinOperation {
@@ -68,6 +141,9 @@ pub enum BuiltinOperation {
     AddEdge,
     SetEdgeValueToCycle,
     SetEdgeValue(String),
+    SetNodeValue(i32),
+    CopyNodeValueTo,
+    Decrement,
 }
 
 impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
@@ -156,6 +232,37 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                     node_keys_to_subst: HashMap::from([(a, 0), (b, 1)]),
                 }
             }
+            BuiltinOperation::SetNodeValue(_) => {
+                let mut g = grabapl::graph::Graph::new();
+                let a = g.add_node(());
+                OperationParameter {
+                    explicit_input_nodes: vec![0],
+                    parameter_graph: g,
+                    subst_to_node_keys: HashMap::from([(0, a)]),
+                    node_keys_to_subst: HashMap::from([(a, 0)]),
+                }
+            }
+            BuiltinOperation::CopyNodeValueTo => {
+                let mut g = grabapl::graph::Graph::new();
+                let a = g.add_node(());
+                let b = g.add_node(());
+                OperationParameter {
+                    explicit_input_nodes: vec![0, 1],
+                    parameter_graph: g,
+                    subst_to_node_keys: HashMap::from([(0, a), (1, b)]),
+                    node_keys_to_subst: HashMap::from([(a, 0), (b, 1)]),
+                }
+            }
+            BuiltinOperation::Decrement => {
+                let mut g = grabapl::graph::Graph::new();
+                let a = g.add_node(());
+                OperationParameter {
+                    explicit_input_nodes: vec![0],
+                    parameter_graph: g,
+                    subst_to_node_keys: HashMap::from([(0, a)]),
+                    node_keys_to_subst: HashMap::from([(a, 0)]),
+                }
+            }
         }
     }
 
@@ -193,6 +300,18 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 let a = substitution.mapping[&0];
                 let b = substitution.mapping[&1];
                 *g.get_mut_edge_attr((a, b)).unwrap() = EdgePattern::Exact(val.clone());
+            }
+            BuiltinOperation::SetNodeValue(val) => {
+                // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
+            }
+            BuiltinOperation::CopyNodeValueTo => {
+                let a = substitution.mapping[&0];
+                let b = substitution.mapping[&1];
+                // Noop as long as the abstract value is just the unit type...
+                *g.get_mut_node_attr(b).unwrap() = *g.get_node_attr(a).unwrap();
+            }
+            BuiltinOperation::Decrement => {
+                // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
             }
         }
     }
@@ -242,6 +361,20 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 let a = substitution.mapping[&0];
                 let b = substitution.mapping[&1];
                 *graph.get_mut_edge_attr((a, b)).unwrap() = val.clone();
+            }
+            BuiltinOperation::SetNodeValue(val) => {
+                let a = substitution.mapping[&0];
+                *graph.get_mut_node_attr(a).unwrap() = *val;
+            }
+            BuiltinOperation::CopyNodeValueTo => {
+                let a = substitution.mapping[&0];
+                let b = substitution.mapping[&1];
+                *graph.get_mut_node_attr(b).unwrap() = *graph.get_node_attr(a).unwrap();
+            }
+            BuiltinOperation::Decrement => {
+                let a = substitution.mapping[&0];
+                let val = graph.get_node_attr(a).unwrap();
+                *graph.get_mut_node_attr(a).unwrap() = val - 1;
             }
         }
 

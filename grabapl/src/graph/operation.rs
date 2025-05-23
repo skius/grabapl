@@ -1,4 +1,5 @@
 pub mod user_defined;
+pub mod query;
 
 use crate::{Graph, NodeKey, SubstMarker};
 use std::collections::HashMap;
@@ -42,6 +43,7 @@ pub trait BuiltinOperation {
         substitution: &ParameterSubstition,
     ) -> OperationOutput;
 }
+
 
 /// Contains available operations
 pub struct OperationContext<S: Semantics> {
@@ -99,7 +101,7 @@ fn get_substitution<S: Semantics>(
     g: &AbstractGraph<S>,
     param: &OperationParameter<S>,
     selected_inputs: &[NodeKey],
-) -> Result<ParameterSubstition> {
+) -> OperationResult<ParameterSubstition> {
     if param.explicit_input_nodes.len() != selected_inputs.len() {
         // TODO: decide if we want this to be actually reachable? Or if all preprocessing we do should catch this
         return Err(OperationError::InvalidOperationArgumentCount {
@@ -166,7 +168,7 @@ pub fn run_operation<S: SemanticsClone>(
     op_ctx: &OperationContext<S>,
     op: OperationId,
     selected_inputs: Vec<NodeKey>,
-) -> Result<OperationOutput> {
+) -> OperationResult<OperationOutput> {
     match op_ctx.get(op).expect("Invalid operation ID") {
         Operation::Builtin(builtin) => {
             run_builtin_operation::<S>(g, builtin, selected_inputs)
@@ -181,7 +183,7 @@ fn run_builtin_operation<S: SemanticsClone>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
     op: &S::BuiltinOperation,
     selected_inputs: Vec<NodeKey>,
-) -> Result<OperationOutput>
+) -> OperationResult<OperationOutput>
 {
     // can we run it?
     let param = op.parameter();
@@ -199,7 +201,7 @@ fn run_custom_operation<S: SemanticsClone>(
     op_ctx: &OperationContext<S>,
     op: &UserDefinedOperation<S>,
     selected_inputs: Vec<NodeKey>,
-) -> Result<OperationOutput>
+) -> OperationResult<OperationOutput>
 {
     // can we run it?
     let param = &op.parameter;
@@ -212,7 +214,7 @@ fn run_custom_operation<S: SemanticsClone>(
     Ok(output)
 }
 
-pub type Result<T> = std::result::Result<T, OperationError>;
+pub type OperationResult<T> = std::result::Result<T, OperationError>;
 
 #[derive(Error, Debug)]
 pub enum OperationError {

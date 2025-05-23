@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 use grabapl::{DotCollector, OperationContext, Semantics, WithSubstMarker};
 use grabapl::graph::operation::run_operation;
-use grabapl::graph::operation::user_defined::{AbstractNodeId, Instruction, UserDefinedOperation};
+use grabapl::graph::operation::user_defined::{AbstractNodeId, Instruction, QueryInstructions, QueryTaken, UserDefinedOperation};
 use grabapl::graph::pattern::{OperationOutput, OperationParameter};
-use simple_semantics::{BuiltinOperation, SimpleSemantics};
+use simple_semantics::{BuiltinOperation, BuiltinQuery, SimpleSemantics};
 
 fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemantics> {
     // Expects a child
@@ -44,8 +44,42 @@ fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemantics> 
     }
 }
 
+fn get_mk_n_to_0_list_user_defined_operation() -> UserDefinedOperation<SimpleSemantics> {
+    // Expects one input node
+    let mut g = grabapl::graph::Graph::new();
+    let a = g.add_node(());
+    let param = OperationParameter {
+        explicit_input_nodes: vec![0],
+        parameter_graph: g,
+        subst_to_node_keys: HashMap::from([(0, a)]),
+        node_keys_to_subst: HashMap::from([(a, 0)]),
+    };
+
+    let input_node = AbstractNodeId::ParameterMarker(0);
+    let mut instructions = vec![];
+
+    // If the input value is 0, we do nothing, otherwise we recurse on a new child
+    instructions.push(("eq_0_query (TODO: ignore)".into(), Instruction::BuiltinQuery(BuiltinQuery::IsValueGt(0), vec![input_node], QueryInstructions {
+        not_taken: vec![],
+        taken: vec![
+            ("add_child".into(), Instruction::Operation(1, vec![input_node])),
+            ("TODO: ignore".into(), Instruction::Builtin(BuiltinOperation::CopyNodeValueTo, vec![input_node, AbstractNodeId::DynamicOutputMarker("add_child".into(), "child".into())])),
+            ("TODO: ignore".into(), Instruction::Builtin(BuiltinOperation::Decrement, vec![AbstractNodeId::DynamicOutputMarker("add_child".into(), "child".into())])),
+            // recursive call
+            ("TODO: ignore".into(), Instruction::Operation(10, vec![AbstractNodeId::DynamicOutputMarker("add_child".into(), "child".into())])),
+        ],
+    })));
+
+    UserDefinedOperation {
+        parameter: param,
+        instructions,
+    }
+}
+
 fn main() {
     let user_defined_op = get_sample_user_defined_operation();
+    let mk_list_user_op = get_mk_n_to_0_list_user_defined_operation();
+
 
     let operation_ctx = HashMap::from([
         (0, BuiltinOperation::AddNode),
@@ -56,6 +90,7 @@ fn main() {
     ]);
     let mut operation_ctx = OperationContext::from_builtins(operation_ctx);
     operation_ctx.add_custom_operation(3, user_defined_op);
+    operation_ctx.add_custom_operation(10, mk_list_user_op);
 
     let mut dot_collector = DotCollector::new();
 
@@ -109,6 +144,10 @@ fn main() {
     run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 3, vec![new_start]).unwrap();
     dot_collector.collect(&g);
 
+    // new node to make list out of
+    let list_root = g.add_node(10);
+    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 10, vec![list_root]).unwrap();
+    dot_collector.collect(&g);
 
 
     println!("{}", dot_collector.finalize());

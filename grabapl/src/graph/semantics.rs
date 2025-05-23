@@ -1,8 +1,8 @@
 use petgraph::data::Build;
 use crate::Graph;
 use crate::graph::{EdgeAttribute, NodeAttribute};
-use crate::graph::operation::BuiltinOperation;
-
+use crate::graph::operation::{BuiltinOperation};
+use crate::graph::operation::query::BuiltinQuery;
 // /// Returns the corresponding abstract value/type for a given concrete value.
 // pub trait ToAbstract {
 //     type Abstract;
@@ -57,6 +57,8 @@ pub trait Semantics {
     
     /// Builtin operations are of this type.
     type BuiltinOperation: BuiltinOperation<S = Self>;
+    /// Queries are of this type
+    type BuiltinQuery: BuiltinQuery<S = Self>;
 
     fn new_concrete_graph() -> ConcreteGraph<Self> {
         Graph::new()
