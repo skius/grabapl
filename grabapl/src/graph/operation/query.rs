@@ -29,6 +29,29 @@ pub enum EdgeChange<S: Semantics> {
     },
 }
 
+// TODO: Note:
+//  What if shape queries had just one builtin, and that builtin was of the form:
+//  1. This is my current abstract graph
+//  2. Let me make 'pseudo' changes to it. For example, I add a node, and set it as the child of some existing node.
+//  3. The query tells me if this matches.
+//  How would that work?
+//  As the writer of a user defined op, I would need to have know my current abstract graph. We kind of do have that atm I guess? it's the parameter + the sequence of all instructions
+//  Then I propose changes. Like NewNode(some ident), AbstractValue(some ident, like new node, param, or dynamic output), Edge, etc.
+//  Then I can call the query with those two args (abstract graph, proposed changes) and act based on true/false.
+//  Okay.
+//  How does the query work?
+//  Abstractly it's clear what changes. So do we even need that?
+//  Concretely, it's more difficult I think:
+//  1. We have the concrete graph
+//  2. We have the input abstract graph.
+//   - Here we should have some known mapping from concrete to abstract (Side note: potentially again a problem with assigning one node to multiple abstract nodes)
+//  3. We also have the proposed changes
+//   - With these changes we can build a 'new' abstract graph
+//  Can we now use isomorphisms to find a mapping from the new abstract graph (the subgraph) to the concrete graph, that:
+//   a) makes sure unchanged nodes in the abstract graph still get mapped to the same nodes in the concrete graph
+//   b) changed nodes in the abstract graph can be matched against the ToAbstract version of the concrete nodes' values
+//
+//
 pub trait BuiltinQuery {
     type S: Semantics;
 
