@@ -36,6 +36,11 @@ pub enum EdgeChange<S: Semantics> {
 //  One fix might be to turn the abstract change of a "conditional remove" to just abstractly always remove. Then the user would have
 //  to check again if something is present, so the same behavior as if we instead added something. This is tedious, but should work.
 
+// TODO: wrt above, the same goes for operations that conditionally _change_ an abstract value. I think it should be the "merge"
+//  of the new value and the old value, where the old value is the actual _argument_ abstract value, not the _parameter_ (potentially upcast) abstract
+//  value that is defined in the child operation. So basically, the operation says "ChangeTo(new abstract value)", and then the caller has to
+//  update its abstract graph accordingly with the merge.
+
 // TODO: Note:
 //  What if shape queries had just one builtin, and that builtin was of the form:
 //  1. This is my current abstract graph
