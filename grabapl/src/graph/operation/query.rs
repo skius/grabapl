@@ -1,3 +1,4 @@
+use derive_more::From;
 use crate::graph::operation::{OperationResult, get_substitution};
 use crate::graph::pattern::{OperationArgument, OperationParameter, ParameterSubstition};
 use crate::graph::semantics::{AbstractGraph, ConcreteGraph, SemanticsClone};
@@ -29,6 +30,12 @@ pub enum EdgeChange<S: Semantics> {
     },
 }
 
+// TODO: What to do about operations that conditionally _remove_ nodes or edges?
+//  This implies that our abstract graph may not only be an underapproximation of the concrete graph, but also an overapproximation.
+//  This is a problem because we expect anything we see in the abstract graph can be used concretely.
+//  One fix might be to turn the abstract change of a "conditional remove" to just abstractly always remove. Then the user would have
+//  to check again if something is present, so the same behavior as if we instead added something. This is tedious, but should work.
+
 // TODO: Note:
 //  What if shape queries had just one builtin, and that builtin was of the form:
 //  1. This is my current abstract graph
@@ -51,7 +58,7 @@ pub enum EdgeChange<S: Semantics> {
 //   a) makes sure unchanged nodes in the abstract graph still get mapped to the same nodes in the concrete graph
 //   b) changed nodes in the abstract graph can be matched against the ToAbstract version of the concrete nodes' values
 //
-//
+//   Can the input abstract graph just be a subgraph of the actual abstract graph? Just enough to imply all the necessary context like "next child" or "prev child" or similar?
 pub trait BuiltinQuery {
     type S: Semantics;
 
@@ -75,6 +82,35 @@ pub trait BuiltinQuery {
         argument: OperationArgument,
         substitution: &ParameterSubstition,
     ) -> ConcreteQueryOutput;
+}
+
+pub struct ShapeQuery<S: Semantics> {
+    pub context_abstract_graph: AbstractGraph<S>,
+
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq, From)]
+pub struct ShapeNodeIdentifier(&'static str);
+
+pub enum ShapeQueryChange<S: Semantics> {
+    ExpectNode(ShapeNodeChange<S>),
+    ExpectEdge(ShapeEdgeChange<S>),
+}
+
+pub enum ShapeNodeChange<S: Semantics> {
+    /// Expect a new node with the given abstract value and give it the identifier
+    NewNode(ShapeNodeIdentifier, S::NodeAbstract),
+}
+
+pub enum ShapeEdgeChange<S: Semantics> {
+    /// Expect an edge from the node with the given identifier to the node with the given identifier, with the given abstract value
+    ChangeEdgeValue {
+        from: /*TODO: Turn this into an enum over ShapeNodeIdentifier, Param, AbstractOutput thing.*/,
+        to: ShapeNodeIdentifier,
+        /// If the edge is expected to be present, this is the abstract value of the edge.
+        /// If the edge is not expected to be present, this is None.
+        edge: Option<S::EdgeAbstract>,
+    },
 }
 
 pub(crate) fn run_builtin_query<S: SemanticsClone>(
