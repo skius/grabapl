@@ -10,8 +10,8 @@ use std::hash::RandomState;
 
 pub mod dot;
 pub mod operation;
-pub mod semantics;
 pub mod pattern;
+pub mod semantics;
 
 pub use dot::DotCollector;
 pub use operation::OperationContext;
@@ -110,9 +110,17 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
     }
 
     pub fn nodes(&self) -> impl Iterator<Item = (NodeKey, &NodeAttr)> {
-        self.graph
-            .nodes()
-            .map(|node_key| (node_key, &self.node_attr_map.get(&node_key).as_ref().unwrap().node_attr))
+        self.graph.nodes().map(|node_key| {
+            (
+                node_key,
+                &self
+                    .node_attr_map
+                    .get(&node_key)
+                    .as_ref()
+                    .unwrap()
+                    .node_attr,
+            )
+        })
     }
 
     fn extremum_out_edge_order_key(
@@ -354,21 +362,21 @@ mod tests {
     //     big_graph.add_edge(a, b, ());
     //     big_graph.add_edge(b, c, ());
     //     big_graph.add_edge(c, a, ());
-    // 
+    //
     //     let mut query_graph = Graph::<&str, ()>::new();
     //     let x = query_graph.add_node("X");
     //     let y = query_graph.add_node("Y");
     //     query_graph.add_edge(x, y, ());
-    // 
+    //
     //     let query = &query_graph.graph;
     //     let big = &big_graph.graph;
     //     let mut nm = |_: &_, _: &_| true;
     //     let mut em = |_: &_, _: &_| true;
     //     let isomorphisms = subgraph_isomorphisms_iter(&query, &big, &mut nm, &mut em);
-    // 
+    //
     //     let big_nodes = big_graph.graph.nodes().collect::<Vec<_>>();
     //     let query_nodes = query_graph.graph.nodes().collect::<Vec<_>>();
-    // 
+    //
     //     fn mapping_from_vec(
     //         big_nodes: &[NodeKey],
     //         query_nodes: &[NodeKey],
@@ -382,7 +390,7 @@ mod tests {
     //         }
     //         mapping
     //     }
-    // 
+    //
     //     for isomorphism in isomorphisms.unwrap() {
     //         println!("Isomorphism raw: {:?}", isomorphism);
     //         let mapped = mapping_from_vec(&big_nodes, &query_nodes, isomorphism.as_ref());
@@ -397,13 +405,13 @@ mod tests {
     //             .collect::<Vec<_>>();
     //         println!("Isomorphism attr map: {:?}", attr_map_list);
     //     }
-    // 
+    //
     //     let mut big_graph = Graph::<&str, ()>::new();
     //     let a = big_graph.add_node("A");
     //     let b = big_graph.add_node("B");
     //     let c = big_graph.add_node("C");
     //     let d = big_graph.add_node("D");
-    // 
+    //
     //     big_graph.add_edge_ordered(
     //         a,
     //         b,
@@ -425,7 +433,7 @@ mod tests {
     //         EdgeInsertionOrder::Prepend,
     //         EdgeInsertionOrder::Append,
     //     );
-    // 
+    //
     //     big_graph.add_edge_ordered(
     //         d,
     //         c,
@@ -433,9 +441,9 @@ mod tests {
     //         EdgeInsertionOrder::Append,
     //         EdgeInsertionOrder::Append,
     //     );
-    // 
+    //
     //     // a has ordered children d,b,c
-    // 
+    //
     //     let mut query_graph = Graph::<&str, ()>::new();
     //     let x = query_graph.add_node("X");
     //     let y = query_graph.add_node("Y");
@@ -461,12 +469,12 @@ mod tests {
     //         EdgeInsertionOrder::Append,
     //         EdgeInsertionOrder::Append,
     //     );
-    // 
+    //
     //     let big = &big_graph.graph;
     //     let query = &query_graph.graph;
-    // 
+    //
     //     let isomorphisms = subgraph_isomorphisms_iter(&query, &big, &mut nm, &mut em);
-    // 
+    //
     //     let big_nodes = big_graph.graph.nodes().collect::<Vec<_>>();
     //     let query_nodes = query_graph.graph.nodes().collect::<Vec<_>>();
     //     println!("----");
@@ -485,9 +493,9 @@ mod tests {
     //         attr_map_list.sort_by(|(src1, _), (src2, _)| src1.cmp(src2));
     //         println!("Isomorphism attr map: {:?}", attr_map_list);
     //     }
-    // 
+    //
     //     println!("----");
-    // 
+    //
     //     let mappings = big_graph.match_to_pattern(&query_graph, &mut nm, &mut em);
     //     for mapping in mappings.unwrap() {
     //         let mut attr_map_list = mapping
@@ -501,7 +509,7 @@ mod tests {
     //         attr_map_list.sort_by(|(src1, _), (src2, _)| src1.cmp(src2));
     //         println!("Isomorphism attr map: {:?}", attr_map_list);
     //     }
-    // 
+    //
     //     assert!(false);
     // }
 }

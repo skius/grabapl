@@ -1,12 +1,12 @@
-use petgraph::data::Build;
 use crate::Graph;
-use crate::graph::{EdgeAttribute, NodeAttribute};
-use crate::graph::operation::{BuiltinOperation};
+use crate::graph::operation::BuiltinOperation;
 use crate::graph::operation::query::BuiltinQuery;
+use crate::graph::{EdgeAttribute, NodeAttribute};
+use petgraph::data::Build;
 // /// Returns the corresponding abstract value/type for a given concrete value.
 // pub trait ToAbstract {
 //     type Abstract;
-// 
+//
 //     fn to_abstract(&self) -> Self::Abstract;
 // }
 
@@ -54,7 +54,7 @@ pub trait Semantics {
 
     type NodeConcreteToAbstract: ConcreteToAbstract<Concrete = Self::NodeConcrete, Abstract = Self::NodeAbstract>;
     type EdgeConcreteToAbstract: ConcreteToAbstract<Concrete = Self::EdgeConcrete, Abstract = Self::EdgeAbstract>;
-    
+
     /// Builtin operations are of this type.
     type BuiltinOperation: BuiltinOperation<S = Self>;
     /// Queries are of this type
@@ -71,21 +71,27 @@ pub trait Semantics {
 
 // TODO: do we need this? it's just easier to use this than spell it out
 pub trait SemanticsClone: Semantics<NodeConcrete: Clone, EdgeConcrete: Clone> {
-    
     fn concrete_to_abstract(c: &ConcreteGraph<Self>) -> AbstractGraph<Self> {
         let mut abstract_graph = Graph::new();
         for (node_key, node_concrete) in c.nodes() {
             let node_abstract = Self::NodeConcreteToAbstract::concrete_to_abstract(&node_concrete);
             // TODO: make this better (don't depend on Graph internals)
             abstract_graph.graph.add_node(node_key);
-            abstract_graph.node_attr_map.insert(node_key, NodeAttribute::new(node_abstract));
+            abstract_graph
+                .node_attr_map
+                .insert(node_key, NodeAttribute::new(node_abstract));
         }
         abstract_graph.max_node_key = c.max_node_key;
 
         for (src, dst, weight) in c.graph.all_edges() {
-            let edge_abstract = Self::EdgeConcreteToAbstract::concrete_to_abstract(&weight.edge_attr);
+            let edge_abstract =
+                Self::EdgeConcreteToAbstract::concrete_to_abstract(&weight.edge_attr);
             // TODO: make this better (don't depend on Graph internals)
-            let new_edge_attr = EdgeAttribute::new(edge_abstract, weight.source_out_order, weight.target_in_order);
+            let new_edge_attr = EdgeAttribute::new(
+                edge_abstract,
+                weight.source_out_order,
+                weight.target_in_order,
+            );
             abstract_graph.graph.add_edge(src, dst, new_edge_attr);
         }
 
@@ -96,11 +102,14 @@ impl<S: Semantics> SemanticsClone for S
 where
     S::NodeConcrete: Clone,
     S::EdgeConcrete: Clone,
-{}
+{
+}
 
-pub type ConcreteGraph<S: Semantics> = Graph<<S as Semantics>::NodeConcrete, <S as Semantics>::EdgeConcrete>;
+pub type ConcreteGraph<S: Semantics> =
+    Graph<<S as Semantics>::NodeConcrete, <S as Semantics>::EdgeConcrete>;
 
-pub type AbstractGraph<S: Semantics> = Graph<<S as Semantics>::NodeAbstract, <S as Semantics>::EdgeAbstract>;
+pub type AbstractGraph<S: Semantics> =
+    Graph<<S as Semantics>::NodeAbstract, <S as Semantics>::EdgeAbstract>;
 
 // impl<NC: ToAbstract + Clone, EC: ToAbstract + Clone> Graph<NC, EC>
 // {
@@ -113,14 +122,14 @@ pub type AbstractGraph<S: Semantics> = Graph<<S as Semantics>::NodeAbstract, <S 
 //             abstract_graph.node_attr_map.insert(node_key, NodeAttribute::new(node_abstract));
 //         }
 //         abstract_graph.max_node_key = self.max_node_key;
-// 
+//
 //         for (src, dst, weight) in self.graph.all_edges() {
 //             let edge_abstract = weight.edge_attr.to_abstract();
 //             // TODO: make this better (don't depend on Graph internals)
 //             let new_edge_attr = EdgeAttribute::new(edge_abstract, weight.source_out_order, weight.target_in_order);
 //             abstract_graph.graph.add_edge(src, dst, new_edge_attr);
 //         }
-// 
+//
 //         abstract_graph
 //     }
 // }

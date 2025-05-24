@@ -1,7 +1,7 @@
+use crate::graph::operation::{OperationResult, get_substitution};
 use crate::graph::pattern::{OperationArgument, OperationParameter, ParameterSubstition};
 use crate::graph::semantics::{AbstractGraph, ConcreteGraph, SemanticsClone};
 use crate::{NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
-use crate::graph::operation::{get_substitution, OperationResult};
 
 pub struct AbstractQueryOutput<S: Semantics> {
     pub changes: Vec<AbstractQueryChange<S>>,
@@ -26,7 +26,7 @@ pub enum EdgeChange<S: Semantics> {
         from: SubstMarker,
         to: SubstMarker,
         edge: S::EdgeAbstract,
-    }
+    },
 }
 
 pub trait BuiltinQuery {

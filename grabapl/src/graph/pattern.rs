@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use derive_more::From;
-use crate::{Graph, NodeKey, Semantics, SubstMarker, WithSubstMarker};
 use crate::graph::semantics::AbstractGraph;
+use crate::{Graph, NodeKey, Semantics, SubstMarker, WithSubstMarker};
+use derive_more::From;
+use std::collections::HashMap;
 
 pub struct OperationParameter<S: Semantics> {
     /// The ordered input nodes that must be explicitly selected.
@@ -40,4 +40,3 @@ pub struct OperationOutput {
     // TODO: use OutputMarker instead of SubstMarker?
     pub new_nodes: HashMap<AbstractOutputNodeMarker, NodeKey>,
 }
-

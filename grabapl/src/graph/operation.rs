@@ -1,16 +1,21 @@
-pub mod user_defined;
 pub mod query;
+pub mod user_defined;
 
-use crate::{Graph, NodeKey, SubstMarker};
-use std::collections::HashMap;
-use std::marker::PhantomData;
-use petgraph::algo::general_subgraph_monomorphisms_iter;
-use petgraph::visit::NodeIndexable;
-use thiserror::Error;
 use crate::graph::EdgeAttribute;
 use crate::graph::operation::user_defined::{AbstractOperationResultMarker, UserDefinedOperation};
-use crate::graph::pattern::{AbstractOutputNodeMarker, OperationArgument, OperationOutput, OperationParameter, ParameterSubstition};
-use crate::graph::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics, SemanticsClone};
+use crate::graph::pattern::{
+    AbstractOutputNodeMarker, OperationArgument, OperationOutput, OperationParameter,
+    ParameterSubstition,
+};
+use crate::graph::semantics::{
+    AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics, SemanticsClone,
+};
+use crate::{Graph, NodeKey, SubstMarker};
+use petgraph::algo::general_subgraph_monomorphisms_iter;
+use petgraph::visit::NodeIndexable;
+use std::collections::HashMap;
+use std::marker::PhantomData;
+use thiserror::Error;
 
 // TODO: We might want to be able to supply additional data to builtin operations. For example, a Set Value operation should be 'generic' over its value without
 //  needing to store a separate operation in the OpCtx for every value...
@@ -44,7 +49,6 @@ pub trait BuiltinOperation {
     ) -> OperationOutput;
 }
 
-
 /// Contains available operations
 pub struct OperationContext<S: Semantics> {
     builtins: HashMap<OperationId, S::BuiltinOperation>,
@@ -58,7 +62,7 @@ impl<S: Semantics> OperationContext<S> {
             custom: HashMap::new(),
         }
     }
-    
+
     pub fn from_builtins(builtins: HashMap<OperationId, S::BuiltinOperation>) -> Self {
         OperationContext {
             builtins,
@@ -95,7 +99,6 @@ enum Operation<'a, S: Semantics> {
 
 pub type OperationId = u32;
 
-
 /// Returns the pattern subst to input graph node key mapping, if the operation is applicable.
 fn get_substitution<S: Semantics>(
     g: &AbstractGraph<S>,
@@ -117,7 +120,10 @@ fn get_substitution<S: Semantics>(
         .iter()
         .zip(selected_inputs.iter())
         .map(|((param_marker, argument_node_key))| {
-            let param_node_key = param.subst_to_node_keys.get(param_marker).expect("Invalid parameter marker");
+            let param_node_key = param
+                .subst_to_node_keys
+                .get(param_marker)
+                .expect("Invalid parameter marker");
             (*param_node_key, *argument_node_key)
         })
         .collect::<HashMap<_, _>>();
@@ -134,20 +140,19 @@ fn get_substitution<S: Semantics>(
         S::NodeMatcher::matches(arg_attr, &param_attr)
     };
 
-    let mut em = |param_attr_wrapper: &EdgeAttribute<S::EdgeAbstract>, arg_attr_wrapper: &EdgeAttribute<S::EdgeAbstract>| {
+    let mut em = |param_attr_wrapper: &EdgeAttribute<S::EdgeAbstract>,
+                  arg_attr_wrapper: &EdgeAttribute<S::EdgeAbstract>| {
         let param_attr = &param_attr_wrapper.edge_attr;
         let arg_attr = &arg_attr_wrapper.edge_attr;
         S::EdgeMatcher::matches(arg_attr, &param_attr)
     };
 
-    let isos = general_subgraph_monomorphisms_iter(&param_ref, &arg_ref,
-        &mut nm,
-        &mut em,
-    ).ok_or(OperationError::ArgumentDoesNotMatchParameter)?;
+    let isos = general_subgraph_monomorphisms_iter(&param_ref, &arg_ref, &mut nm, &mut em)
+        .ok_or(OperationError::ArgumentDoesNotMatchParameter)?;
 
     isos.filter_map(|iso| {
         // TODO: handle edge orderedness
-        
+
         let mapping = iso
             .iter()
             .enumerate()
@@ -157,9 +162,12 @@ fn get_substitution<S: Semantics>(
                 (param.node_keys_to_subst[&param_node_key], arg_node_key)
             })
             .collect::<HashMap<_, _>>();
-        
+
         Some(mapping)
-    }).next().map(ParameterSubstition::new).ok_or(OperationError::ArgumentDoesNotMatchParameter)
+    })
+    .next()
+    .map(ParameterSubstition::new)
+    .ok_or(OperationError::ArgumentDoesNotMatchParameter)
 }
 
 // TODO: return result instead
@@ -170,12 +178,8 @@ pub fn run_operation<S: SemanticsClone>(
     selected_inputs: Vec<NodeKey>,
 ) -> OperationResult<OperationOutput> {
     match op_ctx.get(op).expect("Invalid operation ID") {
-        Operation::Builtin(builtin) => {
-            run_builtin_operation::<S>(g, builtin, selected_inputs)
-        }
-        Operation::Custom(custom) => {
-            run_custom_operation::<S>(g, op_ctx, custom, selected_inputs)
-        }
+        Operation::Builtin(builtin) => run_builtin_operation::<S>(g, builtin, selected_inputs),
+        Operation::Custom(custom) => run_custom_operation::<S>(g, op_ctx, custom, selected_inputs),
     }
 }
 
@@ -183,15 +187,20 @@ fn run_builtin_operation<S: SemanticsClone>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
     op: &S::BuiltinOperation,
     selected_inputs: Vec<NodeKey>,
-) -> OperationResult<OperationOutput>
-{
+) -> OperationResult<OperationOutput> {
     // can we run it?
     let param = op.parameter();
     let abstract_g = S::concrete_to_abstract(&g);
     let subst = get_substitution(&abstract_g, &param, &selected_inputs)?;
 
     // TODO: we probably dont need to pass the OperationArgument down. Might just cause confusion.
-    let output = op.apply(g, OperationArgument { selected_input_nodes: selected_inputs }, &subst);
+    let output = op.apply(
+        g,
+        OperationArgument {
+            selected_input_nodes: selected_inputs,
+        },
+        &subst,
+    );
 
     Ok(output)
 }
@@ -201,15 +210,21 @@ fn run_custom_operation<S: SemanticsClone>(
     op_ctx: &OperationContext<S>,
     op: &UserDefinedOperation<S>,
     selected_inputs: Vec<NodeKey>,
-) -> OperationResult<OperationOutput>
-{
+) -> OperationResult<OperationOutput> {
     // can we run it?
     let param = &op.parameter;
     let abstract_g = S::concrete_to_abstract(&g);
     let subst = get_substitution(&abstract_g, param, &selected_inputs)?;
 
     // TODO: we probably dont need to pass the OperationArgument down. Might just cause confusion.
-    let output = op.apply(op_ctx, g, OperationArgument { selected_input_nodes: selected_inputs }, &subst)?;
+    let output = op.apply(
+        op_ctx,
+        g,
+        OperationArgument {
+            selected_input_nodes: selected_inputs,
+        },
+        &subst,
+    )?;
 
     Ok(output)
 }
@@ -222,10 +237,7 @@ pub enum OperationError {
     #[error("operation {0} not found")]
     InvalidOperationId(OperationId),
     #[error("invalid operation argument count: expected {expected}, got {actual}")]
-    InvalidOperationArgumentCount {
-        expected: usize,
-        actual: usize,
-    },
+    InvalidOperationArgumentCount { expected: usize, actual: usize },
     #[error("operation argument does not match parameter")]
     ArgumentDoesNotMatchParameter,
     #[error("unknown parameter marker: {0}")]
@@ -235,21 +247,3 @@ pub enum OperationError {
     #[error("unknown output node marker: {0:?}")]
     UnknownOutputNodeMarker(AbstractOutputNodeMarker),
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

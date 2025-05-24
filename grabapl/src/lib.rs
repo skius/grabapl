@@ -44,7 +44,6 @@ pub use graph::semantics::Semantics;
 // Because we'll want to work abstractly with a pattern graph, we'll want the pattern type to be the type that pattern matches against.
 // In other words, we want the pattern type to be the analogue of the PL-"type", with subtyping. eg. a wildcard is just the analogue of the Top type
 
-
 /// A marker for substitution in the graph.
 ///
 /// Useful for programmatically defined operations to know the substitution of their input pattern.

@@ -1,16 +1,20 @@
+use crate::graph::operation::query::{BuiltinQuery, run_builtin_query};
+use crate::graph::operation::{
+    OperationError, OperationResult, run_builtin_operation, run_operation,
+};
+use crate::graph::pattern::{
+    AbstractOutputNodeMarker, OperationArgument, OperationOutput, OperationParameter,
+    ParameterSubstition,
+};
+use crate::graph::semantics::{ConcreteGraph, SemanticsClone};
+use crate::{NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
+use derive_more::with_trait::From;
 use std::collections::HashMap;
 use std::rc::Rc;
-use derive_more::with_trait::From;
-use crate::graph::pattern::{AbstractOutputNodeMarker, OperationArgument, OperationOutput, OperationParameter, ParameterSubstition};
-use crate::{NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
-use crate::graph::operation::{run_builtin_operation, run_operation, OperationError, OperationResult};
-use crate::graph::operation::query::{run_builtin_query, BuiltinQuery};
-use crate::graph::semantics::{ConcreteGraph, SemanticsClone};
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, From)]
 pub struct AbstractOperationResultMarker(pub &'static str);
-
 
 /// Identifies a node in the user defined operation view.
 #[derive(Copy, Clone, From)]
@@ -40,7 +44,10 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
     ) -> OperationResult<OperationOutput> {
         let mut our_output_map: HashMap<AbstractOutputNodeMarker, NodeKey> = HashMap::new();
 
-        let mut previous_results: HashMap<AbstractOperationResultMarker, HashMap<AbstractOutputNodeMarker, NodeKey>> = HashMap::new();
+        let mut previous_results: HashMap<
+            AbstractOperationResultMarker,
+            HashMap<AbstractOutputNodeMarker, NodeKey>,
+        > = HashMap::new();
 
         run_instructions(
             g,
@@ -61,7 +68,10 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
 
 fn run_instructions<S: SemanticsClone>(
     g: &mut ConcreteGraph<S>,
-    previous_results: &mut HashMap<AbstractOperationResultMarker, HashMap<AbstractOutputNodeMarker, NodeKey>>,
+    previous_results: &mut HashMap<
+        AbstractOperationResultMarker,
+        HashMap<AbstractOutputNodeMarker, NodeKey>,
+    >,
     our_output_map: &mut HashMap<AbstractOutputNodeMarker, NodeKey>,
     op_ctx: &OperationContext<S>,
     instructions: &[InstructionWithResultMarker<S>],
@@ -69,29 +79,20 @@ fn run_instructions<S: SemanticsClone>(
 ) -> OperationResult<()> {
     for (abstract_output_id, instruction) in instructions {
         match instruction {
-            oplike@(Instruction::Operation(_, args) | Instruction::Builtin(_, args)) => {
+            oplike @ (Instruction::Operation(_, args) | Instruction::Builtin(_, args)) => {
                 let concrete_args = get_concrete_args::<S>(args, subst, previous_results)?;
                 // TODO: make fallible
                 // TODO: How do we support mutually recursive user defined operations?
                 //  - I think just specifying the ID directly? this will mainly be a problem for the OperationBuilder
                 let output = match oplike {
                     Instruction::Operation(op_id, _) => {
-                        run_operation::<S>(
-                            g,
-                            op_ctx,
-                            *op_id,
-                            concrete_args,
-                        )?
+                        run_operation::<S>(g, op_ctx, *op_id, concrete_args)?
                     }
                     Instruction::Builtin(op, _) => {
-                        run_builtin_operation::<S>(
-                            g,
-                            op,
-                            concrete_args,
-                        )?
+                        run_builtin_operation::<S>(g, op, concrete_args)?
                     }
                     // does not match the outer match arm
-                    Instruction::BuiltinQuery(..) => unreachable!()
+                    Instruction::BuiltinQuery(..) => unreachable!(),
                 };
 
                 previous_results.insert(*abstract_output_id, output.new_nodes);
@@ -119,22 +120,35 @@ fn run_instructions<S: SemanticsClone>(
     Ok(())
 }
 
+// TODO: decide if we really want to have this be fallible, since we may want to instead have some 
+//  invariant that this works. And encode fallibility in a 'builder'.
 fn get_concrete_args<S: Semantics>(
     args: &[AbstractNodeId],
     subst: &ParameterSubstition,
-    previous_results: &HashMap<AbstractOperationResultMarker, HashMap<AbstractOutputNodeMarker, NodeKey>>,
+    previous_results: &HashMap<
+        AbstractOperationResultMarker,
+        HashMap<AbstractOutputNodeMarker, NodeKey>,
+    >,
 ) -> OperationResult<Vec<NodeKey>> {
-    args.iter().map(|arg| match arg {
-        AbstractNodeId::ParameterMarker(subst_marker) => subst.mapping.get(subst_marker).copied().ok_or(OperationError::UnknownParameterMarker(*subst_marker)),
-        AbstractNodeId::DynamicOutputMarker(output_id, output_marker) => {
-            let output_map = previous_results.get(output_id).ok_or(OperationError::UnknownOperationResultMarker(*output_id))?;
-            output_map.get(output_marker)
+    args.iter()
+        .map(|arg| match arg {
+            AbstractNodeId::ParameterMarker(subst_marker) => subst
+                .mapping
+                .get(subst_marker)
                 .copied()
-                .ok_or(OperationError::UnknownOutputNodeMarker(*output_marker))
-        }
-    }).collect()
+                .ok_or(OperationError::UnknownParameterMarker(*subst_marker)),
+            AbstractNodeId::DynamicOutputMarker(output_id, output_marker) => {
+                let output_map = previous_results
+                    .get(output_id)
+                    .ok_or(OperationError::UnknownOperationResultMarker(*output_id))?;
+                output_map
+                    .get(output_marker)
+                    .copied()
+                    .ok_or(OperationError::UnknownOutputNodeMarker(*output_marker))
+            }
+        })
+        .collect()
 }
-
 
 pub enum Instruction<S: Semantics> {
     // TODO: Split out into Instruction::OperationLike (which includes both Builtin and Operation)
