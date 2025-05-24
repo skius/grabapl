@@ -3,7 +3,7 @@ use std::rc::Rc;
 use derive_more::with_trait::From;
 use crate::graph::pattern::{AbstractOutputNodeMarker, OperationArgument, OperationOutput, OperationParameter, ParameterSubstition};
 use crate::{NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
-use crate::graph::operation::{run_builtin_operation, run_operation};
+use crate::graph::operation::{run_builtin_operation, run_operation, OperationError, OperationResult};
 use crate::graph::operation::query::{run_builtin_query, BuiltinQuery};
 use crate::graph::semantics::{ConcreteGraph, SemanticsClone};
 
@@ -37,7 +37,7 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
         g: &mut ConcreteGraph<S>,
         argument: OperationArgument,
         subst: &ParameterSubstition,
-    ) -> OperationOutput {
+    ) -> OperationResult<OperationOutput> {
         let mut our_output_map: HashMap<AbstractOutputNodeMarker, NodeKey> = HashMap::new();
 
         let mut previous_results: HashMap<AbstractOperationResultMarker, HashMap<AbstractOutputNodeMarker, NodeKey>> = HashMap::new();
@@ -49,13 +49,13 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
             op_ctx,
             &self.instructions,
             subst,
-        );
+        )?;
 
         // TODO: How to define a good output here?
         //  probably should be part of the UserDefinedOperation struct. AbstractNodeId should be used, and then we get the actual node key based on what's happening.
-        OperationOutput {
+        Ok(OperationOutput {
             new_nodes: our_output_map,
-        }
+        })
     }
 }
 
@@ -66,24 +66,14 @@ fn run_instructions<S: SemanticsClone>(
     op_ctx: &OperationContext<S>,
     instructions: &[InstructionWithResultMarker<S>],
     subst: &ParameterSubstition,
-) {
+) -> OperationResult<()> {
     for (abstract_output_id, instruction) in instructions {
         match instruction {
             oplike@(Instruction::Operation(_, args) | Instruction::Builtin(_, args)) => {
-                let mut concrete_args = vec![];
-                for arg in args {
-                    match arg {
-                        AbstractNodeId::ParameterMarker(subst_marker) => {
-                            concrete_args.push(subst.mapping[subst_marker]);
-                        }
-                        AbstractNodeId::DynamicOutputMarker(output_id, output_marker) => {
-                            let output_map = previous_results.get_mut(output_id).unwrap();
-                            concrete_args.push(output_map[output_marker]);
-                        }
-                    }
-                }
+                let concrete_args = get_concrete_args::<S>(args, subst, previous_results)?;
                 // TODO: make fallible
                 // TODO: How do we support mutually recursive user defined operations?
+                //  - I think just specifying the ID directly? this will mainly be a problem for the OperationBuilder
                 let output = match oplike {
                     Instruction::Operation(op_id, _) => {
                         run_operation::<S>(
@@ -91,34 +81,24 @@ fn run_instructions<S: SemanticsClone>(
                             op_ctx,
                             *op_id,
                             concrete_args,
-                        ).unwrap()
+                        )?
                     }
                     Instruction::Builtin(op, _) => {
                         run_builtin_operation::<S>(
                             g,
                             op,
                             concrete_args,
-                        ).unwrap()
+                        )?
                     }
+                    // does not match the outer match arm
                     Instruction::BuiltinQuery(..) => unreachable!()
                 };
 
                 previous_results.insert(*abstract_output_id, output.new_nodes);
             }
             Instruction::BuiltinQuery(query, args, query_instr) => {
-                let mut concrete_args = vec![];
-                for arg in args {
-                    match arg {
-                        AbstractNodeId::ParameterMarker(subst_marker) => {
-                            concrete_args.push(subst.mapping[subst_marker]);
-                        }
-                        AbstractNodeId::DynamicOutputMarker(output_id, output_marker) => {
-                            let output_map = previous_results.get_mut(output_id).unwrap();
-                            concrete_args.push(output_map[output_marker]);
-                        }
-                    }
-                }
-                let result = run_builtin_query::<S>(g, query, concrete_args).unwrap();
+                let concrete_args = get_concrete_args::<S>(args, subst, previous_results)?;
+                let result = run_builtin_query::<S>(g, query, concrete_args)?;
                 let next_instr = if result.taken {
                     &query_instr.taken
                 } else {
@@ -132,14 +112,33 @@ fn run_instructions<S: SemanticsClone>(
                     op_ctx,
                     next_instr,
                     subst,
-                )
+                )?
             }
         }
     }
+    Ok(())
+}
+
+fn get_concrete_args<S: Semantics>(
+    args: &[AbstractNodeId],
+    subst: &ParameterSubstition,
+    previous_results: &HashMap<AbstractOperationResultMarker, HashMap<AbstractOutputNodeMarker, NodeKey>>,
+) -> OperationResult<Vec<NodeKey>> {
+    args.iter().map(|arg| match arg {
+        AbstractNodeId::ParameterMarker(subst_marker) => subst.mapping.get(subst_marker).copied().ok_or(OperationError::UnknownParameterMarker(*subst_marker)),
+        AbstractNodeId::DynamicOutputMarker(output_id, output_marker) => {
+            let output_map = previous_results.get(output_id).ok_or(OperationError::UnknownOperationResultMarker(*output_id))?;
+            output_map.get(output_marker)
+                .copied()
+                .ok_or(OperationError::UnknownOutputNodeMarker(*output_marker))
+        }
+    }).collect()
 }
 
 
 pub enum Instruction<S: Semantics> {
+    // TODO: Split out into Instruction::OperationLike (which includes both Builtin and Operation)
+    //  and Instruction::QueryLike (which includes BuiltinQuery and potential future custom queries).
     Builtin(S::BuiltinOperation, Vec<AbstractNodeId>),
     Operation(OperationId, Vec<AbstractNodeId>),
     BuiltinQuery(S::BuiltinQuery, Vec<AbstractNodeId>, QueryInstructions<S>),

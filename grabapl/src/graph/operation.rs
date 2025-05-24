@@ -8,8 +8,8 @@ use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
 use thiserror::Error;
 use crate::graph::EdgeAttribute;
-use crate::graph::operation::user_defined::UserDefinedOperation;
-use crate::graph::pattern::{OperationArgument, OperationOutput, OperationParameter, ParameterSubstition};
+use crate::graph::operation::user_defined::{AbstractOperationResultMarker, UserDefinedOperation};
+use crate::graph::pattern::{AbstractOutputNodeMarker, OperationArgument, OperationOutput, OperationParameter, ParameterSubstition};
 use crate::graph::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics, SemanticsClone};
 
 // TODO: We might want to be able to supply additional data to builtin operations. For example, a Set Value operation should be 'generic' over its value without
@@ -209,13 +209,14 @@ fn run_custom_operation<S: SemanticsClone>(
     let subst = get_substitution(&abstract_g, param, &selected_inputs)?;
 
     // TODO: we probably dont need to pass the OperationArgument down. Might just cause confusion.
-    let output = op.apply(op_ctx, g, OperationArgument { selected_input_nodes: selected_inputs }, &subst);
+    let output = op.apply(op_ctx, g, OperationArgument { selected_input_nodes: selected_inputs }, &subst)?;
 
     Ok(output)
 }
 
 pub type OperationResult<T> = std::result::Result<T, OperationError>;
 
+// TODO: add specific source operation id or similar to the error
 #[derive(Error, Debug)]
 pub enum OperationError {
     #[error("operation {0} not found")]
@@ -227,6 +228,12 @@ pub enum OperationError {
     },
     #[error("operation argument does not match parameter")]
     ArgumentDoesNotMatchParameter,
+    #[error("unknown parameter marker: {0}")]
+    UnknownParameterMarker(SubstMarker),
+    #[error("unknown operation result marker: {0:?}")]
+    UnknownOperationResultMarker(AbstractOperationResultMarker),
+    #[error("unknown output node marker: {0:?}")]
+    UnknownOutputNodeMarker(AbstractOutputNodeMarker),
 }
 
 
