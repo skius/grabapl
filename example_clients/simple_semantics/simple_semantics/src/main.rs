@@ -1,9 +1,11 @@
 use std::collections::HashMap;
-use grabapl::{DotCollector, OperationContext, Semantics, WithSubstMarker};
+use grabapl::{DotCollector, OperationContext, OperationId, Semantics, WithSubstMarker};
+use grabapl::graph::EdgeAttribute;
+use grabapl::graph::operation::query::{GraphShapeQuery, ShapeNodeIdentifier};
 use grabapl::graph::operation::run_operation;
 use grabapl::graph::operation::user_defined::{AbstractNodeId, Instruction, QueryInstructions, QueryTaken, UserDefinedOperation};
 use grabapl::graph::pattern::{OperationOutput, OperationParameter};
-use simple_semantics::{BuiltinOperation, BuiltinQuery, SimpleSemantics};
+use simple_semantics::{BuiltinOperation, BuiltinQuery, EdgePattern, SimpleSemantics};
 
 fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemantics> {
     // Expects a child
@@ -76,10 +78,68 @@ fn get_mk_n_to_0_list_user_defined_operation() -> UserDefinedOperation<SimpleSem
     }
 }
 
+fn get_count_list_len_user_defined_operation(self_op_id: OperationId) -> UserDefinedOperation<SimpleSemantics> {
+    // Expects the list head as first input node, then the accumulator as second input node
+    let mut g = grabapl::graph::Graph::new();
+    let input_key = g.add_node(());
+    let acc_key = g.add_node(());
+
+    let param = OperationParameter {
+        explicit_input_nodes: vec![0, 1],
+        parameter_graph: g,
+        subst_to_node_keys: HashMap::from([(0, input_key), (1, acc_key)]),
+        node_keys_to_subst: HashMap::from([(input_key, 0), (acc_key, 1)]),
+    };
+
+    let input_node = AbstractNodeId::ParameterMarker(0);
+    let acc_node = AbstractNodeId::ParameterMarker(1);
+
+    let mut instructions = vec![];
+    // Increment acc
+    instructions.push(("TODO ignore".into(), Instruction::Builtin(BuiltinOperation::Increment, vec![acc_node])));
+
+    // shape query to get next child if it exists
+    let shape_query = {
+        let mut g = grabapl::graph::Graph::new();
+        let head = g.add_node(());
+        let mut expected_g = g.clone();
+        let param = OperationParameter {
+            explicit_input_nodes: vec![0],
+            parameter_graph: g,
+            subst_to_node_keys: HashMap::from([(0, head)]),
+            node_keys_to_subst: HashMap::from([(head, 0)]),
+        };
+
+        let child = expected_g.add_node(());
+        expected_g.add_edge(head, child, EdgePattern::Wildcard);
+        GraphShapeQuery {
+            parameter: param,
+            expected_graph: expected_g,
+            node_keys_to_shape_idents: HashMap::from([(child, "child".into())]),
+            shape_idents_to_node_keys: HashMap::from([("child".into(), child)]),
+        }
+    };
+
+    let new_child = AbstractNodeId::DynamicOutputMarker("next_child_query".into(), "child".into());
+    instructions.push(("next_child_query".into(), Instruction::ShapeQuery(shape_query, vec![input_node], QueryInstructions {
+        not_taken: vec![],
+        taken: vec![
+            ("TODO: ignore".into(), Instruction::Operation(self_op_id, vec![new_child, acc_node])),
+        ],
+    })));
+
+
+    UserDefinedOperation {
+        parameter: param,
+        instructions,
+    }
+}
+
 fn main() {
     let user_defined_op = get_sample_user_defined_operation();
     let mk_list_user_op = get_mk_n_to_0_list_user_defined_operation();
 
+    let count_list_len_user_op = get_count_list_len_user_defined_operation(11);
 
     let operation_ctx = HashMap::from([
         (0, BuiltinOperation::AddNode),
@@ -91,6 +151,7 @@ fn main() {
     let mut operation_ctx = OperationContext::from_builtins(operation_ctx);
     operation_ctx.add_custom_operation(3, user_defined_op);
     operation_ctx.add_custom_operation(10, mk_list_user_op);
+    operation_ctx.add_custom_operation(11, count_list_len_user_op);
 
     let mut dot_collector = DotCollector::new();
 
@@ -147,6 +208,11 @@ fn main() {
     // new node to make list out of
     let list_root = g.add_node(10);
     run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 10, vec![list_root]).unwrap();
+    dot_collector.collect(&g);
+    
+    // new node to count
+    let accumulator = g.add_node(0);
+    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 11, vec![list_root, accumulator]).unwrap();
     dot_collector.collect(&g);
 
 

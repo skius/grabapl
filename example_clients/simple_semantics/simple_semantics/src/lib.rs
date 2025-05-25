@@ -7,6 +7,7 @@ use grabapl::graph::pattern::{OperationArgument, OperationOutput, OperationParam
 
 pub struct SimpleSemantics;
 
+#[derive(Clone)]
 pub enum EdgePattern {
     Wildcard,
     Exact(String),
@@ -144,6 +145,7 @@ pub enum BuiltinOperation {
     SetNodeValue(i32),
     CopyNodeValueTo,
     Decrement,
+    Increment,
 }
 
 impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
@@ -263,6 +265,16 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                     node_keys_to_subst: HashMap::from([(a, 0)]),
                 }
             }
+            BuiltinOperation::Increment => {
+                let mut g = grabapl::graph::Graph::new();
+                let a = g.add_node(());
+                OperationParameter {
+                    explicit_input_nodes: vec![0],
+                    parameter_graph: g,
+                    subst_to_node_keys: HashMap::from([(0, a)]),
+                    node_keys_to_subst: HashMap::from([(a, 0)]),
+                }
+            }
         }
     }
 
@@ -311,6 +323,9 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 *g.get_mut_node_attr(b).unwrap() = *g.get_node_attr(a).unwrap();
             }
             BuiltinOperation::Decrement => {
+                // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
+            }
+            BuiltinOperation::Increment => {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
             }
         }
@@ -375,6 +390,11 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 let a = substitution.mapping[&0];
                 let val = graph.get_node_attr(a).unwrap();
                 *graph.get_mut_node_attr(a).unwrap() = val - 1;
+            }
+            BuiltinOperation::Increment => {
+                let a = substitution.mapping[&0];
+                let val = graph.get_node_attr(a).unwrap();
+                *graph.get_mut_node_attr(a).unwrap() = val + 1;
             }
         }
 

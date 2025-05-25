@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use derive_more::From;
+use derive_more::with_trait::Into;
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
 use crate::graph::operation::{OperationResult, get_substitution};
@@ -100,7 +101,7 @@ pub struct ShapeQuery<S: Semantics> {
     pub changes: Vec<ShapeQueryChange<S>>,
 }
 
-#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From, Into)]
 pub struct ShapeNodeIdentifier(&'static str);
 
 pub enum AbstractShapeNodeIdentifier {

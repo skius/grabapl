@@ -1,4 +1,4 @@
-use crate::graph::operation::query::{BuiltinQuery, run_builtin_query};
+use crate::graph::operation::query::{BuiltinQuery, run_builtin_query, GraphShapeQuery, run_shape_query, ShapeNodeIdentifier};
 use crate::graph::operation::{
     OperationError, OperationResult, run_builtin_operation, run_operation,
 };
@@ -92,7 +92,7 @@ fn run_instructions<S: SemanticsClone>(
                         run_builtin_operation::<S>(g, op, concrete_args)?
                     }
                     // does not match the outer match arm
-                    Instruction::BuiltinQuery(..) => unreachable!(),
+                    Instruction::BuiltinQuery(..) | Instruction::ShapeQuery(..) => unreachable!(),
                 };
 
                 previous_results.insert(*abstract_output_id, output.new_nodes);
@@ -114,6 +114,36 @@ fn run_instructions<S: SemanticsClone>(
                     next_instr,
                     subst,
                 )?
+            }
+            Instruction::ShapeQuery(query, args, query_instr) => {
+                let concrete_args = get_concrete_args::<S>(args, subst, previous_results)?;
+                let result = run_shape_query(g, query, concrete_args)?;
+                let next_instr = if let Some(shape_idents_to_node_keys) = result.shape_idents_to_node_keys {
+                    // apply the shape idents to node keys mapping
+
+                    let mut query_result_map = HashMap::new();
+                    for (ident, node_key) in shape_idents_to_node_keys {
+                        // TODO: add helper function, or add new variant to AbstractOutputNodeMarker, or just use that one for the shape query mapping and get rid of ShapeNodeIdentifier.
+                        let output_marker = AbstractOutputNodeMarker::from(<ShapeNodeIdentifier as Into<&'static str>>::into(ident.into()));
+                        query_result_map.insert(output_marker, node_key);
+                    }
+                    previous_results.insert(
+                        *abstract_output_id,
+                        query_result_map,
+                    );
+
+                    &query_instr.taken
+                } else {
+                    &query_instr.not_taken
+                };
+                run_instructions(
+                    g,
+                    previous_results,
+                    our_output_map,
+                    op_ctx,
+                    next_instr,
+                    subst,
+                )?;
             }
         }
     }
@@ -156,6 +186,7 @@ pub enum Instruction<S: Semantics> {
     Builtin(S::BuiltinOperation, Vec<AbstractNodeId>),
     Operation(OperationId, Vec<AbstractNodeId>),
     BuiltinQuery(S::BuiltinQuery, Vec<AbstractNodeId>, QueryInstructions<S>),
+    ShapeQuery(GraphShapeQuery<S>, Vec<AbstractNodeId>, QueryInstructions<S>),
 }
 
 pub struct QueryInstructions<S: Semantics> {
