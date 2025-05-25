@@ -66,7 +66,7 @@ pub enum EdgeInsertionOrder {
 }
 
 /// A graph with ordered edges and arbitrary associated edge and node data.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Graph<NodeAttr, EdgeAttr> {
     graph: DiGraphMap<NodeKey, EdgeAttribute<EdgeAttr>, RandomState>,
     max_node_key: NodeKey,

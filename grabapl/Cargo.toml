@@ -14,6 +14,8 @@ thiserror = "2.0.12"
 
 [dev-dependencies]
 criterion = "0.5.1"
+proptest = "1.6.0"
+rand = "0.9.1"
 
 [[bench]]
 name = "isomorphism_find_single_node"
