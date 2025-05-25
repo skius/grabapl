@@ -71,6 +71,7 @@ pub trait Semantics {
 
 // TODO: do we need this? it's just easier to use this than spell it out
 pub trait SemanticsClone: Semantics<NodeConcrete: Clone, EdgeConcrete: Clone> {
+    // TODO: Assert that the node keys are the same
     fn concrete_to_abstract(c: &ConcreteGraph<Self>) -> AbstractGraph<Self> {
         let mut abstract_graph = Graph::new();
         for (node_key, node_concrete) in c.nodes() {

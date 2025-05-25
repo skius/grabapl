@@ -1,8 +1,13 @@
+use std::collections::HashMap;
 use derive_more::From;
+use petgraph::algo::general_subgraph_monomorphisms_iter;
+use petgraph::visit::NodeIndexable;
 use crate::graph::operation::{OperationResult, get_substitution};
-use crate::graph::pattern::{OperationArgument, OperationParameter, ParameterSubstition};
-use crate::graph::semantics::{AbstractGraph, ConcreteGraph, SemanticsClone};
-use crate::{NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
+use crate::graph::pattern::{AbstractOutputNodeMarker, OperationArgument, OperationParameter, ParameterSubstition};
+use crate::graph::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, SemanticsClone};
+use crate::{Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
+use crate::graph::EdgeAttribute;
+use crate::graph::operation::user_defined::{AbstractOperationResultMarker, QueryInstructions};
 
 pub struct AbstractQueryOutput<S: Semantics> {
     pub changes: Vec<AbstractQueryChange<S>>,
@@ -90,12 +95,20 @@ pub trait BuiltinQuery {
 }
 
 pub struct ShapeQuery<S: Semantics> {
-    pub context_abstract_graph: AbstractGraph<S>,
-
+    // The context abstract graph to expect
+    pub parameter: OperationParameter<S>,
+    pub changes: Vec<ShapeQueryChange<S>>,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, From)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
 pub struct ShapeNodeIdentifier(&'static str);
+
+pub enum AbstractShapeNodeIdentifier {
+    /// A node in the parameter graph.
+    ParameterMarker(SubstMarker),
+    /// A node that is expected from this shape query.
+    ShapeQueryNode(ShapeNodeIdentifier),
+}
 
 pub enum ShapeQueryChange<S: Semantics> {
     ExpectNode(ShapeNodeChange<S>),
@@ -109,13 +122,52 @@ pub enum ShapeNodeChange<S: Semantics> {
 
 pub enum ShapeEdgeChange<S: Semantics> {
     /// Expect an edge from the node with the given identifier to the node with the given identifier, with the given abstract value
-    ChangeEdgeValue {
-        from: /*TODO: Turn this into an enum over ShapeNodeIdentifier, Param, AbstractOutput thing.*/,
-        to: ShapeNodeIdentifier,
-        /// If the edge is expected to be present, this is the abstract value of the edge.
-        /// If the edge is not expected to be present, this is None.
-        edge: Option<S::EdgeAbstract>,
+    ExpectedEdgeValue {
+        from: AbstractShapeNodeIdentifier,
+        to: AbstractShapeNodeIdentifier,
+        /// The expected abstract edge value
+        edge: S::EdgeAbstract,
     },
+}
+
+// pub enum GraphShapeQueryNodeWrapper<S: Semantics> {
+//     /// A node that is expected from this shape query.
+//     ShapeQueryNode(ShapeNodeIdentifier, S::NodeAbstract),
+//     /// A node that has already existed.
+//     ExistingNode(NodeKey),
+// }
+//
+// pub enum GraphShapeQueryEdgeWrapper<S: Semantics> {
+//     /// An edge that is expected from this shape query.
+//     ExpectedEdgeValue {
+//         from: AbstractShapeNodeIdentifier,
+//         to: AbstractShapeNodeIdentifier,
+//         edge: S::EdgeAbstract,
+//     },
+//     /// An edge that has already existed.
+//     ExistingEdge(NodeKey, NodeKey),
+// }
+//
+// pub struct GraphShapeQuery<S: Semantics> {
+//     pub parameter: OperationParameter<S>,
+//     pub expected_graph: Graph<GraphShapeQueryNodeWrapper<S>, GraphShapeQueryEdgeWrapper<S>>,
+// }
+
+pub struct GraphShapeQuery<S: Semantics> {
+    pub parameter: OperationParameter<S>,
+    // The keys here for the existing nodes must be equivalent to parameter.graph
+    // TODO: assert this property or refactor^
+    pub expected_graph: AbstractGraph<S>,
+    // In the expected graph, these nodes are _new_ nodes that are expected to be created by the operation and that will be returned with a mapping
+    // the node keys is the key for the expected_graph.
+    pub node_keys_to_shape_idents: HashMap<NodeKey, ShapeNodeIdentifier>,
+    pub shape_idents_to_node_keys: HashMap<ShapeNodeIdentifier, NodeKey>,
+}
+
+
+pub struct ConcreteShapeQueryResult {
+    // the node_keys here are the concrete keys of the mapped graph
+    pub shape_idents_to_node_keys: Option<HashMap<ShapeNodeIdentifier, NodeKey>>,
 }
 
 pub(crate) fn run_builtin_query<S: SemanticsClone>(
@@ -132,3 +184,129 @@ pub(crate) fn run_builtin_query<S: SemanticsClone>(
     let output = query.query(g, argument, &subst);
     Ok(output)
 }
+
+pub(crate) fn run_shape_query<S: SemanticsClone>(
+    g: &mut ConcreteGraph<S>,
+    query: &GraphShapeQuery<S>,
+    selected_inputs: Vec<NodeKey>,
+) -> OperationResult<ConcreteShapeQueryResult> {
+    let param = &query.parameter;
+    let abstract_graph = S::concrete_to_abstract(g);
+    // assert that the abstract graph matches the parameter. this is not the dynamic check yet, this is just asserting
+    // that the preconditions of the query are met.
+    let subst = get_substitution(&abstract_graph, &param, &selected_inputs)?;
+
+    // Check if the concrete graph matches the expected shape
+    // needs to satisfy conditions 1-3 and a-c from above TODO
+
+    // What are we looking for?
+    //  We want a mapping from the ShapeNodeIdentifiers in the shape query to the found matched nodes in the concrete graph, if they exist.
+    //  At the same time, the concrete graph must match the expected abstract shape changes.
+
+            // Hmm...
+            // Maybe it would be nicer to have the ShapeQuery be an explicit Graph with some special node/edge types?
+            // The current "list of instructions" is potentially good for an interactive shape query builder, but maybe not the underlying raw representation?
+            // let's put ^ on the backburner for now.
+
+    // What do we need from our isomorphism?
+    //  1. It needs to search the desired abstract subgraph in the concrete graph (turned into an abstract graph)
+    //  2. It needs to assert that the subgraph matches the original parameter substitution result
+    //  3. It needs to assert that for any changed pattern, the new pattern is valid according to the instructions.
+
+
+    // actually, let's try the graph approach first.
+
+
+
+    // TODO: implement edge order?
+
+    get_shape_query_substitution(query, &abstract_graph, param, &subst)
+
+    // TODO: after calling this, the abstract graph needs to somehow know that it can be changed for changed values!
+}
+
+fn get_shape_query_substitution<S: SemanticsClone>(
+    query: &GraphShapeQuery<S>,
+    dynamic_graph: &AbstractGraph<S>,
+    param: &OperationParameter<S>,
+    subst: &ParameterSubstition,
+) -> OperationResult<ConcreteShapeQueryResult> {
+    let desired_shape = &query.expected_graph;
+
+    let desired_shape_ref = &desired_shape.graph;
+    let dynamic_graph_ref = &dynamic_graph.graph;
+
+    // derive an enforced mapping from the existing parameter subst
+    let mut enforced_desired_to_dynamic: HashMap<NodeKey, NodeKey> = HashMap::new();
+    for (subst_marker, dynamic_node_key) in &subst.mapping {
+        let desired_node_key = param.subst_to_node_keys.get(subst_marker).expect("internal error: parameter substitution incorrect");
+        // that key must be mapped to the same node in the dynamic query we're running
+        enforced_desired_to_dynamic.insert(*desired_node_key, *dynamic_node_key);
+    }
+
+    let mut nm = |desired_shape_node_key: &NodeKey, dynamic_graph_node_key: &NodeKey| {
+        if let Some(expected_dynamic_node_key) = enforced_desired_to_dynamic.get(desired_shape_node_key) {
+            return expected_dynamic_node_key == dynamic_graph_node_key;
+        }
+
+        let desired_shape_attr = desired_shape.get_node_attr(*desired_shape_node_key).unwrap();
+        let dynamic_graph_attr = dynamic_graph.get_node_attr(*dynamic_graph_node_key).unwrap();
+        S::NodeMatcher::matches(dynamic_graph_attr, desired_shape_attr)
+    };
+
+    let mut em = |desired_shape_edge_attr_wrapper: &EdgeAttribute<S::EdgeAbstract>, dynamic_graph_edge_attr_wrapper: &EdgeAttribute<S::EdgeAbstract>| {
+        let desired_shape_edge_attr = &desired_shape_edge_attr_wrapper.edge_attr;
+        let dynamic_graph_edge_attr = &dynamic_graph_edge_attr_wrapper.edge_attr;
+        S::EdgeMatcher::matches(dynamic_graph_edge_attr, desired_shape_edge_attr)
+    };
+
+    let Some(isos) = general_subgraph_monomorphisms_iter(
+        &desired_shape_ref,
+        &dynamic_graph_ref,
+        &mut nm,
+        &mut em,
+    ) else {
+        return Ok(ConcreteShapeQueryResult {
+            shape_idents_to_node_keys: None,
+        });
+    };
+
+    let opt_mapping = isos.filter_map(|iso| {
+        // TODO: handle edge orderedness (factor out into separate function)
+
+        let mapping = iso
+            .iter()
+            .enumerate()
+            .filter_map(|(desired_shape_idx, &dynamic_graph_idx)| {
+                let desired_shape_node_key = desired_shape_ref.from_index(desired_shape_idx);
+                let dynamic_graph_node_key = dynamic_graph_ref.from_index(dynamic_graph_idx);
+                Some((
+                    *query.node_keys_to_shape_idents.get(&desired_shape_node_key)?,
+                    dynamic_graph_node_key,
+                ))
+            })
+            .collect::<HashMap<_, _>>();
+
+        Some(mapping)
+    })
+    .next();
+
+    Ok(ConcreteShapeQueryResult {
+        shape_idents_to_node_keys: opt_mapping,
+    })
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
