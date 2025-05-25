@@ -155,6 +155,7 @@ pub enum ShapeEdgeChange<S: Semantics> {
 // }
 
 pub struct GraphShapeQuery<S: Semantics> {
+    // TODO: perhaps we don't need a fullblown OperationParameter here, since we don't really need SubstMarker?
     pub parameter: OperationParameter<S>,
     // The keys here for the existing nodes must be equivalent to parameter.graph
     // TODO: assert this property or refactor^

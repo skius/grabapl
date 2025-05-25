@@ -1,5 +1,6 @@
 use grabapl::graph::operation::query::{AbstractQueryChange, AbstractQueryOutput, BuiltinQuery as BuiltinQueryTrait, ConcreteQueryOutput, EdgeChange, NodeChange};
 use std::collections::HashMap;
+use std::fmt::Debug;
 use grabapl::graph::semantics::{AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, Semantics};
 use grabapl::{DotCollector, EdgeInsertionOrder, OperationContext, WithSubstMarker};
 use grabapl::graph::operation::run_operation;
@@ -204,6 +205,26 @@ pub enum BuiltinOperation {
     CopyNodeValueTo,
     Decrement,
     Increment,
+    DeleteNode,
+}
+
+impl Debug for BuiltinOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BuiltinOperation::AddNode => write!(f, "AddNode"),
+            BuiltinOperation::AppendChild => write!(f, "AppendChild"),
+            BuiltinOperation::IndexCycle => write!(f, "IndexCycle"),
+            BuiltinOperation::SetValue(_) => write!(f, "SetValue"),
+            BuiltinOperation::AddEdge => write!(f, "AddEdge"),
+            BuiltinOperation::SetEdgeValueToCycle => write!(f, "SetEdgeValueToCycle"),
+            BuiltinOperation::SetEdgeValue(val) => write!(f, "SetEdgeValue({})", val),
+            BuiltinOperation::SetNodeValue(val) => write!(f, "SetNodeValue({})", val),
+            BuiltinOperation::CopyNodeValueTo => write!(f, "CopyNodeValueTo"),
+            BuiltinOperation::Decrement => write!(f, "Decrement"),
+            BuiltinOperation::Increment => write!(f, "Increment"),
+            BuiltinOperation::DeleteNode => write!(f, "DeleteNode"),
+        }
+    }
 }
 
 impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
@@ -333,6 +354,16 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                     node_keys_to_subst: HashMap::from([(a, 0)]),
                 }
             }
+            BuiltinOperation::DeleteNode => {
+                let mut g = grabapl::graph::Graph::new();
+                let a = g.add_node(());
+                OperationParameter {
+                    explicit_input_nodes: vec![0],
+                    parameter_graph: g,
+                    subst_to_node_keys: HashMap::from([(0, a)]),
+                    node_keys_to_subst: HashMap::from([(a, 0)]),
+                }
+            }
         }
     }
 
@@ -385,6 +416,10 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
             }
             BuiltinOperation::Increment => {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
+            }
+            BuiltinOperation::DeleteNode => {
+                let a = substitution.mapping[&0];
+                g.remove_node(a);
             }
         }
     }
@@ -453,6 +488,10 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 let a = substitution.mapping[&0];
                 let val = graph.get_node_attr(a).unwrap();
                 *graph.get_mut_node_attr(a).unwrap() = val + 1;
+            }
+            BuiltinOperation::DeleteNode => {
+                let a = substitution.mapping[&0];
+                graph.remove_node(a);
             }
         }
 

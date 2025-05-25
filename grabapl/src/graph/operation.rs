@@ -10,16 +10,17 @@ use crate::graph::pattern::{
 use crate::graph::semantics::{
     AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics, SemanticsClone,
 };
-use crate::{Graph, NodeKey, SubstMarker};
+use crate::{DotCollector, Graph, NodeKey, SubstMarker};
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use thiserror::Error;
 
 // TODO: We might want to be able to supply additional data to builtin operations. For example, a Set Value operation should be 'generic' over its value without
 //  needing to store a separate operation in the OpCtx for every value...
-pub trait BuiltinOperation {
+pub trait BuiltinOperation: Debug {
     type S: Semantics;
 
     /// The pattern to match against the graph.
