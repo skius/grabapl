@@ -119,3 +119,28 @@ const button_callback = (event) => {
 
 };
 
+// make the btnInsertNode button use the nodeVal input label
+document.querySelector("#btnInsertNode").addEventListener("click", (event) => {
+    let nodeVal = document.querySelector("#nodeVal").value;
+    if (nodeVal === "") {
+        alert("Please enter a value for the node.");
+        return;
+    }
+    console.log("Inserting node with value: " + nodeVal);
+    concrete.addNode(nodeVal);
+    onChange()
+});
+
+// make btnCallBstInsert use the bstInsertVal and bstRootId inputs to call operation 5
+document.querySelector("#btnCallBstInsert").addEventListener("click", (event) => {
+    let bstInsertVal = document.querySelector("#bstInsertVal").value;
+    let bstRootId = document.querySelector("#bstRootId").value;
+    if (bstInsertVal === "" || bstRootId === "") {
+        alert("Please enter a value for the node and the root id.");
+        return;
+    }
+    console.log("Calling BST insert with value: " + bstInsertVal + " and root id: " + bstRootId);
+    let value_node_key = concrete.addNode(parseInt(bstInsertVal));
+    runner.run(concrete, opCtx, 5, [parseInt(bstRootId), value_node_key]);
+    onChange()
+});

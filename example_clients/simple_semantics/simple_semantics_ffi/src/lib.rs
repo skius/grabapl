@@ -27,7 +27,10 @@ mod ffi {
 
     impl OpCtx {
         pub fn create() -> Box<OpCtx> {
-            let operation_ctx = grabapl::OperationContext::from_builtins(
+            // TODO: define an init function that calls this
+            console_error_panic_hook::set_once();
+            log::error!("test log::error! call");
+            let mut operation_ctx = grabapl::OperationContext::from_builtins(
                 std::collections::HashMap::from([
                     (0, BuiltinOperation::AddNode),
                     (1, BuiltinOperation::AppendChild),
@@ -37,6 +40,7 @@ mod ffi {
                     }))),
                 ])
             );
+            operation_ctx.add_custom_operation(5, simple_semantics::sample_user_defined_operations::get_labeled_edges_insert_bst_user_defined_operation(5));
             Box::new(OpCtx(operation_ctx))
         }
     }

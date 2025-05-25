@@ -1,3 +1,5 @@
+pub mod sample_user_defined_operations;
+
 use grabapl::graph::operation::query::{AbstractQueryChange, AbstractQueryOutput, BuiltinQuery as BuiltinQueryTrait, ConcreteQueryOutput, EdgeChange, NodeChange};
 use std::collections::HashMap;
 use std::fmt::Debug;
