@@ -148,6 +148,8 @@ pub fn get_count_list_len_user_defined_operation(self_op_id: OperationId) -> Use
 //  nil node is -1
 //  otherwise left child is smaller, right child is larger, inner nodes can store values.
 
+// TODO: I'm pretty sure this has a (user fault, not library) bug when there's just one child and we add the second child,
+//  because we _append_ the child even if it should be the left child.
 pub fn get_insert_bst_user_defined_operation(self_op_id: OperationId) -> UserDefinedOperation<SimpleSemantics> {
     // Expects the root of the binary tree as first input node, then the value to insert as second input node
     let mut g = grabapl::graph::Graph::new();
