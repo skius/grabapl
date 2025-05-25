@@ -49,6 +49,9 @@ impl ConcreteToAbstract for EdgeConcreteToAbstract {
 pub enum BuiltinQuery {
     HasChild,
     IsValueGt(i32),
+    IsValueEq(i32),
+    ValuesEqual,
+    FirstGtSnd,
 }
 
 impl BuiltinQueryTrait for BuiltinQuery {
@@ -76,6 +79,38 @@ impl BuiltinQueryTrait for BuiltinQuery {
                     node_keys_to_subst: HashMap::from([(a, 0)]),
                 }
             }
+            BuiltinQuery::IsValueEq(_) => {
+                let mut g = grabapl::graph::Graph::new();
+                let a = g.add_node(());
+                OperationParameter {
+                    explicit_input_nodes: vec![0],
+                    parameter_graph: g,
+                    subst_to_node_keys: HashMap::from([(0, a)]),
+                    node_keys_to_subst: HashMap::from([(a, 0)]),
+                }
+            }
+            BuiltinQuery::ValuesEqual => {
+                let mut g = grabapl::graph::Graph::new();
+                let a = g.add_node(());
+                let b = g.add_node(());
+                OperationParameter {
+                    explicit_input_nodes: vec![0, 1],
+                    parameter_graph: g,
+                    subst_to_node_keys: HashMap::from([(0, a), (1, b)]),
+                    node_keys_to_subst: HashMap::from([(a, 0), (b, 1)]),
+                }
+            }
+            BuiltinQuery::FirstGtSnd => {
+                let mut g = grabapl::graph::Graph::new();
+                let a = g.add_node(());
+                let b = g.add_node(());
+                OperationParameter {
+                    explicit_input_nodes: vec![0, 1],
+                    parameter_graph: g,
+                    subst_to_node_keys: HashMap::from([(0, a), (1, b)]),
+                    node_keys_to_subst: HashMap::from([(a, 0), (b, 1)]),
+                }
+            }
         }
     }
 
@@ -96,6 +131,9 @@ impl BuiltinQueryTrait for BuiltinQuery {
             BuiltinQuery::IsValueGt(val) => {
                 // No abstract changes if the value is equal, since our type system cannot represent exact values.
             }
+            _ => {
+                todo!("decide what this method even does")
+            }
         }
         AbstractQueryOutput { changes }
     }
@@ -109,6 +147,26 @@ impl BuiltinQueryTrait for BuiltinQuery {
             BuiltinQuery::IsValueGt(val) => {
                 let a = substitution.mapping[&0];
                 if *g.get_node_attr(a).unwrap() > *val {
+                    taken = true;
+                }
+            }
+            BuiltinQuery::IsValueEq(val) => {
+                let a = substitution.mapping[&0];
+                if *g.get_node_attr(a).unwrap() == *val {
+                    taken = true;
+                }
+            }
+            BuiltinQuery::ValuesEqual => {
+                let a = substitution.mapping[&0];
+                let b = substitution.mapping[&1];
+                if g.get_node_attr(a) == g.get_node_attr(b) {
+                    taken = true;
+                }
+            }
+            BuiltinQuery::FirstGtSnd => {
+                let a = substitution.mapping[&0];
+                let b = substitution.mapping[&1];
+                if g.get_node_attr(a) > g.get_node_attr(b) {
                     taken = true;
                 }
             }

@@ -72,6 +72,15 @@ fn get_mk_n_to_0_list_user_defined_operation() -> UserDefinedOperation<SimpleSem
         ],
     })));
 
+    // TODO: think about how to define the "new nodes" thing for user defined ops. In particular, how can we somehow specify
+    //  the names for all recursive calls?
+    //  we could have an automatically generated name by default which is just some concat of op id and the actual op's result marker,
+    //  and then also the option for the user to override a mapping like:
+    //  AbstractNodeId::DynamicOutputMarker("add_child", "child") -> OutputMarker("the_child").
+    //  .
+    //  In such a case, would we want to check that the node always gets created? probably.
+    //  What if a caller wants to access a conditionally created node? the query system needs to be used to check that a node exists.
+
     UserDefinedOperation {
         parameter: param,
         instructions,
@@ -135,11 +144,163 @@ fn get_count_list_len_user_defined_operation(self_op_id: OperationId) -> UserDef
     }
 }
 
+// TODO: add a new op that maybe does something with a binary tree?
+
+// binary search tree:
+//  nil node is -1
+//  otherwise left child is smaller, right child is larger, inner nodes can store values.
+
+fn get_insert_bst_user_defined_operation(self_op_id: OperationId) -> UserDefinedOperation<SimpleSemantics> {
+    // Expects the root of the binary tree as first input node, then the value to insert as second input node
+    let mut g = grabapl::graph::Graph::new();
+    let root_key = g.add_node(());
+    let value_key = g.add_node(());
+    let param = OperationParameter {
+        explicit_input_nodes: vec![0, 1],
+        parameter_graph: g,
+        subst_to_node_keys: HashMap::from([(0, root_key), (1, value_key)]),
+        node_keys_to_subst: HashMap::from([(root_key, 0), (value_key, 1)]),
+    };
+
+    let root_node = AbstractNodeId::ParameterMarker(0);
+    let value_node = AbstractNodeId::ParameterMarker(1);
+    let mut instructions = vec![];
+    // check if the root is nil
+    instructions.push(("is_nil_query (TODO: ignore)".into(), Instruction::BuiltinQuery(BuiltinQuery::IsValueEq(-1), vec![root_node], QueryInstructions {
+        taken: vec![
+            // if it is nil, we insert the value here
+            // TODO: add an OR ValuesEqual to see if the value is already there.
+            ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::CopyNodeValueTo, vec![value_node, root_node])),
+        ],
+        not_taken: vec![
+            // otherwise, we check children. For that we first need to get children.
+            ("two_children_query".into(), Instruction::ShapeQuery(
+                {
+                    // the graph shape query
+                    let mut g = grabapl::graph::Graph::new();
+                    let head = g.add_node(());
+                    let mut expected_g = g.clone();
+                    let left_child = expected_g.add_node(());
+                    let right_child = expected_g.add_node(());
+                    expected_g.add_edge(head, left_child, EdgePattern::Wildcard);
+                    expected_g.add_edge(head, right_child, EdgePattern::Wildcard);
+                    GraphShapeQuery {
+                        parameter: OperationParameter {
+                            explicit_input_nodes: vec![0],
+                            parameter_graph: g,
+                            subst_to_node_keys: HashMap::from([(0, head)]),
+                            node_keys_to_subst: HashMap::from([(head, 0)]),
+                        },
+                        expected_graph: expected_g,
+                        node_keys_to_shape_idents: HashMap::from([
+                            (left_child, "left".into()),
+                            (right_child, "right".into()),
+                        ]),
+                        shape_idents_to_node_keys: HashMap::from([
+                            ("left".into(), left_child),
+                            ("right".into(), right_child),
+                        ]),
+                    }
+                },
+                vec![root_node],
+                QueryInstructions {
+                    taken: vec![
+                        // we have two children, now we need to check if our value is gt or smaller than the root
+                        ("todo ignore".into(), Instruction::BuiltinQuery(BuiltinQuery::FirstGtSnd, vec![value_node, root_node], QueryInstructions {
+                            taken: vec![
+                                // if it is greater, we go to the right child
+                                ("todo ignore".into(), Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("two_children_query".into(), "right".into()), value_node])),
+                            ],
+                            not_taken: vec![
+                                // if it is smaller or equal, we go to the left child
+                                ("todo ignore".into(), Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("two_children_query".into(), "left".into()), value_node])),
+                            ],
+                        })),
+                    ],
+                    not_taken: vec![
+                        // we don't have two children. TODO: check if we have one child or zero children.
+                        ("one_child_query".into(), Instruction::ShapeQuery(
+                            {
+                                // the graph shape query
+                                let mut g = grabapl::graph::Graph::new();
+                                let head = g.add_node(());
+                                let mut expected_g = g.clone();
+                                let child = expected_g.add_node(());
+                                expected_g.add_edge(head, child, EdgePattern::Wildcard);
+                                GraphShapeQuery {
+                                    parameter: OperationParameter {
+                                        explicit_input_nodes: vec![0],
+                                        parameter_graph: g,
+                                        subst_to_node_keys: HashMap::from([(0, head)]),
+                                        node_keys_to_subst: HashMap::from([(head, 0)]),
+                                    },
+                                    expected_graph: expected_g,
+                                    node_keys_to_shape_idents: HashMap::from([(child, "child".into())]),
+                                    shape_idents_to_node_keys: HashMap::from([("child".into(), child)]),
+                                }
+                            },
+                            vec![root_node],
+                            QueryInstructions {
+                                taken: vec![
+                                    // we have one child, now we need to check if our value is gt or smaller than the root
+                                    // then we need to check if the child we have is left or right
+                                    ("todo ignore".into(), Instruction::BuiltinQuery(BuiltinQuery::FirstGtSnd, vec![value_node, root_node], QueryInstructions {
+                                        taken: vec![
+                                            // if value > root, we check if one_child_query.child is the right child (i.e., child > root)
+                                            ("todo ignore".into(), Instruction::BuiltinQuery(BuiltinQuery::FirstGtSnd, vec![AbstractNodeId::DynamicOutputMarker("one_child_query".into(), "child".into()), root_node], QueryInstructions {
+                                                taken: vec![
+                                                    // if it is greater, we go to the right child
+                                                    ("todo ignore".into(), Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("one_child_query".into(), "child".into()), value_node])),
+                                                ],
+                                                not_taken: vec![
+                                                    // if the one child that the root has it is smaller, the value node becomes the right child
+                                                    // TODO: same considerations as connected components TODO below
+                                                    ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::AddEdge, vec![root_node, value_node])),
+                                                ],
+                                            })),
+                                        ],
+                                        not_taken: vec![
+                                            // if value < root, we check if one_child_query.child is the left child (i.e., root > child)
+                                            ("todo ignore".into(), Instruction::BuiltinQuery(BuiltinQuery::FirstGtSnd, vec![root_node, AbstractNodeId::DynamicOutputMarker("one_child_query".into(), "child".into())], QueryInstructions {
+                                                taken: vec![
+                                                    // if child < root, we go to the left child
+                                                    ("todo ignore".into(), Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("one_child_query".into(), "child".into()), value_node])),
+                                                ],
+                                                not_taken: vec![
+                                                    // if the one child that the root has it is larger, the value node becomes the left child
+                                                    // TODO: same considerations as connected components TODO below
+                                                    ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::AddEdge, vec![root_node, value_node])),
+                                                ],
+                                            }))
+                                        ],
+                                    })),
+                                ],
+                                not_taken: vec![
+                                    // we don't have any children, we can insert the value as a child
+                                    // TODO: we're just adding an edge from root to the value node, how does that interact with the abstract graph view and connected components discussion?
+                                    ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::AddEdge, vec![root_node, value_node])),
+                                ],
+                            }
+                        ))
+                    ],
+                }
+            ))
+        ],
+    })));
+    // TODO: add remove value_node instruction
+
+    UserDefinedOperation {
+        parameter: param,
+        instructions,
+    }
+}
+
 fn main() {
     let user_defined_op = get_sample_user_defined_operation();
     let mk_list_user_op = get_mk_n_to_0_list_user_defined_operation();
 
     let count_list_len_user_op = get_count_list_len_user_defined_operation(11);
+    let insert_bst_user_op = get_insert_bst_user_defined_operation(12);
 
     let operation_ctx = HashMap::from([
         (0, BuiltinOperation::AddNode),
@@ -152,6 +313,7 @@ fn main() {
     operation_ctx.add_custom_operation(3, user_defined_op);
     operation_ctx.add_custom_operation(10, mk_list_user_op);
     operation_ctx.add_custom_operation(11, count_list_len_user_op);
+    operation_ctx.add_custom_operation(12, insert_bst_user_op);
 
     let mut dot_collector = DotCollector::new();
 
@@ -209,10 +371,50 @@ fn main() {
     let list_root = g.add_node(10);
     run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 10, vec![list_root]).unwrap();
     dot_collector.collect(&g);
-    
+
     // new node to count
     let accumulator = g.add_node(0);
     run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 11, vec![list_root, accumulator]).unwrap();
+    dot_collector.collect(&g);
+    
+    
+    // new root BST node
+    let bst_root = g.add_node(-1);
+    dot_collector.collect(&g);
+    // insert 5
+    let value_to_insert = g.add_node(5);
+    dot_collector.collect(&g);
+    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
+    dot_collector.collect(&g);
+    
+    // insert 3
+    let value_to_insert = g.add_node(3);
+    dot_collector.collect(&g);
+    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
+    dot_collector.collect(&g);
+    
+    // insert 7
+    let value_to_insert = g.add_node(7);
+    dot_collector.collect(&g);
+    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
+    dot_collector.collect(&g);
+    
+    // insert 1
+    let value_to_insert = g.add_node(1);
+    dot_collector.collect(&g);
+    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
+    dot_collector.collect(&g);
+    
+    // insert 2
+    let value_to_insert = g.add_node(2);
+    dot_collector.collect(&g);
+    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
+    dot_collector.collect(&g);
+    
+    // insert 4
+    let value_to_insert = g.add_node(4);
+    dot_collector.collect(&g);
+    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
     dot_collector.collect(&g);
 
 

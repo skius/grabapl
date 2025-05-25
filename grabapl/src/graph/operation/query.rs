@@ -186,6 +186,9 @@ pub(crate) fn run_builtin_query<S: SemanticsClone>(
     Ok(output)
 }
 
+// TODO: We could make the graph shape query have match arms in the form of a list of (match_arm_name, expected_graph) list that get checked in sequence
+// and the QueryInstructions would contain a hashmap from match_arm_name to the list of instructions to take assuming that match arm is taken.
+
 pub(crate) fn run_shape_query<S: SemanticsClone>(
     g: &mut ConcreteGraph<S>,
     query: &GraphShapeQuery<S>,
