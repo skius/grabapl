@@ -6,7 +6,7 @@ use grabapl::graph::operation::run_operation;
 use grabapl::graph::operation::user_defined::{AbstractNodeId, Instruction, QueryInstructions, QueryTaken, UserDefinedOperation};
 use grabapl::graph::pattern::{OperationOutput, OperationParameter};
 use simple_semantics::{BuiltinOperation, BuiltinQuery, EdgePattern, SimpleSemantics};
-use simple_semantics::sample_user_defined_operations::{get_count_list_len_user_defined_operation, get_insert_bst_user_defined_operation, get_labeled_edges_insert_bst_user_defined_operation, get_mk_n_to_0_list_user_defined_operation, get_sample_user_defined_operation};
+use simple_semantics::sample_user_defined_operations::{get_count_list_len_user_defined_operation, get_insert_bst_user_defined_operation, get_labeled_edges_insert_bst_user_defined_operation, get_mk_n_to_0_list_user_defined_operation, get_node_heights_user_defined_operation, get_sample_user_defined_operation};
 
 fn main() {
     let user_defined_op = get_sample_user_defined_operation();
@@ -15,6 +15,7 @@ fn main() {
     let count_list_len_user_op = get_count_list_len_user_defined_operation(11);
     let insert_bst_user_op = get_insert_bst_user_defined_operation(12);
     let insert_bst_labeled_edges_user_op = get_labeled_edges_insert_bst_user_defined_operation(13);
+    let node_heights_user_op = get_node_heights_user_defined_operation(14);
 
     let operation_ctx = HashMap::from([
         (0, BuiltinOperation::AddNode),
@@ -29,6 +30,7 @@ fn main() {
     operation_ctx.add_custom_operation(11, count_list_len_user_op);
     operation_ctx.add_custom_operation(12, insert_bst_user_op);
     operation_ctx.add_custom_operation(13, insert_bst_labeled_edges_user_op);
+    operation_ctx.add_custom_operation(14, node_heights_user_op);
 
     let mut dot_collector = DotCollector::new();
 
@@ -167,5 +169,10 @@ fn main() {
     run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
     dot_collector.collect(&g);
 
+    
+    // run node heights on that binary tree
+    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 14, vec![bst_labeled_edges_root]).unwrap();
+    dot_collector.collect(&g);
+    
     println!("{}", dot_collector.finalize());
 }

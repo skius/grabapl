@@ -425,3 +425,86 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(self_op_id: Operation
         instructions,
     }
 }
+
+pub fn get_node_heights_user_defined_operation(self_op_id: OperationId) -> UserDefinedOperation<SimpleSemantics> {
+    // expects the root node of a binary tree (with left/right edges for children) as input node
+    let mut g = grabapl::graph::Graph::new();
+    let root_key = g.add_node(());
+    let param = OperationParameter {
+        explicit_input_nodes: vec![0],
+        parameter_graph: g,
+        subst_to_node_keys: HashMap::from([(0, root_key)]),
+        node_keys_to_subst: HashMap::from([(root_key, 0)]),
+    };
+    let root_node = AbstractNodeId::ParameterMarker(0);
+    let mut instructions = vec![];
+    
+    // set root to 0
+    instructions.push(("set_root_height".into(), Instruction::Builtin(BuiltinOperation::SetNodeValue(0), vec![root_node])));
+    // query if 'left' child exists, if so, call self_op_id on that child
+    let left_child_query = {
+        // the graph shape query
+        let mut g = grabapl::graph::Graph::new();
+        let head = g.add_node(());
+        let mut expected_g = g.clone();
+        let left_child = expected_g.add_node(());
+        expected_g.add_edge(head, left_child, EdgePattern::Exact("left".to_string()));
+        GraphShapeQuery {
+            parameter: OperationParameter {
+                explicit_input_nodes: vec![0],
+                parameter_graph: g,
+                subst_to_node_keys: HashMap::from([(0, head)]),
+                node_keys_to_subst: HashMap::from([(head, 0)]),
+            },
+            expected_graph: expected_g,
+            node_keys_to_shape_idents: HashMap::from([(left_child, "left".into())]),
+            shape_idents_to_node_keys: HashMap::from([("left".into(), left_child)]),
+        }
+    };
+    let right_child_query = {
+        // the graph shape query
+        let mut g = grabapl::graph::Graph::new();
+        let head = g.add_node(());
+        let mut expected_g = g.clone();
+        let right_child = expected_g.add_node(());
+        expected_g.add_edge(head, right_child, EdgePattern::Exact("right".to_string()));
+        GraphShapeQuery {
+            parameter: OperationParameter {
+                explicit_input_nodes: vec![0],
+                parameter_graph: g,
+                subst_to_node_keys: HashMap::from([(0, head)]),
+                node_keys_to_subst: HashMap::from([(head, 0)]),
+            },
+            expected_graph: expected_g,
+            node_keys_to_shape_idents: HashMap::from([(right_child, "right".into())]),
+            shape_idents_to_node_keys: HashMap::from([("right".into(), right_child)]),
+        }
+    };
+    let left_child = AbstractNodeId::DynamicOutputMarker("left_child_query".into(), "left".into());
+    let right_child = AbstractNodeId::DynamicOutputMarker("right_child_query".into(), "right".into());
+    instructions.push(("left_child_query".into(), Instruction::ShapeQuery(left_child_query, vec![root_node], QueryInstructions {
+        taken: vec![
+            // we have a left child, recurse on it
+            ("todo ignore".into(), Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("left_child_query".into(), "left".into())])),
+            // set root to max of it and left child
+            ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::SetSndToMaxOfFstSnd, vec![left_child, root_node])),
+        ],
+        not_taken: vec![],
+    })));
+    instructions.push(("right_child_query".into(), Instruction::ShapeQuery(right_child_query, vec![root_node], QueryInstructions {
+        taken: vec![
+            // we have a right child, recurse on it
+            ("todo ignore".into(), Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("right_child_query".into(), "right".into())])),
+            // set root to max of it and right child
+            ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::SetSndToMaxOfFstSnd, vec![right_child, root_node])),
+        ],
+        not_taken: vec![],
+    })));
+    // add 1 to root node, which is now the max of the heights of the left and right children
+    instructions.push(("set_root_height".into(), Instruction::Builtin(BuiltinOperation::Increment, vec![root_node])));
+    
+    UserDefinedOperation {
+        parameter: param,
+        instructions,
+    }
+}

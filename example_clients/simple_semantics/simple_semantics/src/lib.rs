@@ -208,6 +208,8 @@ pub enum BuiltinOperation {
     Decrement,
     Increment,
     DeleteNode,
+    // TODO: 3-argument max: c <- max(a,b) would need to support aliasing of parameters...
+    SetSndToMaxOfFstSnd,
 }
 
 impl Debug for BuiltinOperation {
@@ -225,6 +227,7 @@ impl Debug for BuiltinOperation {
             BuiltinOperation::Decrement => write!(f, "Decrement"),
             BuiltinOperation::Increment => write!(f, "Increment"),
             BuiltinOperation::DeleteNode => write!(f, "DeleteNode"),
+            BuiltinOperation::SetSndToMaxOfFstSnd => write!(f, "SetSndToMaxOfFstSnd"),
         }
     }
 }
@@ -366,6 +369,17 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                     node_keys_to_subst: HashMap::from([(a, 0)]),
                 }
             }
+            BuiltinOperation::SetSndToMaxOfFstSnd => {
+                let mut g = grabapl::graph::Graph::new();
+                let a = g.add_node(());
+                let b = g.add_node(());
+                OperationParameter {
+                    explicit_input_nodes: vec![0, 1],
+                    parameter_graph: g,
+                    subst_to_node_keys: HashMap::from([(0, a), (1, b)]),
+                    node_keys_to_subst: HashMap::from([(a, 0), (b, 1)]),
+                }
+            }
         }
     }
 
@@ -422,6 +436,9 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
             BuiltinOperation::DeleteNode => {
                 let a = substitution.mapping[&0];
                 g.remove_node(a);
+            }
+            BuiltinOperation::SetSndToMaxOfFstSnd => {
+                // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
             }
         }
     }
@@ -494,6 +511,13 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
             BuiltinOperation::DeleteNode => {
                 let a = substitution.mapping[&0];
                 graph.remove_node(a);
+            }
+            BuiltinOperation::SetSndToMaxOfFstSnd => {
+                let a = substitution.mapping[&0];
+                let b = substitution.mapping[&1];
+                let fst = graph.get_node_attr(a).unwrap();
+                let snd = graph.get_node_attr(b).unwrap();
+                *graph.get_mut_node_attr(b).unwrap() = std::cmp::max(*fst, *snd);
             }
         }
 
