@@ -1,5 +1,6 @@
 pub mod query;
 pub mod user_defined;
+pub mod builder;
 
 use crate::graph::EdgeAttribute;
 use crate::graph::operation::user_defined::{AbstractOperationResultMarker, UserDefinedOperation};

@@ -10,7 +10,7 @@ use grabapl::graph::pattern::{OperationArgument, OperationOutput, OperationParam
 
 pub struct SimpleSemantics;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum EdgePattern {
     Wildcard,
     Exact(String),

@@ -190,6 +190,7 @@ pub enum Instruction<S: Semantics> {
 }
 
 pub struct QueryInstructions<S: Semantics> {
+    // TODO: does it make sense to rename these? true_branch and false_branch?
     pub taken: Vec<InstructionWithResultMarker<S>>,
     pub not_taken: Vec<InstructionWithResultMarker<S>>,
 }
