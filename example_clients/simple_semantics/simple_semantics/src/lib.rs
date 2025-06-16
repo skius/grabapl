@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use grabapl::graph::semantics::{AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, Semantics};
 use grabapl::{DotCollector, EdgeInsertionOrder, OperationContext, WithSubstMarker};
 use grabapl::graph::operation::run_operation;
-use grabapl::graph::pattern::{OperationArgument, OperationOutput, OperationParameter, ParameterSubstition};
+use grabapl::graph::pattern::{OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution};
 
 pub struct SimpleSemantics;
 
@@ -118,7 +118,7 @@ impl BuiltinQueryTrait for BuiltinQuery {
         }
     }
 
-    fn abstract_changes(&self, g: &mut AbstractGraph<Self::S>, argument: OperationArgument, substitution: &ParameterSubstition) -> AbstractQueryOutput<Self::S> {
+    fn abstract_changes(&self, g: &mut AbstractGraph<Self::S>, argument: OperationArgument, substitution: &ParameterSubstitution) -> AbstractQueryOutput<Self::S> {
         let mut changes = vec![];
         match self {
             BuiltinQuery::HasChild => {
@@ -142,7 +142,7 @@ impl BuiltinQueryTrait for BuiltinQuery {
         AbstractQueryOutput { changes }
     }
 
-    fn query(&self, g: &mut ConcreteGraph<Self::S>, argument: OperationArgument, substitution: &ParameterSubstition) -> ConcreteQueryOutput {
+    fn query(&self, g: &mut ConcreteGraph<Self::S>, argument: OperationArgument, substitution: &ParameterSubstitution) -> ConcreteQueryOutput {
         let mut taken = false;
         match self {
             BuiltinQuery::HasChild => {
@@ -404,7 +404,7 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
         }
     }
 
-    fn apply_abstract(&self, g: &mut AbstractGraph<Self::S>, argument: OperationArgument, substitution: &ParameterSubstition) {
+    fn apply_abstract(&self, g: &mut AbstractGraph<Self::S>, argument: OperationArgument, substitution: &ParameterSubstitution) {
         match self {
             BuiltinOperation::AddNode => {
                 g.add_node(());
@@ -468,7 +468,7 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
         &self,
         graph: &mut ConcreteGraph<SimpleSemantics>,
         argument: OperationArgument,
-        substitution: &ParameterSubstition,
+        substitution: &ParameterSubstitution,
     ) -> OperationOutput {
         let mut new_nodes = HashMap::new();
         match self {
