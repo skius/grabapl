@@ -19,13 +19,13 @@ pub struct OperationParameter<S: Semantics> {
 
 /// The result of trying to bind an abstract graph to a parameter graph.
 #[derive(Debug)]
-pub struct ParameterSubstition {
+pub struct ParameterSubstitution {
     pub mapping: HashMap<SubstMarker, NodeKey>,
 }
 
-impl ParameterSubstition {
+impl ParameterSubstitution {
     pub fn new(mapping: HashMap<SubstMarker, NodeKey>) -> Self {
-        ParameterSubstition { mapping }
+        ParameterSubstitution { mapping }
     }
 }
 

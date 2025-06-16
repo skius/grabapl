@@ -6,7 +6,7 @@ use crate::graph::EdgeAttribute;
 use crate::graph::operation::user_defined::{AbstractOperationResultMarker, UserDefinedOperation};
 use crate::graph::pattern::{
     AbstractOutputNodeMarker, OperationArgument, OperationOutput, OperationParameter,
-    ParameterSubstition,
+    ParameterSubstitution,
 };
 use crate::graph::semantics::{
     AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics, SemanticsClone,
@@ -38,7 +38,7 @@ pub trait BuiltinOperation: Debug {
         &self,
         g: &mut AbstractGraph<Self::S>,
         argument: OperationArgument,
-        substitution: &ParameterSubstition,
+        substitution: &ParameterSubstitution,
     );
 
     // TODO: OperationOutput returned here should only represent Abstract changes. Basically the guaranteed new nodes so that other ops can refer to it.
@@ -47,7 +47,7 @@ pub trait BuiltinOperation: Debug {
         &self,
         g: &mut ConcreteGraph<Self::S>,
         argument: OperationArgument,
-        substitution: &ParameterSubstition,
+        substitution: &ParameterSubstitution,
     ) -> OperationOutput;
 }
 
@@ -106,7 +106,7 @@ fn get_substitution<S: Semantics>(
     g: &AbstractGraph<S>,
     param: &OperationParameter<S>,
     selected_inputs: &[NodeKey],
-) -> OperationResult<ParameterSubstition> {
+) -> OperationResult<ParameterSubstitution> {
     if param.explicit_input_nodes.len() != selected_inputs.len() {
         // TODO: decide if we want this to be actually reachable? Or if all preprocessing we do should catch this
         return Err(OperationError::InvalidOperationArgumentCount {
@@ -168,7 +168,7 @@ fn get_substitution<S: Semantics>(
         Some(mapping)
     })
     .next()
-    .map(ParameterSubstition::new)
+    .map(ParameterSubstitution::new)
     .ok_or(OperationError::ArgumentDoesNotMatchParameter)
 }
 

@@ -4,7 +4,7 @@ use derive_more::with_trait::Into;
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
 use crate::graph::operation::{OperationResult, get_substitution};
-use crate::graph::pattern::{AbstractOutputNodeMarker, OperationArgument, OperationParameter, ParameterSubstition};
+use crate::graph::pattern::{AbstractOutputNodeMarker, OperationArgument, OperationParameter, ParameterSubstitution};
 use crate::graph::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, SemanticsClone};
 use crate::{Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
 use crate::graph::EdgeAttribute;
@@ -84,14 +84,14 @@ pub trait BuiltinQuery {
         &self,
         g: &mut AbstractGraph<Self::S>,
         argument: OperationArgument,
-        substitution: &ParameterSubstition,
+        substitution: &ParameterSubstitution,
     ) -> AbstractQueryOutput<Self::S>;
 
     fn query(
         &self,
         g: &mut ConcreteGraph<Self::S>,
         argument: OperationArgument,
-        substitution: &ParameterSubstition,
+        substitution: &ParameterSubstitution,
     ) -> ConcreteQueryOutput;
 }
 
@@ -232,7 +232,7 @@ pub(crate) fn run_shape_query<S: SemanticsClone>(
 fn get_shape_query_substitution<S: SemanticsClone>(
     query: &GraphShapeQuery<S>,
     dynamic_graph: &AbstractGraph<S>,
-    subst: &ParameterSubstition,
+    subst: &ParameterSubstitution,
 ) -> OperationResult<ConcreteShapeQueryResult> {
     let desired_shape = &query.expected_graph;
 

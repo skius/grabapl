@@ -4,7 +4,7 @@ use crate::graph::operation::{
 };
 use crate::graph::pattern::{
     AbstractOutputNodeMarker, OperationArgument, OperationOutput, OperationParameter,
-    ParameterSubstition,
+    ParameterSubstitution,
 };
 use crate::graph::semantics::{ConcreteGraph, SemanticsClone};
 use crate::{NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
@@ -27,6 +27,12 @@ pub enum AbstractNodeId {
 
 pub type InstructionWithResultMarker<S> = (Option<AbstractOperationResultMarker>, Instruction<S>);
 
+// TODO: We probably want each instruction to statically know which nodes it uses in a call. We need this because
+//  we want the parameter matching to happen statically, so we know for a fact which nodes get modified. And we're not surprised
+//  if the concrete graph has more edges and thus the called operation matches differently.
+//  This requires thinking about how to keep statically defined mappings in check when running the operation concretely.
+//  ==> see big-picture-todos.md for a solution. TL;DR: store implicitly matched context nodes in the form of an explicit mapping from AbstractNodeId to the context nodes.
+
 // A 'custom'/user-defined operation
 pub struct UserDefinedOperation<S: Semantics> {
     pub parameter: OperationParameter<S>,
@@ -40,7 +46,7 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
         op_ctx: &OperationContext<S>,
         g: &mut ConcreteGraph<S>,
         argument: OperationArgument,
-        subst: &ParameterSubstition,
+        subst: &ParameterSubstitution,
     ) -> OperationResult<OperationOutput> {
         let mut our_output_map: HashMap<AbstractOutputNodeMarker, NodeKey> = HashMap::new();
 
@@ -75,7 +81,7 @@ fn run_instructions<S: SemanticsClone>(
     our_output_map: &mut HashMap<AbstractOutputNodeMarker, NodeKey>,
     op_ctx: &OperationContext<S>,
     instructions: &[InstructionWithResultMarker<S>],
-    subst: &ParameterSubstition,
+    subst: &ParameterSubstitution,
 ) -> OperationResult<()> {
     for (abstract_output_id, instruction) in instructions {
         match instruction {
@@ -157,7 +163,7 @@ fn run_instructions<S: SemanticsClone>(
 //  invariant that this works. And encode fallibility in a 'builder'.
 fn get_concrete_args<S: Semantics>(
     args: &[AbstractNodeId],
-    subst: &ParameterSubstition,
+    subst: &ParameterSubstitution,
     previous_results: &HashMap<
         AbstractOperationResultMarker,
         HashMap<AbstractOutputNodeMarker, NodeKey>,

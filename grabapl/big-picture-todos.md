@@ -8,3 +8,16 @@
    for the edge weight and the node weight.
 - [ ] User-defined queries
 - [ ] Nested types?
+
+
+# Next TODOs
+- [ ] Work with abstract graph
+- [ ] Think about how to keep mapping from abstract graph in tact for concrete execution
+  - When calling an operation, the implicitly matched context nodes are important.
+  - We need the determined mapping at typecheck-time.
+  - Ah! This mapping will use nodes of the "abstract abstract" graph, (i.e., AbstractNodeId)
+  - So we just store the implicitly matched AbstractNodeIds explicitly and pass them when
+    running operations. This needs some restructuring of the run_operation, since it expect to need to match
+    context nodes dynamically.
+  - ==> UserDefinedOperations should store the context nodes explicitly for every call. They
+    should be stored in the form of AbstractNodeId.
