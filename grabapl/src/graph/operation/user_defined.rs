@@ -183,18 +183,26 @@ fn get_concrete_args<S: Semantics>(
         .collect()
 }
 
+#[derive(derive_more::Debug)]
 pub enum Instruction<S: Semantics> {
     // TODO: Split out into Instruction::OperationLike (which includes both Builtin and Operation)
     //  and Instruction::QueryLike (which includes BuiltinQuery and potential future custom queries).
+    #[debug("Builtin(???, {_1:#?})")]
     Builtin(S::BuiltinOperation, Vec<AbstractNodeId>),
+    #[debug("Operation({_0:#?}, {_1:#?})")]
     Operation(OperationId, Vec<AbstractNodeId>),
+    #[debug("BuiltinQuery(???, {_1:#?}, {_2:#?})")]
     BuiltinQuery(S::BuiltinQuery, Vec<AbstractNodeId>, QueryInstructions<S>),
+    #[debug("ShapeQuery(???, {_1:#?}, {_2:#?})")]
     ShapeQuery(GraphShapeQuery<S>, Vec<AbstractNodeId>, QueryInstructions<S>),
 }
 
+#[derive(derive_more::Debug)]
 pub struct QueryInstructions<S: Semantics> {
     // TODO: does it make sense to rename these? true_branch and false_branch?
+    #[debug("[{}]", taken.iter().map(|(opt, inst)| format!("({opt:#?}, {:#?})", inst)).collect::<Vec<_>>().join(", "))]
     pub taken: Vec<InstructionWithResultMarker<S>>,
+    #[debug("[{}]", not_taken.iter().map(|(opt, inst)| format!("({opt:#?}, {:#?})", inst)).collect::<Vec<_>>().join(", "))]
     pub not_taken: Vec<InstructionWithResultMarker<S>>,
 }
 

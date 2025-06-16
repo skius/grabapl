@@ -49,6 +49,7 @@ impl ConcreteToAbstract for EdgeConcreteToAbstract {
     }
 }
 
+#[derive(Clone, Debug)]
 pub enum BuiltinQuery {
     HasChild,
     IsValueGt(i32),
@@ -228,6 +229,26 @@ impl Debug for BuiltinOperation {
             BuiltinOperation::Increment => write!(f, "Increment"),
             BuiltinOperation::DeleteNode => write!(f, "DeleteNode"),
             BuiltinOperation::SetSndToMaxOfFstSnd => write!(f, "SetSndToMaxOfFstSnd"),
+        }
+    }
+}
+
+impl Clone for BuiltinOperation {
+    fn clone(&self) -> Self {
+        match self {
+            BuiltinOperation::AddNode => BuiltinOperation::AddNode,
+            BuiltinOperation::AppendChild => BuiltinOperation::AppendChild,
+            BuiltinOperation::IndexCycle => BuiltinOperation::IndexCycle,
+            BuiltinOperation::SetValue(f) => BuiltinOperation::SetNodeValue(0), // TODO: fix?
+            BuiltinOperation::AddEdge => BuiltinOperation::AddEdge,
+            BuiltinOperation::SetEdgeValueToCycle => BuiltinOperation::SetEdgeValueToCycle,
+            BuiltinOperation::SetEdgeValue(val) => BuiltinOperation::SetEdgeValue(val.clone()),
+            BuiltinOperation::SetNodeValue(val) => BuiltinOperation::SetNodeValue(*val),
+            BuiltinOperation::CopyNodeValueTo => BuiltinOperation::CopyNodeValueTo,
+            BuiltinOperation::Decrement => BuiltinOperation::Decrement,
+            BuiltinOperation::Increment => BuiltinOperation::Increment,
+            BuiltinOperation::DeleteNode => BuiltinOperation::DeleteNode,
+            BuiltinOperation::SetSndToMaxOfFstSnd => BuiltinOperation::SetSndToMaxOfFstSnd,
         }
     }
 }

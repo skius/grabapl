@@ -195,11 +195,10 @@ pub(crate) fn run_shape_query<S: SemanticsClone>(
     query: &GraphShapeQuery<S>,
     selected_inputs: Vec<NodeKey>,
 ) -> OperationResult<ConcreteShapeQueryResult> {
-    let param = &query.parameter;
     let abstract_graph = S::concrete_to_abstract(g);
     // assert that the abstract graph matches the parameter. this is not the dynamic check yet, this is just asserting
     // that the preconditions of the query are met.
-    let subst = get_substitution(&abstract_graph, &param, &selected_inputs)?;
+    let subst = get_substitution(&abstract_graph, &query.parameter, &selected_inputs)?;
 
     // Check if the concrete graph matches the expected shape
     // needs to satisfy conditions 1-3 and a-c from above TODO
@@ -225,7 +224,7 @@ pub(crate) fn run_shape_query<S: SemanticsClone>(
 
     // TODO: implement edge order?
 
-    get_shape_query_substitution(query, &abstract_graph, param, &subst)
+    get_shape_query_substitution(query, &abstract_graph, &subst)
 
     // TODO: after calling this, the abstract graph needs to somehow know that it can be changed for changed values!
 }
@@ -233,7 +232,6 @@ pub(crate) fn run_shape_query<S: SemanticsClone>(
 fn get_shape_query_substitution<S: SemanticsClone>(
     query: &GraphShapeQuery<S>,
     dynamic_graph: &AbstractGraph<S>,
-    param: &OperationParameter<S>,
     subst: &ParameterSubstition,
 ) -> OperationResult<ConcreteShapeQueryResult> {
     let desired_shape = &query.expected_graph;
@@ -244,7 +242,7 @@ fn get_shape_query_substitution<S: SemanticsClone>(
     // derive an enforced mapping from the existing parameter subst
     let mut enforced_desired_to_dynamic: HashMap<NodeKey, NodeKey> = HashMap::new();
     for (subst_marker, dynamic_node_key) in &subst.mapping {
-        let desired_node_key = param.subst_to_node_keys.get(subst_marker).expect("internal error: parameter substitution incorrect");
+        let desired_node_key = query.parameter.subst_to_node_keys.get(subst_marker).expect("internal error: parameter substitution incorrect");
         // that key must be mapped to the same node in the dynamic query we're running
         enforced_desired_to_dynamic.insert(*desired_node_key, *dynamic_node_key);
     }
