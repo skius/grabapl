@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use std::slice::Iter;
 use thiserror::Error;
 use crate::{Graph, NodeKey, OperationContext, OperationId, SubstMarker};
-use crate::graph::operation::user_defined::{AbstractNodeId, AbstractOperationResultMarker, UserDefinedOperation};
+use crate::graph::operation::user_defined::{AbstractNodeId, AbstractOperationResultMarker, QueryInstructions, UserDefinedOperation};
 use crate::graph::pattern::{AbstractOutputNodeMarker, OperationParameter};
 use crate::graph::semantics::{AbstractGraph, SemanticsClone};
 
@@ -55,6 +55,10 @@ pub enum OperationBuilderError {
     ReusedSubstMarker(SubstMarker),
     #[error("Expected an existing subst marker, but {0} was not found")]
     NotFoundSubstMarker(SubstMarker),
+    #[error("Cannot call this while in a query context")]
+    InvalidInQuery,
+    #[error("Already visited the {0} branch of the active query")]
+    AlreadyVisitedBranch(bool),
 }
 
 pub struct OperationBuilder<'a, S: SemanticsClone> {
@@ -388,6 +392,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>> Interm
                     current_query_branch_state = Some(QueryBranchState::NoBranch);
                     instructions_vec_stack.push(current_instructions_vec);
                     current_instructions_vec = Vec::new();
+                    // TODO: try continue here. the 'parsing' style below is easier, but this stack based version would allow easy caching.
                 }
                 _ => {}
             }
@@ -401,54 +406,110 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>> Interm
         let mut iter = instructions.iter().peekable();
 
         let op_parameter = Self::build_operation_parameter(&mut iter)?;
-        
+
         let instructions = Self::build_many_instructions(&mut iter)?;
 
         todo!("Intermediate state builder not implemented yet");
     }
-    
+
     fn build_many_instructions(
         iter: &mut Peekable<Iter<BuilderInstruction<S>>>,
     ) -> Result<Vec<UDInstruction<S>>, OperationBuilderError> {
         let mut instructions = Vec::new();
 
-        while let Some(instruction) = iter.peek() {
-            match instruction {
-                BuilderInstruction::AddNamedInstruction(name, instruction, args) => {
-                    todo!()
-                }
-                BuilderInstruction::AddInstruction(instruction, args) => {
-                    iter.next();
-                    match instruction {
-                        Instruction::Builtin(builtin_op) => {
-                            // Here we would typically apply the builtin operation to the abstract graph.
-                            // For now, we just log it.
-                            println!("Applying builtin operation: {:?} args: {args:?}", builtin_op);
-
-                            instructions.push(UDInstruction::Builtin(builtin_op.clone(), args.clone()));
-                        }
-                        Instruction::FromOperationId(op_id) => {
-                            // Here we would typically look up the operation by its ID and apply it.
-                            // For now, we just log it.
-                            println!("Applying operation with ID: {:?} args: {args:?}", op_id);
-
-                            instructions.push(UDInstruction::Operation(op_id.clone(), args.clone()));
-                        }
-                        Instruction::Recurse => {
-                            // This would typically mean we need to recurse into another operation.
-                            // For now, we just log it.
-                            println!("Recursing into self with args: {args:?}");
-
-                            // TODO: somehow denote 'self' instead of 0
-                            instructions.push(UDInstruction::Operation(0, args.clone()));
-                        }
-                    }
-                }
-                _ => break,
+        while let Some(instr) = iter.peek() {
+            // break on control flow instructions
+            if matches!(instr, BuilderInstruction::EndQuery) {
+                break;
             }
+            instructions.push(Self::build_instruction(iter)?);
         }
 
         Ok(instructions)
+    }
+
+    fn build_instruction(
+        iter: &mut Peekable<Iter<BuilderInstruction<S>>>,
+    ) -> Result<UDInstruction<S>, OperationBuilderError> {
+        let next_instruction = iter.peek().expect("should only be called when there is an instruction");
+        match next_instruction {
+            BuilderInstruction::AddNamedInstruction(name, instruction, args) => {
+                todo!();
+            }
+            BuilderInstruction::AddInstruction(instruction, args) => {
+                iter.next();
+                match instruction {
+                    Instruction::Builtin(builtin_op) => {
+                        // Here we would typically apply the builtin operation to the abstract graph.
+                        // For now, we just log it.
+                        println!("Applying builtin operation: {:?} args: {args:?}", builtin_op);
+                        Ok(UDInstruction::Builtin(builtin_op.clone(), args.clone()))
+                    }
+                    Instruction::FromOperationId(op_id) => {
+                        // Here we would typically look up the operation by its ID and apply it.
+                        // For now, we just log it.
+                        println!("Applying operation with ID: {:?} args: {args:?}", op_id);
+                        Ok(UDInstruction::Operation(op_id.clone(), args.clone()))
+                    }
+                    Instruction::Recurse => {
+                        // This would typically mean we need to recurse into another operation.
+                        // For now, we just log it.
+                        println!("Recursing into self with args: {args:?}");
+                        // TODO: somehow denote 'self' instead of 0
+                        Ok(UDInstruction::Operation(0, args.clone()))
+                    }
+                }
+            }
+            BuilderInstruction::StartQuery(query, args) => {
+                iter.next();
+                // Start a new query state
+                let (true_branch, false_branch) = Self::build_query_instruction(iter)?;
+                // Ok(UDInstruction::BuiltinQuery(query.clone(), args.clone(), QueryInstructions {
+                //     taken: true_branch,
+                //     not_taken: false_branch,
+                // }))
+                todo!()
+            }
+            _ => {
+                todo!()
+            }
+        }
+    }
+
+    fn build_query_instruction(
+        iter: &mut Peekable<Iter<BuilderInstruction<S>>>,
+    ) -> Result<(Vec<UDInstruction<S>>, Vec<UDInstruction<S>>), OperationBuilderError> {
+        // we just consumed a StartQuery instruction.
+        let mut true_branch_instructions = None;
+        let mut false_branch_instructions = None;
+        while let Some(instruction) = iter.peek() {
+            match instruction {
+                BuilderInstruction::EnterTrueBranch => {
+                    iter.next();
+                    if true_branch_instructions.is_some() {
+                        return Err(OperationBuilderError::AlreadyVisitedBranch(true));
+                    }
+                    true_branch_instructions = Some(Self::build_many_instructions(iter)?);
+                }
+                BuilderInstruction::EnterFalseBranch => {
+                    iter.next();
+                    if false_branch_instructions.is_some() {
+                        return Err(OperationBuilderError::AlreadyVisitedBranch(false));
+                    }
+                    false_branch_instructions = Some(Self::build_many_instructions(iter)?);
+                }
+                BuilderInstruction::EndQuery => {
+                    iter.next();
+                    break;
+                }
+                _ => {
+                    return Err(OperationBuilderError::InvalidInQuery);
+                }
+            }
+        }
+        let true_branch = true_branch_instructions.unwrap_or_default();
+        let false_branch = false_branch_instructions.unwrap_or_default();
+        Ok((true_branch, false_branch))
     }
 
     fn build_operation_parameter(iter: &mut Peekable<Iter<BuilderInstruction<S>>>) -> Result<OperationParameter<S>, OperationBuilderError> {
