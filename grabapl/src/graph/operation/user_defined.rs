@@ -25,7 +25,7 @@ pub enum AbstractNodeId {
     DynamicOutputMarker(AbstractOperationResultMarker, AbstractOutputNodeMarker),
 }
 
-pub type InstructionWithResultMarker<S> = (AbstractOperationResultMarker, Instruction<S>);
+pub type InstructionWithResultMarker<S> = (Option<AbstractOperationResultMarker>, Instruction<S>);
 
 // A 'custom'/user-defined operation
 pub struct UserDefinedOperation<S: Semantics> {
@@ -94,8 +94,9 @@ fn run_instructions<S: SemanticsClone>(
                     // does not match the outer match arm
                     Instruction::BuiltinQuery(..) | Instruction::ShapeQuery(..) => unreachable!(),
                 };
-
-                previous_results.insert(*abstract_output_id, output.new_nodes);
+                if let Some(abstract_output_id) = abstract_output_id {
+                    previous_results.insert(*abstract_output_id, output.new_nodes);
+                }
             }
             Instruction::BuiltinQuery(query, args, query_instr) => {
                 let concrete_args = get_concrete_args::<S>(args, subst, previous_results)?;
@@ -127,10 +128,12 @@ fn run_instructions<S: SemanticsClone>(
                         let output_marker = AbstractOutputNodeMarker::from(<ShapeNodeIdentifier as Into<&'static str>>::into(ident.into()));
                         query_result_map.insert(output_marker, node_key);
                     }
-                    previous_results.insert(
-                        *abstract_output_id,
-                        query_result_map,
-                    );
+                    if let Some(abstract_output_id) = abstract_output_id {
+                        previous_results.insert(
+                            *abstract_output_id,
+                            query_result_map,
+                        );
+                    }
 
                     &query_instr.taken
                 } else {

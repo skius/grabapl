@@ -176,8 +176,8 @@ fn main() {
     operation_ctx.add_custom_operation(14, node_heights_user_op);
 
     // use OperationBuilder to try building a new operation
-    let insert_bst_builder_test_user_op = insert_bst_builder_test(&operation_ctx, 15);
-    operation_ctx.add_custom_operation(15, insert_bst_builder_test_user_op);
+    // let insert_bst_builder_test_user_op = insert_bst_builder_test(&operation_ctx, 15);
+    // operation_ctx.add_custom_operation(15, insert_bst_builder_test_user_op);
 
     let mut dot_collector = DotCollector::new();
 

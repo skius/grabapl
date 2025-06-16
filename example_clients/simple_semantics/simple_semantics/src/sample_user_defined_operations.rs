@@ -19,22 +19,22 @@ pub fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemanti
     let input_node = AbstractNodeId::ParameterMarker(0);
 
     let mut instructions = vec![];
-    instructions.push(("first_child".into(), Instruction::Builtin(BuiltinOperation::AppendChild, vec![input_node])));
-    instructions.push(("second_child".into(), Instruction::Builtin(BuiltinOperation::AppendChild, vec![input_node])));
-    instructions.push(("third_child".into(), Instruction::Builtin(BuiltinOperation::AppendChild, vec![input_node])));
-    instructions.push(("fourth_child".into(), Instruction::Builtin(BuiltinOperation::AppendChild, vec![input_node])));
+    instructions.push((Some("first_child".into()), Instruction::Builtin(BuiltinOperation::AppendChild, vec![input_node])));
+    instructions.push((Some("second_child".into()), Instruction::Builtin(BuiltinOperation::AppendChild, vec![input_node])));
+    instructions.push((Some("third_child".into()), Instruction::Builtin(BuiltinOperation::AppendChild, vec![input_node])));
+    instructions.push((Some("fourth_child".into()), Instruction::Builtin(BuiltinOperation::AppendChild, vec![input_node])));
 
     let second_id = AbstractNodeId::DynamicOutputMarker("second_child".into(), "child".into());
     let third_id = AbstractNodeId::DynamicOutputMarker("third_child".into(), "child".into());
     let fourth_id = AbstractNodeId::DynamicOutputMarker("fourth_child".into(), "child".into());
 
-    instructions.push(("TODO ignore".into(), Instruction::Builtin(BuiltinOperation::AddEdge, vec![fourth_id, third_id])));
-    instructions.push(("TODO ignore".into(), Instruction::Builtin(BuiltinOperation::AddEdge, vec![third_id, second_id])));
-    instructions.push(("TODO ignore".into(), Instruction::Builtin(BuiltinOperation::AddEdge, vec![second_id, fourth_id])));
-    instructions.push(("TODO ignore".into(), Instruction::Builtin(BuiltinOperation::SetEdgeValue("cycle".to_string()), vec![second_id, fourth_id])));
+    instructions.push((None, Instruction::Builtin(BuiltinOperation::AddEdge, vec![fourth_id, third_id])));
+    instructions.push((None, Instruction::Builtin(BuiltinOperation::AddEdge, vec![third_id, second_id])));
+    instructions.push((None, Instruction::Builtin(BuiltinOperation::AddEdge, vec![second_id, fourth_id])));
+    instructions.push((None, Instruction::Builtin(BuiltinOperation::SetEdgeValue("cycle".to_string()), vec![second_id, fourth_id])));
 
 
-    instructions.push(("TODO ignore me".into(), Instruction::Builtin(BuiltinOperation::IndexCycle, vec![
+    instructions.push((None, Instruction::Builtin(BuiltinOperation::IndexCycle, vec![
         fourth_id
     ])));
 
@@ -59,14 +59,14 @@ pub fn get_mk_n_to_0_list_user_defined_operation() -> UserDefinedOperation<Simpl
     let mut instructions = vec![];
 
     // If the input value is 0, we do nothing, otherwise we recurse on a new child
-    instructions.push(("eq_0_query (TODO: ignore)".into(), Instruction::BuiltinQuery(BuiltinQuery::IsValueGt(0), vec![input_node], QueryInstructions {
+    instructions.push((None, Instruction::BuiltinQuery(BuiltinQuery::IsValueGt(0), vec![input_node], QueryInstructions {
         not_taken: vec![],
         taken: vec![
-            ("add_child".into(), Instruction::Operation(1, vec![input_node])),
-            ("TODO: ignore".into(), Instruction::Builtin(BuiltinOperation::CopyNodeValueTo, vec![input_node, AbstractNodeId::DynamicOutputMarker("add_child".into(), "child".into())])),
-            ("TODO: ignore".into(), Instruction::Builtin(BuiltinOperation::Decrement, vec![AbstractNodeId::DynamicOutputMarker("add_child".into(), "child".into())])),
+            (Some("add_child".into()), Instruction::Operation(1, vec![input_node])),
+            (None, Instruction::Builtin(BuiltinOperation::CopyNodeValueTo, vec![input_node, AbstractNodeId::DynamicOutputMarker("add_child".into(), "child".into())])),
+            (None, Instruction::Builtin(BuiltinOperation::Decrement, vec![AbstractNodeId::DynamicOutputMarker("add_child".into(), "child".into())])),
             // recursive call
-            ("TODO: ignore".into(), Instruction::Operation(10, vec![AbstractNodeId::DynamicOutputMarker("add_child".into(), "child".into())])),
+            (None, Instruction::Operation(10, vec![AbstractNodeId::DynamicOutputMarker("add_child".into(), "child".into())])),
         ],
     })));
 
@@ -103,7 +103,7 @@ pub fn get_count_list_len_user_defined_operation(self_op_id: OperationId) -> Use
 
     let mut instructions = vec![];
     // Increment acc
-    instructions.push(("TODO ignore".into(), Instruction::Builtin(BuiltinOperation::Increment, vec![acc_node])));
+    instructions.push((None, Instruction::Builtin(BuiltinOperation::Increment, vec![acc_node])));
 
     // shape query to get next child if it exists
     let shape_query = {
@@ -128,10 +128,10 @@ pub fn get_count_list_len_user_defined_operation(self_op_id: OperationId) -> Use
     };
 
     let new_child = AbstractNodeId::DynamicOutputMarker("next_child_query".into(), "child".into());
-    instructions.push(("next_child_query".into(), Instruction::ShapeQuery(shape_query, vec![input_node], QueryInstructions {
+    instructions.push((Some("next_child_query".into()), Instruction::ShapeQuery(shape_query, vec![input_node], QueryInstructions {
         not_taken: vec![],
         taken: vec![
-            ("TODO: ignore".into(), Instruction::Operation(self_op_id, vec![new_child, acc_node])),
+            (None, Instruction::Operation(self_op_id, vec![new_child, acc_node])),
         ],
     })));
 
@@ -166,15 +166,15 @@ pub fn get_insert_bst_user_defined_operation(self_op_id: OperationId) -> UserDef
     let value_node = AbstractNodeId::ParameterMarker(1);
     let mut instructions = vec![];
     // check if the root is nil
-    instructions.push(("is_nil_query (TODO: ignore)".into(), Instruction::BuiltinQuery(BuiltinQuery::IsValueEq(-1), vec![root_node], QueryInstructions {
+    instructions.push((None, Instruction::BuiltinQuery(BuiltinQuery::IsValueEq(-1), vec![root_node], QueryInstructions {
         taken: vec![
             // if it is nil, we insert the value here
             // TODO: add an OR ValuesEqual to see if the value is already there.
-            ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::CopyNodeValueTo, vec![value_node, root_node])),
+            (None, Instruction::Builtin(BuiltinOperation::CopyNodeValueTo, vec![value_node, root_node])),
         ],
         not_taken: vec![
             // otherwise, we check children. For that we first need to get children.
-            ("two_children_query".into(), Instruction::ShapeQuery(
+            (Some("two_children_query".into()), Instruction::ShapeQuery(
                 {
                     // the graph shape query
                     let mut g = grabapl::graph::Graph::new();
@@ -206,20 +206,20 @@ pub fn get_insert_bst_user_defined_operation(self_op_id: OperationId) -> UserDef
                 QueryInstructions {
                     taken: vec![
                         // we have two children, now we need to check if our value is gt or smaller than the root
-                        ("todo ignore".into(), Instruction::BuiltinQuery(BuiltinQuery::FirstGtSnd, vec![value_node, root_node], QueryInstructions {
+                        (None, Instruction::BuiltinQuery(BuiltinQuery::FirstGtSnd, vec![value_node, root_node], QueryInstructions {
                             taken: vec![
                                 // if it is greater, we go to the right child
-                                ("todo ignore".into(), Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("two_children_query".into(), "right".into()), value_node])),
+                                (None, Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("two_children_query".into(), "right".into()), value_node])),
                             ],
                             not_taken: vec![
                                 // if it is smaller or equal, we go to the left child
-                                ("todo ignore".into(), Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("two_children_query".into(), "left".into()), value_node])),
+                                (None, Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("two_children_query".into(), "left".into()), value_node])),
                             ],
                         })),
                     ],
                     not_taken: vec![
                         // we don't have two children. TODO: check if we have one child or zero children.
-                        ("one_child_query".into(), Instruction::ShapeQuery(
+                        (Some("one_child_query".into()), Instruction::ShapeQuery(
                             {
                                 // the graph shape query
                                 let mut g = grabapl::graph::Graph::new();
@@ -244,32 +244,32 @@ pub fn get_insert_bst_user_defined_operation(self_op_id: OperationId) -> UserDef
                                 taken: vec![
                                     // we have one child, now we need to check if our value is gt or smaller than the root
                                     // then we need to check if the child we have is left or right
-                                    ("todo ignore".into(), Instruction::BuiltinQuery(BuiltinQuery::FirstGtSnd, vec![value_node, root_node], QueryInstructions {
+                                    (None, Instruction::BuiltinQuery(BuiltinQuery::FirstGtSnd, vec![value_node, root_node], QueryInstructions {
                                         taken: vec![
                                             // if value > root, we check if one_child_query.child is the right child (i.e., child > root)
-                                            ("todo ignore".into(), Instruction::BuiltinQuery(BuiltinQuery::FirstGtSnd, vec![AbstractNodeId::DynamicOutputMarker("one_child_query".into(), "child".into()), root_node], QueryInstructions {
+                                            (None, Instruction::BuiltinQuery(BuiltinQuery::FirstGtSnd, vec![AbstractNodeId::DynamicOutputMarker("one_child_query".into(), "child".into()), root_node], QueryInstructions {
                                                 taken: vec![
                                                     // if it is greater, we go to the right child
-                                                    ("todo ignore".into(), Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("one_child_query".into(), "child".into()), value_node])),
+                                                    (None, Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("one_child_query".into(), "child".into()), value_node])),
                                                 ],
                                                 not_taken: vec![
                                                     // if the one child that the root has it is smaller, the value node becomes the right child
                                                     // TODO: same considerations as connected components TODO below
-                                                    ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::AddEdge, vec![root_node, value_node])),
+                                                    (None, Instruction::Builtin(BuiltinOperation::AddEdge, vec![root_node, value_node])),
                                                 ],
                                             })),
                                         ],
                                         not_taken: vec![
                                             // if value < root, we check if one_child_query.child is the left child (i.e., root > child)
-                                            ("todo ignore".into(), Instruction::BuiltinQuery(BuiltinQuery::FirstGtSnd, vec![root_node, AbstractNodeId::DynamicOutputMarker("one_child_query".into(), "child".into())], QueryInstructions {
+                                            (None, Instruction::BuiltinQuery(BuiltinQuery::FirstGtSnd, vec![root_node, AbstractNodeId::DynamicOutputMarker("one_child_query".into(), "child".into())], QueryInstructions {
                                                 taken: vec![
                                                     // if child < root, we go to the left child
-                                                    ("todo ignore".into(), Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("one_child_query".into(), "child".into()), value_node])),
+                                                    (None, Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("one_child_query".into(), "child".into()), value_node])),
                                                 ],
                                                 not_taken: vec![
                                                     // if the one child that the root has it is larger, the value node becomes the left child
                                                     // TODO: same considerations as connected components TODO below
-                                                    ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::AddEdge, vec![root_node, value_node])),
+                                                    (None, Instruction::Builtin(BuiltinOperation::AddEdge, vec![root_node, value_node])),
                                                 ],
                                             }))
                                         ],
@@ -278,7 +278,7 @@ pub fn get_insert_bst_user_defined_operation(self_op_id: OperationId) -> UserDef
                                 not_taken: vec![
                                     // we don't have any children, we can insert the value as a child
                                     // TODO: we're just adding an edge from root to the value node, how does that interact with the abstract graph view and connected components discussion?
-                                    ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::AddEdge, vec![root_node, value_node])),
+                                    (None, Instruction::Builtin(BuiltinOperation::AddEdge, vec![root_node, value_node])),
                                 ],
                             }
                         ))
@@ -315,23 +315,23 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(self_op_id: Operation
     let value_node = AbstractNodeId::ParameterMarker(1);
 
     let mk_delete = || {
-        ("delete_value_node".into(), Instruction::Builtin(BuiltinOperation::DeleteNode, vec![value_node]))
+        (Some("delete_value_node".into()), Instruction::Builtin(BuiltinOperation::DeleteNode, vec![value_node]))
     };
 
     let mut instructions = vec![];
     // check if the root is nil
-    instructions.push(("is_nil_query (TODO: ignore)".into(), Instruction::BuiltinQuery(BuiltinQuery::IsValueEq(-1), vec![root_node], QueryInstructions {
+    instructions.push((None, Instruction::BuiltinQuery(BuiltinQuery::IsValueEq(-1), vec![root_node], QueryInstructions {
         taken: vec![
             // if it is nil, we insert the value here
-            ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::CopyNodeValueTo, vec![value_node, root_node])),
+            (None, Instruction::Builtin(BuiltinOperation::CopyNodeValueTo, vec![value_node, root_node])),
             mk_delete(),
         ],
         not_taken: vec![
             // otherwise, we need to check if value > root
-            ("todo ignore".into(), Instruction::BuiltinQuery(BuiltinQuery::FirstGtSnd, vec![value_node, root_node], QueryInstructions {
+            (None, Instruction::BuiltinQuery(BuiltinQuery::FirstGtSnd, vec![value_node, root_node], QueryInstructions {
                 taken: vec![
                     // value > root. See if there is a right child, or, if not, add the value as right child
-                    ("right_child_query".into(), Instruction::ShapeQuery(
+                    (Some("right_child_query".into()), Instruction::ShapeQuery(
                         {
                             // the graph shape query
                             let mut g = grabapl::graph::Graph::new();
@@ -355,14 +355,14 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(self_op_id: Operation
                         QueryInstructions {
                             taken: vec![
                                 // we have a right child, recurse on it
-                                ("todo ignore".into(), Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("right_child_query".into(), "right".into()), value_node])),
+                                (None, Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("right_child_query".into(), "right".into()), value_node])),
                             ],
                             not_taken: vec![
                                 // we don't have a right child, add the value as right child
-                                ("add_node".into(), Instruction::Builtin(BuiltinOperation::AddNode, vec![])),
-                                ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::CopyNodeValueTo, vec![value_node, AbstractNodeId::DynamicOutputMarker("add_node".into(), "new".into())])),
-                                ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::AddEdge, vec![root_node, AbstractNodeId::DynamicOutputMarker("add_node".into(), "new".into())])),
-                                ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::SetEdgeValue("right".to_string()), vec![root_node, AbstractNodeId::DynamicOutputMarker("add_node".into(), "new".into())])),
+                                (Some("add_node".into()), Instruction::Builtin(BuiltinOperation::AddNode, vec![])),
+                                (None, Instruction::Builtin(BuiltinOperation::CopyNodeValueTo, vec![value_node, AbstractNodeId::DynamicOutputMarker("add_node".into(), "new".into())])),
+                                (None, Instruction::Builtin(BuiltinOperation::AddEdge, vec![root_node, AbstractNodeId::DynamicOutputMarker("add_node".into(), "new".into())])),
+                                (None, Instruction::Builtin(BuiltinOperation::SetEdgeValue("right".to_string()), vec![root_node, AbstractNodeId::DynamicOutputMarker("add_node".into(), "new".into())])),
                                 mk_delete(),
                             ],
                         }
@@ -370,7 +370,7 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(self_op_id: Operation
                 ],
                 not_taken: vec![
                     // value < root. See if there is a left child, or, if not, add the value as left child
-                    ("left_child_query".into(), Instruction::ShapeQuery(
+                    (Some("left_child_query".into()), Instruction::ShapeQuery(
                         {
                             // the graph shape query
                             let mut g = grabapl::graph::Graph::new();
@@ -394,14 +394,14 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(self_op_id: Operation
                         QueryInstructions {
                             taken: vec![
                                 // we have a left child, recurse on it
-                                ("todo ignore".into(), Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("left_child_query".into(), "left".into()), value_node])),
+                                (None, Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("left_child_query".into(), "left".into()), value_node])),
                             ],
                             not_taken: vec![
                                 // we don't have a left child, add the value as left child
-                                ("add_node".into(), Instruction::Builtin(BuiltinOperation::AddNode, vec![])),
-                                ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::CopyNodeValueTo, vec![value_node, AbstractNodeId::DynamicOutputMarker("add_node".into(), "new".into())])),
-                                ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::AddEdge, vec![root_node, AbstractNodeId::DynamicOutputMarker("add_node".into(), "new".into())])),
-                                ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::SetEdgeValue("left".to_string()), vec![root_node, AbstractNodeId::DynamicOutputMarker("add_node".into(), "new".into())])),
+                                (Some("add_node".into()), Instruction::Builtin(BuiltinOperation::AddNode, vec![])),
+                                (None, Instruction::Builtin(BuiltinOperation::CopyNodeValueTo, vec![value_node, AbstractNodeId::DynamicOutputMarker("add_node".into(), "new".into())])),
+                                (None, Instruction::Builtin(BuiltinOperation::AddEdge, vec![root_node, AbstractNodeId::DynamicOutputMarker("add_node".into(), "new".into())])),
+                                (None, Instruction::Builtin(BuiltinOperation::SetEdgeValue("left".to_string()), vec![root_node, AbstractNodeId::DynamicOutputMarker("add_node".into(), "new".into())])),
                                 mk_delete(),
                             ],
                         }
@@ -440,7 +440,7 @@ pub fn get_node_heights_user_defined_operation(self_op_id: OperationId) -> UserD
     let mut instructions = vec![];
     
     // set root to 0
-    instructions.push(("set_root_height".into(), Instruction::Builtin(BuiltinOperation::SetNodeValue(0), vec![root_node])));
+    instructions.push((Some("set_root_height".into()), Instruction::Builtin(BuiltinOperation::SetNodeValue(0), vec![root_node])));
     // query if 'left' child exists, if so, call self_op_id on that child
     let left_child_query = {
         // the graph shape query
@@ -482,26 +482,26 @@ pub fn get_node_heights_user_defined_operation(self_op_id: OperationId) -> UserD
     };
     let left_child = AbstractNodeId::DynamicOutputMarker("left_child_query".into(), "left".into());
     let right_child = AbstractNodeId::DynamicOutputMarker("right_child_query".into(), "right".into());
-    instructions.push(("left_child_query".into(), Instruction::ShapeQuery(left_child_query, vec![root_node], QueryInstructions {
+    instructions.push((Some("left_child_query".into()), Instruction::ShapeQuery(left_child_query, vec![root_node], QueryInstructions {
         taken: vec![
             // we have a left child, recurse on it
-            ("todo ignore".into(), Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("left_child_query".into(), "left".into())])),
+            (None, Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("left_child_query".into(), "left".into())])),
             // set root to max of it and left child
-            ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::SetSndToMaxOfFstSnd, vec![left_child, root_node])),
+            (None, Instruction::Builtin(BuiltinOperation::SetSndToMaxOfFstSnd, vec![left_child, root_node])),
         ],
         not_taken: vec![],
     })));
-    instructions.push(("right_child_query".into(), Instruction::ShapeQuery(right_child_query, vec![root_node], QueryInstructions {
+    instructions.push((Some("right_child_query".into()), Instruction::ShapeQuery(right_child_query, vec![root_node], QueryInstructions {
         taken: vec![
             // we have a right child, recurse on it
-            ("todo ignore".into(), Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("right_child_query".into(), "right".into())])),
+            (None, Instruction::Operation(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("right_child_query".into(), "right".into())])),
             // set root to max of it and right child
-            ("todo ignore".into(), Instruction::Builtin(BuiltinOperation::SetSndToMaxOfFstSnd, vec![right_child, root_node])),
+            (None, Instruction::Builtin(BuiltinOperation::SetSndToMaxOfFstSnd, vec![right_child, root_node])),
         ],
         not_taken: vec![],
     })));
     // add 1 to root node, which is now the max of the heights of the left and right children
-    instructions.push(("set_root_height".into(), Instruction::Builtin(BuiltinOperation::Increment, vec![root_node])));
+    instructions.push((Some("set_root_height".into()), Instruction::Builtin(BuiltinOperation::Increment, vec![root_node])));
     
     UserDefinedOperation {
         parameter: param,
