@@ -1,19 +1,52 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::iter::Peekable;
+use std::marker::PhantomData;
+use std::slice::Iter;
 use thiserror::Error;
-use crate::{Graph, NodeKey, OperationContext, SubstMarker};
-use crate::graph::operation::user_defined::UserDefinedOperation;
-use crate::graph::semantics::SemanticsClone;
+use crate::{Graph, NodeKey, OperationContext, OperationId, SubstMarker};
+use crate::graph::operation::user_defined::{AbstractNodeId, AbstractOperationResultMarker, UserDefinedOperation};
+use crate::graph::pattern::{AbstractOutputNodeMarker, OperationParameter};
+use crate::graph::semantics::{AbstractGraph, SemanticsClone};
+
+/*
+General overview:
+
+1. While building, the builder just stores the messages sent to it.
+We cannot do fancy compile-time checks like "every query has a condition and two branches", because
+every step of that (condition, true branch, false branch) should be interruptible and resumable.
+E.g., a frontend needs to be able to give intermediate feedback to the user, so that the user
+can work with that feedback and send new messages to the builder.
+
+However, to give good feedback for which messages are appropriate, we construct the operation on the fly (TODO: cache this?),
+so that errors like invalid identifiers or ending a query without starting one can be caught immediately at message-time.
+This is the same routine that can provide state feedback to the user like:
+ * right now you're in this branch of that query
+ * the abstract graph looks like this
+ * more ???
+
+The intermediate state returns a graph and a hashmap from nodes and edges to additional metadata, like their abstract node id.
+*/
+
+pub enum Instruction<S: SemanticsClone> {
+    Builtin(S::BuiltinOperation),
+    FromOperationId(OperationId),
+    Recurse,
+}
 
 enum BuilderInstruction<S: SemanticsClone> {
     ExpectParameterNode(SubstMarker, S::NodeAbstract),
     ExpectContextNode(SubstMarker, S::NodeAbstract),
     ExpectParameterEdge(SubstMarker, SubstMarker, S::EdgeAbstract),
-}
-
-pub struct OperationBuilder<'a, S: SemanticsClone> {
-    op_ctx: &'a OperationContext<S>,
-    instructions: Vec<BuilderInstruction<S>>,
+    StartQuery(S::BuiltinQuery, Vec<AbstractNodeId>),
+    EnterTrueBranch,
+    EnterFalseBranch,
+    StartShapeQuery(AbstractOperationResultMarker),
+    EndQuery,
+    ExpectShapeNode(AbstractOutputNodeMarker, S::NodeAbstract),
+    ExpectShapeEdge(AbstractNodeId, AbstractNodeId, S::EdgeAbstract),
+    AddNamedInstruction(AbstractOperationResultMarker, Instruction<S>, Vec<AbstractNodeId>),
+    AddInstruction(Instruction<S>, Vec<AbstractNodeId>),
 }
 
 #[derive(Error, Debug)]
@@ -24,6 +57,12 @@ pub enum OperationBuilderError {
     NotFoundSubstMarker(SubstMarker),
 }
 
+pub struct OperationBuilder<'a, S: SemanticsClone> {
+    op_ctx: &'a OperationContext<S>,
+    instructions: Vec<BuilderInstruction<S>>,
+}
+
+// TODO: all message adding, validate all args by building temp graph
 impl<'a, S: SemanticsClone> OperationBuilder<'a, S> {
     pub fn new(op_ctx: &'a OperationContext<S>) -> Self {
         Self {
@@ -67,28 +106,79 @@ impl<'a, S: SemanticsClone> OperationBuilder<'a, S> {
     pub fn start_query(
         &mut self,
         query: S::BuiltinQuery,
-        args: Vec<SubstMarker>
+        args: Vec<AbstractNodeId>
     ) -> Result<(), OperationBuilderError> {
         // todo!()
+        self.instructions.push(BuilderInstruction::StartQuery(query, args));
         Ok(())
     }
     
     pub fn enter_true_branch(&mut self) -> Result<(), OperationBuilderError> {
         // todo!()
+        self.instructions.push(BuilderInstruction::EnterTrueBranch);
         Ok(())
     }
     
     pub fn enter_false_branch(&mut self) -> Result<(), OperationBuilderError> {
         // todo!()
+        self.instructions.push(BuilderInstruction::EnterFalseBranch);
+        Ok(())
+    }
+
+    // TODO: get rid of AbstractOperationResultMarker requirement. Either completely or make it optional and autogenerate one.
+    //  How to specify which shape node? ==> the shape node markers should be unique per path
+    pub fn start_shape_query(&mut self, op_marker: AbstractOperationResultMarker) -> Result<(), OperationBuilderError> {
+        // todo!()
+        self.instructions.push(BuilderInstruction::StartShapeQuery(op_marker));
+        Ok(())
+    }
+
+    pub fn end_query(&mut self) -> Result<(), OperationBuilderError> {
+        // todo!()
+        Ok(())
+    }
+
+    // TODO: should expect_*_node really expect a marker? maybe it should instead return a marker?
+    //  it could also take an Option<Marker> so that it can autogenerate one if it's none so the caller doesn't have to deal with it.
+    pub fn expect_shape_node(
+        &mut self,
+        marker: AbstractOutputNodeMarker,
+        node: S::NodeAbstract,
+    ) -> Result<(), OperationBuilderError> {
+        // TODO
+        self.instructions.push(BuilderInstruction::ExpectShapeNode(marker, node));
+        Ok(())
+    }
+
+    pub fn expect_shape_edge(
+        &mut self,
+        source: AbstractNodeId,
+        target: AbstractNodeId,
+        edge: S::EdgeAbstract,
+    ) -> Result<(), OperationBuilderError> {
+        // TODO
+        self.instructions.push(BuilderInstruction::ExpectShapeEdge(source, target, edge));
+        Ok(())
+    }
+
+    pub fn add_named_instruction(
+        &mut self,
+        name: AbstractOperationResultMarker,
+        instruction: Instruction<S>,
+        args: Vec<AbstractNodeId>,
+    ) -> Result<(), OperationBuilderError> {
+        // TODO
+        self.instructions.push(BuilderInstruction::AddNamedInstruction(name, instruction, args));
         Ok(())
     }
     
     pub fn add_instruction(
         &mut self,
-        instruction: S::BuiltinOperation,
-        args: Vec<SubstMarker>,
+        instruction: Instruction<S>,
+        args: Vec<AbstractNodeId>,
     ) -> Result<(), OperationBuilderError> {
         // todo!()
+        self.instructions.push(BuilderInstruction::AddInstruction(instruction, args));
         Ok(())
     }
     
@@ -127,11 +217,11 @@ impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug>> OperationB
                 BuilderInstruction::ExpectParameterNode(marker, node) => {
                     let key = g.add_node(node.clone());
                     subst_to_node_keys.insert(*marker, key);
-                }
+                },
                 BuilderInstruction::ExpectContextNode(marker, node) => {
                     let key = g.add_node(node.clone());
                     subst_to_node_keys.insert(*marker, key);
-                }
+                },
                 BuilderInstruction::ExpectParameterEdge(source_marker, target_marker, edge) => {
                     let source_key = *subst_to_node_keys
                         .get(source_marker)
@@ -144,6 +234,9 @@ impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug>> OperationB
                         target_key,
                         edge.clone(),
                     );
+                },
+                _ => {
+                    eprintln!("Skipping instruction");
                 }
             }
         }
@@ -152,10 +245,258 @@ impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug>> OperationB
     }
 }
 
+struct NodeMetadata<S: SemanticsClone> {
+    abstract_node_id: AbstractNodeId, // how do we refer to this node?
+    _phantom: PhantomData<S>,
+}
+
+struct IntermediateState<S: SemanticsClone> {
+    graph: AbstractGraph<S>,
+    node_metadata: HashMap<NodeKey, NodeMetadata<S>>,
+}
+
+struct IntermediateStateBuilder<'a, S: SemanticsClone> {
+    instructions: &'a [BuilderInstruction<S>],
+    op_ctx: &'a OperationContext<S>,
+}
+
+use super::user_defined::Instruction as UDInstruction;
+
+
+// TODO: maybe this is not *intermediate* but actually the final state as well potentially?
+impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>> IntermediateStateBuilder<'a, S> {
+    fn run(
+        instructions: &'a [BuilderInstruction<S>],
+        op_ctx: &'a OperationContext<S>,
+    ) -> Result<IntermediateState<S>, OperationBuilderError> {
+        /*
+        General idea:
+        Whenever we see start_query (or start_shape_query), we push a query state onto a stack.
+        When we see
+
+        */
+
+
+
+        enum QueryBranchState {
+            // if we haven't encountered an enter_*_branch message yet
+            NoBranch,
+            TrueBranch,
+            FalseBranch,
+        }
+        struct QueryState<S: SemanticsClone> {
+            true_instructions: Vec<UDInstruction<S>>,
+            false_instructions: Vec<UDInstruction<S>>,
+            current_branch: QueryBranchState,
+        }
+
+        enum StackState {
+
+        }
+
+        #[derive(Clone, Copy, Debug)]
+        enum State {
+            BuildingParameterGraph,
+            ExpectingInstruction,
+            BuildingQuery,
+            BuildingShapeQuery,
+        }
+
+        let mut current_query_branch_state: Option<QueryBranchState> = None;
+        let mut current_state = State::BuildingParameterGraph;
+
+        let mut operation_parameter = OperationParameter::<S> {
+            explicit_input_nodes: Vec::new(),
+            parameter_graph: AbstractGraph::<S>::new(),
+            subst_to_node_keys: HashMap::new(),
+            node_keys_to_subst: HashMap::new(),
+        };
+
+        // unsure if we need these.
+        let mut abstract_graph = AbstractGraph::<S>::new();
+        let mut aid_to_node_keys: HashMap<AbstractNodeId, NodeKey> = HashMap::new();
+        let mut node_keys_to_aid: HashMap<NodeKey, AbstractNodeId> = HashMap::new();
+
+        // build a partial UserDefinedOperation.
+        // This UserDefinedOperation is what we will use to build the partial abstract graph at that state.
+
+        // This is a stack of instruction vectors.
+        let mut instructions_vec_stack: Vec<Vec<UDInstruction<S>>> = Vec::new();
+        // We push any new instructions onto this vector.
+        let mut current_instructions_vec: Vec<UDInstruction<S>> = Vec::new();
+
+
+        for instruction in instructions {
+            let mut next_state = current_state;
+            match (current_state, instruction) {
+                (State::BuildingParameterGraph, BuilderInstruction::ExpectParameterNode(marker, node_abstract)) => {
+                    if operation_parameter.subst_to_node_keys.contains_key(marker) {
+                        return Err(OperationBuilderError::ReusedSubstMarker(*marker));
+                    }
+                    let key = operation_parameter.parameter_graph.add_node(node_abstract.clone());
+                    operation_parameter.subst_to_node_keys.insert(*marker, key);
+                    operation_parameter.node_keys_to_subst.insert(key, *marker);
+                    operation_parameter.explicit_input_nodes.push(*marker);
+                }
+                (State::BuildingParameterGraph, BuilderInstruction::ExpectContextNode(marker, node_abstract)) => {
+                    if operation_parameter.subst_to_node_keys.contains_key(marker) {
+                        return Err(OperationBuilderError::ReusedSubstMarker(*marker));
+                    }
+                    let key = operation_parameter.parameter_graph.add_node(node_abstract.clone());
+                    operation_parameter.subst_to_node_keys.insert(*marker, key);
+                    operation_parameter.node_keys_to_subst.insert(key, *marker);
+                }
+                (State::BuildingParameterGraph, BuilderInstruction::ExpectParameterEdge(source_marker, target_marker, edge_abstract)) => {
+                    let source_key = operation_parameter.subst_to_node_keys.get(source_marker)
+                        .ok_or(OperationBuilderError::NotFoundSubstMarker(*source_marker))?;
+                    let target_key = operation_parameter.subst_to_node_keys.get(target_marker)
+                        .ok_or(OperationBuilderError::NotFoundSubstMarker(*target_marker))?;
+                    operation_parameter.parameter_graph.add_edge(*source_key, *target_key, edge_abstract.clone());
+                }
+                (State::ExpectingInstruction | State::BuildingParameterGraph, BuilderInstruction::AddInstruction(instruction, args)) => {
+                    next_state = State::ExpectingInstruction;
+
+                    match instruction {
+                        Instruction::Builtin(builtin_op) => {
+                            // Here we would typically apply the builtin operation to the abstract graph.
+                            // For now, we just log it.
+                            println!("Applying builtin operation: {:?} args: {args:?}", builtin_op);
+
+                            current_instructions_vec.push(UDInstruction::Builtin(builtin_op.clone(), args.clone()));
+                        }
+                        Instruction::FromOperationId(op_id) => {
+                            // Here we would typically look up the operation by its ID and apply it.
+                            // For now, we just log it.
+                            println!("Applying operation with ID: {:?} args: {args:?}", op_id);
+
+                            current_instructions_vec.push(UDInstruction::Operation(op_id.clone(), args.clone()));
+                        }
+                        Instruction::Recurse => {
+                            // This would typically mean we need to recurse into another operation.
+                            // For now, we just log it.
+                            println!("Recursing into self with args: {args:?}");
+
+                            // TODO: somehow denote 'self' instead of 0
+                            current_instructions_vec.push(UDInstruction::Operation(0, args.clone()));
+                        }
+                    }
+                }
+                (State::ExpectingInstruction | State::BuildingParameterGraph, BuilderInstruction::StartQuery(query, args)) => {
+                    next_state = State::BuildingQuery;
+
+                    // Start a new query state
+                    current_query_branch_state = Some(QueryBranchState::NoBranch);
+                    instructions_vec_stack.push(current_instructions_vec);
+                    current_instructions_vec = Vec::new();
+                }
+                _ => {}
+            }
+            current_state = next_state;
+        }
 
 
 
 
+
+        let mut iter = instructions.iter().peekable();
+
+        let op_parameter = Self::build_operation_parameter(&mut iter)?;
+        
+        let instructions = Self::build_many_instructions(&mut iter)?;
+
+        todo!("Intermediate state builder not implemented yet");
+    }
+    
+    fn build_many_instructions(
+        iter: &mut Peekable<Iter<BuilderInstruction<S>>>,
+    ) -> Result<Vec<UDInstruction<S>>, OperationBuilderError> {
+        let mut instructions = Vec::new();
+
+        while let Some(instruction) = iter.peek() {
+            match instruction {
+                BuilderInstruction::AddNamedInstruction(name, instruction, args) => {
+                    todo!()
+                }
+                BuilderInstruction::AddInstruction(instruction, args) => {
+                    iter.next();
+                    match instruction {
+                        Instruction::Builtin(builtin_op) => {
+                            // Here we would typically apply the builtin operation to the abstract graph.
+                            // For now, we just log it.
+                            println!("Applying builtin operation: {:?} args: {args:?}", builtin_op);
+
+                            instructions.push(UDInstruction::Builtin(builtin_op.clone(), args.clone()));
+                        }
+                        Instruction::FromOperationId(op_id) => {
+                            // Here we would typically look up the operation by its ID and apply it.
+                            // For now, we just log it.
+                            println!("Applying operation with ID: {:?} args: {args:?}", op_id);
+
+                            instructions.push(UDInstruction::Operation(op_id.clone(), args.clone()));
+                        }
+                        Instruction::Recurse => {
+                            // This would typically mean we need to recurse into another operation.
+                            // For now, we just log it.
+                            println!("Recursing into self with args: {args:?}");
+
+                            // TODO: somehow denote 'self' instead of 0
+                            instructions.push(UDInstruction::Operation(0, args.clone()));
+                        }
+                    }
+                }
+                _ => break,
+            }
+        }
+
+        Ok(instructions)
+    }
+
+    fn build_operation_parameter(iter: &mut Peekable<Iter<BuilderInstruction<S>>>) -> Result<OperationParameter<S>, OperationBuilderError> {
+        let mut operation_parameter = OperationParameter::<S> {
+            explicit_input_nodes: Vec::new(),
+            parameter_graph: AbstractGraph::<S>::new(),
+            subst_to_node_keys: HashMap::new(),
+            node_keys_to_subst: HashMap::new(),
+        };
+
+        while let Some(instruction) = iter.peek() {
+            match instruction {
+                BuilderInstruction::ExpectParameterNode(marker, node_abstract) => {
+                    iter.next();
+                    if operation_parameter.subst_to_node_keys.contains_key(marker) {
+                        return Err(OperationBuilderError::ReusedSubstMarker(*marker));
+                    }
+                    let key = operation_parameter.parameter_graph.add_node(node_abstract.clone());
+                    operation_parameter.subst_to_node_keys.insert(*marker, key);
+                    operation_parameter.node_keys_to_subst.insert(key, *marker);
+                    operation_parameter.explicit_input_nodes.push(*marker);
+                }
+                BuilderInstruction::ExpectContextNode(marker, node_abstract) => {
+                    iter.next();
+                    if operation_parameter.subst_to_node_keys.contains_key(marker) {
+                        return Err(OperationBuilderError::ReusedSubstMarker(*marker));
+                    }
+                    let key = operation_parameter.parameter_graph.add_node(node_abstract.clone());
+                    operation_parameter.subst_to_node_keys.insert(*marker, key);
+                    operation_parameter.node_keys_to_subst.insert(key, *marker);
+                }
+                BuilderInstruction::ExpectParameterEdge(source_marker, target_marker, edge_abstract) => {
+                    iter.next();
+                    let source_key = operation_parameter.subst_to_node_keys.get(source_marker)
+                        .ok_or(OperationBuilderError::NotFoundSubstMarker(*source_marker))?;
+                    let target_key = operation_parameter.subst_to_node_keys.get(target_marker)
+                        .ok_or(OperationBuilderError::NotFoundSubstMarker(*target_marker))?;
+                    operation_parameter.parameter_graph.add_edge(*source_key, *target_key, edge_abstract.clone());
+                }
+                _ => {
+                    break;
+                }
+            }
+        }
+
+        Ok(operation_parameter)
+    }
+}
 
 
 

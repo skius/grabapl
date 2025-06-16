@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 use grabapl::{DotCollector, OperationContext, OperationId, Semantics, WithSubstMarker};
 use grabapl::graph::EdgeAttribute;
-use grabapl::graph::operation::builder::OperationBuilder;
+use grabapl::graph::operation::builder::{OperationBuilder, Instruction};
 use grabapl::graph::operation::query::{GraphShapeQuery, ShapeNodeIdentifier};
 use grabapl::graph::operation::run_operation;
-use grabapl::graph::operation::user_defined::{AbstractNodeId, Instruction, QueryInstructions, QueryTaken, UserDefinedOperation};
+use grabapl::graph::operation::user_defined::{AbstractNodeId, QueryInstructions, QueryTaken, UserDefinedOperation};
 use grabapl::graph::pattern::{OperationOutput, OperationParameter};
 use simple_semantics::{BuiltinOperation, BuiltinQuery, EdgePattern, SimpleSemantics};
 use simple_semantics::sample_user_defined_operations::{get_count_list_len_user_defined_operation, get_insert_bst_user_defined_operation, get_labeled_edges_insert_bst_user_defined_operation, get_mk_n_to_0_list_user_defined_operation, get_node_heights_user_defined_operation, get_sample_user_defined_operation};
@@ -16,25 +16,27 @@ fn insert_bst_builder_test(op_ctx: &OperationContext<SimpleSemantics>, self_op_i
         println!("{}\n----------", op_builder.show_state());
     };
 
-    let root_node_id = 0;
-    let node_to_insert_id = 1;
-    op_builder.expect_parameter_node(root_node_id, ()).unwrap();
+    let root_node_marker = 0;
+    let root_node = AbstractNodeId::ParameterMarker(root_node_marker);
+    let node_to_insert_marker = 1;
+    let node_to_insert = AbstractNodeId::ParameterMarker(node_to_insert_marker);
+    op_builder.expect_parameter_node(root_node_marker, ()).unwrap();
     show(&op_builder);
-    op_builder.expect_parameter_node(node_to_insert_id, ()).unwrap();
+    op_builder.expect_parameter_node(node_to_insert_marker, ()).unwrap();
     show(&op_builder);
 
     // Start a query on the root node to figure out if it's -1.
-    op_builder.start_query(BuiltinQuery::IsValueEq(-1), vec![root_node_id]).unwrap();
+    op_builder.start_query(BuiltinQuery::IsValueEq(-1), vec![root_node]).unwrap();
     show(&op_builder);
     {
         // If it is, the tree is empty and hence we set the root to be the node to insert.
         op_builder.enter_true_branch().unwrap();
         show(&op_builder);
         {
-            op_builder.add_instruction(BuiltinOperation::CopyNodeValueTo, vec![node_to_insert_id, root_node_id]).unwrap();
+            op_builder.add_instruction(Instruction::Builtin(BuiltinOperation::CopyNodeValueTo), vec![node_to_insert, root_node]).unwrap();
             show(&op_builder);
             // delete the node
-            op_builder.add_instruction(BuiltinOperation::DeleteNode, vec![node_to_insert_id]).unwrap();
+            op_builder.add_instruction(Instruction::Builtin(BuiltinOperation::DeleteNode), vec![node_to_insert]).unwrap();
             show(&op_builder);
         }
         op_builder.enter_false_branch().unwrap();
@@ -42,21 +44,23 @@ fn insert_bst_builder_test(op_ctx: &OperationContext<SimpleSemantics>, self_op_i
         {
             // If it is not, we need to insert the node into the existing tree.
             // Check if value > root
-            op_builder.start_query(BuiltinQuery::FirstGtSnd, vec![node_to_insert_id, root_node_id]).unwrap();
+            op_builder.start_query(BuiltinQuery::FirstGtSnd, vec![node_to_insert, root_node]).unwrap();
             show(&op_builder);
             {
                 op_builder.enter_true_branch().unwrap();
                 show(&op_builder);
                 {
                     // If it is, we need to go to the right subtree, if it exists
-                    op_builder.start_shape_query().unwrap();
+                    op_builder.start_shape_query("right_query".into()).unwrap();
                     show(&op_builder);
                     // now expect what we want
-                    // "2" is the node we will refer to in the "if" case. it doubles as both the identifier for the
+                    // "child" is the node we will refer to in the "if" case. it doubles as both the identifier for the
                     // shape query, and the actual matched node.
-                    op_builder.expect_shape_node(2, ()).unwrap();
+                    let child = "child".into();
+                    op_builder.expect_shape_node(child, ()).unwrap();
                     show(&op_builder);
-                    op_builder.expect_shape_edge(0, 2, EdgePattern::Exact("right".to_string()));
+                    let child_id = AbstractNodeId::DynamicOutputMarker("right_query".into(), child);
+                    op_builder.expect_shape_edge(AbstractNodeId::ParameterMarker(0), child_id, EdgePattern::Exact("right".to_string())).unwrap();
                     show(&op_builder);
                     {
                         op_builder.enter_true_branch().unwrap();
@@ -64,7 +68,7 @@ fn insert_bst_builder_test(op_ctx: &OperationContext<SimpleSemantics>, self_op_i
                         {
 
                             // If it exists, we need to recurse into the right subtree.
-                            op_builder.add_instruction(Instruction::Recurse, vec![2, node_to_insert_id]).unwrap();
+                            op_builder.add_instruction(Instruction::Recurse, vec![child_id, node_to_insert]).unwrap();
                             show(&op_builder);
                         }
                         // if there is none, we add it as right child
@@ -72,13 +76,15 @@ fn insert_bst_builder_test(op_ctx: &OperationContext<SimpleSemantics>, self_op_i
                         show(&op_builder);
                         {
                             let new_node = AbstractNodeId::DynamicOutputMarker("add_node".into(), "new".into());
-                            op_builder.add_named_instruction("add_node", BuiltinOperation::AddNode, vec![]).unwrap();
+                            op_builder.add_named_instruction("add_node".into(), Instruction::Builtin(BuiltinOperation::AddNode), vec![]).unwrap();
                             show(&op_builder);
-                            op_builder.add_instruction(BuiltinOperation::CopyNodeValueTo, vec![node_to_insert_id, new_node]).unwrap();
+                            // TODO: in above^ show of the intermediate state, we should "see" `add_node:new` as a node with the metadata of that
+                            // AbstractNodeId.
+                            op_builder.add_instruction(Instruction::Builtin(BuiltinOperation::CopyNodeValueTo), vec![node_to_insert, new_node]).unwrap();
                             show(&op_builder);
-                            op_builder.add_instruction(BuiltinOperation::AddEdge, vec![root_node_id, new_node]).unwrap();
+                            op_builder.add_instruction(Instruction::Builtin(BuiltinOperation::AddEdge), vec![root_node, new_node]).unwrap();
                             show(&op_builder);
-                            op_builder.add_instruction(BuiltinOperation::SetEdgeValue("right".to_string()), vec![root_node_id, new_node]).unwrap();
+                            op_builder.add_instruction(Instruction::Builtin(BuiltinOperation::SetEdgeValue("right".to_string())), vec![root_node, new_node]).unwrap();
                             show(&op_builder);
                         }
                         op_builder.end_query().unwrap();
@@ -91,18 +97,21 @@ fn insert_bst_builder_test(op_ctx: &OperationContext<SimpleSemantics>, self_op_i
                 {
                     // vaLue < root
                     // check if left subtree exists
-                    op_builder.start_shape_query().unwrap();
+                    let left_query = "left_query".into();
+                    op_builder.start_shape_query(left_query).unwrap();
                     show(&op_builder);
-                    op_builder.expect_shape_node(2, ()).unwrap();
+                    let child = "child".into();
+                    let child_id = AbstractNodeId::DynamicOutputMarker(left_query, child);
+                    op_builder.expect_shape_node(child, ()).unwrap();
                     show(&op_builder);
-                    op_builder.expect_shape_edge(0, 2, EdgePattern::Exact("left".to_string()));
+                    op_builder.expect_shape_edge(root_node, child_id, EdgePattern::Exact("left".to_string()));
                     show(&op_builder);
                     {
                         op_builder.enter_true_branch().unwrap();
                         show(&op_builder);
                         {
                             // if it exists, recurse into the left subtree
-                            op_builder.add_instruction(Instruction::Recurse, vec![2, node_to_insert_id]).unwrap();
+                            op_builder.add_instruction(Instruction::Recurse, vec![child_id, node_to_insert]).unwrap();
                             show(&op_builder);
                         }
                         // if it does not, we add it as left child
@@ -110,13 +119,13 @@ fn insert_bst_builder_test(op_ctx: &OperationContext<SimpleSemantics>, self_op_i
                         show(&op_builder);
                         {
                             let new_node = AbstractNodeId::DynamicOutputMarker("add_node".into(), "new".into());
-                            op_builder.add_named_instruction("add_node", BuiltinOperation::AddNode, vec![]).unwrap();
+                            op_builder.add_named_instruction("add_node".into(), Instruction::Builtin(BuiltinOperation::AddNode), vec![]).unwrap();
                             show(&op_builder);
-                            op_builder.add_instruction(BuiltinOperation::CopyNodeValueTo, vec![node_to_insert_id, new_node]).unwrap();
+                            op_builder.add_instruction(Instruction::Builtin(BuiltinOperation::CopyNodeValueTo), vec![node_to_insert, new_node]).unwrap();
                             show(&op_builder);
-                            op_builder.add_instruction(BuiltinOperation::AddEdge, vec![root_node_id, new_node]).unwrap();
+                            op_builder.add_instruction(Instruction::Builtin(BuiltinOperation::AddEdge), vec![root_node, new_node]).unwrap();
                             show(&op_builder);
-                            op_builder.add_instruction(BuiltinOperation::SetEdgeValue("left".to_string()), vec![root_node_id, new_node]).unwrap();
+                            op_builder.add_instruction(Instruction::Builtin(BuiltinOperation::SetEdgeValue("left".to_string())), vec![root_node, new_node]).unwrap();
                             show(&op_builder);
                         }
                         // end the query
