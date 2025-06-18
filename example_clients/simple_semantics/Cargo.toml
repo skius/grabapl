@@ -1,4 +1,0 @@
-[workspace]
-members = ["simple_semantics", "simple_semantics_ffi"]
-
-resolver = "2"

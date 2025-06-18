@@ -1,0 +1,4 @@
+[workspace]
+resolver = "2"
+members = ["grabapl", "example_clients/simple_semantics/simple_semantics", "example_clients/simple_semantics/simple_semantics_ffi"]
+exclude = ["playground", "wasm-game-of-life"]
