@@ -61,9 +61,19 @@ pub fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemanti
     instructions.push((None, mk_builtin_instruction(BuiltinOperation::SetEdgeValue("cycle".to_string()), vec![second_id, fourth_id])));
 
 
-    instructions.push((None, mk_builtin_instruction(BuiltinOperation::IndexCycle, vec![
-        fourth_id
-    ])));
+    instructions.push((None, Instruction::Builtin(BuiltinOperation::IndexCycle, AbstractOperationArgument{
+        selected_input_nodes: vec![
+            fourth_id
+        ],
+        // TODO: double check this hashmap. I think it's right but ...
+        subst_to_aid: HashMap::from([
+            (0, fourth_id),
+            (1, AbstractNodeId::DynamicOutputMarker("third_child".into(), "child".into())),
+            (2, AbstractNodeId::DynamicOutputMarker("second_child".into(), "child".into())),
+            // (1, AbstractNodeId::DynamicOutputMarker("first_child".into(), "child".into())),
+            // (4, AbstractNodeId::DynamicOutputMarker("fourth_child".into(), "child".into())),
+        ]),
+    })));
 
     UserDefinedOperation {
         parameter: param,

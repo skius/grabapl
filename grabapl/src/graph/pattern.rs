@@ -32,7 +32,9 @@ impl ParameterSubstitution {
     }
 }
 
+
 // TODO: maybe this is not needed and ParameterSubstitution is already enough?
+#[derive(Debug)]
 pub struct OperationArgument {
     pub selected_input_nodes: Vec<NodeKey>,
     /// We know this substitution statically already, since we define our parameter substitutions statically.

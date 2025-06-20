@@ -230,7 +230,7 @@ pub fn run_from_concrete<S: SemanticsClone>(
 ) -> OperationResult<OperationOutput> {
     // first get substitution
     let abstract_g = S::concrete_to_abstract(g);
-    
+
     let subst = match op_ctx.get(op).ok_or(OperationError::InvalidOperationId(op))? {
         Operation::Builtin(builtin) => {
             let param = builtin.parameter();
@@ -246,7 +246,7 @@ pub fn run_from_concrete<S: SemanticsClone>(
         subst,
         selected_input_nodes: selected_inputs,
     };
-    
+
     run_operation(g, op_ctx, op, arg)
 }
 
