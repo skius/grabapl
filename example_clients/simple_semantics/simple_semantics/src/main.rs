@@ -3,7 +3,7 @@ use grabapl::{DotCollector, OperationContext, OperationId, Semantics, WithSubstM
 use grabapl::graph::EdgeAttribute;
 use grabapl::graph::operation::builder::{OperationBuilder, Instruction};
 use grabapl::graph::operation::query::{GraphShapeQuery, ShapeNodeIdentifier};
-use grabapl::graph::operation::run_operation;
+use grabapl::graph::operation::{run_from_concrete, run_operation};
 use grabapl::graph::operation::user_defined::{AbstractNodeId, QueryInstructions, QueryTaken, UserDefinedOperation};
 use grabapl::graph::pattern::{OperationOutput, OperationParameter};
 use simple_semantics::{BuiltinOperation, BuiltinQuery, EdgePattern, SimpleSemantics};
@@ -176,8 +176,8 @@ fn main() {
     operation_ctx.add_custom_operation(14, node_heights_user_op);
 
     // use OperationBuilder to try building a new operation
-    let insert_bst_builder_test_user_op = insert_bst_builder_test(&operation_ctx, 15);
-    operation_ctx.add_custom_operation(15, insert_bst_builder_test_user_op);
+    // let insert_bst_builder_test_user_op = insert_bst_builder_test(&operation_ctx, 15);
+    // operation_ctx.add_custom_operation(15, insert_bst_builder_test_user_op);
 
     let mut dot_collector = DotCollector::new();
 
@@ -190,20 +190,20 @@ fn main() {
     g.add_edge(a, b, "edge".to_string());
     dot_collector.collect(&g);
 
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 0, vec![]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 0, vec![]).unwrap();
     dot_collector.collect(&g);
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 1, vec![2]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 1, vec![2]).unwrap();
     dot_collector.collect(&g);
 
     // add 3 new nodes
     // 4
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 0, vec![]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 0, vec![]).unwrap();
     dot_collector.collect(&g);
     // 5
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 0, vec![]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 0, vec![]).unwrap();
     dot_collector.collect(&g);
     // 6
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 0, vec![]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 0, vec![]).unwrap();
     dot_collector.collect(&g);
 
     // add cycle
@@ -217,28 +217,28 @@ fn main() {
     dot_collector.collect(&g);
 
     // add other children to 4 that are ignored
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 1, vec![4]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 1, vec![4]).unwrap();
     dot_collector.collect(&g);
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 1, vec![4]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 1, vec![4]).unwrap();
     dot_collector.collect(&g);
 
     // run cycle operation
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 2, vec![4]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 2, vec![4]).unwrap();
     dot_collector.collect(&g);
 
     // run user defined op
     let new_start = g.add_node(99);
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 3, vec![new_start]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 3, vec![new_start]).unwrap();
     dot_collector.collect(&g);
 
     // new node to make list out of
     let list_root = g.add_node(10);
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 10, vec![list_root]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 10, vec![list_root]).unwrap();
     dot_collector.collect(&g);
 
     // new node to count
     let accumulator = g.add_node(0);
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 11, vec![list_root, accumulator]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 11, vec![list_root, accumulator]).unwrap();
     dot_collector.collect(&g);
 
 
@@ -248,37 +248,37 @@ fn main() {
     // insert 5
     let value_to_insert = g.add_node(5);
     dot_collector.collect(&g);
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
     dot_collector.collect(&g);
 
     // insert 3
     let value_to_insert = g.add_node(3);
     dot_collector.collect(&g);
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
     dot_collector.collect(&g);
 
     // insert 7
     let value_to_insert = g.add_node(7);
     dot_collector.collect(&g);
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
     dot_collector.collect(&g);
 
     // insert 1
     let value_to_insert = g.add_node(1);
     dot_collector.collect(&g);
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
     dot_collector.collect(&g);
 
     // insert 2
     let value_to_insert = g.add_node(2);
     dot_collector.collect(&g);
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
     dot_collector.collect(&g);
 
     // insert 4
     let value_to_insert = g.add_node(4);
     dot_collector.collect(&g);
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
     dot_collector.collect(&g);
 
     let bst_labeled_edges_root = g.add_node(-1);
@@ -287,38 +287,38 @@ fn main() {
     // insert 5
     let value_to_insert = g.add_node(5);
     dot_collector.collect(&g);
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
     dot_collector.collect(&g);
     // insert 3
     let value_to_insert = g.add_node(3);
     dot_collector.collect(&g);
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
     dot_collector.collect(&g);
     // insert 7
     let value_to_insert = g.add_node(7);
     dot_collector.collect(&g);
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
     dot_collector.collect(&g);
     // insert 1
     let value_to_insert = g.add_node(1);
     dot_collector.collect(&g);
     // println!("{}", dot_collector.finalize());
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
     dot_collector.collect(&g);
     // insert 2
     let value_to_insert = g.add_node(2);
     dot_collector.collect(&g);
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
     dot_collector.collect(&g);
     // insert 4
     let value_to_insert = g.add_node(4);
     dot_collector.collect(&g);
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
     dot_collector.collect(&g);
 
     
     // run node heights on that binary tree
-    run_operation::<SimpleSemantics>(&mut g, &operation_ctx, 14, vec![bst_labeled_edges_root]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 14, vec![bst_labeled_edges_root]).unwrap();
     dot_collector.collect(&g);
     
     println!("{}", dot_collector.finalize());

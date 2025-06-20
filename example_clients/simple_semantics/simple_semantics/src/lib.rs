@@ -142,7 +142,7 @@ impl BuiltinQueryTrait for BuiltinQuery {
         AbstractQueryOutput { changes }
     }
 
-    fn query(&self, g: &mut ConcreteGraph<Self::S>, argument: OperationArgument, substitution: &ParameterSubstitution) -> ConcreteQueryOutput {
+    fn query(&self, g: &mut ConcreteGraph<Self::S>, substitution: &ParameterSubstitution) -> ConcreteQueryOutput {
         let mut taken = false;
         match self {
             BuiltinQuery::HasChild => {
@@ -467,7 +467,6 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
     fn apply(
         &self,
         graph: &mut ConcreteGraph<SimpleSemantics>,
-        argument: OperationArgument,
         substitution: &ParameterSubstitution,
     ) -> OperationOutput {
         let mut new_nodes = HashMap::new();

@@ -46,7 +46,6 @@ pub trait BuiltinOperation: Debug {
     fn apply(
         &self,
         g: &mut ConcreteGraph<Self::S>,
-        argument: OperationArgument,
         substitution: &ParameterSubstitution,
     ) -> OperationOutput;
 }
@@ -102,7 +101,7 @@ enum Operation<'a, S: Semantics> {
 pub type OperationId = u32;
 
 /// Returns the pattern subst to input graph node key mapping, if the operation is applicable.
-fn get_substitution<S: Semantics>(
+pub fn get_substitution<S: Semantics>(
     g: &AbstractGraph<S>,
     param: &OperationParameter<S>,
     selected_inputs: &[NodeKey],
@@ -172,36 +171,32 @@ fn get_substitution<S: Semantics>(
     .ok_or(OperationError::ArgumentDoesNotMatchParameter)
 }
 
-// TODO: return result instead
 pub fn run_operation<S: SemanticsClone>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
     op_ctx: &OperationContext<S>,
     op: OperationId,
-    selected_inputs: Vec<NodeKey>,
+    arg: OperationArgument,
 ) -> OperationResult<OperationOutput> {
     match op_ctx.get(op).expect("Invalid operation ID") {
-        Operation::Builtin(builtin) => run_builtin_operation::<S>(g, builtin, selected_inputs),
-        Operation::Custom(custom) => run_custom_operation::<S>(g, op_ctx, custom, selected_inputs),
+        Operation::Builtin(builtin) => run_builtin_operation::<S>(g, builtin, arg),
+        Operation::Custom(custom) => run_custom_operation::<S>(g, op_ctx, custom, arg),
     }
 }
 
 fn run_builtin_operation<S: SemanticsClone>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
     op: &S::BuiltinOperation,
-    selected_inputs: Vec<NodeKey>,
+    arg: OperationArgument,
 ) -> OperationResult<OperationOutput> {
     // can we run it?
-    let param = op.parameter();
-    let abstract_g = S::concrete_to_abstract(&g);
-    let subst = get_substitution(&abstract_g, &param, &selected_inputs)?;
+    // let param = op.parameter();
+    // let abstract_g = S::concrete_to_abstract(&g);
+    // let subst = get_substitution(&abstract_g, &param, &selected_inputs)?;
 
     // TODO: we probably dont need to pass the OperationArgument down. Might just cause confusion.
     let output = op.apply(
         g,
-        OperationArgument {
-            selected_input_nodes: selected_inputs,
-        },
-        &subst,
+        &arg.subst,
     );
 
     Ok(output)
@@ -211,24 +206,48 @@ fn run_custom_operation<S: SemanticsClone>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
     op_ctx: &OperationContext<S>,
     op: &UserDefinedOperation<S>,
-    selected_inputs: Vec<NodeKey>,
+    arg: OperationArgument,
 ) -> OperationResult<OperationOutput> {
     // can we run it?
-    let param = &op.parameter;
-    let abstract_g = S::concrete_to_abstract(&g);
-    let subst = get_substitution(&abstract_g, param, &selected_inputs)?;
+    // let param = &op.parameter;
+    // let abstract_g = S::concrete_to_abstract(&g);
+    // let subst = get_substitution(&abstract_g, param, &selected_inputs)?;
 
-    // TODO: we probably dont need to pass the OperationArgument down. Might just cause confusion.
     let output = op.apply(
         op_ctx,
         g,
-        OperationArgument {
-            selected_input_nodes: selected_inputs,
-        },
-        &subst,
+        &arg.subst,
     )?;
 
     Ok(output)
+}
+
+pub fn run_from_concrete<S: SemanticsClone>(
+    g: &mut ConcreteGraph<S>,
+    op_ctx: &OperationContext<S>,
+    op: OperationId,
+    selected_inputs: Vec<NodeKey>,
+) -> OperationResult<OperationOutput> {
+    // first get substitution
+    let abstract_g = S::concrete_to_abstract(g);
+    
+    let subst = match op_ctx.get(op).ok_or(OperationError::InvalidOperationId(op))? {
+        Operation::Builtin(builtin) => {
+            let param = builtin.parameter();
+            get_substitution(&abstract_g, &param, &selected_inputs)?
+        }
+        Operation::Custom(custom) => {
+            let param = &custom.parameter;
+            get_substitution(&abstract_g, param, &selected_inputs)?
+        }
+    };
+    // then run the operation
+    let arg = OperationArgument {
+        subst,
+        selected_input_nodes: selected_inputs,
+    };
+    
+    run_operation(g, op_ctx, op, arg)
 }
 
 pub type OperationResult<T> = std::result::Result<T, OperationError>;

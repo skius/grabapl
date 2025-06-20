@@ -25,6 +25,61 @@ pub enum AbstractNodeId {
     DynamicOutputMarker(AbstractOperationResultMarker, AbstractOutputNodeMarker),
 }
 
+/// Represents the abstract nodes that will be passed to an operation.
+///
+/// The mapping for the implicitly matched context graph *needs* to be stored statically,
+/// since we define our operation parameters to be matched statically.
+#[derive(Debug, Clone)]
+pub struct AbstractOperationArgument {
+    /// The nodes that were selected explicitly as input to the operation.
+    pub selected_input_nodes: Vec<AbstractNodeId>,
+    /// A mapping from the parameter's implicitly matched context nodes to the statically matched
+    /// nodes from our abstract graph.
+    pub subst_to_aid: HashMap<SubstMarker, AbstractNodeId>,
+}
+
+impl AbstractOperationArgument {
+    pub fn infer_explicit_for_param(selected_nodes: Vec<AbstractNodeId>, param: &OperationParameter<impl Semantics>) -> OperationResult<Self> {
+        if param.explicit_input_nodes.len() != selected_nodes.len() {
+            return Err(OperationError::InvalidOperationArgumentCount {
+                expected: param.explicit_input_nodes.len(),
+                actual: selected_nodes.len()
+            });
+        }
+
+        let subst = param.explicit_input_nodes.iter().zip(selected_nodes.iter())
+            .map(|(subst_marker, node_key)| (*subst_marker, *node_key))
+            .collect();
+        Ok(AbstractOperationArgument {
+            selected_input_nodes: selected_nodes,
+            subst_to_aid: subst,
+        })
+    }
+}
+
+#[derive(derive_more::Debug)]
+pub enum Instruction<S: Semantics> {
+    // TODO: Split out into Instruction::OperationLike (which includes both Builtin and Operation)
+    //  and Instruction::QueryLike (which includes BuiltinQuery and potential future custom queries).
+    #[debug("Builtin(???, {_1:#?})")]
+    Builtin(S::BuiltinOperation, AbstractOperationArgument),
+    #[debug("Operation({_0:#?}, {_1:#?})")]
+    Operation(OperationId, AbstractOperationArgument),
+    #[debug("BuiltinQuery(???, {_1:#?}, {_2:#?})")]
+    BuiltinQuery(S::BuiltinQuery, AbstractOperationArgument, QueryInstructions<S>),
+    #[debug("ShapeQuery(???, {_1:#?}, {_2:#?})")]
+    ShapeQuery(GraphShapeQuery<S>, Vec<AbstractNodeId>, QueryInstructions<S>),
+}
+
+#[derive(derive_more::Debug)]
+pub struct QueryInstructions<S: Semantics> {
+    // TODO: does it make sense to rename these? true_branch and false_branch?
+    #[debug("[{}]", taken.iter().map(|(opt, inst)| format!("({opt:#?}, {:#?})", inst)).collect::<Vec<_>>().join(", "))]
+    pub taken: Vec<InstructionWithResultMarker<S>>,
+    #[debug("[{}]", not_taken.iter().map(|(opt, inst)| format!("({opt:#?}, {:#?})", inst)).collect::<Vec<_>>().join(", "))]
+    pub not_taken: Vec<InstructionWithResultMarker<S>>,
+}
+
 pub type InstructionWithResultMarker<S> = (Option<AbstractOperationResultMarker>, Instruction<S>);
 
 // TODO: We probably want each instruction to statically know which nodes it uses in a call. We need this because
@@ -45,7 +100,6 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
         &self,
         op_ctx: &OperationContext<S>,
         g: &mut ConcreteGraph<S>,
-        argument: OperationArgument,
         subst: &ParameterSubstitution,
     ) -> OperationResult<OperationOutput> {
         let mut our_output_map: HashMap<AbstractOutputNodeMarker, NodeKey> = HashMap::new();
@@ -85,17 +139,18 @@ fn run_instructions<S: SemanticsClone>(
 ) -> OperationResult<()> {
     for (abstract_output_id, instruction) in instructions {
         match instruction {
-            oplike @ (Instruction::Operation(_, args) | Instruction::Builtin(_, args)) => {
-                let concrete_args = get_concrete_args::<S>(args, subst, previous_results)?;
+            oplike @ (Instruction::Operation(_, arg) | Instruction::Builtin(_, arg)) => {
+                let concrete_arg = get_concrete_arg::<S>(&arg.selected_input_nodes, &arg.subst_to_aid, subst, previous_results)?;
                 // TODO: make fallible
                 // TODO: How do we support mutually recursive user defined operations?
                 //  - I think just specifying the ID directly? this will mainly be a problem for the OperationBuilder
+                //  - we need some ExecutionContext that potentially stores information like fuel (to avoid infinite loops and timing out)
                 let output = match oplike {
                     Instruction::Operation(op_id, _) => {
-                        run_operation::<S>(g, op_ctx, *op_id, concrete_args)?
+                        run_operation::<S>(g, op_ctx, *op_id, concrete_arg)?
                     }
                     Instruction::Builtin(op, _) => {
-                        run_builtin_operation::<S>(g, op, concrete_args)?
+                        run_builtin_operation::<S>(g, op, concrete_arg)?
                     }
                     // does not match the outer match arm
                     Instruction::BuiltinQuery(..) | Instruction::ShapeQuery(..) => unreachable!(),
@@ -104,9 +159,9 @@ fn run_instructions<S: SemanticsClone>(
                     previous_results.insert(*abstract_output_id, output.new_nodes);
                 }
             }
-            Instruction::BuiltinQuery(query, args, query_instr) => {
-                let concrete_args = get_concrete_args::<S>(args, subst, previous_results)?;
-                let result = run_builtin_query::<S>(g, query, concrete_args)?;
+            Instruction::BuiltinQuery(query, arg, query_instr) => {
+                let concrete_arg = get_concrete_arg::<S>(&arg.selected_input_nodes, &arg.subst_to_aid, subst, previous_results)?;
+                let result = run_builtin_query::<S>(g, query, concrete_arg)?;
                 let next_instr = if result.taken {
                     &query_instr.taken
                 } else {
@@ -123,8 +178,9 @@ fn run_instructions<S: SemanticsClone>(
                 )?
             }
             Instruction::ShapeQuery(query, args, query_instr) => {
-                let concrete_args = get_concrete_args::<S>(args, subst, previous_results)?;
-                let result = run_shape_query(g, query, concrete_args)?;
+                // ShapeQueries dont have context mappings, so we can just pass an empty hashmap.
+                let concrete_arg = get_concrete_arg::<S>(args, &HashMap::new(), subst, previous_results)?;
+                let result = run_shape_query(g, query, concrete_arg.selected_input_nodes)?;
                 let next_instr = if let Some(shape_idents_to_node_keys) = result.shape_idents_to_node_keys {
                     // apply the shape idents to node keys mapping
 
@@ -161,55 +217,61 @@ fn run_instructions<S: SemanticsClone>(
 
 // TODO: decide if we really want to have this be fallible, since we may want to instead have some 
 //  invariant that this works. And encode fallibility in a 'builder'.
-fn get_concrete_args<S: Semantics>(
-    args: &[AbstractNodeId],
+fn get_concrete_arg<S: Semantics>(
+    explicit_args: &[AbstractNodeId],
+    context_mapping: &HashMap<SubstMarker, AbstractNodeId>,
     subst: &ParameterSubstitution,
     previous_results: &HashMap<
         AbstractOperationResultMarker,
         HashMap<AbstractOutputNodeMarker, NodeKey>,
     >,
-) -> OperationResult<Vec<NodeKey>> {
-    args.iter()
-        .map(|arg| match arg {
-            AbstractNodeId::ParameterMarker(subst_marker) => subst
-                .mapping
-                .get(subst_marker)
+) -> OperationResult<OperationArgument> {
+    let selected_keys = explicit_args.iter()
+        .map(|arg| aid_to_node_key(*arg, subst, previous_results))
+        .collect::<OperationResult<_>>()?;
+
+    let subst = ParameterSubstitution::new(
+        context_mapping
+            .iter()
+            .map(|(subst_marker, abstract_node_id)| {
+                Ok((
+                    *subst_marker,
+                    aid_to_node_key(*abstract_node_id, subst, previous_results)?,
+                ))
+            })
+            .collect::<OperationResult<_>>()?,
+    );
+
+    Ok(OperationArgument {
+        selected_input_nodes: selected_keys,
+        subst,
+    })
+}
+
+fn aid_to_node_key(
+    aid: AbstractNodeId,
+    subst: &ParameterSubstitution,
+    previous_results: &HashMap<
+        AbstractOperationResultMarker,
+        HashMap<AbstractOutputNodeMarker, NodeKey>,
+    >,
+) -> OperationResult<NodeKey> {
+    match aid {
+        AbstractNodeId::ParameterMarker(subst_marker) => subst
+            .mapping
+            .get(&subst_marker)
+            .copied()
+            .ok_or(OperationError::UnknownParameterMarker(subst_marker)),
+        AbstractNodeId::DynamicOutputMarker(output_id, output_marker) => {
+            let output_map = previous_results
+                .get(&output_id)
+                .ok_or(OperationError::UnknownOperationResultMarker(output_id))?;
+            output_map
+                .get(&output_marker)
                 .copied()
-                .ok_or(OperationError::UnknownParameterMarker(*subst_marker)),
-            AbstractNodeId::DynamicOutputMarker(output_id, output_marker) => {
-                let output_map = previous_results
-                    .get(output_id)
-                    .ok_or(OperationError::UnknownOperationResultMarker(*output_id))?;
-                output_map
-                    .get(output_marker)
-                    .copied()
-                    .ok_or(OperationError::UnknownOutputNodeMarker(*output_marker))
-            }
-        })
-        .collect()
-}
-
-#[derive(derive_more::Debug)]
-pub enum Instruction<S: Semantics> {
-    // TODO: Split out into Instruction::OperationLike (which includes both Builtin and Operation)
-    //  and Instruction::QueryLike (which includes BuiltinQuery and potential future custom queries).
-    #[debug("Builtin(???, {_1:#?})")]
-    Builtin(S::BuiltinOperation, Vec<AbstractNodeId>),
-    #[debug("Operation({_0:#?}, {_1:#?})")]
-    Operation(OperationId, Vec<AbstractNodeId>),
-    #[debug("BuiltinQuery(???, {_1:#?}, {_2:#?})")]
-    BuiltinQuery(S::BuiltinQuery, Vec<AbstractNodeId>, QueryInstructions<S>),
-    #[debug("ShapeQuery(???, {_1:#?}, {_2:#?})")]
-    ShapeQuery(GraphShapeQuery<S>, Vec<AbstractNodeId>, QueryInstructions<S>),
-}
-
-#[derive(derive_more::Debug)]
-pub struct QueryInstructions<S: Semantics> {
-    // TODO: does it make sense to rename these? true_branch and false_branch?
-    #[debug("[{}]", taken.iter().map(|(opt, inst)| format!("({opt:#?}, {:#?})", inst)).collect::<Vec<_>>().join(", "))]
-    pub taken: Vec<InstructionWithResultMarker<S>>,
-    #[debug("[{}]", not_taken.iter().map(|(opt, inst)| format!("({opt:#?}, {:#?})", inst)).collect::<Vec<_>>().join(", "))]
-    pub not_taken: Vec<InstructionWithResultMarker<S>>,
+                .ok_or(OperationError::UnknownOutputNodeMarker(output_marker))
+        }
+    }
 }
 
 // What happens when the query results in true.

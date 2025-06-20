@@ -56,7 +56,7 @@ mod ffi {
         }
 
         pub fn run(&self, graph: &mut ConcreteGraph, op_ctx: &OpCtx, op_id: u32, args: &[u32]) {
-            grabapl::graph::operation::run_operation::<SimpleSemantics>(
+            grabapl::graph::operation::run_from_concrete::<SimpleSemantics>(
                 &mut graph.0,
                 &op_ctx.0,
                 op_id,

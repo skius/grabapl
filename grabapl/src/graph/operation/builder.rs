@@ -6,7 +6,7 @@ use std::slice::Iter;
 use thiserror::Error;
 use crate::{Graph, NodeKey, OperationContext, OperationId, SubstMarker};
 use crate::graph::operation::query::{GraphShapeQuery, ShapeNodeIdentifier};
-use crate::graph::operation::user_defined::{AbstractNodeId, AbstractOperationResultMarker, QueryInstructions, UserDefinedOperation};
+use crate::graph::operation::user_defined::{AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, QueryInstructions, UserDefinedOperation};
 use crate::graph::pattern::{AbstractOutputNodeMarker, OperationParameter};
 use crate::graph::semantics::{AbstractGraph, SemanticsClone};
 
@@ -288,12 +288,19 @@ use super::user_defined::Instruction as UDInstruction;
 
 #[derive(derive_more::Debug)]
 enum IntermediateInstruction<S: SemanticsClone> {
-    #[debug("Final({_0:#?})")]
-    Final(UDInstruction<S>),
+    OpLike(IntermediateOpLike<S>),
     #[debug("GraphShapeQuery({_0:#?}, {_1:#?}, {_2:#?})")]
     GraphShapeQuery(AbstractOperationResultMarker, Vec<GraphShapeQueryInstruction<S>>, IntermediateQueryInstructions<S>),
     #[debug("BuiltinQuery(???, {_1:#?}, {_2:#?})")]
     BuiltinQuery(S::BuiltinQuery, Vec<AbstractNodeId>, IntermediateQueryInstructions<S>),
+}
+
+#[derive(derive_more::Debug)]
+enum IntermediateOpLike<S: SemanticsClone> {
+    #[debug("Builtin(???, {_1:#?})")]
+    Builtin(S::BuiltinOperation, Vec<AbstractNodeId>),
+    Operation(OperationId, Vec<AbstractNodeId>),
+    Recurse(Vec<AbstractNodeId>),
 }
 
 #[derive(derive_more::Debug)]
@@ -487,18 +494,18 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>> Interm
                 };
                 iter.next();
 
-                match instruction {
+                let oplike = match instruction {
                     Instruction::Builtin(builtin_op) => {
-                        Ok((name, IntermediateInstruction::Final(UDInstruction::Builtin(builtin_op.clone(), args.clone()))))
+                        IntermediateOpLike::Builtin(builtin_op.clone(), args.clone())
                     }
                     Instruction::FromOperationId(op_id) => {
-                        Ok((name, IntermediateInstruction::Final(UDInstruction::Operation(op_id.clone(), args.clone()))))
+                        IntermediateOpLike::Operation(op_id.clone(), args.clone())
                     }
                     Instruction::Recurse => {
-                        // TODO: somehow denote 'self' instead of 0
-                        Ok((name, IntermediateInstruction::Final(UDInstruction::Operation(0, args.clone()))))
+                        IntermediateOpLike::Recurse(args.clone())
                     }
-                }
+                };
+                Ok((name, IntermediateInstruction::OpLike(oplike)))
             }
             BuilderInstruction::StartQuery(query, args) => {
                 iter.next();

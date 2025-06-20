@@ -90,7 +90,6 @@ pub trait BuiltinQuery {
     fn query(
         &self,
         g: &mut ConcreteGraph<Self::S>,
-        argument: OperationArgument,
         substitution: &ParameterSubstitution,
     ) -> ConcreteQueryOutput;
 }
@@ -156,6 +155,8 @@ pub enum ShapeEdgeChange<S: Semantics> {
 
 pub struct GraphShapeQuery<S: Semantics> {
     // TODO: perhaps we don't need a fullblown OperationParameter here, since we don't really need SubstMarker?
+    //  yeah, we really don't want to deal with context graphs here.
+    // INVARIANT: the context graph must be empty. All inputs must be explicit.
     pub parameter: OperationParameter<S>,
     // The keys here for the existing nodes must be equivalent to parameter.graph
     // TODO: assert this property or refactor^
@@ -175,15 +176,12 @@ pub struct ConcreteShapeQueryResult {
 pub(crate) fn run_builtin_query<S: SemanticsClone>(
     g: &mut ConcreteGraph<S>,
     query: &S::BuiltinQuery,
-    selected_inputs: Vec<NodeKey>,
+    arg: OperationArgument,
 ) -> OperationResult<ConcreteQueryOutput> {
-    let param = query.parameter();
-    let abstract_graph = S::concrete_to_abstract(g);
-    let subst = get_substitution(&abstract_graph, &param, &selected_inputs)?;
-    let argument = OperationArgument {
-        selected_input_nodes: selected_inputs,
-    };
-    let output = query.query(g, argument, &subst);
+    // let param = query.parameter();
+    // let abstract_graph = S::concrete_to_abstract(g);
+    // let subst = get_substitution(&abstract_graph, &param, &selected_inputs)?;
+    let output = query.query(g, &arg.subst);
     Ok(output)
 }
 
@@ -198,7 +196,10 @@ pub(crate) fn run_shape_query<S: SemanticsClone>(
     let abstract_graph = S::concrete_to_abstract(g);
     // assert that the abstract graph matches the parameter. this is not the dynamic check yet, this is just asserting
     // that the preconditions of the query are met.
-    let subst = get_substitution(&abstract_graph, &query.parameter, &selected_inputs)?;
+    // ^ since we have an invariant that graphshapequeries dont have context graphs, the returned substitution should just always be the explicit node mapping.
+    // let subst = get_substitution(&abstract_graph, &query.parameter, &selected_inputs)?;
+
+    let subst = OperationArgument::infer_explicit_for_param(selected_inputs, &query.parameter)?.subst;
 
     // Check if the concrete graph matches the expected shape
     // needs to satisfy conditions 1-3 and a-c from above TODO

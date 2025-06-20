@@ -2,6 +2,8 @@
 name = "simple_semantics"
 version = "0.1.0"
 edition = "2024"
+default-run = "simple_semantics"
+
 
 [dependencies]
 grabapl = { path = "../../../grabapl" }
