@@ -1,15 +1,24 @@
-use std::collections::HashMap;
-use grabapl::{DotCollector, OperationContext, OperationId, Semantics, WithSubstMarker};
 use grabapl::graph::EdgeAttribute;
-use grabapl::graph::operation::builder::{OperationBuilder, Instruction};
+use grabapl::graph::operation::builder::{Instruction, OperationBuilder};
 use grabapl::graph::operation::query::{GraphShapeQuery, ShapeNodeIdentifier};
+use grabapl::graph::operation::user_defined::{
+    AbstractNodeId, QueryInstructions, QueryTaken, UserDefinedOperation,
+};
 use grabapl::graph::operation::{run_from_concrete, run_operation};
-use grabapl::graph::operation::user_defined::{AbstractNodeId, QueryInstructions, QueryTaken, UserDefinedOperation};
 use grabapl::graph::pattern::{OperationOutput, OperationParameter};
+use grabapl::{DotCollector, OperationContext, OperationId, Semantics, WithSubstMarker};
+use simple_semantics::sample_user_defined_operations::{
+    get_count_list_len_user_defined_operation, get_insert_bst_user_defined_operation,
+    get_labeled_edges_insert_bst_user_defined_operation, get_mk_n_to_0_list_user_defined_operation,
+    get_node_heights_user_defined_operation, get_sample_user_defined_operation,
+};
 use simple_semantics::{BuiltinOperation, BuiltinQuery, EdgePattern, SimpleSemantics};
-use simple_semantics::sample_user_defined_operations::{get_count_list_len_user_defined_operation, get_insert_bst_user_defined_operation, get_labeled_edges_insert_bst_user_defined_operation, get_mk_n_to_0_list_user_defined_operation, get_node_heights_user_defined_operation, get_sample_user_defined_operation};
+use std::collections::HashMap;
 
-fn insert_bst_builder_test(op_ctx: &OperationContext<SimpleSemantics>, self_op_id: OperationId) -> UserDefinedOperation<SimpleSemantics> {
+fn insert_bst_builder_test(
+    op_ctx: &OperationContext<SimpleSemantics>,
+    self_op_id: OperationId,
+) -> UserDefinedOperation<SimpleSemantics> {
     // OperationBuilder has an inner state enum. in fact, that is a stack referencing the current query stack it is inside.
     let mut op_builder = OperationBuilder::new(op_ctx);
     let show = |op_builder: &OperationBuilder<_>| {
@@ -20,23 +29,39 @@ fn insert_bst_builder_test(op_ctx: &OperationContext<SimpleSemantics>, self_op_i
     let root_node = AbstractNodeId::ParameterMarker(root_node_marker);
     let node_to_insert_marker = 1;
     let node_to_insert = AbstractNodeId::ParameterMarker(node_to_insert_marker);
-    op_builder.expect_parameter_node(root_node_marker, ()).unwrap();
+    op_builder
+        .expect_parameter_node(root_node_marker, ())
+        .unwrap();
     show(&op_builder);
-    op_builder.expect_parameter_node(node_to_insert_marker, ()).unwrap();
+    op_builder
+        .expect_parameter_node(node_to_insert_marker, ())
+        .unwrap();
     show(&op_builder);
 
     // Start a query on the root node to figure out if it's -1.
-    op_builder.start_query(BuiltinQuery::IsValueEq(-1), vec![root_node]).unwrap();
+    op_builder
+        .start_query(BuiltinQuery::IsValueEq(-1), vec![root_node])
+        .unwrap();
     show(&op_builder);
     {
         // If it is, the tree is empty and hence we set the root to be the node to insert.
         op_builder.enter_true_branch().unwrap();
         show(&op_builder);
         {
-            op_builder.add_instruction(Instruction::Builtin(BuiltinOperation::CopyNodeValueTo), vec![node_to_insert, root_node]).unwrap();
+            op_builder
+                .add_instruction(
+                    Instruction::Builtin(BuiltinOperation::CopyNodeValueTo),
+                    vec![node_to_insert, root_node],
+                )
+                .unwrap();
             show(&op_builder);
             // delete the node
-            op_builder.add_instruction(Instruction::Builtin(BuiltinOperation::DeleteNode), vec![node_to_insert]).unwrap();
+            op_builder
+                .add_instruction(
+                    Instruction::Builtin(BuiltinOperation::DeleteNode),
+                    vec![node_to_insert],
+                )
+                .unwrap();
             show(&op_builder);
         }
         op_builder.enter_false_branch().unwrap();
@@ -44,7 +69,9 @@ fn insert_bst_builder_test(op_ctx: &OperationContext<SimpleSemantics>, self_op_i
         {
             // If it is not, we need to insert the node into the existing tree.
             // Check if value > root
-            op_builder.start_query(BuiltinQuery::FirstGtSnd, vec![node_to_insert, root_node]).unwrap();
+            op_builder
+                .start_query(BuiltinQuery::FirstGtSnd, vec![node_to_insert, root_node])
+                .unwrap();
             show(&op_builder);
             {
                 op_builder.enter_true_branch().unwrap();
@@ -60,31 +87,67 @@ fn insert_bst_builder_test(op_ctx: &OperationContext<SimpleSemantics>, self_op_i
                     op_builder.expect_shape_node(child, ()).unwrap();
                     show(&op_builder);
                     let child_id = AbstractNodeId::DynamicOutputMarker("right_query".into(), child);
-                    op_builder.expect_shape_edge(AbstractNodeId::ParameterMarker(0), child_id, EdgePattern::Exact("right".to_string())).unwrap();
+                    op_builder
+                        .expect_shape_edge(
+                            AbstractNodeId::ParameterMarker(0),
+                            child_id,
+                            EdgePattern::Exact("right".to_string()),
+                        )
+                        .unwrap();
                     show(&op_builder);
                     {
                         op_builder.enter_true_branch().unwrap();
                         show(&op_builder);
                         {
-
                             // If it exists, we need to recurse into the right subtree.
-                            op_builder.add_instruction(Instruction::Recurse, vec![child_id, node_to_insert]).unwrap();
+                            op_builder
+                                .add_instruction(
+                                    Instruction::Recurse,
+                                    vec![child_id, node_to_insert],
+                                )
+                                .unwrap();
                             show(&op_builder);
                         }
                         // if there is none, we add it as right child
                         op_builder.enter_false_branch();
                         show(&op_builder);
                         {
-                            let new_node = AbstractNodeId::DynamicOutputMarker("add_node".into(), "new".into());
-                            op_builder.add_named_instruction("add_node".into(), Instruction::Builtin(BuiltinOperation::AddNode), vec![]).unwrap();
+                            let new_node = AbstractNodeId::DynamicOutputMarker(
+                                "add_node".into(),
+                                "new".into(),
+                            );
+                            op_builder
+                                .add_named_instruction(
+                                    "add_node".into(),
+                                    Instruction::Builtin(BuiltinOperation::AddNode),
+                                    vec![],
+                                )
+                                .unwrap();
                             show(&op_builder);
                             // TODO: in above^ show of the intermediate state, we should "see" `add_node:new` as a node with the metadata of that
                             // AbstractNodeId.
-                            op_builder.add_instruction(Instruction::Builtin(BuiltinOperation::CopyNodeValueTo), vec![node_to_insert, new_node]).unwrap();
+                            op_builder
+                                .add_instruction(
+                                    Instruction::Builtin(BuiltinOperation::CopyNodeValueTo),
+                                    vec![node_to_insert, new_node],
+                                )
+                                .unwrap();
                             show(&op_builder);
-                            op_builder.add_instruction(Instruction::Builtin(BuiltinOperation::AddEdge), vec![root_node, new_node]).unwrap();
+                            op_builder
+                                .add_instruction(
+                                    Instruction::Builtin(BuiltinOperation::AddEdge),
+                                    vec![root_node, new_node],
+                                )
+                                .unwrap();
                             show(&op_builder);
-                            op_builder.add_instruction(Instruction::Builtin(BuiltinOperation::SetEdgeValue("right".to_string())), vec![root_node, new_node]).unwrap();
+                            op_builder
+                                .add_instruction(
+                                    Instruction::Builtin(BuiltinOperation::SetEdgeValue(
+                                        "right".to_string(),
+                                    )),
+                                    vec![root_node, new_node],
+                                )
+                                .unwrap();
                             show(&op_builder);
                         }
                         op_builder.end_query().unwrap();
@@ -104,28 +167,63 @@ fn insert_bst_builder_test(op_ctx: &OperationContext<SimpleSemantics>, self_op_i
                     let child_id = AbstractNodeId::DynamicOutputMarker(left_query, child);
                     op_builder.expect_shape_node(child, ()).unwrap();
                     show(&op_builder);
-                    op_builder.expect_shape_edge(root_node, child_id, EdgePattern::Exact("left".to_string()));
+                    op_builder.expect_shape_edge(
+                        root_node,
+                        child_id,
+                        EdgePattern::Exact("left".to_string()),
+                    );
                     show(&op_builder);
                     {
                         op_builder.enter_true_branch().unwrap();
                         show(&op_builder);
                         {
                             // if it exists, recurse into the left subtree
-                            op_builder.add_instruction(Instruction::Recurse, vec![child_id, node_to_insert]).unwrap();
+                            op_builder
+                                .add_instruction(
+                                    Instruction::Recurse,
+                                    vec![child_id, node_to_insert],
+                                )
+                                .unwrap();
                             show(&op_builder);
                         }
                         // if it does not, we add it as left child
                         op_builder.enter_false_branch().unwrap();
                         show(&op_builder);
                         {
-                            let new_node = AbstractNodeId::DynamicOutputMarker("add_node".into(), "new".into());
-                            op_builder.add_named_instruction("add_node".into(), Instruction::Builtin(BuiltinOperation::AddNode), vec![]).unwrap();
+                            let new_node = AbstractNodeId::DynamicOutputMarker(
+                                "add_node".into(),
+                                "new".into(),
+                            );
+                            op_builder
+                                .add_named_instruction(
+                                    "add_node".into(),
+                                    Instruction::Builtin(BuiltinOperation::AddNode),
+                                    vec![],
+                                )
+                                .unwrap();
                             show(&op_builder);
-                            op_builder.add_instruction(Instruction::Builtin(BuiltinOperation::CopyNodeValueTo), vec![node_to_insert, new_node]).unwrap();
+                            op_builder
+                                .add_instruction(
+                                    Instruction::Builtin(BuiltinOperation::CopyNodeValueTo),
+                                    vec![node_to_insert, new_node],
+                                )
+                                .unwrap();
                             show(&op_builder);
-                            op_builder.add_instruction(Instruction::Builtin(BuiltinOperation::AddEdge), vec![root_node, new_node]).unwrap();
+                            op_builder
+                                .add_instruction(
+                                    Instruction::Builtin(BuiltinOperation::AddEdge),
+                                    vec![root_node, new_node],
+                                )
+                                .unwrap();
                             show(&op_builder);
-                            op_builder.add_instruction(Instruction::Builtin(BuiltinOperation::SetEdgeValue("left".to_string())), vec![root_node, new_node]).unwrap();
+                            op_builder
+                                .add_instruction(
+                                    Instruction::Builtin(BuiltinOperation::SetEdgeValue(
+                                        "left".to_string(),
+                                    )),
+                                    vec![root_node, new_node],
+                                )
+                                .unwrap();
                             show(&op_builder);
                         }
                         // end the query
@@ -143,13 +241,10 @@ fn insert_bst_builder_test(op_ctx: &OperationContext<SimpleSemantics>, self_op_i
         show(&op_builder);
     }
 
-
     // TODO: finish operation
-
 
     op_builder.build(self_op_id).unwrap()
 }
-
 
 fn main() {
     let user_defined_op = get_sample_user_defined_operation();
@@ -238,9 +333,9 @@ fn main() {
 
     // new node to count
     let accumulator = g.add_node(0);
-    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 11, vec![list_root, accumulator]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 11, vec![list_root, accumulator])
+        .unwrap();
     dot_collector.collect(&g);
-
 
     // new root BST node
     let bst_root = g.add_node(-1);
@@ -248,37 +343,73 @@ fn main() {
     // insert 5
     let value_to_insert = g.add_node(5);
     dot_collector.collect(&g);
-    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(
+        &mut g,
+        &operation_ctx,
+        12,
+        vec![bst_root, value_to_insert],
+    )
+    .unwrap();
     dot_collector.collect(&g);
 
     // insert 3
     let value_to_insert = g.add_node(3);
     dot_collector.collect(&g);
-    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(
+        &mut g,
+        &operation_ctx,
+        12,
+        vec![bst_root, value_to_insert],
+    )
+    .unwrap();
     dot_collector.collect(&g);
 
     // insert 7
     let value_to_insert = g.add_node(7);
     dot_collector.collect(&g);
-    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(
+        &mut g,
+        &operation_ctx,
+        12,
+        vec![bst_root, value_to_insert],
+    )
+    .unwrap();
     dot_collector.collect(&g);
 
     // insert 1
     let value_to_insert = g.add_node(1);
     dot_collector.collect(&g);
-    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(
+        &mut g,
+        &operation_ctx,
+        12,
+        vec![bst_root, value_to_insert],
+    )
+    .unwrap();
     dot_collector.collect(&g);
 
     // insert 2
     let value_to_insert = g.add_node(2);
     dot_collector.collect(&g);
-    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(
+        &mut g,
+        &operation_ctx,
+        12,
+        vec![bst_root, value_to_insert],
+    )
+    .unwrap();
     dot_collector.collect(&g);
 
     // insert 4
     let value_to_insert = g.add_node(4);
     dot_collector.collect(&g);
-    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 12, vec![bst_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(
+        &mut g,
+        &operation_ctx,
+        12,
+        vec![bst_root, value_to_insert],
+    )
+    .unwrap();
     dot_collector.collect(&g);
 
     let bst_labeled_edges_root = g.add_node(-1);
@@ -287,39 +418,75 @@ fn main() {
     // insert 5
     let value_to_insert = g.add_node(5);
     dot_collector.collect(&g);
-    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(
+        &mut g,
+        &operation_ctx,
+        13,
+        vec![bst_labeled_edges_root, value_to_insert],
+    )
+    .unwrap();
     dot_collector.collect(&g);
     // insert 3
     let value_to_insert = g.add_node(3);
     dot_collector.collect(&g);
-    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(
+        &mut g,
+        &operation_ctx,
+        13,
+        vec![bst_labeled_edges_root, value_to_insert],
+    )
+    .unwrap();
     dot_collector.collect(&g);
     // insert 7
     let value_to_insert = g.add_node(7);
     dot_collector.collect(&g);
-    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(
+        &mut g,
+        &operation_ctx,
+        13,
+        vec![bst_labeled_edges_root, value_to_insert],
+    )
+    .unwrap();
     dot_collector.collect(&g);
     // insert 1
     let value_to_insert = g.add_node(1);
     dot_collector.collect(&g);
     // println!("{}", dot_collector.finalize());
-    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(
+        &mut g,
+        &operation_ctx,
+        13,
+        vec![bst_labeled_edges_root, value_to_insert],
+    )
+    .unwrap();
     dot_collector.collect(&g);
     // insert 2
     let value_to_insert = g.add_node(2);
     dot_collector.collect(&g);
-    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(
+        &mut g,
+        &operation_ctx,
+        13,
+        vec![bst_labeled_edges_root, value_to_insert],
+    )
+    .unwrap();
     dot_collector.collect(&g);
     // insert 4
     let value_to_insert = g.add_node(4);
     dot_collector.collect(&g);
-    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 13, vec![bst_labeled_edges_root, value_to_insert]).unwrap();
+    run_from_concrete::<SimpleSemantics>(
+        &mut g,
+        &operation_ctx,
+        13,
+        vec![bst_labeled_edges_root, value_to_insert],
+    )
+    .unwrap();
     dot_collector.collect(&g);
 
-    
     // run node heights on that binary tree
-    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 14, vec![bst_labeled_edges_root]).unwrap();
+    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 14, vec![bst_labeled_edges_root])
+        .unwrap();
     dot_collector.collect(&g);
-    
+
     println!("{}", dot_collector.finalize());
 }

@@ -1,12 +1,19 @@
 pub mod sample_user_defined_operations;
 
-use grabapl::graph::operation::query::{AbstractQueryChange, AbstractQueryOutput, BuiltinQuery as BuiltinQueryTrait, ConcreteQueryOutput, EdgeChange, NodeChange};
+use grabapl::graph::operation::query::{
+    AbstractQueryChange, AbstractQueryOutput, BuiltinQuery as BuiltinQueryTrait,
+    ConcreteQueryOutput, EdgeChange, NodeChange,
+};
+use grabapl::graph::operation::run_operation;
+use grabapl::graph::pattern::{
+    OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution,
+};
+use grabapl::graph::semantics::{
+    AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, Semantics,
+};
+use grabapl::{DotCollector, EdgeInsertionOrder, OperationContext, WithSubstMarker};
 use std::collections::HashMap;
 use std::fmt::Debug;
-use grabapl::graph::semantics::{AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, Semantics};
-use grabapl::{DotCollector, EdgeInsertionOrder, OperationContext, WithSubstMarker};
-use grabapl::graph::operation::run_operation;
-use grabapl::graph::pattern::{OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution};
 
 pub struct SimpleSemantics;
 
@@ -118,19 +125,32 @@ impl BuiltinQueryTrait for BuiltinQuery {
         }
     }
 
-    fn abstract_changes(&self, g: &mut AbstractGraph<Self::S>, argument: OperationArgument, substitution: &ParameterSubstitution) -> AbstractQueryOutput<Self::S> {
+    fn abstract_changes(
+        &self,
+        g: &mut AbstractGraph<Self::S>,
+        argument: OperationArgument,
+        substitution: &ParameterSubstitution,
+    ) -> AbstractQueryOutput<Self::S> {
         let mut changes = vec![];
         match self {
             BuiltinQuery::HasChild => {
                 let parent = substitution.mapping[&0];
                 let child = g.add_node(());
-                g.add_edge_ordered(parent, child, EdgePattern::Wildcard, EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+                g.add_edge_ordered(
+                    parent,
+                    child,
+                    EdgePattern::Wildcard,
+                    EdgeInsertionOrder::Append,
+                    EdgeInsertionOrder::Append,
+                );
                 changes.push(AbstractQueryChange::ExpectNode(NodeChange::NewNode(1, ())));
-                changes.push(AbstractQueryChange::ExpectEdge(EdgeChange::ChangeEdgeValue {
-                    from: 0,
-                    to: 1,
-                    edge: EdgePattern::Wildcard,
-                }));
+                changes.push(AbstractQueryChange::ExpectEdge(
+                    EdgeChange::ChangeEdgeValue {
+                        from: 0,
+                        to: 1,
+                        edge: EdgePattern::Wildcard,
+                    },
+                ));
             }
             BuiltinQuery::IsValueGt(val) => {
                 // No abstract changes if the value is equal, since our type system cannot represent exact values.
@@ -142,11 +162,17 @@ impl BuiltinQueryTrait for BuiltinQuery {
         AbstractQueryOutput { changes }
     }
 
-    fn query(&self, g: &mut ConcreteGraph<Self::S>, substitution: &ParameterSubstitution) -> ConcreteQueryOutput {
+    fn query(
+        &self,
+        g: &mut ConcreteGraph<Self::S>,
+        substitution: &ParameterSubstitution,
+    ) -> ConcreteQueryOutput {
         let mut taken = false;
         match self {
             BuiltinQuery::HasChild => {
-                todo!("TODO: how to handle this? we need a notion of the current 'known' graph in order to tell whether there really is a new child or not")
+                todo!(
+                    "TODO: how to handle this? we need a notion of the current 'known' graph in order to tell whether there really is a new child or not"
+                )
             }
             BuiltinQuery::IsValueGt(val) => {
                 let a = substitution.mapping[&0];
@@ -404,7 +430,12 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
         }
     }
 
-    fn apply_abstract(&self, g: &mut AbstractGraph<Self::S>, argument: OperationArgument, substitution: &ParameterSubstitution) {
+    fn apply_abstract(
+        &self,
+        g: &mut AbstractGraph<Self::S>,
+        argument: OperationArgument,
+        substitution: &ParameterSubstitution,
+    ) {
         match self {
             BuiltinOperation::AddNode => {
                 g.add_node(());
@@ -416,7 +447,13 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 //  On the one hand, we know for a fact this is an exact "" that will be added, so in type-theory, we correctly add the most precise type (Exact instead of Wildcard)
                 //  But if this ever used as a _pattern_ (parameter), it is a *decision* we're making here. Exact will permit fewer matches.
                 //  Realistically this is not a problem, because we don't run builtin operations on parameters. But we should be careful.
-                g.add_edge_ordered(parent, child, EdgePattern::Exact("".to_string()), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+                g.add_edge_ordered(
+                    parent,
+                    child,
+                    EdgePattern::Exact("".to_string()),
+                    EdgeInsertionOrder::Append,
+                    EdgeInsertionOrder::Append,
+                );
             }
             BuiltinOperation::IndexCycle => {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
@@ -427,7 +464,13 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
             BuiltinOperation::AddEdge => {
                 let a = substitution.mapping[&0];
                 let b = substitution.mapping[&1];
-                g.add_edge_ordered(a, b, EdgePattern::Exact("".to_string()), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+                g.add_edge_ordered(
+                    a,
+                    b,
+                    EdgePattern::Exact("".to_string()),
+                    EdgeInsertionOrder::Append,
+                    EdgeInsertionOrder::Append,
+                );
             }
             BuiltinOperation::SetEdgeValueToCycle => {
                 let a = substitution.mapping[&0];
@@ -478,7 +521,13 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
             BuiltinOperation::AppendChild => {
                 let parent = substitution.mapping[&0];
                 let child = graph.add_node(0);
-                graph.add_edge_ordered(parent, child, "".to_string(), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+                graph.add_edge_ordered(
+                    parent,
+                    child,
+                    "".to_string(),
+                    EdgeInsertionOrder::Append,
+                    EdgeInsertionOrder::Append,
+                );
                 new_nodes.insert("child".into(), child);
             }
             BuiltinOperation::IndexCycle => {
@@ -496,7 +545,13 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
             BuiltinOperation::AddEdge => {
                 let a = substitution.mapping[&0];
                 let b = substitution.mapping[&1];
-                graph.add_edge_ordered(a, b, "".to_string(), EdgeInsertionOrder::Append, EdgeInsertionOrder::Append);
+                graph.add_edge_ordered(
+                    a,
+                    b,
+                    "".to_string(),
+                    EdgeInsertionOrder::Append,
+                    EdgeInsertionOrder::Append,
+                );
             }
             // TODO: make this generic over its value
             BuiltinOperation::SetEdgeValueToCycle => {
@@ -541,21 +596,14 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
             }
         }
 
-        OperationOutput {
-            new_nodes,
-        }
+        OperationOutput { new_nodes }
     }
 }
-
-
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
-
-    }
+    fn it_works() {}
 }

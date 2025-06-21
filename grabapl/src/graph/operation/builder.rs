@@ -1,15 +1,18 @@
+use crate::graph::operation::query::{GraphShapeQuery, ShapeNodeIdentifier};
+use crate::graph::operation::user_defined::{
+    AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, QueryInstructions,
+    UserDefinedOperation,
+};
+use crate::graph::pattern::{AbstractOutputNodeMarker, OperationParameter};
+use crate::graph::semantics::{AbstractGraph, SemanticsClone};
+use crate::util::bimap::BiMap;
+use crate::{Graph, NodeKey, OperationContext, OperationId, SubstMarker};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::iter::Peekable;
 use std::marker::PhantomData;
 use std::slice::Iter;
 use thiserror::Error;
-use crate::{Graph, NodeKey, OperationContext, OperationId, SubstMarker};
-use crate::graph::operation::query::{GraphShapeQuery, ShapeNodeIdentifier};
-use crate::graph::operation::user_defined::{AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, QueryInstructions, UserDefinedOperation};
-use crate::graph::pattern::{AbstractOutputNodeMarker, OperationParameter};
-use crate::graph::semantics::{AbstractGraph, SemanticsClone};
-use crate::util::bimap::BiMap;
 /*
 General overview:
 
@@ -58,7 +61,11 @@ enum BuilderInstruction<S: SemanticsClone> {
     #[debug("ExpectShapeEdge({_0:?}, {_1:?}, ???)")]
     ExpectShapeEdge(AbstractNodeId, AbstractNodeId, S::EdgeAbstract),
     #[debug("AddNamedInstruction({_0:?}, ???, args: {_2:?})")]
-    AddNamedInstruction(AbstractOperationResultMarker, Instruction<S>, Vec<AbstractNodeId>),
+    AddNamedInstruction(
+        AbstractOperationResultMarker,
+        Instruction<S>,
+        Vec<AbstractNodeId>,
+    ),
     #[debug("AddInstruction(???, args: {_1:?})")]
     AddInstruction(Instruction<S>, Vec<AbstractNodeId>),
 }
@@ -96,7 +103,8 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         marker: SubstMarker,
         node: S::NodeAbstract,
     ) -> Result<(), OperationBuilderError> {
-        self.instructions.push(BuilderInstruction::ExpectParameterNode(marker, node));
+        self.instructions
+            .push(BuilderInstruction::ExpectParameterNode(marker, node));
         Ok(())
     }
 
@@ -105,7 +113,8 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         marker: SubstMarker,
         node: S::NodeAbstract,
     ) -> Result<(), OperationBuilderError> {
-        self.instructions.push(BuilderInstruction::ExpectContextNode(marker, node));
+        self.instructions
+            .push(BuilderInstruction::ExpectContextNode(marker, node));
         // TODO: check if subst marker does not exist yet
         Ok(())
     }
@@ -116,29 +125,33 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         target_marker: SubstMarker,
         edge: S::EdgeAbstract,
     ) -> Result<(), OperationBuilderError> {
-        self.instructions.push(BuilderInstruction::ExpectParameterEdge(
-            source_marker, target_marker, edge,
-        ));
+        self.instructions
+            .push(BuilderInstruction::ExpectParameterEdge(
+                source_marker,
+                target_marker,
+                edge,
+            ));
         // TODO: check if both subst markers are valid
         Ok(())
     }
-    
+
     pub fn start_query(
         &mut self,
         query: S::BuiltinQuery,
-        args: Vec<AbstractNodeId>
+        args: Vec<AbstractNodeId>,
     ) -> Result<(), OperationBuilderError> {
         // todo!()
-        self.instructions.push(BuilderInstruction::StartQuery(query, args));
+        self.instructions
+            .push(BuilderInstruction::StartQuery(query, args));
         Ok(())
     }
-    
+
     pub fn enter_true_branch(&mut self) -> Result<(), OperationBuilderError> {
         // todo!()
         self.instructions.push(BuilderInstruction::EnterTrueBranch);
         Ok(())
     }
-    
+
     pub fn enter_false_branch(&mut self) -> Result<(), OperationBuilderError> {
         // todo!()
         self.instructions.push(BuilderInstruction::EnterFalseBranch);
@@ -147,9 +160,13 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
 
     // TODO: get rid of AbstractOperationResultMarker requirement. Either completely or make it optional and autogenerate one.
     //  How to specify which shape node? ==> the shape node markers should be unique per path
-    pub fn start_shape_query(&mut self, op_marker: AbstractOperationResultMarker) -> Result<(), OperationBuilderError> {
+    pub fn start_shape_query(
+        &mut self,
+        op_marker: AbstractOperationResultMarker,
+    ) -> Result<(), OperationBuilderError> {
         // todo!()
-        self.instructions.push(BuilderInstruction::StartShapeQuery(op_marker));
+        self.instructions
+            .push(BuilderInstruction::StartShapeQuery(op_marker));
         Ok(())
     }
 
@@ -167,7 +184,8 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         node: S::NodeAbstract,
     ) -> Result<(), OperationBuilderError> {
         // TODO: check that any shape nodes are not free floating. maybe this should be in a GraphShapeQuery validator?
-        self.instructions.push(BuilderInstruction::ExpectShapeNode(marker, node));
+        self.instructions
+            .push(BuilderInstruction::ExpectShapeNode(marker, node));
         Ok(())
     }
 
@@ -178,7 +196,8 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         edge: S::EdgeAbstract,
     ) -> Result<(), OperationBuilderError> {
         // TODO:
-        self.instructions.push(BuilderInstruction::ExpectShapeEdge(source, target, edge));
+        self.instructions
+            .push(BuilderInstruction::ExpectShapeEdge(source, target, edge));
         Ok(())
     }
 
@@ -189,21 +208,30 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         args: Vec<AbstractNodeId>,
     ) -> Result<(), OperationBuilderError> {
         // TODO
-        self.instructions.push(BuilderInstruction::AddNamedInstruction(name, instruction, args));
+        self.instructions
+            .push(BuilderInstruction::AddNamedInstruction(
+                name,
+                instruction,
+                args,
+            ));
         Ok(())
     }
-    
+
     pub fn add_instruction(
         &mut self,
         instruction: Instruction<S>,
         args: Vec<AbstractNodeId>,
     ) -> Result<(), OperationBuilderError> {
         // todo!()
-        self.instructions.push(BuilderInstruction::AddInstruction(instruction, args));
+        self.instructions
+            .push(BuilderInstruction::AddInstruction(instruction, args));
         Ok(())
     }
-    
-    pub fn build(self, self_op_id: SubstMarker) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
+
+    pub fn build(
+        self,
+        self_op_id: SubstMarker,
+    ) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
         // Here we would typically finalize the operation and return it.
         // For now, we just return Ok to indicate success.
 
@@ -221,7 +249,6 @@ impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug>> OperationB
         let (g, subst_to_node_keys) = self.build_debug_graph_at_current_point();
         let dot = g.dot();
 
-
         let mut result = String::new();
 
         result.push_str(&"Current Operation Builder State:\n".to_string());
@@ -232,7 +259,10 @@ impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug>> OperationB
 
     fn build_debug_graph_at_current_point(
         &self,
-    ) -> (Graph<S::NodeAbstract, S::EdgeAbstract>, HashMap<SubstMarker, NodeKey>) {
+    ) -> (
+        Graph<S::NodeAbstract, S::EdgeAbstract>,
+        HashMap<SubstMarker, NodeKey>,
+    ) {
         let mut g = Graph::new();
         let mut subst_to_node_keys: HashMap<SubstMarker, NodeKey> = HashMap::new();
 
@@ -241,11 +271,11 @@ impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug>> OperationB
                 BuilderInstruction::ExpectParameterNode(marker, node) => {
                     let key = g.add_node(node.clone());
                     subst_to_node_keys.insert(*marker, key);
-                },
+                }
                 BuilderInstruction::ExpectContextNode(marker, node) => {
                     let key = g.add_node(node.clone());
                     subst_to_node_keys.insert(*marker, key);
-                },
+                }
                 BuilderInstruction::ExpectParameterEdge(source_marker, target_marker, edge) => {
                     let source_key = *subst_to_node_keys
                         .get(source_marker)
@@ -253,12 +283,8 @@ impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug>> OperationB
                     let target_key = *subst_to_node_keys
                         .get(target_marker)
                         .expect("Target marker not found in subst_to_node_keys");
-                    g.add_edge(
-                        source_key,
-                        target_key,
-                        edge.clone(),
-                    );
-                },
+                    g.add_edge(source_key, target_key, edge.clone());
+                }
                 _ => {
                     eprintln!("Skipping instruction");
                 }
@@ -280,9 +306,17 @@ use super::user_defined::Instruction as UDInstruction;
 enum IntermediateInstruction<S: SemanticsClone> {
     OpLike(IntermediateOpLike<S>),
     #[debug("GraphShapeQuery({_0:#?}, {_1:#?}, {_2:#?})")]
-    GraphShapeQuery(AbstractOperationResultMarker, Vec<GraphShapeQueryInstruction<S>>, IntermediateQueryInstructions<S>),
+    GraphShapeQuery(
+        AbstractOperationResultMarker,
+        Vec<GraphShapeQueryInstruction<S>>,
+        IntermediateQueryInstructions<S>,
+    ),
     #[debug("BuiltinQuery(???, {_1:#?}, {_2:#?})")]
-    BuiltinQuery(S::BuiltinQuery, Vec<AbstractNodeId>, IntermediateQueryInstructions<S>),
+    BuiltinQuery(
+        S::BuiltinQuery,
+        Vec<AbstractNodeId>,
+        IntermediateQueryInstructions<S>,
+    ),
 }
 
 #[derive(derive_more::Debug)]
@@ -296,9 +330,15 @@ enum IntermediateOpLike<S: SemanticsClone> {
 #[derive(derive_more::Debug)]
 struct IntermediateQueryInstructions<S: SemanticsClone> {
     #[debug("[{}]", true_branch.iter().map(|(opt, inst)| format!("({opt:#?}, {:#?})", inst)).collect::<Vec<_>>().join(", "))]
-    true_branch: Vec<(Option<AbstractOperationResultMarker>, IntermediateInstruction<S>)>,
+    true_branch: Vec<(
+        Option<AbstractOperationResultMarker>,
+        IntermediateInstruction<S>,
+    )>,
     #[debug("[{}]", false_branch.iter().map(|(opt, inst)| format!("({opt:#?}, {:#?})", inst)).collect::<Vec<_>>().join(", "))]
-    false_branch: Vec<(Option<AbstractOperationResultMarker>, IntermediateInstruction<S>)>,
+    false_branch: Vec<(
+        Option<AbstractOperationResultMarker>,
+        IntermediateInstruction<S>,
+    )>,
 }
 
 #[derive(derive_more::Debug)]
@@ -310,7 +350,9 @@ enum GraphShapeQueryInstruction<S: SemanticsClone> {
 }
 
 // TODO: maybe this is not *intermediate* but actually the final state as well potentially?
-impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>> IntermediateStateBuilder<'a, S> {
+impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
+    IntermediateStateBuilder<'a, S>
+{
     fn run(
         instructions: &'a [BuilderInstruction<S>],
         op_ctx: &'a OperationContext<S>,
@@ -321,7 +363,6 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>> Interm
         When we see
 
         */
-
 
         //
         // enum QueryBranchState {
@@ -441,10 +482,6 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>> Interm
         //     current_state = next_state;
         // }
 
-
-
-
-
         let mut iter = instructions.iter().peekable();
 
         let op_parameter = Self::build_operation_parameter(&mut iter)?;
@@ -458,12 +495,23 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>> Interm
 
     fn build_many_instructions(
         iter: &mut Peekable<Iter<BuilderInstruction<S>>>,
-    ) -> Result<Vec<(Option<AbstractOperationResultMarker>, IntermediateInstruction<S>)>, OperationBuilderError> {
+    ) -> Result<
+        Vec<(
+            Option<AbstractOperationResultMarker>,
+            IntermediateInstruction<S>,
+        )>,
+        OperationBuilderError,
+    > {
         let mut instructions = Vec::new();
 
         while let Some(instr) = iter.peek() {
             // break on control flow instructions and don't consume
-            if matches!(instr, BuilderInstruction::EndQuery | BuilderInstruction::EnterTrueBranch | BuilderInstruction::EnterFalseBranch) {
+            if matches!(
+                instr,
+                BuilderInstruction::EndQuery
+                    | BuilderInstruction::EnterTrueBranch
+                    | BuilderInstruction::EnterFalseBranch
+            ) {
                 break;
             }
             instructions.push(Self::build_instruction(iter)?);
@@ -473,15 +521,25 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>> Interm
 
     fn build_instruction(
         iter: &mut Peekable<Iter<BuilderInstruction<S>>>,
-    ) -> Result<(Option<AbstractOperationResultMarker>, IntermediateInstruction<S>), OperationBuilderError> {
-        let next_instruction = iter.peek().expect("should only be called when there is an instruction");
+    ) -> Result<
+        (
+            Option<AbstractOperationResultMarker>,
+            IntermediateInstruction<S>,
+        ),
+        OperationBuilderError,
+    > {
+        let next_instruction = iter
+            .peek()
+            .expect("should only be called when there is an instruction");
         match next_instruction {
-            BuilderInstruction::AddNamedInstruction(_, instruction, args) | BuilderInstruction::AddInstruction(instruction, args) => {
-                let name = if let BuilderInstruction::AddNamedInstruction(name, _, _) = next_instruction {
-                    Some(*name)
-                } else {
-                    None
-                };
+            BuilderInstruction::AddNamedInstruction(_, instruction, args)
+            | BuilderInstruction::AddInstruction(instruction, args) => {
+                let name =
+                    if let BuilderInstruction::AddNamedInstruction(name, _, _) = next_instruction {
+                        Some(*name)
+                    } else {
+                        None
+                    };
                 iter.next();
 
                 let oplike = match instruction {
@@ -491,9 +549,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>> Interm
                     Instruction::FromOperationId(op_id) => {
                         IntermediateOpLike::Operation(op_id.clone(), args.clone())
                     }
-                    Instruction::Recurse => {
-                        IntermediateOpLike::Recurse(args.clone())
-                    }
+                    Instruction::Recurse => IntermediateOpLike::Recurse(args.clone()),
                 };
                 Ok((name, IntermediateInstruction::OpLike(oplike)))
             }
@@ -501,25 +557,44 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>> Interm
                 iter.next();
                 // Start a new query state
                 let query_instructions = Self::build_query_instruction(iter)?;
-                Ok((None, IntermediateInstruction::BuiltinQuery(query.clone(), args.clone(), query_instructions)))
+                Ok((
+                    None,
+                    IntermediateInstruction::BuiltinQuery(
+                        query.clone(),
+                        args.clone(),
+                        query_instructions,
+                    ),
+                ))
             }
             BuilderInstruction::StartShapeQuery(op_marker) => {
                 iter.next();
                 // Start a new shape query state
-                let (gsq_instructions, branch_instructions) = Self::build_shape_query(iter, *op_marker)?;
+                let (gsq_instructions, branch_instructions) =
+                    Self::build_shape_query(iter, *op_marker)?;
                 // Ok((Some(*op_marker), UDInstruction::ShapeQuery()))
-                Ok((None, IntermediateInstruction::GraphShapeQuery(*op_marker, gsq_instructions, branch_instructions)))
+                Ok((
+                    None,
+                    IntermediateInstruction::GraphShapeQuery(
+                        *op_marker,
+                        gsq_instructions,
+                        branch_instructions,
+                    ),
+                ))
             }
-            _ => {
-                Err(OperationBuilderError::InvalidInQuery)
-            }
+            _ => Err(OperationBuilderError::InvalidInQuery),
         }
     }
 
     fn build_shape_query(
         iter: &mut Peekable<Iter<BuilderInstruction<S>>>,
         operation_marker: AbstractOperationResultMarker,
-    ) -> Result<(Vec<GraphShapeQueryInstruction<S>>, IntermediateQueryInstructions<S>), OperationBuilderError> {
+    ) -> Result<
+        (
+            Vec<GraphShapeQueryInstruction<S>>,
+            IntermediateQueryInstructions<S>,
+        ),
+        OperationBuilderError,
+    > {
         // we just consumed a StartShapeQuery instruction.
 
         // let mut gsq = GraphShapeQuery {
@@ -569,7 +644,10 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>> Interm
                     // gsq.node_keys_to_shape_idents.insert(key, shape_node_ident);
                     // gsq.shape_idents_to_node_keys.insert(shape_node_ident, key);
 
-                    gsq_instructions.push(GraphShapeQueryInstruction::ExpectShapeNode(*marker, abstract_value.clone()));
+                    gsq_instructions.push(GraphShapeQueryInstruction::ExpectShapeNode(
+                        *marker,
+                        abstract_value.clone(),
+                    ));
                 }
                 BuilderInstruction::ExpectShapeEdge(source, target, abstract_value) => {
                     iter.next();
@@ -577,7 +655,11 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>> Interm
                     //  an actual `Graph`.
 
                     // instead, switch to deferred approach by just passing along the instructions
-                    gsq_instructions.push(GraphShapeQueryInstruction::ExpectShapeEdge(*source, *target, abstract_value.clone()));
+                    gsq_instructions.push(GraphShapeQueryInstruction::ExpectShapeEdge(
+                        *source,
+                        *target,
+                        abstract_value.clone(),
+                    ));
                 }
                 _ => {
                     return Err(OperationBuilderError::InvalidInQuery);
@@ -585,12 +667,14 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>> Interm
             }
         }
 
-        Ok((gsq_instructions, IntermediateQueryInstructions {
-            true_branch: true_branch_instructions.unwrap_or_default(),
-            false_branch: false_branch_instructions.unwrap_or_default(),
-        }))
+        Ok((
+            gsq_instructions,
+            IntermediateQueryInstructions {
+                true_branch: true_branch_instructions.unwrap_or_default(),
+                false_branch: false_branch_instructions.unwrap_or_default(),
+            },
+        ))
     }
-
 
     fn build_query_instruction(
         iter: &mut Peekable<Iter<BuilderInstruction<S>>>,
@@ -631,7 +715,9 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>> Interm
         })
     }
 
-    fn build_operation_parameter(iter: &mut Peekable<Iter<BuilderInstruction<S>>>) -> Result<OperationParameter<S>, OperationBuilderError> {
+    fn build_operation_parameter(
+        iter: &mut Peekable<Iter<BuilderInstruction<S>>>,
+    ) -> Result<OperationParameter<S>, OperationBuilderError> {
         let mut operation_parameter = OperationParameter::<S> {
             explicit_input_nodes: Vec::new(),
             parameter_graph: AbstractGraph::<S>::new(),
@@ -646,7 +732,9 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>> Interm
                     if operation_parameter.subst_to_node_keys.contains_key(marker) {
                         return Err(OperationBuilderError::ReusedSubstMarker(*marker));
                     }
-                    let key = operation_parameter.parameter_graph.add_node(node_abstract.clone());
+                    let key = operation_parameter
+                        .parameter_graph
+                        .add_node(node_abstract.clone());
                     operation_parameter.subst_to_node_keys.insert(*marker, key);
                     operation_parameter.node_keys_to_subst.insert(key, *marker);
                     operation_parameter.explicit_input_nodes.push(*marker);
@@ -656,17 +744,31 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>> Interm
                     if operation_parameter.subst_to_node_keys.contains_key(marker) {
                         return Err(OperationBuilderError::ReusedSubstMarker(*marker));
                     }
-                    let key = operation_parameter.parameter_graph.add_node(node_abstract.clone());
+                    let key = operation_parameter
+                        .parameter_graph
+                        .add_node(node_abstract.clone());
                     operation_parameter.subst_to_node_keys.insert(*marker, key);
                     operation_parameter.node_keys_to_subst.insert(key, *marker);
                 }
-                BuilderInstruction::ExpectParameterEdge(source_marker, target_marker, edge_abstract) => {
+                BuilderInstruction::ExpectParameterEdge(
+                    source_marker,
+                    target_marker,
+                    edge_abstract,
+                ) => {
                     iter.next();
-                    let source_key = operation_parameter.subst_to_node_keys.get(source_marker)
+                    let source_key = operation_parameter
+                        .subst_to_node_keys
+                        .get(source_marker)
                         .ok_or(OperationBuilderError::NotFoundSubstMarker(*source_marker))?;
-                    let target_key = operation_parameter.subst_to_node_keys.get(target_marker)
+                    let target_key = operation_parameter
+                        .subst_to_node_keys
+                        .get(target_marker)
                         .ok_or(OperationBuilderError::NotFoundSubstMarker(*target_marker))?;
-                    operation_parameter.parameter_graph.add_edge(*source_key, *target_key, edge_abstract.clone());
+                    operation_parameter.parameter_graph.add_edge(
+                        *source_key,
+                        *target_key,
+                        edge_abstract.clone(),
+                    );
                 }
                 _ => {
                     break;
@@ -686,7 +788,6 @@ enum IntermediateStatePath {
     // TODO: is this the same as Advance?
     SkipQuery,
 }
-
 
 // TODO: here make the intermediate state interpreter have points at which it knows the state
 //  eg at every query branch point... hmm maybe it should be passed an argument of _where_ we want to know the state?
@@ -733,8 +834,17 @@ enum InterpretedOpLike<S: SemanticsClone> {
 
 enum InterpretedInstruction<S: SemanticsClone> {
     OpLike(InterpretedOpLike<S>),
-    BuiltinQuery(S::BuiltinQuery, AbstractOperationArgument, InterpretedQueryInstructions<S>),
-    GraphShapeQuery(AbstractOperationResultMarker, Vec<AbstractNodeId>, GraphShapeQuery<S>, InterpretedQueryInstructions<S>),
+    BuiltinQuery(
+        S::BuiltinQuery,
+        AbstractOperationArgument,
+        InterpretedQueryInstructions<S>,
+    ),
+    GraphShapeQuery(
+        AbstractOperationResultMarker,
+        Vec<AbstractNodeId>,
+        GraphShapeQuery<S>,
+        InterpretedQueryInstructions<S>,
+    ),
 }
 
 struct InterpretedQueryInstructions<S: SemanticsClone> {
@@ -751,13 +861,19 @@ struct InterpretedInstructionWithState<S: SemanticsClone> {
 struct IntermediateInterpreter<S: SemanticsClone> {
     op_param: OperationParameter<S>,
     initial_state: IntermediateState<S>,
-    instructions: Vec<(Option<AbstractOperationResultMarker>, InterpretedInstructionWithState<S>)>,
+    instructions: Vec<(
+        Option<AbstractOperationResultMarker>,
+        InterpretedInstructionWithState<S>,
+    )>,
 }
 
 impl<S: SemanticsClone> IntermediateInterpreter<S> {
     fn new(
         op_param: OperationParameter<S>,
-        intermediate_instructions: Vec<(Option<AbstractOperationResultMarker>, IntermediateInstruction<S>)>,
+        intermediate_instructions: Vec<(
+            Option<AbstractOperationResultMarker>,
+            IntermediateInstruction<S>,
+        )>,
     ) -> Self {
         let initial_graph = op_param.parameter_graph.clone();
 
@@ -783,22 +899,13 @@ impl<S: SemanticsClone> IntermediateInterpreter<S> {
         interpreter
     }
 
-    fn interpret(&mut self, intermediate_instructions: Vec<(Option<AbstractOperationResultMarker>, IntermediateInstruction<S>)>) -> Result<(), OperationBuilderError> {
-
+    fn interpret(
+        &mut self,
+        intermediate_instructions: Vec<(
+            Option<AbstractOperationResultMarker>,
+            IntermediateInstruction<S>,
+        )>,
+    ) -> Result<(), OperationBuilderError> {
+        
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

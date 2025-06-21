@@ -7,11 +7,11 @@ extern "C" {
 
 #[diplomat::bridge]
 mod ffi {
+    use super::prompt;
+    use grabapl::Semantics;
     use grabapl::graph::semantics::AbstractGraph as RustAbstractGraph;
     use grabapl::graph::semantics::ConcreteGraph as RustConcreteGraph;
-    use grabapl::Semantics;
     use simple_semantics::{BuiltinOperation, SimpleSemantics};
-    use super::prompt;
     use std::fmt::Write;
 
     #[diplomat::opaque]
@@ -30,16 +30,18 @@ mod ffi {
             // TODO: define an init function that calls this
             console_error_panic_hook::set_once();
             log::error!("test log::error! call");
-            let mut operation_ctx = grabapl::OperationContext::from_builtins(
-                std::collections::HashMap::from([
+            let mut operation_ctx =
+                grabapl::OperationContext::from_builtins(std::collections::HashMap::from([
                     (0, BuiltinOperation::AddNode),
                     (1, BuiltinOperation::AppendChild),
                     (2, BuiltinOperation::IndexCycle),
-                    (3, BuiltinOperation::SetValue(Box::new(|| {
-                        prompt("Set value:").parse().unwrap()
-                    }))),
-                ])
-            );
+                    (
+                        3,
+                        BuiltinOperation::SetValue(Box::new(|| {
+                            prompt("Set value:").parse().unwrap()
+                        })),
+                    ),
+                ]));
             operation_ctx.add_custom_operation(5, simple_semantics::sample_user_defined_operations::get_labeled_edges_insert_bst_user_defined_operation(5));
             Box::new(OpCtx(operation_ctx))
         }
@@ -60,8 +62,9 @@ mod ffi {
                 &mut graph.0,
                 &op_ctx.0,
                 op_id,
-                args.to_vec()
-            ).unwrap();
+                args.to_vec(),
+            )
+            .unwrap();
         }
     }
 
@@ -101,6 +104,4 @@ mod ffi {
             write!(dw, "{}", self.0.finalize());
         }
     }
-
-
 }

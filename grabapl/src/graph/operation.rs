@@ -1,6 +1,6 @@
+pub mod builder;
 pub mod query;
 pub mod user_defined;
-pub mod builder;
 
 use crate::graph::EdgeAttribute;
 use crate::graph::operation::user_defined::{AbstractOperationResultMarker, UserDefinedOperation};
@@ -194,10 +194,7 @@ fn run_builtin_operation<S: SemanticsClone>(
     // let subst = get_substitution(&abstract_g, &param, &selected_inputs)?;
 
     // TODO: we probably dont need to pass the OperationArgument down. Might just cause confusion.
-    let output = op.apply(
-        g,
-        &arg.subst,
-    );
+    let output = op.apply(g, &arg.subst);
 
     Ok(output)
 }
@@ -213,11 +210,7 @@ fn run_custom_operation<S: SemanticsClone>(
     // let abstract_g = S::concrete_to_abstract(&g);
     // let subst = get_substitution(&abstract_g, param, &selected_inputs)?;
 
-    let output = op.apply(
-        op_ctx,
-        g,
-        &arg.subst,
-    )?;
+    let output = op.apply(op_ctx, g, &arg.subst)?;
 
     Ok(output)
 }
@@ -231,7 +224,10 @@ pub fn run_from_concrete<S: SemanticsClone>(
     // first get substitution
     let abstract_g = S::concrete_to_abstract(g);
 
-    let subst = match op_ctx.get(op).ok_or(OperationError::InvalidOperationId(op))? {
+    let subst = match op_ctx
+        .get(op)
+        .ok_or(OperationError::InvalidOperationId(op))?
+    {
         Operation::Builtin(builtin) => {
             let param = builtin.parameter();
             get_substitution(&abstract_g, &param, &selected_inputs)?

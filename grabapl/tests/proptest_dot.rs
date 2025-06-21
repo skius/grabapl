@@ -1,10 +1,10 @@
-use std::fmt::Debug;
-use std::hash::RandomState;
+use grabapl::Graph;
 use petgraph::dot::Dot;
 use petgraph::prelude::DiGraphMap;
 use proptest::collection::vec;
 use proptest::prelude::*;
-use grabapl::Graph;
+use std::fmt::Debug;
+use std::hash::RandomState;
 
 #[derive(Clone)]
 struct MyGraph<N, E>(Graph<N, E>);
@@ -30,7 +30,13 @@ where
     type Parameters = MyGraphArbParams<N, E>;
     type Strategy = BoxedStrategy<Self>;
 
-    fn arbitrary_with(MyGraphArbParams { max_nodes, node_strategy, edge_strategy }: Self::Parameters) -> Self::Strategy {
+    fn arbitrary_with(
+        MyGraphArbParams {
+            max_nodes,
+            node_strategy,
+            edge_strategy,
+        }: Self::Parameters,
+    ) -> Self::Strategy {
         (0..=max_nodes)
             .prop_flat_map(move |nodes| {
                 let node_vec = vec(node_strategy.clone().unwrap(), nodes as usize);
@@ -93,7 +99,6 @@ prop_compose! {
     }
 }
 
-
 proptest! {
     #[test]
     fn test_graph_dot_format(graph in arb_grabapl_graph(10)) {
@@ -118,7 +123,7 @@ proptest! {
     })) {
         let dot_string = graph.0.dot();
         println!("{}", dot_string);
-        
+
         assert!(dot_string.contains("->"));
 
     }

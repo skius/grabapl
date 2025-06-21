@@ -1,8 +1,8 @@
+use crate::graph::operation::{OperationError, OperationResult};
 use crate::graph::semantics::AbstractGraph;
 use crate::{Graph, NodeKey, Semantics, SubstMarker, WithSubstMarker};
 use derive_more::From;
 use std::collections::HashMap;
-use crate::graph::operation::{OperationError, OperationResult};
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
 
 pub struct OperationParameter<S: Semantics> {
@@ -32,7 +32,6 @@ impl ParameterSubstitution {
     }
 }
 
-
 // TODO: maybe this is not needed and ParameterSubstitution is already enough?
 #[derive(Debug)]
 pub struct OperationArgument {
@@ -43,15 +42,21 @@ pub struct OperationArgument {
 }
 
 impl OperationArgument {
-    pub fn infer_explicit_for_param(selected_nodes: Vec<NodeKey>, param: &OperationParameter<impl Semantics>) -> OperationResult<Self> {
+    pub fn infer_explicit_for_param(
+        selected_nodes: Vec<NodeKey>,
+        param: &OperationParameter<impl Semantics>,
+    ) -> OperationResult<Self> {
         if param.explicit_input_nodes.len() != selected_nodes.len() {
             return Err(OperationError::InvalidOperationArgumentCount {
                 expected: param.explicit_input_nodes.len(),
-                actual: selected_nodes.len()
+                actual: selected_nodes.len(),
             });
         }
 
-        let subst = param.explicit_input_nodes.iter().zip(selected_nodes.iter())
+        let subst = param
+            .explicit_input_nodes
+            .iter()
+            .zip(selected_nodes.iter())
             .map(|(subst_marker, node_key)| (*subst_marker, *node_key))
             .collect();
         Ok(OperationArgument {

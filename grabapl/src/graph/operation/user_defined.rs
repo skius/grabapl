@@ -1,4 +1,6 @@
-use crate::graph::operation::query::{BuiltinQuery, run_builtin_query, GraphShapeQuery, run_shape_query, ShapeNodeIdentifier};
+use crate::graph::operation::query::{
+    BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier, run_builtin_query, run_shape_query,
+};
 use crate::graph::operation::{
     OperationError, OperationResult, run_builtin_operation, run_operation,
 };
@@ -39,15 +41,21 @@ pub struct AbstractOperationArgument {
 }
 
 impl AbstractOperationArgument {
-    pub fn infer_explicit_for_param(selected_nodes: Vec<AbstractNodeId>, param: &OperationParameter<impl Semantics>) -> OperationResult<Self> {
+    pub fn infer_explicit_for_param(
+        selected_nodes: Vec<AbstractNodeId>,
+        param: &OperationParameter<impl Semantics>,
+    ) -> OperationResult<Self> {
         if param.explicit_input_nodes.len() != selected_nodes.len() {
             return Err(OperationError::InvalidOperationArgumentCount {
                 expected: param.explicit_input_nodes.len(),
-                actual: selected_nodes.len()
+                actual: selected_nodes.len(),
             });
         }
 
-        let subst = param.explicit_input_nodes.iter().zip(selected_nodes.iter())
+        let subst = param
+            .explicit_input_nodes
+            .iter()
+            .zip(selected_nodes.iter())
             .map(|(subst_marker, node_key)| (*subst_marker, *node_key))
             .collect();
         Ok(AbstractOperationArgument {
@@ -66,9 +74,17 @@ pub enum Instruction<S: Semantics> {
     #[debug("Operation({_0:#?}, {_1:#?})")]
     Operation(OperationId, AbstractOperationArgument),
     #[debug("BuiltinQuery(???, {_1:#?}, {_2:#?})")]
-    BuiltinQuery(S::BuiltinQuery, AbstractOperationArgument, QueryInstructions<S>),
+    BuiltinQuery(
+        S::BuiltinQuery,
+        AbstractOperationArgument,
+        QueryInstructions<S>,
+    ),
     #[debug("ShapeQuery(???, {_1:#?}, {_2:#?})")]
-    ShapeQuery(GraphShapeQuery<S>, Vec<AbstractNodeId>, QueryInstructions<S>),
+    ShapeQuery(
+        GraphShapeQuery<S>,
+        Vec<AbstractNodeId>,
+        QueryInstructions<S>,
+    ),
 }
 
 #[derive(derive_more::Debug)]
@@ -140,7 +156,12 @@ fn run_instructions<S: SemanticsClone>(
     for (abstract_output_id, instruction) in instructions {
         match instruction {
             oplike @ (Instruction::Operation(_, arg) | Instruction::Builtin(_, arg)) => {
-                let concrete_arg = get_concrete_arg::<S>(&arg.selected_input_nodes, &arg.subst_to_aid, subst, previous_results)?;
+                let concrete_arg = get_concrete_arg::<S>(
+                    &arg.selected_input_nodes,
+                    &arg.subst_to_aid,
+                    subst,
+                    previous_results,
+                )?;
                 // TODO: make fallible
                 // TODO: How do we support mutually recursive user defined operations?
                 //  - I think just specifying the ID directly? this will mainly be a problem for the OperationBuilder
@@ -149,9 +170,7 @@ fn run_instructions<S: SemanticsClone>(
                     Instruction::Operation(op_id, _) => {
                         run_operation::<S>(g, op_ctx, *op_id, concrete_arg)?
                     }
-                    Instruction::Builtin(op, _) => {
-                        run_builtin_operation::<S>(g, op, concrete_arg)?
-                    }
+                    Instruction::Builtin(op, _) => run_builtin_operation::<S>(g, op, concrete_arg)?,
                     // does not match the outer match arm
                     Instruction::BuiltinQuery(..) | Instruction::ShapeQuery(..) => unreachable!(),
                 };
@@ -160,7 +179,12 @@ fn run_instructions<S: SemanticsClone>(
                 }
             }
             Instruction::BuiltinQuery(query, arg, query_instr) => {
-                let concrete_arg = get_concrete_arg::<S>(&arg.selected_input_nodes, &arg.subst_to_aid, subst, previous_results)?;
+                let concrete_arg = get_concrete_arg::<S>(
+                    &arg.selected_input_nodes,
+                    &arg.subst_to_aid,
+                    subst,
+                    previous_results,
+                )?;
                 let result = run_builtin_query::<S>(g, query, concrete_arg)?;
                 let next_instr = if result.taken {
                     &query_instr.taken
@@ -179,28 +203,32 @@ fn run_instructions<S: SemanticsClone>(
             }
             Instruction::ShapeQuery(query, args, query_instr) => {
                 // ShapeQueries dont have context mappings, so we can just pass an empty hashmap.
-                let concrete_arg = get_concrete_arg::<S>(args, &HashMap::new(), subst, previous_results)?;
+                let concrete_arg =
+                    get_concrete_arg::<S>(args, &HashMap::new(), subst, previous_results)?;
                 let result = run_shape_query(g, query, concrete_arg.selected_input_nodes)?;
-                let next_instr = if let Some(shape_idents_to_node_keys) = result.shape_idents_to_node_keys {
-                    // apply the shape idents to node keys mapping
+                let next_instr =
+                    if let Some(shape_idents_to_node_keys) = result.shape_idents_to_node_keys {
+                        // apply the shape idents to node keys mapping
 
-                    let mut query_result_map = HashMap::new();
-                    for (ident, node_key) in shape_idents_to_node_keys {
-                        // TODO: add helper function, or add new variant to AbstractOutputNodeMarker, or just use that one for the shape query mapping and get rid of ShapeNodeIdentifier.
-                        let output_marker = AbstractOutputNodeMarker::from(<ShapeNodeIdentifier as Into<&'static str>>::into(ident.into()));
-                        query_result_map.insert(output_marker, node_key);
-                    }
-                    if let Some(abstract_output_id) = abstract_output_id {
-                        previous_results.insert(
-                            *abstract_output_id,
-                            query_result_map,
-                        );
-                    }
+                        let mut query_result_map = HashMap::new();
+                        for (ident, node_key) in shape_idents_to_node_keys {
+                            // TODO: add helper function, or add new variant to AbstractOutputNodeMarker, or just use that one for the shape query mapping and get rid of ShapeNodeIdentifier.
+                            let output_marker =
+                                AbstractOutputNodeMarker::from(<ShapeNodeIdentifier as Into<
+                                    &'static str,
+                                >>::into(
+                                    ident.into()
+                                ));
+                            query_result_map.insert(output_marker, node_key);
+                        }
+                        if let Some(abstract_output_id) = abstract_output_id {
+                            previous_results.insert(*abstract_output_id, query_result_map);
+                        }
 
-                    &query_instr.taken
-                } else {
-                    &query_instr.not_taken
-                };
+                        &query_instr.taken
+                    } else {
+                        &query_instr.not_taken
+                    };
                 run_instructions(
                     g,
                     previous_results,
@@ -215,7 +243,7 @@ fn run_instructions<S: SemanticsClone>(
     Ok(())
 }
 
-// TODO: decide if we really want to have this be fallible, since we may want to instead have some 
+// TODO: decide if we really want to have this be fallible, since we may want to instead have some
 //  invariant that this works. And encode fallibility in a 'builder'.
 fn get_concrete_arg<S: Semantics>(
     explicit_args: &[AbstractNodeId],
@@ -226,7 +254,8 @@ fn get_concrete_arg<S: Semantics>(
         HashMap<AbstractOutputNodeMarker, NodeKey>,
     >,
 ) -> OperationResult<OperationArgument> {
-    let selected_keys = explicit_args.iter()
+    let selected_keys = explicit_args
+        .iter()
         .map(|arg| aid_to_node_key(*arg, subst, previous_results))
         .collect::<OperationResult<_>>()?;
 

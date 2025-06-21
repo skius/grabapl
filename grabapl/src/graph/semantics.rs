@@ -55,7 +55,7 @@ pub trait Semantics {
     // TODO: does the inverse make sense?
     // Could we somehow benefit from something that takes (abstract, concrete) and returns an 'unwrapped' concrete?
     // eg: abstract is enum { i32, String }, and concrete is enum { i32(i32), String(String) }, then
-    // the function would unwrap the specific type we need. but I don't think there is a way in rust for this to 
+    // the function would unwrap the specific type we need. but I don't think there is a way in rust for this to
     // help us statically.
     type NodeConcreteToAbstract: ConcreteToAbstract<Concrete = Self::NodeConcrete, Abstract = Self::NodeAbstract>;
     type EdgeConcreteToAbstract: ConcreteToAbstract<Concrete = Self::EdgeConcrete, Abstract = Self::EdgeAbstract>;
@@ -75,7 +75,9 @@ pub trait Semantics {
 }
 
 // TODO: do we need this? it's just easier to use this than spell it out
-pub trait SemanticsClone: Semantics<NodeConcrete: Clone, NodeAbstract: Clone, EdgeConcrete: Clone, EdgeAbstract: Clone> {
+pub trait SemanticsClone:
+    Semantics<NodeConcrete: Clone, NodeAbstract: Clone, EdgeConcrete: Clone, EdgeAbstract: Clone>
+{
     // TODO: Assert that the node keys are the same
     fn concrete_to_abstract(c: &ConcreteGraph<Self>) -> AbstractGraph<Self> {
         let mut abstract_graph = Graph::new();
