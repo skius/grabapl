@@ -18,6 +18,9 @@ use std::rc::Rc;
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, From)]
 pub enum AbstractOperationResultMarker {
     Custom(&'static str),
+    // NOTE: this may not be created by the user! since this is an unstable index, if the user
+    // reorders operations, this marker may suddenly point to a different operation result.
+    // Custom markers must always be used for arguments!
     Implicit(u64),
 }
 
