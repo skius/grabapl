@@ -17,7 +17,7 @@ use std::rc::Rc;
 pub struct AbstractOperationResultMarker(pub &'static str);
 
 /// Identifies a node in the user defined operation view.
-#[derive(Copy, Clone, From, Debug)]
+#[derive(Copy, Clone, From, Debug, Eq, PartialEq, Hash)]
 pub enum AbstractNodeId {
     /// A node in the parameter graph.
     ParameterMarker(SubstMarker),

@@ -9,7 +9,7 @@ use crate::graph::operation::query::{GraphShapeQuery, ShapeNodeIdentifier};
 use crate::graph::operation::user_defined::{AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, QueryInstructions, UserDefinedOperation};
 use crate::graph::pattern::{AbstractOutputNodeMarker, OperationParameter};
 use crate::graph::semantics::{AbstractGraph, SemanticsClone};
-
+use crate::util::bimap::BiMap;
 /*
 General overview:
 
@@ -267,16 +267,6 @@ impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug>> OperationB
 
         (g, subst_to_node_keys)
     }
-}
-
-struct NodeMetadata<S: SemanticsClone> {
-    abstract_node_id: AbstractNodeId, // how do we refer to this node?
-    _phantom: PhantomData<S>,
-}
-
-struct IntermediateState<S: SemanticsClone> {
-    graph: AbstractGraph<S>,
-    node_metadata: HashMap<NodeKey, NodeMetadata<S>>,
 }
 
 struct IntermediateStateBuilder<'a, S: SemanticsClone> {
@@ -688,9 +678,115 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>> Interm
     }
 }
 
+enum IntermediateStatePath {
+    // advance by one regular instruction. don't go in.
+    Advance,
+    EnterTrue,
+    EnterFalse,
+    // TODO: is this the same as Advance?
+    SkipQuery,
+}
 
 
+// TODO: here make the intermediate state interpreter have points at which it knows the state
+//  eg at every query branch point... hmm maybe it should be passed an argument of _where_ we want to know the state?
+//  some path like entering the true/false branch, leaving a query...
 
+/*
+What kind of information do we want to give the user when they ask for the current state of the operation?
+
+1. Current abstract graph
+ * Realistically, this should be formatted by ignoring NodeKeys and only showing AbstractNodeId
+ ==> We need a NodeKey => AbstractNodeId mapping
+2. Available AbstractNodeIds and their abstract values
+ * We can do this by mapping AbstractNodeId to NodeKey and then looking up the node in the graph.
+ ==> We need an AbstractNodeId => NodeKey mapping
+3. Current query state
+ * How should this be represented?
+ * Some path? Can we "visualize" queries?
+ * then we could have paths like: "GtZero on AID_1 true branch, ShapeQuery Y (Shape queries will be difficult to visualize)
+   on AID_2 and AID_3 false branch, EqValues on AID_3 and AID_4 no branch yet"
+
+
+How do we store intermediate representation?
+To do this memory-efficiently, some incremental representation would be nice. Like "this instruction added this AID".
+But, for time reasons, let's just store a copy of the entire state from above after each instruction.
+*/
+
+enum QueryPath {
+    Query(String),
+    TrueBranch,
+    FalseBranch,
+}
+
+struct IntermediateState<S: SemanticsClone> {
+    graph: AbstractGraph<S>,
+    node_keys_to_aid: BiMap<NodeKey, AbstractNodeId>,
+    query_path: Vec<QueryPath>,
+}
+
+enum InterpretedOpLike<S: SemanticsClone> {
+    Builtin(S::BuiltinOperation, AbstractOperationArgument),
+    Operation(OperationId, AbstractOperationArgument),
+    Recurse(AbstractOperationArgument),
+}
+
+enum InterpretedInstruction<S: SemanticsClone> {
+    OpLike(InterpretedOpLike<S>),
+    BuiltinQuery(S::BuiltinQuery, AbstractOperationArgument, InterpretedQueryInstructions<S>),
+    GraphShapeQuery(AbstractOperationResultMarker, Vec<AbstractNodeId>, GraphShapeQuery<S>, InterpretedQueryInstructions<S>),
+}
+
+struct InterpretedQueryInstructions<S: SemanticsClone> {
+    initial_state_true_branch: IntermediateState<S>,
+    true_branch: Vec<InterpretedInstructionWithState<S>>,
+    false_branch: Vec<InterpretedInstructionWithState<S>>,
+}
+
+struct InterpretedInstructionWithState<S: SemanticsClone> {
+    instruction: IntermediateInstruction<S>,
+    args: Vec<AbstractNodeId>,
+}
+
+struct IntermediateInterpreter<S: SemanticsClone> {
+    op_param: OperationParameter<S>,
+    initial_state: IntermediateState<S>,
+    instructions: Vec<(Option<AbstractOperationResultMarker>, InterpretedInstructionWithState<S>)>,
+}
+
+impl<S: SemanticsClone> IntermediateInterpreter<S> {
+    fn new(
+        op_param: OperationParameter<S>,
+        intermediate_instructions: Vec<(Option<AbstractOperationResultMarker>, IntermediateInstruction<S>)>,
+    ) -> Self {
+        let initial_graph = op_param.parameter_graph.clone();
+
+        let mut initial_mapping = BiMap::new();
+
+        for (key, subst) in op_param.node_keys_to_subst.iter() {
+            let aid = AbstractNodeId::ParameterMarker(subst.clone());
+            initial_mapping.insert(*key, aid);
+        }
+
+        let initial_state = IntermediateState {
+            graph: initial_graph,
+            node_keys_to_aid: initial_mapping,
+            query_path: Vec::new(),
+        };
+
+        let interpreter = IntermediateInterpreter {
+            op_param,
+            initial_state,
+            instructions: Vec::new(),
+        };
+
+        interpreter
+    }
+
+    fn interpret(&mut self, intermediate_instructions: Vec<(Option<AbstractOperationResultMarker>, IntermediateInstruction<S>)>) -> Result<(), OperationBuilderError> {
+
+    }
+}
 
 
 

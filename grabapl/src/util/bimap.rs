@@ -1,0 +1,50 @@
+use std::collections::HashMap;
+
+pub struct BiMap<L, R> {
+    left_to_right: HashMap<L, R>,
+    right_to_left: HashMap<R, L>,
+}
+
+impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> BiMap<L, R> {
+    pub fn new() -> Self {
+        BiMap {
+            left_to_right: HashMap::new(),
+            right_to_left: HashMap::new(),
+        }
+    }
+
+    pub fn insert(&mut self, left: L, right: R) {
+        // Ensure no existing mapping for left or right
+        if self.left_to_right.contains_key(&left) || self.right_to_left.contains_key(&right) {
+            panic!("Cannot insert: left or right already exists in the map");
+        }
+        self.left_to_right.insert(left.clone(), right.clone());
+        self.right_to_left.insert(right, left);
+    }
+
+    pub fn get_left(&self, left: &L) -> Option<&R> {
+        self.left_to_right.get(left)
+    }
+
+    pub fn get_right(&self, right: &R) -> Option<&L> {
+        self.right_to_left.get(right)
+    }
+
+    pub fn remove_left(&mut self, left: &L) -> Option<R> {
+        if let Some(right) = self.left_to_right.remove(left) {
+            self.right_to_left.remove(&right);
+            Some(right)
+        } else {
+            None
+        }
+    }
+
+    pub fn remove_right(&mut self, right: &R) -> Option<L> {
+        if let Some(left) = self.right_to_left.remove(right) {
+            self.left_to_right.remove(&left);
+            Some(left)
+        } else {
+            None
+        }
+    }
+}

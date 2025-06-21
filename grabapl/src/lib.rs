@@ -1,5 +1,6 @@
 pub mod graph;
 pub mod pattern_match;
+pub mod util;
 
 use crate::graph::*;
 use petgraph::algo::subgraph_isomorphisms_iter;
