@@ -29,6 +29,16 @@ fn insert_bst_builder_test(
     let root_node = AbstractNodeId::ParameterMarker(root_node_marker);
     let node_to_insert_marker = 1;
     let node_to_insert = AbstractNodeId::ParameterMarker(node_to_insert_marker);
+    let mk_delete = |op_builder: &mut OperationBuilder<SimpleSemantics>| {
+        op_builder
+            .add_instruction(
+                Instruction::Builtin(BuiltinOperation::DeleteNode),
+                vec![node_to_insert],
+            )
+            .unwrap();
+        show(&op_builder);
+    };
+
     op_builder
         .expect_parameter_node(root_node_marker, ())
         .unwrap();
@@ -36,10 +46,6 @@ fn insert_bst_builder_test(
     op_builder
         .expect_parameter_node(node_to_insert_marker, ())
         .unwrap();
-    show(&op_builder);
-    
-    // just for fun, TODO remove
-    op_builder.add_instruction(Instruction::Builtin(BuiltinOperation::AddNode), vec![]).unwrap();
     show(&op_builder);
 
     // Start a query on the root node to figure out if it's -1.
@@ -59,14 +65,7 @@ fn insert_bst_builder_test(
                 )
                 .unwrap();
             show(&op_builder);
-            // delete the node
-            op_builder
-                .add_instruction(
-                    Instruction::Builtin(BuiltinOperation::DeleteNode),
-                    vec![node_to_insert],
-                )
-                .unwrap();
-            show(&op_builder);
+            mk_delete(&mut op_builder);
         }
         op_builder.enter_false_branch().unwrap();
         show(&op_builder);
@@ -153,6 +152,7 @@ fn insert_bst_builder_test(
                                 )
                                 .unwrap();
                             show(&op_builder);
+                            mk_delete(&mut op_builder);
                         }
                         op_builder.end_query().unwrap();
                         show(&op_builder);
@@ -229,6 +229,7 @@ fn insert_bst_builder_test(
                                 )
                                 .unwrap();
                             show(&op_builder);
+                            mk_delete(&mut op_builder);
                         }
                         // end the query
                         op_builder.end_query().unwrap();
@@ -488,9 +489,83 @@ fn main() {
     dot_collector.collect(&g);
 
     // run node heights on that binary tree
-    run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 14, vec![bst_labeled_edges_root])
+    // run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 14, vec![bst_labeled_edges_root])
+    //     .unwrap();
+    // dot_collector.collect(&g);
+
+
+    // repeat the BST experiement but with op 15
+    let bst_root = g.add_node(-1);
+    dot_collector.collect(&g);
+    // insert 5
+    let value_to_insert = g.add_node(5);
+    dot_collector.collect(&g);
+    run_from_concrete::<SimpleSemantics>(
+        &mut g,
+        &operation_ctx,
+        15,
+        vec![bst_root, value_to_insert],
+    )
         .unwrap();
     dot_collector.collect(&g);
+    // insert 3
+    let value_to_insert = g.add_node(3);
+    dot_collector.collect(&g);
+    run_from_concrete::<SimpleSemantics>(
+        &mut g,
+        &operation_ctx,
+        15,
+        vec![bst_root, value_to_insert],
+    )
+        .unwrap();
+    dot_collector.collect(&g);
+    // insert 7
+    let value_to_insert = g.add_node(7);
+    dot_collector.collect(&g);
+    run_from_concrete::<SimpleSemantics>(
+        &mut g,
+        &operation_ctx,
+        15,
+        vec![bst_root, value_to_insert],
+    )
+        .unwrap();
+    dot_collector.collect(&g);
+    // insert 1
+    let value_to_insert = g.add_node(1);
+    dot_collector.collect(&g);
+    // println!("{}", dot_collector.finalize());
+    run_from_concrete::<SimpleSemantics>(
+        &mut g,
+        &operation_ctx,
+        15,
+        vec![bst_root, value_to_insert],
+    )
+        .unwrap();
+    dot_collector.collect(&g);
+    // insert 2
+    let value_to_insert = g.add_node(2);
+    dot_collector.collect(&g);
+    run_from_concrete::<SimpleSemantics>(
+        &mut g,
+        &operation_ctx,
+        15,
+        vec![bst_root, value_to_insert],
+    )
+        .unwrap();
+    dot_collector.collect(&g);
+    // insert 4
+    let value_to_insert = g.add_node(4);
+    dot_collector.collect(&g);
+    run_from_concrete::<SimpleSemantics>(
+        &mut g,
+        &operation_ctx,
+        15,
+        vec![bst_root, value_to_insert],
+    )
+        .unwrap();
+    dot_collector.collect(&g);
+
+
 
     println!("{}", dot_collector.finalize());
 }

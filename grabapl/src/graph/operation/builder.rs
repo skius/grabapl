@@ -278,10 +278,10 @@ impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug, BuiltinOper
         let intermediate_state = get_state_for_path(&interpreter.initial_state, &interp_instructions, &mut path_iter).unwrap();
 
         let dot = intermediate_state.graph.dot();
-        let mapping = intermediate_state.node_keys_to_aid;
+        let mapping = intermediate_state.node_keys_to_aid.into_inner().0;
         let query_path = intermediate_state.query_path;
 
-        format!("\nIntermediate State:\n{dot}\nmapping: {mapping:#?}\nTODO query path")
+        format!("\nIntermediate State:\n{dot}\npath: {path:?}\nmapping: {mapping:#?}\nTODO query path")
 
     }
 
@@ -291,14 +291,14 @@ impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug, BuiltinOper
     pub fn show_state(&self) -> String {
         // let (g, subst_to_node_keys) = self.build_debug_graph_at_current_point();
         // let dot = g.dot();
-        // 
+        //
         // let mut result = String::new();
-        // 
+        //
         // result.push_str(&"Current Operation Builder State:\n".to_string());
         // result.push_str(&"Graph at current point:\n".to_string());
         // result.push_str(&dot);
         // result
-        
+
         self.get_intermediate_state()
     }
 
@@ -626,7 +626,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     self.build_shape_query(iter, *op_marker)?;
                 // Ok((Some(*op_marker), UDInstruction::ShapeQuery()))
                 Ok((
-                    None,
+                    Some(*op_marker), // NOTE: this marker is needed as well for the _concrete_ execution
                     IntermediateInstruction::GraphShapeQuery(
                         *op_marker,
                         gsq_instructions,
@@ -773,6 +773,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     iter.next();
                     // we are ending the query, so we remove the current query state from the path
                     self.remove_until_query_start();
+                    self.path.push(IntermediateStatePath::SkipQuery);
                     break;
                 }
                 _ => {
@@ -853,6 +854,29 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
     }
 
     fn remove_until_branch(&mut self, branch: bool) {
+        // need to check that a branch is actually there in the region until the last skip_query
+        let branch_to_find = if branch {
+            IntermediateStatePath::EnterTrue
+        } else {
+            IntermediateStatePath::EnterFalse
+        };
+        
+        let mut found = false;
+        for last in self.path.iter().rev() {
+            if last == &branch_to_find {
+                // we found the branch, so we can stop
+                found = true;
+            }
+            if last == &IntermediateStatePath::StartQuery {
+                // we reached the start of the query, so we cannot find the branch
+                break;
+            }
+        }
+        if !found {
+            // we did not find the branch, so we cannot remove it
+            return;
+        }
+        
         while let Some(last) = self.path.pop() {
             if (branch && last == IntermediateStatePath::EnterTrue) ||
                (!branch && last == IntermediateStatePath::EnterFalse) {
@@ -1116,9 +1140,14 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             IntermediateOpLike::Recurse(args) => {
                 // TODO: recursion is actually tricky. because at this point we have not finished interpreting the current operation yet.
                 //  So how are we supposed to know the abstract changes?
-                todo!("Recursion not implemented yet");
 
                 // TODO: use approach from `problems-testcases.md`
+                
+                let (subst, abstract_arg) = self.get_current_substitution(&self.op_param, args)?;
+                // apply the operation to the current graph
+                // TODO: apply op
+                // this should probably use some pre-defined (at the beginning) abstract changes to the graph.
+                Ok(UDInstruction::Operation(self.self_op_id, abstract_arg))
             }
         }
     }
@@ -1350,10 +1379,9 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         // switch back to the other state
         let after_true_branch_state = mem::replace(&mut self.current_state, false_branch_state);
         let (ud_false_branch, interp_false_branch) = self.interpret_instructions(query_instructions.false_branch)?;
-
+        let after_false_branch_state = mem::replace(&mut self.current_state, state_before);
         // TODO: reconcile the states of both branches. same as in query.
 
-        let after_false_branch_state = mem::replace(&mut self.current_state, state_before);
         // current situation: self.current_state is before both branches, and we have the true and false branch states
         // available to reconcile.
 
@@ -1429,8 +1457,10 @@ fn get_state_for_path<S: SemanticsClone>(initial_state: &IntermediateState<S>, i
                     IntermediateStatePath::Advance | IntermediateStatePath::SkipQuery => {
                         current_state = &instruction.state_after;
                     }
-                    IntermediateStatePath::EnterTrue => {}
-                    IntermediateStatePath::EnterFalse => {}
+                    IntermediateStatePath::EnterTrue | IntermediateStatePath::EnterFalse => {
+                        // this should not happen
+                        panic!("internal error: unexpected path element: {:?}", path_element);
+                    }
                     IntermediateStatePath::StartQuery => {
                         if let InterpretedInstruction::Query(query_instructions) = &instruction.instruction {
                             // we are entering a query, so we need to check the true branch
