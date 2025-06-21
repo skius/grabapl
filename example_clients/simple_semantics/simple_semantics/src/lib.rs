@@ -125,41 +125,40 @@ impl BuiltinQueryTrait for BuiltinQuery {
         }
     }
 
-    fn abstract_changes(
+    fn apply_abstract(
         &self,
         g: &mut AbstractGraph<Self::S>,
-        argument: OperationArgument,
         substitution: &ParameterSubstitution,
-    ) -> AbstractQueryOutput<Self::S> {
-        let mut changes = vec![];
+    ) {
         match self {
             BuiltinQuery::HasChild => {
-                let parent = substitution.mapping[&0];
-                let child = g.add_node(());
-                g.add_edge_ordered(
-                    parent,
-                    child,
-                    EdgePattern::Wildcard,
-                    EdgeInsertionOrder::Append,
-                    EdgeInsertionOrder::Append,
-                );
-                changes.push(AbstractQueryChange::ExpectNode(NodeChange::NewNode(1, ())));
-                changes.push(AbstractQueryChange::ExpectEdge(
-                    EdgeChange::ChangeEdgeValue {
-                        from: 0,
-                        to: 1,
-                        edge: EdgePattern::Wildcard,
-                    },
-                ));
+                // let parent = substitution.mapping[&0];
+                // let child = g.add_node(());
+                // g.add_edge_ordered(
+                //     parent,
+                //     child,
+                //     EdgePattern::Wildcard,
+                //     EdgeInsertionOrder::Append,
+                //     EdgeInsertionOrder::Append,
+                // );
+                // changes.push(AbstractQueryChange::ExpectNode(NodeChange::NewNode(1, ())));
+                // changes.push(AbstractQueryChange::ExpectEdge(
+                //     EdgeChange::ChangeEdgeValue {
+                //         from: 0,
+                //         to: 1,
+                //         edge: EdgePattern::Wildcard,
+                //     },
+                // ));
+                // TODO: how to handle this? probably not needed.
             }
             BuiltinQuery::IsValueGt(val) => {
                 // No abstract changes if the value is equal, since our type system cannot represent exact values.
             }
             _ => {
-                todo!("decide what this method even does")
+                // TODO decide what this method even does
+                //  Imo, it should not necessarily mutate, so it would be fine to just get rid of it entirely.
             }
         }
-        AbstractQueryOutput { changes }
     }
 
     fn query(
@@ -433,9 +432,9 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
     fn apply_abstract(
         &self,
         g: &mut AbstractGraph<Self::S>,
-        argument: OperationArgument,
         substitution: &ParameterSubstitution,
-    ) {
+    ) -> OperationOutput {
+        let mut new_nodes = HashMap::new();
         match self {
             BuiltinOperation::AddNode => {
                 g.add_node(());
@@ -505,6 +504,7 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
             }
         }
+        OperationOutput { new_nodes: todo!("abstract operation output") }
     }
 
     fn apply(
