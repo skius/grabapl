@@ -990,14 +990,13 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         marker: Option<AbstractOperationResultMarker>,
         oplike: IntermediateOpLike<S>,
     ) -> Result<UDInstruction<S>, OperationBuilderError> {
-        match oplike {
+        let result = match oplike {
             IntermediateOpLike::Builtin(op, args) => {
                 let param = op.parameter();
                 let (subst, abstract_arg) = self.get_current_substitution(&param, args)?;
 
                 // now apply op and store result
-                let mut new_graph = self.current_state.graph.clone();
-                let operation_output = op.apply_abstract(&mut new_graph, &subst);
+                let operation_output = op.apply_abstract(&mut self.current_state.graph, &subst);
                 // go over new nodes
                 let marker = marker.unwrap_or_else(|| self.get_new_unnamed_abstract_operation_marker());
                 for (node_marker, node_key) in operation_output.new_nodes {
@@ -1015,9 +1014,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 let param = op.parameter();
                 let (subst, abstract_arg) = self.get_current_substitution(&param, args)?;
 
-                // TODO: need to apply the operation abstractly here.
-                let mut new_graph = self.current_state.graph.clone();
-                let operation_output = op.apply_abstract(self.op_ctx, &mut new_graph, &subst);
+                let operation_output = op.apply_abstract(self.op_ctx, &mut self.current_state.graph, &subst);
                 // go over new nodes
                 let marker = marker.unwrap_or_else(|| self.get_new_unnamed_abstract_operation_marker());
                 let operation_output = operation_output.map_err(|e| {
@@ -1042,7 +1039,11 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
 
                 // TODO: use approach from `problems-testcases.md`
             }
-        }
+        };
+
+        let state_after = self.current_state.clone();
+
+        result
     }
 
     fn interpret_builtin_query(
@@ -1051,6 +1052,10 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         args: Vec<AbstractNodeId>,
         query_instructions: IntermediateQueryInstructions<S>,
     ) -> Result<UDInstruction<S>, OperationBuilderError> {
+        let state_before = self.current_state.clone();
+        let false_branch_state = self.current_state.clone();
+
+
         let param = query.parameter();
         let (subst, arg) = self.get_current_substitution(&param, args)?;
         // create a new graph to apply the query to
@@ -1065,7 +1070,10 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
 
         // interpret the instructions in the true and false branches
         let true_branch = self.interpret_instructions(query_instructions.true_branch)?;
+        let after_true_branch_state = mem::replace(&mut self.current_state, false_branch_state);
         let false_branch = self.interpret_instructions(query_instructions.false_branch)?;
+        let after_false_branch_state = mem::replace(&mut self.current_state, state_before);
+        //
 
 
         // TODO: update current state etc...
@@ -1092,9 +1100,11 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         query_instructions: IntermediateQueryInstructions<S>,
     ) -> Result<UDInstruction<S>, OperationBuilderError> {
 
+        let mut state_before = self.current_state.clone();
+
         // preparation for false branch
-        let mut false_branch_state = self.current_state.clone();
-        
+        let false_branch_state = self.current_state.clone();
+
         // first pass: collect the initial graph (the parameter)
         let mut param = OperationParameter::<S> {
             explicit_input_nodes: vec![],
@@ -1102,7 +1112,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             subst_to_node_keys: HashMap::new(),
             node_keys_to_subst: HashMap::new(),
         };
-        
+
         let mut abstract_args = Vec::new();
 
         let mut arg_aid_to_param_subst: BiMap<AbstractNodeId, SubstMarker> = BiMap::new();
@@ -1210,7 +1220,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                     // TODO: insert is panicking and therefore we should return an error instead here.
                     // TODO: make bimap::insert fallible? return a must_use Option<()>?
                     node_keys_to_shape_idents.insert(key, shape_node_ident);
-                    
+
                     // now update the state for the true branch.
                     let state_key = self.current_state.graph.add_node(av);
                     let aid = AbstractNodeId::DynamicOutputMarker(gsq_op_marker, marker);
@@ -1220,7 +1230,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                     let src_key = aid_to_node_key_hack!(src)?;
                     let target_key = aid_to_node_key_hack!(target)?;
                     expected_graph.add_edge(src_key, target_key, av.clone());
-                    
+
                     // now update the state for the true branch.
                     let state_src_key = *self.current_state.node_keys_to_aid.get_right(&src).ok_or(OperationBuilderError::NotFoundAid(src))?;
                     let state_target_key = *self.current_state.node_keys_to_aid.get_right(&target).ok_or(OperationBuilderError::NotFoundAid(target))?;
@@ -1242,17 +1252,20 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             node_keys_to_shape_idents,
             shape_idents_to_node_keys,
         };
-        
+
         let true_branch = self.interpret_instructions(query_instructions.true_branch)?;
         // switch back to the other state
         let after_true_branch_state = mem::replace(&mut self.current_state, false_branch_state);
         let false_branch = self.interpret_instructions(query_instructions.false_branch)?;
-        
+
         // TODO: reconcile the states of both branches. same as in query.
-        
+
+        let after_false_branch_state = mem::replace(&mut self.current_state, state_before);
+        // current situation: self.current_state is before both branches, and we have the true and false branch states
+        // available to reconcile.
 
         // TODO: we will need to make sure we pass down the correct current state to the true/false branches.
-        
+
         Ok(UDInstruction::ShapeQuery(
             gsq,
             abstract_args,

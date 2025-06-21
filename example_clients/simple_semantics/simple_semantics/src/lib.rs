@@ -437,7 +437,8 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
         let mut new_nodes = HashMap::new();
         match self {
             BuiltinOperation::AddNode => {
-                g.add_node(());
+                let new_key = g.add_node(());
+                new_nodes.insert("new".into(), new_key);
             }
             BuiltinOperation::AppendChild => {
                 let parent = substitution.mapping[&0];
@@ -453,6 +454,7 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                     EdgeInsertionOrder::Append,
                     EdgeInsertionOrder::Append,
                 );
+                new_nodes.insert("child".into(), child);
             }
             BuiltinOperation::IndexCycle => {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
@@ -504,7 +506,7 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
             }
         }
-        OperationOutput { new_nodes: todo!("abstract operation output") }
+        OperationOutput { new_nodes }
     }
 
     fn apply(
