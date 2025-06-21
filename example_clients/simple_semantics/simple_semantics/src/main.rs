@@ -37,6 +37,10 @@ fn insert_bst_builder_test(
         .expect_parameter_node(node_to_insert_marker, ())
         .unwrap();
     show(&op_builder);
+    
+    // just for fun, TODO remove
+    op_builder.add_instruction(Instruction::Builtin(BuiltinOperation::AddNode), vec![]).unwrap();
+    show(&op_builder);
 
     // Start a query on the root node to figure out if it's -1.
     op_builder
@@ -271,8 +275,8 @@ fn main() {
     operation_ctx.add_custom_operation(14, node_heights_user_op);
 
     // use OperationBuilder to try building a new operation
-    // let insert_bst_builder_test_user_op = insert_bst_builder_test(&operation_ctx, 15);
-    // operation_ctx.add_custom_operation(15, insert_bst_builder_test_user_op);
+    let insert_bst_builder_test_user_op = insert_bst_builder_test(&operation_ctx, 15);
+    operation_ctx.add_custom_operation(15, insert_bst_builder_test_user_op);
 
     let mut dot_collector = DotCollector::new();
 

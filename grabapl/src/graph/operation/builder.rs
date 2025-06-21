@@ -243,31 +243,63 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
 
     pub fn build(
         self,
-        self_op_id: SubstMarker,
+        self_op_id: OperationId,
     ) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
         // Here we would typically finalize the operation and return it.
         // For now, we just return Ok to indicate success.
 
-        IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
+        let (param, instructions, _state_path) = IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
 
-        todo!("build not implemented yet");
+        let mut interpreter = IntermediateInterpreter::new_for_self_op_id(
+            self_op_id,
+            param,
+            self.op_ctx,
+        );
+
+        let user_def_op = interpreter.create_user_defined_operation(instructions)?;
+
+        Ok(user_def_op)
     }
 }
 
-impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug>> OperationBuilder<'a, S> {
+impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug, BuiltinOperation: Clone, BuiltinQuery: Clone>> OperationBuilder<'a, S> {
+    fn get_intermediate_state(&self) -> String {
+        let (param, instructions, path) = IntermediateStateBuilder::run(&self.instructions, self.op_ctx).unwrap();
+        let mut interpreter = IntermediateInterpreter::new_for_self_op_id(
+            0, // TODO: use a real operation ID here
+            param,
+            self.op_ctx,
+        );
+
+        let (_, interp_instructions) = interpreter.interpret_instructions(instructions).unwrap();
+
+        let mut path_iter = path.iter().peekable().cloned();
+
+        let intermediate_state = get_state_for_path(&interpreter.initial_state, &interp_instructions, &mut path_iter).unwrap();
+
+        let dot = intermediate_state.graph.dot();
+        let mapping = intermediate_state.node_keys_to_aid;
+        let query_path = intermediate_state.query_path;
+
+        format!("\nIntermediate State:\n{dot}\nmapping: {mapping:#?}\nTODO query path")
+
+    }
+
     /// Visualizes the current state of the operation builder.
     /// Provides context on the current nest level as well as the DOT representation of the graph
     /// at the current cursor.
     pub fn show_state(&self) -> String {
-        let (g, subst_to_node_keys) = self.build_debug_graph_at_current_point();
-        let dot = g.dot();
-
-        let mut result = String::new();
-
-        result.push_str(&"Current Operation Builder State:\n".to_string());
-        result.push_str(&"Graph at current point:\n".to_string());
-        result.push_str(&dot);
-        result
+        // let (g, subst_to_node_keys) = self.build_debug_graph_at_current_point();
+        // let dot = g.dot();
+        // 
+        // let mut result = String::new();
+        // 
+        // result.push_str(&"Current Operation Builder State:\n".to_string());
+        // result.push_str(&"Graph at current point:\n".to_string());
+        // result.push_str(&dot);
+        // result
+        
+        self.get_intermediate_state()
     }
 
     fn build_debug_graph_at_current_point(
@@ -309,8 +341,8 @@ impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug>> OperationB
 }
 
 struct IntermediateStateBuilder<'a, S: SemanticsClone> {
-    instructions: Peekable<Iter<'a, BuilderInstruction<S>>>,
-    op_ctx: &'a OperationContext<S>,
+    path: Vec<IntermediateStatePath>,
+    _phantom_data: PhantomData<&'a S>
 }
 
 use super::user_defined::Instruction as UDInstruction;
@@ -367,9 +399,9 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
     IntermediateStateBuilder<'a, S>
 {
     fn run(
-        instructions: &'a [BuilderInstruction<S>],
+        builder_instructions: &'a [BuilderInstruction<S>],
         op_ctx: &'a OperationContext<S>,
-    ) -> Result<IntermediateState<S>, OperationBuilderError> {
+    ) -> Result<(OperationParameter<S>, Vec<(Option<AbstractOperationResultMarker>, IntermediateInstruction<S>)>, Vec<IntermediateStatePath>), OperationBuilderError> {
         /*
         General idea:
         Whenever we see start_query (or start_shape_query), we push a query state onto a stack.
@@ -495,18 +527,22 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
         //     current_state = next_state;
         // }
 
-        let mut iter = instructions.iter().peekable();
+        let mut iter = builder_instructions.iter().peekable();
 
         let op_parameter = Self::build_operation_parameter(&mut iter)?;
 
-        let instructions = Self::build_many_instructions(&mut iter)?;
+        let mut builder = Self {
+            _phantom_data: PhantomData,
+            path: Vec::new(),
+        };
 
-        dbg!(&instructions);
+        let instructions = builder.build_many_instructions(&mut iter)?;
 
-        todo!("Intermediate state builder not implemented yet");
+        Ok((op_parameter, instructions, builder.path))
     }
 
     fn build_many_instructions(
+        &mut self,
         iter: &mut Peekable<Iter<BuilderInstruction<S>>>,
     ) -> Result<
         Vec<(
@@ -527,12 +563,13 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
             ) {
                 break;
             }
-            instructions.push(Self::build_instruction(iter)?);
+            instructions.push(self.build_instruction(iter)?);
         }
         Ok(instructions)
     }
 
     fn build_instruction(
+        &mut self,
         iter: &mut Peekable<Iter<BuilderInstruction<S>>>,
     ) -> Result<
         (
@@ -564,12 +601,14 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     }
                     Instruction::Recurse => IntermediateOpLike::Recurse(args.clone()),
                 };
+                self.path.push(IntermediateStatePath::Advance);
                 Ok((name, IntermediateInstruction::OpLike(oplike)))
             }
             BuilderInstruction::StartQuery(query, args) => {
                 iter.next();
                 // Start a new query state
-                let query_instructions = Self::build_query_instruction(iter)?;
+                self.path.push(IntermediateStatePath::StartQuery);
+                let query_instructions = self.build_query_instruction(iter)?;
                 Ok((
                     None,
                     IntermediateInstruction::BuiltinQuery(
@@ -581,9 +620,10 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
             }
             BuilderInstruction::StartShapeQuery(op_marker) => {
                 iter.next();
+                self.path.push(IntermediateStatePath::StartQuery);
                 // Start a new shape query state
                 let (gsq_instructions, branch_instructions) =
-                    Self::build_shape_query(iter, *op_marker)?;
+                    self.build_shape_query(iter, *op_marker)?;
                 // Ok((Some(*op_marker), UDInstruction::ShapeQuery()))
                 Ok((
                     None,
@@ -599,6 +639,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
     }
 
     fn build_shape_query(
+        &mut self,
         iter: &mut Peekable<Iter<BuilderInstruction<S>>>,
         operation_marker: AbstractOperationResultMarker,
     ) -> Result<
@@ -634,20 +675,30 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     if true_branch_instructions.is_some() {
                         return Err(OperationBuilderError::AlreadyVisitedBranch(true));
                     }
-                    true_branch_instructions = Some(Self::build_many_instructions(iter)?);
+                    // we are entering a true branch, so we remove the false branch from the path
+                    self.remove_until_branch(false);
+                    self.path.push(IntermediateStatePath::EnterTrue);
+                    true_branch_instructions = Some(self.build_many_instructions(iter)?);
                 }
                 BuilderInstruction::EnterFalseBranch => {
                     iter.next();
                     if false_branch_instructions.is_some() {
                         return Err(OperationBuilderError::AlreadyVisitedBranch(false));
                     }
-                    false_branch_instructions = Some(Self::build_many_instructions(iter)?);
+                    // we are entering a false branch, so we remove the true branch from the path
+                    self.remove_until_branch(true);
+                    self.path.push(IntermediateStatePath::EnterFalse);
+                    false_branch_instructions = Some(self.build_many_instructions(iter)?);
                 }
                 BuilderInstruction::EndQuery => {
                     iter.next();
+                    // we are ending the query, so we remove the current query state from the path
+                    self.remove_until_query_start();
+                    self.path.push(IntermediateStatePath::SkipQuery);
                     break;
                 }
                 BuilderInstruction::ExpectShapeNode(marker, abstract_value) => {
+                    // TODO: do we want to assert that we haven't entered any branches yet? probably...
                     iter.next();
                     // let shape_node_ident = marker.0.into();
                     // if gsq.shape_idents_to_node_keys.contains_key(&shape_node_ident) {
@@ -690,6 +741,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
     }
 
     fn build_query_instruction(
+        &mut self,
         iter: &mut Peekable<Iter<BuilderInstruction<S>>>,
     ) -> Result<IntermediateQueryInstructions<S>, OperationBuilderError> {
         // we just consumed a StartQuery instruction.
@@ -702,17 +754,25 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     if true_branch_instructions.is_some() {
                         return Err(OperationBuilderError::AlreadyVisitedBranch(true));
                     }
-                    true_branch_instructions = Some(Self::build_many_instructions(iter)?);
+                    // we are entering a true branch, so we remove the false branch from the path
+                    self.remove_until_branch(false);
+                    self.path.push(IntermediateStatePath::EnterTrue);
+                    true_branch_instructions = Some(self.build_many_instructions(iter)?);
                 }
                 BuilderInstruction::EnterFalseBranch => {
                     iter.next();
                     if false_branch_instructions.is_some() {
                         return Err(OperationBuilderError::AlreadyVisitedBranch(false));
                     }
-                    false_branch_instructions = Some(Self::build_many_instructions(iter)?);
+                    // we are entering a false branch, so we remove the true branch from the path
+                    self.remove_until_branch(true);
+                    self.path.push(IntermediateStatePath::EnterFalse);
+                    false_branch_instructions = Some(self.build_many_instructions(iter)?);
                 }
                 BuilderInstruction::EndQuery => {
                     iter.next();
+                    // we are ending the query, so we remove the current query state from the path
+                    self.remove_until_query_start();
                     break;
                 }
                 _ => {
@@ -791,8 +851,26 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
 
         Ok(operation_parameter)
     }
+
+    fn remove_until_branch(&mut self, branch: bool) {
+        while let Some(last) = self.path.pop() {
+            if (branch && last == IntermediateStatePath::EnterTrue) ||
+               (!branch && last == IntermediateStatePath::EnterFalse) {
+                break;
+            }
+        }
+    }
+
+    fn remove_until_query_start(&mut self) {
+        while let Some(last) = self.path.pop() {
+            if last == IntermediateStatePath::StartQuery {
+                break;
+            }
+        }
+    }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum IntermediateStatePath {
     // advance by one regular instruction. don't go in.
     Advance,
@@ -800,6 +878,7 @@ enum IntermediateStatePath {
     EnterFalse,
     // TODO: is this the same as Advance?
     SkipQuery,
+    StartQuery,
 }
 
 // TODO: here make the intermediate state interpreter have points at which it knows the state
@@ -837,6 +916,7 @@ enum QueryPath {
 struct IntermediateState<S: SemanticsClone> {
     graph: AbstractGraph<S>,
     node_keys_to_aid: BiMap<NodeKey, AbstractNodeId>,
+    // TODO: make query path
     query_path: Vec<QueryPath>,
 }
 
@@ -852,35 +932,20 @@ impl<S: SemanticsClone> Clone for IntermediateState<S> {
     }
 }
 
-enum InterpretedOpLike<S: SemanticsClone> {
-    Builtin(S::BuiltinOperation, AbstractOperationArgument),
-    Operation(OperationId, AbstractOperationArgument),
-    Recurse(AbstractOperationArgument),
-}
 
 enum InterpretedInstruction<S: SemanticsClone> {
-    OpLike(InterpretedOpLike<S>),
-    BuiltinQuery(
-        S::BuiltinQuery,
-        AbstractOperationArgument,
-        InterpretedQueryInstructions<S>,
-    ),
-    GraphShapeQuery(
-        AbstractOperationResultMarker,
-        Vec<AbstractNodeId>,
-        GraphShapeQuery<S>,
-        InterpretedQueryInstructions<S>,
-    ),
+    OpLike,
+    Query(InterpretedQueryInstructions<S>),
 }
 
 struct InterpretedQueryInstructions<S: SemanticsClone> {
     initial_state_true_branch: IntermediateState<S>,
-    true_branch: Vec<InterpretedInstructionWithState<S>>,
-    false_branch: Vec<InterpretedInstructionWithState<S>>,
+    true_branch: InterpretedInstructions<S>,
+    false_branch: InterpretedInstructions<S>,
 }
 
 struct InterpretedInstructionWithState<S: SemanticsClone> {
-    instruction: IntermediateInstruction<S>,
+    instruction: InterpretedInstruction<S>,
     state_after: IntermediateState<S>,
 }
 
@@ -890,13 +955,19 @@ struct IntermediateInterpreter<'a, S: SemanticsClone> {
     op_param: OperationParameter<S>,
     initial_state: IntermediateState<S>,
     current_state: IntermediateState<S>,
-    instructions: Vec<(
-        Option<AbstractOperationResultMarker>,
-        InterpretedInstructionWithState<S>,
-    )>,
     /// A counter to generate unique operation result markers.
     counter: u64,
 }
+
+type UDInstructionsWithMarker<S> = Vec<(
+    Option<AbstractOperationResultMarker>,
+    UDInstruction<S>,
+)>;
+
+type InterpretedInstructions<S> = Vec<(
+    Option<AbstractOperationResultMarker>,
+    InterpretedInstructionWithState<S>,
+)>;
 
 impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
     fn new_for_self_op_id(
@@ -927,7 +998,6 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             op_param,
             initial_state,
             current_state,
-            instructions: Vec::new(),
             counter: 0,
         };
 
@@ -942,9 +1012,12 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         )>,
     ) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
 
+
+        let (ud_instructions, _interp_instructions) = self.interpret_instructions(intermediate_instructions)?;
+
         Ok(UserDefinedOperation {
             parameter: self.op_param.clone(),
-            instructions: self.interpret_instructions(intermediate_instructions)?,
+            instructions: ud_instructions,
         })
     }
 
@@ -954,23 +1027,31 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             Option<AbstractOperationResultMarker>,
             IntermediateInstruction<S>,
         )>,
-    ) -> Result<Vec<(Option<AbstractOperationResultMarker>, UDInstruction<S>)>, OperationBuilderError> {
-        let mut instructions = Vec::new();
+    ) -> Result<(UDInstructionsWithMarker<S>, InterpretedInstructions<S>), OperationBuilderError> {
+        let mut ud_instructions = Vec::new();
+        let mut interpreted_instructions = Vec::new();
         for (marker, instruction) in intermediate_instructions {
-            let instruction = self.interpret_single_instruction(marker, instruction)?;
-            instructions.push((marker, instruction));
+            let (ud_instruction, interpreted_instruction) = self.interpret_single_instruction(marker, instruction)?;
+            ud_instructions.push((marker, ud_instruction));
+            interpreted_instructions.push((
+                marker,
+                InterpretedInstructionWithState {
+                    instruction: interpreted_instruction,
+                    state_after: self.current_state.clone(),
+                },
+            ));
         }
-        Ok(instructions)
+        Ok((ud_instructions, interpreted_instructions))
     }
 
     fn interpret_single_instruction(
         &mut self,
         marker: Option<AbstractOperationResultMarker>,
         instruction: IntermediateInstruction<S>,
-    ) -> Result<UDInstruction<S>, OperationBuilderError> {
+    ) -> Result<(UDInstruction<S>, InterpretedInstruction<S>), OperationBuilderError> {
         match instruction {
             IntermediateInstruction::OpLike(oplike) => {
-                self.interpret_op_like(marker, oplike)
+                Ok((self.interpret_op_like(marker, oplike)?, InterpretedInstruction::OpLike))
             }
             IntermediateInstruction::BuiltinQuery(query, args, query_instructions) => {
                 self.interpret_builtin_query(query, args, query_instructions)
@@ -990,7 +1071,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         marker: Option<AbstractOperationResultMarker>,
         oplike: IntermediateOpLike<S>,
     ) -> Result<UDInstruction<S>, OperationBuilderError> {
-        let result = match oplike {
+        match oplike {
             IntermediateOpLike::Builtin(op, args) => {
                 let param = op.parameter();
                 let (subst, abstract_arg) = self.get_current_substitution(&param, args)?;
@@ -1039,11 +1120,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
 
                 // TODO: use approach from `problems-testcases.md`
             }
-        };
-
-        let state_after = self.current_state.clone();
-
-        result
+        }
     }
 
     fn interpret_builtin_query(
@@ -1051,27 +1128,30 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         query: S::BuiltinQuery,
         args: Vec<AbstractNodeId>,
         query_instructions: IntermediateQueryInstructions<S>,
-    ) -> Result<UDInstruction<S>, OperationBuilderError> {
-        let state_before = self.current_state.clone();
-        let false_branch_state = self.current_state.clone();
-
-
+    ) -> Result<(UDInstruction<S>, InterpretedInstruction<S>), OperationBuilderError> {
         let param = query.parameter();
         let (subst, arg) = self.get_current_substitution(&param, args)?;
-        // create a new graph to apply the query to
-        let mut new_graph = self.current_state.graph.clone();
 
         // apply the query to the current graph
         query.apply_abstract(
-            &mut new_graph,
+            &mut self.current_state.graph,
             &subst,
         );
 
+        // TODO: is this right? do we want to snapshot the state _after_ the query?
+        //  I think so, because right now (weirdly enough) the query can modify. and the modifications
+        //  are applied to both branches and what comes after.
+
+        let state_before = self.current_state.clone();
+        let false_branch_state = self.current_state.clone();
+
+        let initial_true_branch_state = self.current_state.clone();
+
 
         // interpret the instructions in the true and false branches
-        let true_branch = self.interpret_instructions(query_instructions.true_branch)?;
+        let (ud_true_branch, interp_true_branch) = self.interpret_instructions(query_instructions.true_branch)?;
         let after_true_branch_state = mem::replace(&mut self.current_state, false_branch_state);
-        let false_branch = self.interpret_instructions(query_instructions.false_branch)?;
+        let (ud_false_branch, interp_false_branch) = self.interpret_instructions(query_instructions.false_branch)?;
         let after_false_branch_state = mem::replace(&mut self.current_state, state_before);
         //
 
@@ -1082,15 +1162,26 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         // TODO: reconciliation should probably be done via having the same AID for the same node in both branches.
         //  all other ones will be ignored.
         //  ==> we must manually change the abstract graph ourselves here!
+        //  ==> we must reconcile into self.current_state
 
-        Ok(UDInstruction::BuiltinQuery(
+        let ud_instr = UDInstruction::BuiltinQuery(
             query,
             arg,
             QueryInstructions {
-                taken: true_branch,
-                not_taken: false_branch,
+                taken: ud_true_branch,
+                not_taken: ud_false_branch,
             },
-        ))
+        );
+
+        let interp_instruction = InterpretedInstruction::Query(
+            InterpretedQueryInstructions {
+                initial_state_true_branch: initial_true_branch_state,
+                true_branch: interp_true_branch,
+                false_branch: interp_false_branch,
+            },
+        );
+
+        Ok((ud_instr, interp_instruction))
     }
 
     fn interpret_graph_shape_query(
@@ -1098,7 +1189,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         gsq_op_marker: AbstractOperationResultMarker,
         gsq_instructions: Vec<GraphShapeQueryInstruction<S>>,
         query_instructions: IntermediateQueryInstructions<S>,
-    ) -> Result<UDInstruction<S>, OperationBuilderError> {
+    ) -> Result<(UDInstruction<S>, InterpretedInstruction<S>), OperationBuilderError> {
 
         let mut state_before = self.current_state.clone();
 
@@ -1253,10 +1344,12 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             shape_idents_to_node_keys,
         };
 
-        let true_branch = self.interpret_instructions(query_instructions.true_branch)?;
+        let mut initial_true_branch_state = self.current_state.clone();
+
+        let (ud_true_branch, interp_true_branch) = self.interpret_instructions(query_instructions.true_branch)?;
         // switch back to the other state
         let after_true_branch_state = mem::replace(&mut self.current_state, false_branch_state);
-        let false_branch = self.interpret_instructions(query_instructions.false_branch)?;
+        let (ud_false_branch, interp_false_branch) = self.interpret_instructions(query_instructions.false_branch)?;
 
         // TODO: reconcile the states of both branches. same as in query.
 
@@ -1266,14 +1359,24 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
 
         // TODO: we will need to make sure we pass down the correct current state to the true/false branches.
 
-        Ok(UDInstruction::ShapeQuery(
+        let ud_instruction = UDInstruction::ShapeQuery(
             gsq,
             abstract_args,
             QueryInstructions {
-                taken: true_branch,
-                not_taken: false_branch,
+                taken: ud_true_branch,
+                not_taken: ud_false_branch,
             },
-        ))
+        );
+
+        let interp_instruction = InterpretedInstruction::Query(
+            InterpretedQueryInstructions {
+                initial_state_true_branch: initial_true_branch_state,
+                true_branch: interp_true_branch,
+                false_branch: interp_false_branch,
+            },
+        );
+
+        Ok((ud_instruction, interp_instruction))
     }
 
     fn get_current_substitution(&self,
@@ -1310,4 +1413,62 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         self.counter += 1;
         AbstractOperationResultMarker::Implicit(val)
     }
+}
+
+fn get_state_for_path<S: SemanticsClone>(initial_state: &IntermediateState<S>, interpreted_instructions: &InterpretedInstructions<S>, path: &mut impl Iterator<Item =IntermediateStatePath>) -> Option<IntermediateState<S>> {
+    let mut current_state = initial_state;
+
+    for (_, instruction) in interpreted_instructions {
+        match path.next() {
+            None => {
+                // no more path, we are done
+                return Some(current_state.clone());
+            }
+            Some(path_element) => {
+                match path_element {
+                    IntermediateStatePath::Advance | IntermediateStatePath::SkipQuery => {
+                        current_state = &instruction.state_after;
+                    }
+                    IntermediateStatePath::EnterTrue => {}
+                    IntermediateStatePath::EnterFalse => {}
+                    IntermediateStatePath::StartQuery => {
+                        if let InterpretedInstruction::Query(query_instructions) = &instruction.instruction {
+                            // we are entering a query, so we need to check the true branch
+                            current_state = &query_instructions.initial_state_true_branch;
+
+                            // now we need either enter true or enter false
+                            match path.next() {
+                                Some(IntermediateStatePath::EnterTrue) => {
+                                    // we are entering the true branch, so we need to check the true branch instructions
+                                    return get_state_for_path(
+                                        &current_state,
+                                        &query_instructions.true_branch,
+                                        path,
+                                    );
+                                }
+                                Some(IntermediateStatePath::EnterFalse) => {
+                                    // we are entering the false branch, so we need to check the false branch instructions
+                                    return get_state_for_path(
+                                        &current_state,
+                                        &query_instructions.false_branch,
+                                        path,
+                                    );
+                                }
+                                _ => {
+                                    // we are not entering any branch, so we just return the current state
+                                    return Some(current_state.clone());
+                                }
+                            }
+
+                        } else {
+                            // this should not happen, since we only enter queries here
+                            return None;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Some(current_state.clone())
 }
