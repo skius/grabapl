@@ -1,6 +1,6 @@
 use crate::graph::EdgeAttribute;
 use crate::graph::operation::user_defined::{AbstractOperationResultMarker, QueryInstructions};
-use crate::graph::operation::{OperationResult, get_substitution};
+use crate::graph::operation::{OperationResult};
 use crate::graph::pattern::{
     AbstractOutputNodeMarker, OperationArgument, OperationParameter, ParameterSubstitution,
 };
@@ -82,12 +82,17 @@ pub trait BuiltinQuery {
     //  perhaps the abstract shape change should just more or less be a const fn that returns (Taken, NotTaken) changes?
     //  And concrete just returns which path to take?
 
-    fn abstract_changes(
+    // TODO ^ above is obsolete I think
+
+    // TODO: add invariant (checked?) that the abstract graph does not get new nodes or deleted nodes.
+    //  actually, do we really need modification at all? ...
+
+    fn apply_abstract(
         &self,
         g: &mut AbstractGraph<Self::S>,
-        argument: OperationArgument,
         substitution: &ParameterSubstitution,
-    ) -> AbstractQueryOutput<Self::S>;
+    );
+    // ) -> AbstractQueryOutput<Self::S>;
 
     fn query(
         &self,
@@ -171,6 +176,7 @@ pub struct GraphShapeQuery<S: Semantics> {
 
 pub struct ConcreteShapeQueryResult {
     // the node_keys here are the concrete keys of the mapped graph
+    /// Some(mapping) if the shape query matched, None if it did not match.
     pub shape_idents_to_node_keys: Option<HashMap<ShapeNodeIdentifier, NodeKey>>,
 }
 

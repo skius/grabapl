@@ -37,9 +37,8 @@ pub trait BuiltinOperation: Debug {
     fn apply_abstract(
         &self,
         g: &mut AbstractGraph<Self::S>,
-        argument: OperationArgument,
         substitution: &ParameterSubstitution,
-    );
+    ) -> OperationOutput;
 
     // TODO: OperationOutput returned here should only represent Abstract changes. Basically the guaranteed new nodes so that other ops can refer to it.
     //  Maybe we could have something be returned in apply_abstract (just a Vec<SubstMarker>?) to indicate _which_ nodes are guaranteed to be added, and apply then returns a map with those substmarkers as keys?
@@ -95,20 +94,50 @@ enum Operation<'a, S: Semantics> {
     Custom(&'a UserDefinedOperation<S>),
 }
 
+impl<'a, S: SemanticsClone> Operation<'a, S> {
+    pub fn parameter(&self) -> OperationParameter<S> {
+        match self {
+            Operation::Builtin(op) => op.parameter(),
+            Operation::Custom(op) => op.parameter.clone(),
+        }
+    }
+    
+    pub fn apply_abstract(
+        &self,
+        op_ctx: &OperationContext<S>,
+        g: &mut AbstractGraph<S>,
+        subst: &ParameterSubstitution,
+    ) -> OperationResult<OperationOutput> {
+        match self {
+            Operation::Builtin(op) => Ok(op.apply_abstract(g, subst)),
+            Operation::Custom(op) => op.apply_abstract(op_ctx, g, subst),
+        }
+    }
+}
+
 // TODO: Builtin operations should be a trait that follows some generic pattern of mutating the graph
 // also,
 
 pub type OperationId = u32;
+
+
+#[derive(Error, Debug)]
+pub enum SubstitutionError {
+    #[error("invalid operation argument count: expected {expected}, got {actual}")]
+    InvalidOperationArgumentCount { expected: usize, actual: usize },
+    #[error("operation argument does not match parameter")]
+    ArgumentDoesNotMatchParameter,
+}
 
 /// Returns the pattern subst to input graph node key mapping, if the operation is applicable.
 pub fn get_substitution<S: Semantics>(
     g: &AbstractGraph<S>,
     param: &OperationParameter<S>,
     selected_inputs: &[NodeKey],
-) -> OperationResult<ParameterSubstitution> {
+) -> Result<ParameterSubstitution, SubstitutionError> {
     if param.explicit_input_nodes.len() != selected_inputs.len() {
         // TODO: decide if we want this to be actually reachable? Or if all preprocessing we do should catch this
-        return Err(OperationError::InvalidOperationArgumentCount {
+        return Err(SubstitutionError::InvalidOperationArgumentCount {
             expected: param.explicit_input_nodes.len(),
             actual: selected_inputs.len(),
         });
@@ -116,6 +145,8 @@ pub fn get_substitution<S: Semantics>(
 
     // TODO: this won't work if the user selects the same node multiple times. We cannot have a subgraph where two nodes of the subgraph actually match to just a single one in the input graph.
     //  A fix might be to split the isomorphism finding to per-explicitly-selected node?
+
+    // TODO: should we not return an error here?
     let enforced_param_to_arg_node_key_mapping = param
         .explicit_input_nodes
         .iter()
@@ -149,7 +180,7 @@ pub fn get_substitution<S: Semantics>(
     };
 
     let isos = general_subgraph_monomorphisms_iter(&param_ref, &arg_ref, &mut nm, &mut em)
-        .ok_or(OperationError::ArgumentDoesNotMatchParameter)?;
+        .ok_or(SubstitutionError::ArgumentDoesNotMatchParameter)?;
 
     isos.filter_map(|iso| {
         // TODO: handle edge orderedness
@@ -168,7 +199,7 @@ pub fn get_substitution<S: Semantics>(
     })
     .next()
     .map(ParameterSubstitution::new)
-    .ok_or(OperationError::ArgumentDoesNotMatchParameter)
+    .ok_or(SubstitutionError::ArgumentDoesNotMatchParameter)
 }
 
 pub fn run_operation<S: SemanticsClone>(
@@ -263,4 +294,17 @@ pub enum OperationError {
     UnknownOperationResultMarker(AbstractOperationResultMarker),
     #[error("unknown output node marker: {0:?}")]
     UnknownOutputNodeMarker(AbstractOutputNodeMarker),
+}
+
+impl From<SubstitutionError> for OperationError {
+    fn from(err: SubstitutionError) -> Self {
+        match err {
+            SubstitutionError::InvalidOperationArgumentCount { expected, actual } => {
+                OperationError::InvalidOperationArgumentCount { expected, actual }
+            }
+            SubstitutionError::ArgumentDoesNotMatchParameter => {
+                OperationError::ArgumentDoesNotMatchParameter
+            }
+        }
+    }
 }

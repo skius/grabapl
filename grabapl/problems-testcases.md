@@ -1,0 +1,69 @@
+# Problems and Test Cases to be solved
+
+## User defined operation abstract graph shape changes
+**Core problem**: How can a user defined operation change the abstract graph when applied?
+
+The _least_ (defined as 'this always happens') change must be entirely caused by new nodes/edges.
+Actually, we can support more, but it's difficult.
+
+For example:
+1. Operation `add_child_if_not_exists` with input node `a`
+2. Shape query that checks if `a` has a child `child`
+3. False branch of that query that adds a new node `child` to `a`
+
+One might say that the least change is that `a` now has a child `child`.
+This is true only for the builder - we can call operations on that child.
+However, the abstract graph is not changed by this operation.
+Imagine if that was not the case:
+
+
+1. Outside of that op, we have an abstract graph `a -> child`.
+2. When running `add_child_if_not_exists(a)`, what should the result be?
+
+Realistically, we don't want the abstract graph to change. We want it to somehow know that the
+new node `child` inside the operation's abstract graph is the same as the `child` in the argument
+graph.
+
+Similarly, if the argument did not have `child`, we would expect the abstract graph to change to `a -> child` for some
+new node `child`.
+
+ACTUALLY! Since we define shape queries to run on the _concrete_ graph, the child from the outer abstract graph
+_might not even be the same child that is matched inside_.
+
+So, the only way we could support changing the abstract graph for a shape query node, is if we had aliasing
+nodes. Then we could unconditionally add a new node `child` that may or may not alias the other child node.
+But this is very tricky and we don't want to do that.
+
+Hence: Abstract graph changes due to shape queries are not supported.
+
+This would work, however:
+1. Operation `add_child` with input node `a`
+2. non-shape-query on eg `a` (eg Eq0)
+3. True branch: add child `child` to `a`
+4. False branch: add child `child` to `a`
+5. After query: reconciled abstract graph is `a -> child`, both for the operation builder and also for any
+   calling code.
+
+## Recursion in operation builder
+*More information in MT Report Notes gdoc*
+
+**Core problem**: How can we support recursion in the operation builder? At some point during the builder interpretation step, we need to be able to call the operation that's being 
+  built recursively.
+* Positive: The built operation cannot abstractly _always_ eg add a new node, since that would be an infinite loop.
+  Hence we know for sure that the operation will not abstractly add a new node.
+* But: How do we know the new _abstract values_ to set in the abstract graph after recursing?
+
+For user defined operations, we could make the user say which (sound) changes they want to be visible.
+Because we know that the operation will abstractly not add a new node, the abstract graph will be the same
+as the parameter graph.
+
+Hence, we can make the user say which abstract node and edge values will change to what values.
+
+Caveats:
+1. This must be sound. That is, the user can only change the abstract value to something that is a *supertype* of the
+   abstract value at the end of the operation. We will need to check this.
+2. This needs to happen _at the beginning_ of the operation, because if we're partially building an operation, and then
+   recurse, we must already know the abstract values that will change.
+   * This is bad user experience, but let's try it for now.
+
+[//]: # (TODO: make this better user experience.)

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+#[derive(Debug, Clone)]
 pub struct BiMap<L, R> {
     left_to_right: HashMap<L, R>,
     right_to_left: HashMap<R, L>,
@@ -11,6 +12,10 @@ impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> BiMap<L, 
             left_to_right: HashMap::new(),
             right_to_left: HashMap::new(),
         }
+    }
+    
+    pub fn into_inner(self) -> (HashMap<L, R>, HashMap<R, L>) {
+        (self.left_to_right, self.right_to_left)
     }
 
     pub fn insert(&mut self, left: L, right: R) {
@@ -28,6 +33,14 @@ impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> BiMap<L, 
 
     pub fn get_right(&self, right: &R) -> Option<&L> {
         self.right_to_left.get(right)
+    }
+    
+    pub fn contains_left(&self, left: &L) -> bool {
+        self.left_to_right.contains_key(left)
+    }
+    
+    pub fn contains_right(&self, right: &R) -> bool {
+        self.right_to_left.contains_key(right)
     }
 
     pub fn remove_left(&mut self, left: &L) -> Option<R> {

@@ -1,9 +1,9 @@
-use crate::graph::operation::query::{GraphShapeQuery, ShapeNodeIdentifier};
+use crate::graph::operation::query::{BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier};
 use crate::graph::operation::user_defined::{
     AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, QueryInstructions,
     UserDefinedOperation,
 };
-use crate::graph::pattern::{AbstractOutputNodeMarker, OperationParameter};
+use crate::graph::pattern::{AbstractOutputNodeMarker, OperationParameter, ParameterSubstitution};
 use crate::graph::semantics::{AbstractGraph, SemanticsClone};
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, OperationContext, OperationId, SubstMarker};
@@ -11,8 +11,10 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::iter::Peekable;
 use std::marker::PhantomData;
+use std::mem;
 use std::slice::Iter;
 use thiserror::Error;
+use crate::graph::operation::{get_substitution, BuiltinOperation, OperationError};
 /*
 General overview:
 
@@ -82,6 +84,17 @@ pub enum OperationBuilderError {
     InvalidInQuery,
     #[error("Already visited the {0} branch of the active query")]
     AlreadyVisitedBranch(bool),
+    #[error("Could not find abstract node id: {0:?}")]
+    NotFoundAid(AbstractNodeId),
+    #[error("Could not find operation ID: {0}")]
+    NotFoundOperationId(OperationId),
+    #[error("Could not apply operation due to mismatched arguments: {0}")]
+    SubstitutionError(#[from] crate::graph::operation::SubstitutionError),
+    #[error("Could not abstractly apply operation {0} due to: {1}")]
+    AbstractApplyOperationError(
+        OperationId,
+        OperationError,
+    ),
 }
 
 pub struct OperationBuilder<'a, S: SemanticsClone> {
@@ -814,6 +827,7 @@ To do this memory-efficiently, some incremental representation would be nice. Li
 But, for time reasons, let's just store a copy of the entire state from above after each instruction.
 */
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 enum QueryPath {
     Query(String),
     TrueBranch,
@@ -824,6 +838,18 @@ struct IntermediateState<S: SemanticsClone> {
     graph: AbstractGraph<S>,
     node_keys_to_aid: BiMap<NodeKey, AbstractNodeId>,
     query_path: Vec<QueryPath>,
+}
+
+// TODO: unfortunately, we cannot derive Clone, since it implies a `S: Clone` bound.
+//  - in theory, we could add that bound, since a Semantics as a value does not really store much. So clone should be fine.
+impl<S: SemanticsClone> Clone for IntermediateState<S> {
+    fn clone(&self) -> Self {
+        IntermediateState {
+            graph: self.graph.clone(),
+            node_keys_to_aid: self.node_keys_to_aid.clone(),
+            query_path: self.query_path.clone(),
+        }
+    }
 }
 
 enum InterpretedOpLike<S: SemanticsClone> {
@@ -855,25 +881,28 @@ struct InterpretedQueryInstructions<S: SemanticsClone> {
 
 struct InterpretedInstructionWithState<S: SemanticsClone> {
     instruction: IntermediateInstruction<S>,
-    args: Vec<AbstractNodeId>,
+    state_after: IntermediateState<S>,
 }
 
-struct IntermediateInterpreter<S: SemanticsClone> {
+struct IntermediateInterpreter<'a, S: SemanticsClone> {
+    self_op_id: OperationId,
+    op_ctx: &'a OperationContext<S>,
     op_param: OperationParameter<S>,
     initial_state: IntermediateState<S>,
+    current_state: IntermediateState<S>,
     instructions: Vec<(
         Option<AbstractOperationResultMarker>,
         InterpretedInstructionWithState<S>,
     )>,
+    /// A counter to generate unique operation result markers.
+    counter: u64,
 }
 
-impl<S: SemanticsClone> IntermediateInterpreter<S> {
-    fn new(
+impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
+    fn new_for_self_op_id(
+        self_op_id: OperationId,
         op_param: OperationParameter<S>,
-        intermediate_instructions: Vec<(
-            Option<AbstractOperationResultMarker>,
-            IntermediateInstruction<S>,
-        )>,
+        op_ctx: &'a OperationContext<S>,
     ) -> Self {
         let initial_graph = op_param.parameter_graph.clone();
 
@@ -890,22 +919,382 @@ impl<S: SemanticsClone> IntermediateInterpreter<S> {
             query_path: Vec::new(),
         };
 
+        let current_state = initial_state.clone();
+
         let interpreter = IntermediateInterpreter {
+            self_op_id,
+            op_ctx,
             op_param,
             initial_state,
+            current_state,
             instructions: Vec::new(),
+            counter: 0,
         };
 
         interpreter
     }
 
-    fn interpret(
+    fn create_user_defined_operation(
+        &mut self,
+        intermediate_instructions: Vec<(
+        Option<AbstractOperationResultMarker>,
+        IntermediateInstruction<S>,
+        )>,
+    ) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
+
+        Ok(UserDefinedOperation {
+            parameter: self.op_param.clone(),
+            instructions: self.interpret_instructions(intermediate_instructions)?,
+        })
+    }
+
+    fn interpret_instructions(
         &mut self,
         intermediate_instructions: Vec<(
             Option<AbstractOperationResultMarker>,
             IntermediateInstruction<S>,
         )>,
-    ) -> Result<(), OperationBuilderError> {
+    ) -> Result<Vec<(Option<AbstractOperationResultMarker>, UDInstruction<S>)>, OperationBuilderError> {
+        let mut instructions = Vec::new();
+        for (marker, instruction) in intermediate_instructions {
+            let instruction = self.interpret_single_instruction(marker, instruction)?;
+            instructions.push((marker, instruction));
+        }
+        Ok(instructions)
+    }
+
+    fn interpret_single_instruction(
+        &mut self,
+        marker: Option<AbstractOperationResultMarker>,
+        instruction: IntermediateInstruction<S>,
+    ) -> Result<UDInstruction<S>, OperationBuilderError> {
+        match instruction {
+            IntermediateInstruction::OpLike(oplike) => {
+                self.interpret_op_like(marker, oplike)
+            }
+            IntermediateInstruction::BuiltinQuery(query, args, query_instructions) => {
+                self.interpret_builtin_query(query, args, query_instructions)
+            }
+            IntermediateInstruction::GraphShapeQuery(
+                op_marker,
+                gsq_instructions,
+                query_instructions,
+            ) => {
+                self.interpret_graph_shape_query(op_marker, gsq_instructions, query_instructions)
+            }
+        }
+    }
+
+    fn interpret_op_like(
+        &mut self,
+        marker: Option<AbstractOperationResultMarker>,
+        oplike: IntermediateOpLike<S>,
+    ) -> Result<UDInstruction<S>, OperationBuilderError> {
+        match oplike {
+            IntermediateOpLike::Builtin(op, args) => {
+                let param = op.parameter();
+                let (subst, abstract_arg) = self.get_current_substitution(&param, args)?;
+
+                // now apply op and store result
+                let mut new_graph = self.current_state.graph.clone();
+                let operation_output = op.apply_abstract(&mut new_graph, &subst);
+                // go over new nodes
+                let marker = marker.unwrap_or_else(|| self.get_new_unnamed_abstract_operation_marker());
+                for (node_marker, node_key) in operation_output.new_nodes {
+                    let aid = AbstractNodeId::DynamicOutputMarker(marker, node_marker);
+                    self.current_state.node_keys_to_aid.insert(node_key, aid);
+                }
+
+                Ok(UDInstruction::Builtin(
+                    op,
+                    abstract_arg,
+                ))
+            }
+            IntermediateOpLike::Operation(id, args) => {
+                let op = self.op_ctx.get(id).ok_or(OperationBuilderError::NotFoundOperationId(id))?;
+                let param = op.parameter();
+                let (subst, abstract_arg) = self.get_current_substitution(&param, args)?;
+
+                // TODO: need to apply the operation abstractly here.
+                let mut new_graph = self.current_state.graph.clone();
+                let operation_output = op.apply_abstract(self.op_ctx, &mut new_graph, &subst);
+                // go over new nodes
+                let marker = marker.unwrap_or_else(|| self.get_new_unnamed_abstract_operation_marker());
+                let operation_output = operation_output.map_err(|e| {
+                    OperationBuilderError::AbstractApplyOperationError(
+                        id,
+                        e,
+                    )
+                })?;
+                for (node_marker, node_key) in operation_output.new_nodes {
+                    let aid = AbstractNodeId::DynamicOutputMarker(marker, node_marker);
+                    self.current_state.node_keys_to_aid.insert(node_key, aid);
+                }
+                Ok(UDInstruction::Operation(
+                    id,
+                    abstract_arg,
+                ))
+            }
+            IntermediateOpLike::Recurse(args) => {
+                // TODO: recursion is actually tricky. because at this point we have not finished interpreting the current operation yet.
+                //  So how are we supposed to know the abstract changes?
+                todo!("Recursion not implemented yet");
+
+                // TODO: use approach from `problems-testcases.md`
+            }
+        }
+    }
+
+    fn interpret_builtin_query(
+        &mut self,
+        query: S::BuiltinQuery,
+        args: Vec<AbstractNodeId>,
+        query_instructions: IntermediateQueryInstructions<S>,
+    ) -> Result<UDInstruction<S>, OperationBuilderError> {
+        let param = query.parameter();
+        let (subst, arg) = self.get_current_substitution(&param, args)?;
+        // create a new graph to apply the query to
+        let mut new_graph = self.current_state.graph.clone();
+
+        // apply the query to the current graph
+        query.apply_abstract(
+            &mut new_graph,
+            &subst,
+        );
+
+
+        // interpret the instructions in the true and false branches
+        let true_branch = self.interpret_instructions(query_instructions.true_branch)?;
+        let false_branch = self.interpret_instructions(query_instructions.false_branch)?;
+
+
+        // TODO: update current state etc...
+
+        // TODO: reconcile states of both true and false branch!
+        // TODO: reconciliation should probably be done via having the same AID for the same node in both branches.
+        //  all other ones will be ignored.
+        //  ==> we must manually change the abstract graph ourselves here!
+
+        Ok(UDInstruction::BuiltinQuery(
+            query,
+            arg,
+            QueryInstructions {
+                taken: true_branch,
+                not_taken: false_branch,
+            },
+        ))
+    }
+
+    fn interpret_graph_shape_query(
+        &mut self,
+        gsq_op_marker: AbstractOperationResultMarker,
+        gsq_instructions: Vec<GraphShapeQueryInstruction<S>>,
+        query_instructions: IntermediateQueryInstructions<S>,
+    ) -> Result<UDInstruction<S>, OperationBuilderError> {
+
+        // preparation for false branch
+        let mut false_branch_state = self.current_state.clone();
         
+        // first pass: collect the initial graph (the parameter)
+        let mut param = OperationParameter::<S> {
+            explicit_input_nodes: vec![],
+            parameter_graph: AbstractGraph::<S>::new(),
+            subst_to_node_keys: HashMap::new(),
+            node_keys_to_subst: HashMap::new(),
+        };
+        
+        let mut abstract_args = Vec::new();
+
+        let mut arg_aid_to_param_subst: BiMap<AbstractNodeId, SubstMarker> = BiMap::new();
+        let mut arg_aid_to_node_keys: BiMap<AbstractNodeId, NodeKey> = BiMap::new();
+
+        let mut collect_aid = |aid| -> Result<(), OperationBuilderError> {
+            if arg_aid_to_param_subst.contains_left(aid) {
+                // we already processed this
+                return Ok(());
+            }
+            let subst_marker = SubstMarker::from(param.explicit_input_nodes.len() as u32);
+            let key = self.current_state.node_keys_to_aid.get_right(aid)
+                .cloned()
+                .ok_or(OperationBuilderError::NotFoundAid(*aid))?;
+            let abstract_value = self.current_state.graph.get_node_attr(key)
+                .expect("internal error: node key should be in state graph since it is in the mapping")
+                .clone();
+            let param_key = param.parameter_graph.add_node(abstract_value);
+            param.subst_to_node_keys.insert(subst_marker, param_key);
+            param.node_keys_to_subst.insert(param_key, subst_marker);
+            param.explicit_input_nodes.push(subst_marker);
+            abstract_args.push(aid.clone());
+            arg_aid_to_param_subst.insert(aid.clone(), subst_marker);
+            arg_aid_to_node_keys.insert(aid.clone(), key);
+            Ok(())
+        };
+
+        for instruction in &gsq_instructions {
+            match instruction {
+                GraphShapeQueryInstruction::ExpectShapeNode(_, _) => {
+                    // Skip. this does not affect the initial graph.
+                }
+                GraphShapeQueryInstruction::ExpectShapeEdge(src, target, _) => {
+                    // we need both src and target to be in the initial graph, assuming they dont come from `gsq_op_marker`
+                    match src {
+                        AbstractNodeId::ParameterMarker(_) => {
+                            // we need this.
+                            collect_aid(src)?;
+                        }
+                        AbstractNodeId::DynamicOutputMarker(orm, node_marker) => {
+                            // we need this, but only if it is not from the current graph shape query.
+                            if orm != &gsq_op_marker {
+                                collect_aid(src)?;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // second pass:
+        // modify to have the expected graph as well as shape ident mappings.
+        // simultaneously, also modify the *current state graph* to prepare it for the true branch.
+        // make a copy before that though, for the false branch.
+
+        let mut expected_graph = param.parameter_graph.clone();
+        let mut node_keys_to_shape_idents: BiMap<NodeKey, ShapeNodeIdentifier> = BiMap::new();
+
+        // let aid_to_node_key = |aid| -> Result<NodeKey, OperationBuilderError> {
+        //     arg_aid_to_node_keys.get_left(&aid)
+        //         .cloned()
+        //         .or_else(|| {
+        //             if let AbstractNodeId::DynamicOutputMarker(orm, node_marker) = aid {
+        //                 if orm == gsq_op_marker {
+        //                     // this is a new node from the graph shape query.
+        //                     let sni: ShapeNodeIdentifier = node_marker.0.into();
+        //                     node_keys_to_shape_idents.get_right(&sni).copied()
+        //                 } else {
+        //                     None
+        //                 }
+        //             } else {
+        //                 None
+        //             }
+        //         })
+        //         .ok_or(OperationBuilderError::NotFoundAid(aid))
+        // };
+
+        // TODO: ugly. fix. needed because the above closure approach does not work due to borrowing issues.
+        macro_rules! aid_to_node_key_hack {
+            ($aid:expr) => {
+                arg_aid_to_node_keys.get_left(&$aid)
+                .cloned()
+                .or_else(|| {
+                    if let AbstractNodeId::DynamicOutputMarker(orm, node_marker) = $aid {
+                        if orm == gsq_op_marker {
+                            // this is a new node from the graph shape query.
+                            let sni: ShapeNodeIdentifier = node_marker.0.into();
+                            node_keys_to_shape_idents.get_right(&sni).copied()
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .ok_or(OperationBuilderError::NotFoundAid($aid))
+            };
+        }
+
+        for instruction in gsq_instructions {
+            match instruction {
+                GraphShapeQueryInstruction::ExpectShapeNode(marker, av) => {
+                    let key = expected_graph.add_node(av.clone());
+                    let shape_node_ident = marker.0.into();
+                    // TODO: insert is panicking and therefore we should return an error instead here.
+                    // TODO: make bimap::insert fallible? return a must_use Option<()>?
+                    node_keys_to_shape_idents.insert(key, shape_node_ident);
+                    
+                    // now update the state for the true branch.
+                    let state_key = self.current_state.graph.add_node(av);
+                    let aid = AbstractNodeId::DynamicOutputMarker(gsq_op_marker, marker);
+                    self.current_state.node_keys_to_aid.insert(state_key, aid.clone());
+                }
+                GraphShapeQueryInstruction::ExpectShapeEdge(src, target, av) => {
+                    let src_key = aid_to_node_key_hack!(src)?;
+                    let target_key = aid_to_node_key_hack!(target)?;
+                    expected_graph.add_edge(src_key, target_key, av.clone());
+                    
+                    // now update the state for the true branch.
+                    let state_src_key = *self.current_state.node_keys_to_aid.get_right(&src).ok_or(OperationBuilderError::NotFoundAid(src))?;
+                    let state_target_key = *self.current_state.node_keys_to_aid.get_right(&target).ok_or(OperationBuilderError::NotFoundAid(target))?;
+                    self.current_state.graph.add_edge(
+                        state_src_key,
+                        state_target_key,
+                        av,
+                    );
+                }
+            }
+        }
+
+        let (node_keys_to_shape_idents, shape_idents_to_node_keys) =
+            node_keys_to_shape_idents
+                .into_inner();
+        let gsq = GraphShapeQuery {
+            parameter: param,
+            expected_graph,
+            node_keys_to_shape_idents,
+            shape_idents_to_node_keys,
+        };
+        
+        let true_branch = self.interpret_instructions(query_instructions.true_branch)?;
+        // switch back to the other state
+        let after_true_branch_state = mem::replace(&mut self.current_state, false_branch_state);
+        let false_branch = self.interpret_instructions(query_instructions.false_branch)?;
+        
+        // TODO: reconcile the states of both branches. same as in query.
+        
+
+        // TODO: we will need to make sure we pass down the correct current state to the true/false branches.
+        
+        Ok(UDInstruction::ShapeQuery(
+            gsq,
+            abstract_args,
+            QueryInstructions {
+                taken: true_branch,
+                not_taken: false_branch,
+            },
+        ))
+    }
+
+    fn get_current_substitution(&self,
+                                param: &OperationParameter<S>,
+                                args: Vec<AbstractNodeId>,
+    ) -> Result<(ParameterSubstitution, AbstractOperationArgument), OperationBuilderError> {
+        let selected_inputs = args
+            .iter()
+            .map(|aid| {
+                self.current_state
+                    .node_keys_to_aid
+                    .get_right(aid)
+                    .cloned()
+                    .ok_or(OperationBuilderError::NotFoundAid(*aid))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let subst = get_substitution(&self.current_state.graph, &param, &selected_inputs)?;
+        let subst_to_aid = subst.mapping.iter().map(|(&subst, &key)| {
+            let aid = self.current_state.node_keys_to_aid.get_left(&key).cloned()
+                .expect("node key should be in mapping, because all node keys from the abstract graph should be in the mapping. internal error");
+            (subst, aid)
+        }).collect();
+
+        let abstract_arg = AbstractOperationArgument {
+            selected_input_nodes: args,
+            subst_to_aid,
+        };
+
+        Ok((subst, abstract_arg))
+    }
+
+    fn get_new_unnamed_abstract_operation_marker(&mut self) -> AbstractOperationResultMarker {
+        let val = self.counter;
+        self.counter += 1;
+        AbstractOperationResultMarker::Implicit(val)
     }
 }

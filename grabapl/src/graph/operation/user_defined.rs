@@ -8,7 +8,7 @@ use crate::graph::pattern::{
     AbstractOutputNodeMarker, OperationArgument, OperationOutput, OperationParameter,
     ParameterSubstitution,
 };
-use crate::graph::semantics::{ConcreteGraph, SemanticsClone};
+use crate::graph::semantics::{AbstractGraph, ConcreteGraph, SemanticsClone};
 use crate::{NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
 use derive_more::with_trait::From;
 use std::collections::HashMap;
@@ -16,7 +16,10 @@ use std::rc::Rc;
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, From)]
-pub struct AbstractOperationResultMarker(pub &'static str);
+pub enum AbstractOperationResultMarker {
+    Custom(&'static str),
+    Implicit(u64),
+}
 
 /// Identifies a node in the user defined operation view.
 #[derive(Copy, Clone, From, Debug, Eq, PartialEq, Hash)]
@@ -41,6 +44,13 @@ pub struct AbstractOperationArgument {
 }
 
 impl AbstractOperationArgument {
+    pub fn new() -> Self {
+        AbstractOperationArgument {
+            selected_input_nodes: Vec::new(),
+            subst_to_aid: HashMap::new(),
+        }
+    }
+
     pub fn infer_explicit_for_param(
         selected_nodes: Vec<AbstractNodeId>,
         param: &OperationParameter<impl Semantics>,
@@ -109,9 +119,19 @@ pub struct UserDefinedOperation<S: Semantics> {
     pub parameter: OperationParameter<S>,
     // TODO: add preprocessing (checking) step to see if the instructions make sense and are well formed wrt which nodes they access statically.
     pub instructions: Vec<InstructionWithResultMarker<S>>,
+    // TODO: need to define output changes.
 }
 
 impl<S: SemanticsClone> UserDefinedOperation<S> {
+    pub(crate) fn apply_abstract(
+        &self,
+        op_ctx: &OperationContext<S>,
+        abstract_g: &mut AbstractGraph<S>,
+        subst: &ParameterSubstitution,
+    ) -> OperationResult<OperationOutput> {
+        todo!("Implement apply_abstract for UserDefinedOperation");
+    }
+
     pub(crate) fn apply(
         &self,
         op_ctx: &OperationContext<S>,
@@ -214,7 +234,7 @@ fn run_instructions<S: SemanticsClone>(
                         for (ident, node_key) in shape_idents_to_node_keys {
                             // TODO: add helper function, or add new variant to AbstractOutputNodeMarker, or just use that one for the shape query mapping and get rid of ShapeNodeIdentifier.
                             let output_marker =
-                                AbstractOutputNodeMarker::from(<ShapeNodeIdentifier as Into<
+                                AbstractOutputNodeMarker(<ShapeNodeIdentifier as Into<
                                     &'static str,
                                 >>::into(
                                     ident.into()

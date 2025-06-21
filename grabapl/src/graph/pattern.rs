@@ -1,5 +1,5 @@
 use crate::graph::operation::{OperationError, OperationResult};
-use crate::graph::semantics::AbstractGraph;
+use crate::graph::semantics::{AbstractGraph, SemanticsClone};
 use crate::{Graph, NodeKey, Semantics, SubstMarker, WithSubstMarker};
 use derive_more::From;
 use std::collections::HashMap;
@@ -17,6 +17,17 @@ pub struct OperationParameter<S: Semantics> {
     pub subst_to_node_keys: HashMap<SubstMarker, NodeKey>,
     /// Maps node keys in the pattern graph to the user-defined substitution markers.
     pub node_keys_to_subst: HashMap<NodeKey, SubstMarker>,
+}
+
+impl<S: SemanticsClone> Clone for OperationParameter<S> {
+    fn clone(&self) -> Self {
+        OperationParameter {
+            explicit_input_nodes: self.explicit_input_nodes.clone(),
+            parameter_graph: self.parameter_graph.clone(),
+            subst_to_node_keys: self.subst_to_node_keys.clone(),
+            node_keys_to_subst: self.node_keys_to_subst.clone(),
+        }
+    }
 }
 
 /// The result of trying to bind an abstract graph to a parameter graph.
@@ -69,7 +80,15 @@ impl OperationArgument {
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, From)]
 pub struct AbstractOutputNodeMarker(pub &'static str);
 
+// TODO: OperationOutput should also include substractive changes to the graph,
+//  i.e.:
+//  * nodes that were removed
+//  * edges that were removed
+//  * abstract values whose attributes were changed
+// TODO: this last point seems tricky. How can we know which attrs were changed?
+//  I guess: for Builtins, we can just run the apply_abstract and try to do some
+//  'merge'. Well, actually, the apply_abstract does the merge for us.
+//  For UserDefinedOp, we need to determine the least common ancestor
 pub struct OperationOutput {
-    // TODO: use OutputMarker instead of SubstMarker?
     pub new_nodes: HashMap<AbstractOutputNodeMarker, NodeKey>,
 }
