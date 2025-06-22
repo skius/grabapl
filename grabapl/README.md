@@ -21,3 +21,5 @@ cargo check --target wasm32-unknown-unknown
 
 - [ ] In user defined operations, make sure that only _new_ nodes are returned abstractly. And only those that the user wants to return. Needs some new field on UserDefinedOp.
   * will need to make sure they're contravariant to the actual determined state as by the interpreter. (if a node is supposed to be a String, then the user can only return it as a String or Object, but not as eg a Number)
+  
+- [ ] Start some tests...
