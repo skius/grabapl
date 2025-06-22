@@ -100,3 +100,23 @@ Perhaps there should be some "last_invisible" marker that refers to the last edg
 abstract graph does not see, and then the new edge would be "last_invisible + 1", another edge after that
 "last_invisible + 2", etc.
 
+## Prettier Operation Builder
+The current approach mirrors parsing a stream of tokens via a recursive descent parser with multiple passes through
+different structs.
+
+This is quite complex, not very efficient, and not easy to modify.
+
+What is keeping us from using a state machine with an explicit stack?
+
+Essentially, all local variables from the current recursive descent methods need to be stored in the stack.
+Since they appear at different points of parsing, they need to be made optional in the explicit stack since we may have not
+reached the relevant point yet.
+
+==> There is a lot of overhead.
+
+**Alternative**: Perhaps it is enough to just make the existing operation builder a bit prettier.
+
+It uses a lot of tuples, introducing structs could make it more readable.
+
+Really, if we could just have a Debug constraint on the BuiltinOperation and BuiltinQuery types, the actual IntermediateState
+that we can print would potentially be more helpful.

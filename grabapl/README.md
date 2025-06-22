@@ -23,3 +23,6 @@ cargo check --target wasm32-unknown-unknown
   * will need to make sure they're contravariant to the actual determined state as by the interpreter. (if a node is supposed to be a String, then the user can only return it as a String or Object, but not as eg a Number)
   
 - [ ] Start some tests...
+- [ ] Just add Debug constraints and simplify a lot of code?
+- [ ] Fix the 'static lifetime from markers and turn it into an owned String
+- [ ] Add the CustomName variant for AbstractNodeId?
