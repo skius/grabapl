@@ -104,7 +104,13 @@ document.querySelector("#btnRunOp").addEventListener("click", (event) => {
     let inputs = parts.slice(1).map(x => parseInt(x));
     console.log("Adding operation with id: " + id + " and inputs: " + inputs);
 
-    runner.run(concrete, opCtx, id, inputs)
+    try {
+        runner.run(concrete, opCtx, id, inputs)
+    } catch (e) {
+        console.error("Error running operation:", e);
+        alert("Error running operation: " + e.message);
+        return;
+    }
     onChange()
 })
 
