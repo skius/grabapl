@@ -10,4 +10,6 @@ export class BuilderOpLike {
     static newFromId(opId: number): BuilderOpLike;
 
     static newRecurse(): BuilderOpLike;
+
+    static newAddNode(): BuilderOpLike;
 }

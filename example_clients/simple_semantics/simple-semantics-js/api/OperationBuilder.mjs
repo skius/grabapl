@@ -7,6 +7,7 @@ import { EdgeAbstract } from "./EdgeAbstract.mjs"
 import { IntermediateState } from "./IntermediateState.mjs"
 import { OpCtx } from "./OpCtx.mjs"
 import { OperationBuilderError } from "./OperationBuilderError.mjs"
+import { UserDefinedOperation } from "./UserDefinedOperation.mjs"
 import wasm from "./diplomat-wasm.mjs";
 import * as diplomatRuntime from "./diplomat-runtime.mjs";
 
@@ -283,6 +284,25 @@ export class OperationBuilder {
                 throw new globalThis.Error('OperationBuilderError: ' + cause.toString(), { cause });
             }
             return new IntermediateState(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+        }
+
+        finally {
+            diplomatReceive.free();
+        }
+    }
+
+    finalize(opId) {
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.OperationBuilder_finalize(diplomatReceive.buffer, this.ffiValue, opId);
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new OperationBuilderError(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+                throw new globalThis.Error('OperationBuilderError: ' + cause.toString(), { cause });
+            }
+            return new UserDefinedOperation(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
         }
 
         finally {

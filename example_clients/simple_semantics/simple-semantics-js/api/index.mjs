@@ -25,3 +25,5 @@ export { OperationBuilder } from "./OperationBuilder.mjs"
 export { OperationBuilderError } from "./OperationBuilderError.mjs"
 
 export { Runner } from "./Runner.mjs"
+
+export { UserDefinedOperation } from "./UserDefinedOperation.mjs"

@@ -27,3 +27,5 @@ export { OperationBuilder } from "./OperationBuilder"
 export { OperationBuilderError } from "./OperationBuilderError"
 
 export { Runner } from "./Runner"
+
+export { UserDefinedOperation } from "./UserDefinedOperation"

@@ -69,6 +69,12 @@ mod ffi {
             operation_ctx.add_custom_operation(5, simple_semantics::sample_user_defined_operations::get_labeled_edges_insert_bst_user_defined_operation(5));
             Box::new(OpCtx(operation_ctx))
         }
+
+        // TODO: dangerous function because it needs a mutable OpCtx while at the same time we store a reference
+        //  to OpCtx in the OperationBuilder.
+        pub fn add_custom_operation(&mut self, op_id: u32, operation: &mut UserDefinedOperation) {
+            self.0.add_custom_operation(op_id, operation.0.take().unwrap());
+        }
     }
 
     #[diplomat::opaque]
@@ -128,7 +134,7 @@ mod ffi {
     }
 
     impl<'a> OperationBuilder<'a> {
-        // TODO: this is only safe as long as the OpCtx is not edited.
+        // TODO: this is only safe and sound as long as the OpCtx is not edited.
         pub fn create(op_ctx: &'a OpCtx) -> Box<OperationBuilder<'a>> {
             Box::new(OperationBuilder(RustOperationBuilder::new(&op_ctx.0)))
         }
@@ -197,7 +203,16 @@ mod ffi {
             self.0.show_state().map(|s| Box::new(IntermediateState(s))).map_err(|e| Box::new(OperationBuilderError(e)))
         }
 
+        pub fn finalize(&self, op_id: u32) -> Result<Box<UserDefinedOperation>, Box<OperationBuilderError>> {
+            self.0.build(op_id).map(|op| Box::new(UserDefinedOperation(Some(op)))).map_err(|e| Box::new(OperationBuilderError(e)))
+        }
+
     }
+
+    // Option again because cloning is difficult so we want to take.
+    #[diplomat::opaque]
+    pub struct UserDefinedOperation(Option<grabapl::graph::operation::user_defined::UserDefinedOperation<SimpleSemantics>>);
+
 
     #[diplomat::opaque]
     pub struct IntermediateState(RustIntermediateState<SimpleSemantics>);
@@ -232,6 +247,10 @@ mod ffi {
 
         pub fn new_recurse() -> Box<BuilderOpLike> {
             Box::new(BuilderOpLike(Some(Instruction::Recurse)))
+        }
+
+        pub fn new_add_node() -> Box<BuilderOpLike> {
+            Box::new(BuilderOpLike(Some(Instruction::Builtin(BuiltinOperation::AddNode))))
         }
     }
 

@@ -58,6 +58,18 @@ export class BuilderOpLike {
         }
     }
 
+    static newAddNode() {
+
+        const result = wasm.BuilderOpLike_new_add_node();
+
+        try {
+            return new BuilderOpLike(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+        }
+    }
+
     constructor(symbol, ptr, selfEdge) {
         return this.#internalConstructor(...arguments)
     }

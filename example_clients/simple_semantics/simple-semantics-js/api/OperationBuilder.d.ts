@@ -7,6 +7,7 @@ import type { EdgeAbstract } from "./EdgeAbstract"
 import type { IntermediateState } from "./IntermediateState"
 import type { OpCtx } from "./OpCtx"
 import type { OperationBuilderError } from "./OperationBuilderError"
+import type { UserDefinedOperation } from "./UserDefinedOperation"
 import type { pointer, codepoint } from "./diplomat-runtime.d.ts";
 
 
@@ -40,4 +41,6 @@ export class OperationBuilder {
     addInstruction(name: string | null, instruction: BuilderOpLike, args: AbstractArgList): void;
 
     show(): IntermediateState;
+
+    finalize(opId: number): UserDefinedOperation;
 }

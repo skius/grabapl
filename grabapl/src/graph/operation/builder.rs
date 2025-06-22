@@ -45,6 +45,8 @@ pub enum Instruction<S: SemanticsClone> {
     Recurse,
 }
 
+// TODO: perhaps this should include a "GiveNodeExplicitName" instruction that gives a node a name of a single string?
+//  this would need to be a variant of AbstractNodeId.
 #[derive(derive_more::Debug)]
 enum BuilderInstruction<S: SemanticsClone> {
     #[debug("ExpectParameterNode({_0:?}, ???)")]
@@ -251,7 +253,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
     // TODO: This should run further post processing checks.
     //  Stuff like Context nodes must be connected, etc.
     pub fn build(
-        self,
+        &self,
         self_op_id: OperationId,
     ) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
         // Here we would typically finalize the operation and return it.

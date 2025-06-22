@@ -15,6 +15,7 @@ export interface InitOutput {
   readonly AbstractNodeId_destroy: (a: number) => void;
   readonly BuilderOpLike_new_from_id: (a: number) => number;
   readonly BuilderOpLike_new_recurse: () => number;
+  readonly BuilderOpLike_new_add_node: () => number;
   readonly BuilderOpLike_destroy: (a: number) => void;
   readonly BuiltinQuery_new_is_value_gt: (a: number) => number;
   readonly BuiltinQuery_new_is_value_eq: (a: number) => number;
@@ -30,7 +31,6 @@ export interface InitOutput {
   readonly DotCollector_collect: (a: number, b: number) => void;
   readonly DotCollector_get_dot: (a: number, b: number) => void;
   readonly DotCollector_destroy: (a: number) => void;
-  readonly EdgeAbstract_new_wildcard: () => number;
   readonly EdgeAbstract_new_exact: (a: number, b: number) => number;
   readonly EdgeAbstract_destroy: (a: number) => void;
   readonly IntermediateState_get_dot: (a: number, b: number) => void;
@@ -38,6 +38,7 @@ export interface InitOutput {
   readonly IntermediateState_query_context: (a: number, b: number) => void;
   readonly IntermediateState_destroy: (a: number) => void;
   readonly OpCtx_create: () => number;
+  readonly OpCtx_add_custom_operation: (a: number, b: number, c: number) => void;
   readonly OpCtx_destroy: (a: number) => void;
   readonly OperationBuilder_create: (a: number) => number;
   readonly OperationBuilder_expect_parameter_node: (a: number, b: number, c: number) => void;
@@ -52,12 +53,15 @@ export interface InitOutput {
   readonly OperationBuilder_expect_shape_edge: (a: number, b: number, c: number, d: number, e: number) => void;
   readonly OperationBuilder_add_instruction: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
   readonly OperationBuilder_show: (a: number, b: number) => void;
+  readonly OperationBuilder_finalize: (a: number, b: number, c: number) => void;
   readonly OperationBuilder_destroy: (a: number) => void;
   readonly OperationBuilderError_message: (a: number, b: number) => void;
   readonly OperationBuilderError_destroy: (a: number) => void;
   readonly Runner_create: () => number;
   readonly Runner_run: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly Runner_destroy: (a: number) => void;
+  readonly UserDefinedOperation_destroy: (a: number) => void;
+  readonly EdgeAbstract_new_wildcard: () => number;
   readonly diplomat_init: () => void;
   readonly diplomat_simple_write: (a: number, b: number, c: number) => void;
   readonly diplomat_buffer_write_create: (a: number) => number;

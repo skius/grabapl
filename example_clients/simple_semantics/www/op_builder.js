@@ -1,6 +1,6 @@
 import {
     AbstractArgList,
-    AbstractNodeId, BuiltinQuery,
+    AbstractNodeId, BuilderOpLike, BuiltinQuery,
     EdgeAbstract,
     OpCtx,
     OperationBuilder,
@@ -9,6 +9,10 @@ import {
 import {Graphviz} from "@hpcc-js/wasm";
 
 let opCtx = OpCtx.create();
+
+export const getOpCtx = () => {
+    return opCtx;
+}
 
 let op_builder = OperationBuilder.create(opCtx);
 
@@ -154,6 +158,15 @@ const initCommands = () => {
             }
         },
         {
+            "name": "Add Node",
+            "inputs": ["Operation Name"],
+            "invoke": (op_marker) => {
+                let op = BuilderOpLike.newAddNode();
+                let args = AbstractArgList.create();
+                op_builder.addInstruction(op_marker, op, args);
+            }
+        },
+        {
             "name": "Sample",
             "inputs": [],
             "invoke": (input1) => {
@@ -223,3 +236,30 @@ const initCommands = () => {
 }
 
 initCommands();
+
+let finalizeButton = document.querySelector("#opb-btnFinalize");
+let opIdInput = document.querySelector("#opb-opId");
+finalizeButton.addEventListener("click", () => {
+    let opId = parseInt(opIdInput.value);
+    let op;
+    try {
+        op = op_builder.finalize(opId);
+    } catch (e) {
+        // get cause of e
+        let cause = e.cause ? e.cause : e;
+        if (cause instanceof OperationBuilderError) {
+            console.error(cause.message());
+        } else {
+            console.error("An unexpected error occurred:", e);
+        }
+        return; // exit early if there was an error
+    }
+    // move out of op_builder for safety and soundness reasons TODO: check does this even help?
+    op_builder = null
+    opCtx.addCustomOperation(opId, op);
+    // recreate
+    op_builder = OperationBuilder.create(opCtx);
+    updateState();
+
+    console.log(`Finalized operation with id ${opId}`);
+})
