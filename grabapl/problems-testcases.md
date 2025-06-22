@@ -67,3 +67,36 @@ Caveats:
    * This is bad user experience, but let's try it for now.
 
 [//]: # (TODO: make this better user experience.)
+
+## Merging query branch abstract states after the query - Edge Order
+*Assuming we make edge order a thing*, we must consider the specific edge order of a common
+node in two branches of a query.
+
+For example, if we have a shape query that checks if node `a` has a child `b` with edge `"child"`,
+and it checks if that edge is the **first** edge, and the false branch creates a child with edge `"child"`,
+then the merged abstract graph should know that `a` does in fact have a child `b` with edge `"child"`,
+**however**, the specific edge order must be the *least common ancestor* in the edge order lattice of
+"the last child" (since we just added the edge - actually, what is the edge order of a newly added edge?) and
+the "first child".
+
+That means in the resulting abstract graph, the edge order should be some Top element probably, i.e.,
+`Any`, probably.
+
+## Edge Orders
+
+### Representation
+*More information: in MT meeting notes gdoc as well as some types here in the Rust project*
+
+We should probably have both concrete edges and abstract edges.
+
+Abstract edges should be elements of some lattice.
+
+But! What should the abstract edge order of an "add edge" operation be?
+
+At that point we know it's the "last" edge, but as soon as we add another edge, it's not the last
+anymore. So how can we represent the fact that it's only last for a given time period?
+
+Perhaps there should be some "last_invisible" marker that refers to the last edge that the
+abstract graph does not see, and then the new edge would be "last_invisible + 1", another edge after that
+"last_invisible + 2", etc.
+
