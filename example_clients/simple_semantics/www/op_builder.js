@@ -192,7 +192,25 @@ const initCommands = () => {
                 op_builder.addInstruction(null, op, args);
             }
         },
-
+        {
+            "name": "Run Operation Id",
+            "inputs": ["Output Name", "Operation Id", "Input1 + Input2 + ..."],
+            "invoke": (name, opId, str_inputs) => {
+                let op_id = parseInt(opId);
+                // parse inputs
+                let input_list = str_inputs.split("+").map(input => input.trim());
+                // remove empty strings
+                input_list = input_list.filter(input => input !== "");
+                let args = AbstractArgList.create();
+                input_list.forEach(input => {
+                    let node_id = AbstractNodeId.newFromStr(input);
+                    args.push(node_id);
+                });
+                console.log(`Running operation with id ${op_id} and inputs: ${input_list}`);
+                let op = BuilderOpLike.newFromId(op_id);
+                op_builder.addInstruction(name, op, args);
+            }
+        },
         // copy paste me
         {
             "name": "Sample",
