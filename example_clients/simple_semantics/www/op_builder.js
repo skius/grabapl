@@ -167,6 +167,34 @@ const initCommands = () => {
             }
         },
         {
+            "name": "Add Edge",
+            "inputs": ["From", "To"],
+            "invoke": (from, to) => {
+                let from_id = AbstractNodeId.newFromStr(from);
+                let to_id = AbstractNodeId.newFromStr(to);
+                let op = BuilderOpLike.newAddEdge();
+                let args = AbstractArgList.create();
+                args.push(from_id);
+                args.push(to_id);
+                op_builder.addInstruction(null, op, args);
+            }
+        },
+        {
+            "name": "Set Edge Value",
+            "inputs": ["From", "To", "Value"],
+            "invoke": (from, to, exact_value) => {
+                let from_id = AbstractNodeId.newFromStr(from);
+                let to_id = AbstractNodeId.newFromStr(to);
+                let op = BuilderOpLike.newSetEdgeValue(exact_value);
+                let args = AbstractArgList.create();
+                args.push(from_id);
+                args.push(to_id);
+                op_builder.addInstruction(null, op, args);
+            }
+        },
+
+        // copy paste me
+        {
             "name": "Sample",
             "inputs": [],
             "invoke": (input1) => {

@@ -12,4 +12,8 @@ export class BuilderOpLike {
     static newRecurse(): BuilderOpLike;
 
     static newAddNode(): BuilderOpLike;
+
+    static newAddEdge(): BuilderOpLike;
+
+    static newSetEdgeValue(value: string): BuilderOpLike;
 }

@@ -223,6 +223,7 @@ mod ffi {
         }
 
         pub fn available_aids(&self, dw: &mut DiplomatWrite) {
+            // TODO: sort this to have a stable debug output
             let aids: Vec<RustAbstractNodeId> = self.0.node_keys_to_aid.right_values().cloned().collect();
             write!(dw, "Available AIDs: {:#?}", aids).unwrap();
         }
@@ -251,6 +252,14 @@ mod ffi {
 
         pub fn new_add_node() -> Box<BuilderOpLike> {
             Box::new(BuilderOpLike(Some(Instruction::Builtin(BuiltinOperation::AddNode))))
+        }
+
+        pub fn new_add_edge() -> Box<BuilderOpLike> {
+            Box::new(BuilderOpLike(Some(Instruction::Builtin(BuiltinOperation::AddEdge))))
+        }
+
+        pub fn new_set_edge_value(value: &str) -> Box<BuilderOpLike> {
+            Box::new(BuilderOpLike(Some(Instruction::Builtin(BuiltinOperation::SetEdgeValue(value.to_string())))))
         }
     }
 

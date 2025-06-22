@@ -70,6 +70,35 @@ export class BuilderOpLike {
         }
     }
 
+    static newAddEdge() {
+
+        const result = wasm.BuilderOpLike_new_add_edge();
+
+        try {
+            return new BuilderOpLike(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+        }
+    }
+
+    static newSetEdgeValue(value) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const valueSlice = diplomatRuntime.DiplomatBuf.str8(wasm, value);
+
+        const result = wasm.BuilderOpLike_new_set_edge_value(...valueSlice.splat());
+
+        try {
+            return new BuilderOpLike(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+            functionCleanupArena.free();
+
+        }
+    }
+
     constructor(symbol, ptr, selfEdge) {
         return this.#internalConstructor(...arguments)
     }

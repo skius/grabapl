@@ -61,6 +61,9 @@ enum BuilderInstruction<S: SemanticsClone> {
     EnterTrueBranch,
     #[debug("EnterFalseBranch")]
     EnterFalseBranch,
+    // TODO: think about what happens when we start two shape queries with the same name. the gsq_op_marker if statement below somewhere is a problem.
+    //  specifically, when they're nested (eg one with name "foo", true branch, another one with "foo").
+    //  potentially could be fine to support, but needs implementation work.
     #[debug("StartShapeQuery({_0:?})")]
     StartShapeQuery(AbstractOperationResultMarker),
     #[debug("EndQuery")]

@@ -16,6 +16,8 @@ export interface InitOutput {
   readonly BuilderOpLike_new_from_id: (a: number) => number;
   readonly BuilderOpLike_new_recurse: () => number;
   readonly BuilderOpLike_new_add_node: () => number;
+  readonly BuilderOpLike_new_add_edge: () => number;
+  readonly BuilderOpLike_new_set_edge_value: (a: number, b: number) => number;
   readonly BuilderOpLike_destroy: (a: number) => void;
   readonly BuiltinQuery_new_is_value_gt: (a: number) => number;
   readonly BuiltinQuery_new_is_value_eq: (a: number) => number;
@@ -31,7 +33,6 @@ export interface InitOutput {
   readonly DotCollector_collect: (a: number, b: number) => void;
   readonly DotCollector_get_dot: (a: number, b: number) => void;
   readonly DotCollector_destroy: (a: number) => void;
-  readonly EdgeAbstract_new_exact: (a: number, b: number) => number;
   readonly EdgeAbstract_destroy: (a: number) => void;
   readonly IntermediateState_get_dot: (a: number, b: number) => void;
   readonly IntermediateState_available_aids: (a: number, b: number) => void;
@@ -61,6 +62,7 @@ export interface InitOutput {
   readonly Runner_run: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly Runner_destroy: (a: number) => void;
   readonly UserDefinedOperation_destroy: (a: number) => void;
+  readonly EdgeAbstract_new_exact: (a: number, b: number) => number;
   readonly EdgeAbstract_new_wildcard: () => number;
   readonly diplomat_init: () => void;
   readonly diplomat_simple_write: (a: number, b: number, c: number) => void;
