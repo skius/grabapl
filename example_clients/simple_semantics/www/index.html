@@ -6,28 +6,46 @@
   </head>
   <body>
     <noscript>This page contains webassembly and javascript content, please enable javascript in your browser.</noscript>
-    <button id="btn">Click me!</button>
-    <button id="btnAddNode">Add node</button>
-    <button id="btnAddEdge">Add edge</button>
-    <button id="btnRunOp">Run operation</button>
-    <button id="btnReset">Reset</button>
-    <button id="btnDotCollector">Show DOT</button>
-    <button id="btnShowCurrent">Render current graph</button>
-    <br/>
-    <label for="nodeVal">New value to insert:</label>
-    <input type="text" id="nodeVal" value="5">
-    <button id="btnInsertNode">Insert node</button>
-    <br/>
+    <div class="tab">
+      <button id="playground-tab-button">Main Playground</button>
+      <button id="operation-builder-tab-button">OperationBuilder</button>
+    </div>
+    <div id="playground-tab" class="tabcontent">
+      <button id="btn">Click me!</button>
+      <button id="btnAddNode">Add node</button>
+      <button id="btnAddEdge">Add edge</button>
+      <button id="btnRunOp">Run operation</button>
+      <button id="btnReset">Reset</button>
+      <button id="btnDotCollector">Show DOT</button>
+      <button id="btnShowCurrent">Render current graph</button>
+      <br/>
+      <label for="nodeVal">New value to insert:</label>
+      <input type="text" id="nodeVal" value="5">
+      <button id="btnInsertNode">Insert node</button>
+      <br/>
 
-    <label for="bstRootId">Enter BST root node key:</label>
-    <input type="text" id="bstRootId" value="0">
-    <label for="bstInsertVal">Enter value to insert:</label>
-    <input type="text" id="bstInsertVal" value="10">
-    <button id="btnCallBstInsert">Insert node</button>
-    <br/>
+      <label for="bstRootId">Enter BST root node key:</label>
+      <input type="text" id="bstRootId" value="0">
+      <label for="bstInsertVal">Enter value to insert:</label>
+      <input type="text" id="bstInsertVal" value="10">
+      <button id="btnCallBstInsert">Insert node</button>
+      <br/>
 
-    <div id="svgContainer"></div>
-    <pre id="main"></pre>
+      <div id="svgContainer"></div>
+      <pre id="main"></pre>
+    </div>
+    <div id="operation-builder-tab" class="tabcontent" style="display:none;">
+      <h1>Operation Builder</h1>
+      <p>Commands:</p>
+      <!-- TODO add all possible builder commands here -->
+      <div id="opb-commands">
+
+      </div>
+      <p>Current graph:</p>
+      <div id="opb-svgContainer"></div>
+      <p>Additional information:</p>
+      <pre id="opb-info"></pre>
+    </div>
     <script src="./bootstrap.js"></script>
   </body>
 </html>

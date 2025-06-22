@@ -22,7 +22,7 @@ fn insert_bst_builder_test(
     // OperationBuilder has an inner state enum. in fact, that is a stack referencing the current query stack it is inside.
     let mut op_builder = OperationBuilder::new(op_ctx);
     let show = |op_builder: &OperationBuilder<_>| {
-        println!("{}\n----------", op_builder.show_state());
+        println!("{}\n----------", op_builder.format_state());
     };
 
     let root_node_marker = 0;

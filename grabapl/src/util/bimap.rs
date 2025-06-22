@@ -13,7 +13,7 @@ impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> BiMap<L, 
             right_to_left: HashMap::new(),
         }
     }
-    
+
     pub fn into_inner(self) -> (HashMap<L, R>, HashMap<R, L>) {
         (self.left_to_right, self.right_to_left)
     }
@@ -34,11 +34,11 @@ impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> BiMap<L, 
     pub fn get_right(&self, right: &R) -> Option<&L> {
         self.right_to_left.get(right)
     }
-    
+
     pub fn contains_left(&self, left: &L) -> bool {
         self.left_to_right.contains_key(left)
     }
-    
+
     pub fn contains_right(&self, right: &R) -> bool {
         self.right_to_left.contains_key(right)
     }
@@ -59,5 +59,13 @@ impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> BiMap<L, 
         } else {
             None
         }
+    }
+    
+    pub fn right_values(&self) -> impl Iterator<Item = &R> {
+        self.left_to_right.values()
+    }
+    
+    pub fn left_values(&self) -> impl Iterator<Item = &L> {
+        self.right_to_left.values()
     }
 }

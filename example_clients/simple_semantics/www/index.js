@@ -144,3 +144,41 @@ document.querySelector("#btnCallBstInsert").addEventListener("click", (event) =>
     runner.run(concrete, opCtx, 5, [parseInt(bstRootId), value_node_key]);
     onChange()
 });
+
+
+
+
+// tab handling
+let playground_button = document.querySelector("#playground-tab-button");
+let operation_builder_button = document.querySelector("#operation-builder-tab-button");
+playground_button.addEventListener("click", (event) => {
+    openTab(event, "playground-tab");
+});
+
+operation_builder_button.addEventListener("click", (event) => {
+    openTab(event, "operation-builder-tab");
+});
+
+
+function openTab(evt, tabId) {
+    // Declare all variables
+    var i, tabcontent, tablinks;
+
+    // Get all elements with class="tabcontent" and hide them
+    tabcontent = document.getElementsByClassName("tabcontent");
+    for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+    }
+
+    // // Get all elements with class="tablinks" and remove the class "active"
+    // tablinks = document.getElementsByClassName("tablinks");
+    // for (i = 0; i < tablinks.length; i++) {
+    //     tablinks[i].className = tablinks[i].className.replace(" active", "");
+    // }
+
+    // Show the current tab, and add an "active" class to the button that opened the tab
+    document.getElementById(tabId).style.display = "block";
+    // evt.currentTarget.className += " active";
+}
+
+

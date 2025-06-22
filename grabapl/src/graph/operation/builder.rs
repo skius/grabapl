@@ -34,6 +34,8 @@ This is the same routine that can provide state feedback to the user like:
 The intermediate state returns a graph and a hashmap from nodes and edges to additional metadata, like their abstract node id.
 */
 
+// TODO: rename this into BuilderOpLike, because that's what it is.
+//  'Instruction' is reserved for _all_ kinds of things you can do in a user defined op
 pub enum Instruction<S: SemanticsClone> {
     Builtin(S::BuiltinOperation),
     FromOperationId(OperationId),
@@ -118,7 +120,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
     ) -> Result<(), OperationBuilderError> {
         self.instructions
             .push(BuilderInstruction::ExpectParameterNode(marker, node));
-        Ok(())
+        self.check_instructions()
     }
 
     pub fn expect_context_node(
@@ -129,7 +131,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         self.instructions
             .push(BuilderInstruction::ExpectContextNode(marker, node));
         // TODO: check if subst marker does not exist yet
-        Ok(())
+        self.check_instructions()
     }
 
     pub fn expect_parameter_edge(
@@ -145,7 +147,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
                 edge,
             ));
         // TODO: check if both subst markers are valid
-        Ok(())
+        self.check_instructions()
     }
 
     pub fn start_query(
@@ -156,19 +158,19 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         // todo!()
         self.instructions
             .push(BuilderInstruction::StartQuery(query, args));
-        Ok(())
+        self.check_instructions()
     }
 
     pub fn enter_true_branch(&mut self) -> Result<(), OperationBuilderError> {
         // todo!()
         self.instructions.push(BuilderInstruction::EnterTrueBranch);
-        Ok(())
+        self.check_instructions()
     }
 
     pub fn enter_false_branch(&mut self) -> Result<(), OperationBuilderError> {
         // todo!()
         self.instructions.push(BuilderInstruction::EnterFalseBranch);
-        Ok(())
+        self.check_instructions()
     }
 
     // TODO: get rid of AbstractOperationResultMarker requirement. Either completely or make it optional and autogenerate one.
@@ -180,13 +182,13 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         // todo!()
         self.instructions
             .push(BuilderInstruction::StartShapeQuery(op_marker));
-        Ok(())
+        self.check_instructions()
     }
 
     pub fn end_query(&mut self) -> Result<(), OperationBuilderError> {
         // todo!()
         self.instructions.push(BuilderInstruction::EndQuery);
-        Ok(())
+        self.check_instructions()
     }
 
     // TODO: should expect_*_node really expect a marker? maybe it should instead return a marker?
@@ -199,7 +201,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         // TODO: check that any shape nodes are not free floating. maybe this should be in a GraphShapeQuery validator?
         self.instructions
             .push(BuilderInstruction::ExpectShapeNode(marker, node));
-        Ok(())
+        self.check_instructions()
     }
 
     pub fn expect_shape_edge(
@@ -211,7 +213,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         // TODO:
         self.instructions
             .push(BuilderInstruction::ExpectShapeEdge(source, target, edge));
-        Ok(())
+        self.check_instructions()
     }
 
     pub fn add_named_instruction(
@@ -227,7 +229,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
                 instruction,
                 args,
             ));
-        Ok(())
+        self.check_instructions()
     }
 
     pub fn add_instruction(
@@ -238,7 +240,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         // todo!()
         self.instructions
             .push(BuilderInstruction::AddInstruction(instruction, args));
-        Ok(())
+        self.check_instructions()
     }
 
     pub fn build(
@@ -260,35 +262,49 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
 
         Ok(user_def_op)
     }
+
+    fn check_instructions(
+        &self,
+    ) -> Result<(), OperationBuilderError> {
+        let (param, instrs, _) = IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
+        let mut interpreter = IntermediateInterpreter::new_for_self_op_id(
+            0, // Unused. TODO: make prettier...
+            param,
+            self.op_ctx,
+        );
+        let _ = interpreter.interpret_instructions(instrs)?;
+        Ok(())
+    }
 }
 
 impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug, BuiltinOperation: Clone, BuiltinQuery: Clone>> OperationBuilder<'a, S> {
-    fn get_intermediate_state(&self) -> String {
-        let (param, instructions, path) = IntermediateStateBuilder::run(&self.instructions, self.op_ctx).unwrap();
+    fn get_intermediate_state(&self) -> Result<(IntermediateState<S>, Vec<IntermediateStatePath>), OperationBuilderError> {
+        let (param, instructions, path) = IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
         let mut interpreter = IntermediateInterpreter::new_for_self_op_id(
             0, // TODO: use a real operation ID here
             param,
             self.op_ctx,
         );
 
-        let (_, interp_instructions) = interpreter.interpret_instructions(instructions).unwrap();
+        let (_, interp_instructions) = interpreter.interpret_instructions(instructions)?;
 
         let mut path_iter = path.iter().peekable().cloned();
 
-        let intermediate_state = get_state_for_path(&interpreter.initial_state, &interp_instructions, &mut path_iter).unwrap();
+        let intermediate_state = get_state_for_path(&interpreter.initial_state, &interp_instructions, &mut path_iter).expect(
+            "internal error: Failed to get intermediate state for path",
+        );
 
-        let dot = intermediate_state.graph.dot();
-        let mapping = intermediate_state.node_keys_to_aid.into_inner().0;
-        let query_path = intermediate_state.query_path;
+        // let dot = intermediate_state.graph.dot();
+        // let mapping = intermediate_state.node_keys_to_aid.into_inner().0;
+        // let query_path = intermediate_state.query_path;
 
-        format!("\nIntermediate State:\n{dot}\npath: {path:?}\nmapping: {mapping:#?}\nTODO query path")
-
+        Ok((intermediate_state, path))
     }
 
     /// Visualizes the current state of the operation builder.
     /// Provides context on the current nest level as well as the DOT representation of the graph
     /// at the current cursor.
-    pub fn show_state(&self) -> String {
+    pub fn show_state(&self) -> Result<IntermediateState<S>, OperationBuilderError> {
         // let (g, subst_to_node_keys) = self.build_debug_graph_at_current_point();
         // let dot = g.dot();
         //
@@ -299,7 +315,17 @@ impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug, BuiltinOper
         // result.push_str(&dot);
         // result
 
-        self.get_intermediate_state()
+        Ok(self.get_intermediate_state()?.0)
+    }
+
+    pub fn format_state(&self) -> String {
+        // TODO: should probably return a Result
+        let (state, path) = self.get_intermediate_state().unwrap();
+        let dot = state.graph.dot();
+        let mapping = state.node_keys_to_aid.into_inner().0;
+        let query_path = state.query_path;
+        format!("\nIntermediate State:\n{dot}\nmapping: {mapping:#?}\nTODO query path")
+
     }
 
     fn build_debug_graph_at_current_point(
@@ -860,7 +886,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
         } else {
             IntermediateStatePath::EnterFalse
         };
-        
+
         let mut found = false;
         for last in self.path.iter().rev() {
             if last == &branch_to_find {
@@ -876,7 +902,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
             // we did not find the branch, so we cannot remove it
             return;
         }
-        
+
         while let Some(last) = self.path.pop() {
             if (branch && last == IntermediateStatePath::EnterTrue) ||
                (!branch && last == IntermediateStatePath::EnterFalse) {
@@ -937,11 +963,11 @@ enum QueryPath {
     FalseBranch,
 }
 
-struct IntermediateState<S: SemanticsClone> {
-    graph: AbstractGraph<S>,
-    node_keys_to_aid: BiMap<NodeKey, AbstractNodeId>,
+pub struct IntermediateState<S: SemanticsClone> {
+    pub graph: AbstractGraph<S>,
+    pub node_keys_to_aid: BiMap<NodeKey, AbstractNodeId>,
     // TODO: make query path
-    query_path: Vec<QueryPath>,
+    pub query_path: Vec<QueryPath>,
 }
 
 // TODO: unfortunately, we cannot derive Clone, since it implies a `S: Clone` bound.
@@ -1142,7 +1168,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 //  So how are we supposed to know the abstract changes?
 
                 // TODO: use approach from `problems-testcases.md`
-                
+
                 let (subst, abstract_arg) = self.get_current_substitution(&self.op_param, args)?;
                 // apply the operation to the current graph
                 // TODO: apply op

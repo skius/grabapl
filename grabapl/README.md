@@ -16,6 +16,7 @@ cargo check --target wasm32-unknown-unknown
 - [ ] support subtractive changes in abstract_apply. i.e., removing edges and nodes.
 - [ ] actually run the interpreter on every change to op builder in order to catch errors
 - [ ] Better show state that uses the abstract node IDs in a pretty printed way.
+- [ ] finish query branch state merging
 
 - [ ] In user defined operations, make sure that only _new_ nodes are returned abstractly. And only those that the user wants to return. Needs some new field on UserDefinedOp.
   * will need to make sure they're contravariant to the actual determined state as by the interpreter. (if a node is supposed to be a String, then the user can only return it as a String or Object, but not as eg a Number)
