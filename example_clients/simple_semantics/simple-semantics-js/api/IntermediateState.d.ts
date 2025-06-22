@@ -10,4 +10,6 @@ export class IntermediateState {
     getDot(): string;
 
     availableAids(): string;
+
+    queryContext(): string;
 }

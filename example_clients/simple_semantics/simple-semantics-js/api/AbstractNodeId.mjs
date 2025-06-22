@@ -64,6 +64,23 @@ export class AbstractNodeId {
         }
     }
 
+    static newFromStr(aid) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const aidSlice = diplomatRuntime.DiplomatBuf.str8(wasm, aid);
+
+        const result = wasm.AbstractNodeId_new_from_str(...aidSlice.splat());
+
+        try {
+            return new AbstractNodeId(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+            functionCleanupArena.free();
+
+        }
+    }
+
     constructor(symbol, ptr, selfEdge) {
         return this.#internalConstructor(...arguments)
     }

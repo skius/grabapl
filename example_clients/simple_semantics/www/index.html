@@ -10,7 +10,7 @@
       <button id="playground-tab-button">Main Playground</button>
       <button id="operation-builder-tab-button">OperationBuilder</button>
     </div>
-    <div id="playground-tab" class="tabcontent">
+    <div id="playground-tab" class="tabcontent" style="display:none;">
       <button id="btn">Click me!</button>
       <button id="btnAddNode">Add node</button>
       <button id="btnAddEdge">Add edge</button>
@@ -34,7 +34,7 @@
       <div id="svgContainer"></div>
       <pre id="main"></pre>
     </div>
-    <div id="operation-builder-tab" class="tabcontent" style="display:none;">
+    <div id="operation-builder-tab" class="tabcontent">
       <h1>Operation Builder</h1>
       <p>Commands:</p>
       <!-- TODO add all possible builder commands here -->
@@ -44,7 +44,9 @@
       <p>Current graph:</p>
       <div id="opb-svgContainer"></div>
       <p>Additional information:</p>
-      <pre id="opb-info"></pre>
+      <pre id="opb-info">
+        <br/>
+      </pre>
     </div>
     <script src="./bootstrap.js"></script>
   </body>

@@ -204,12 +204,20 @@ mod ffi {
 
     impl IntermediateState {
         pub fn get_dot(&self, dw: &mut DiplomatWrite) {
-            write!(dw, "{}", self.0.graph.dot()).unwrap();
+            write!(dw, "{}", self.0.dot_with_aid()).unwrap();
         }
 
         pub fn available_aids(&self, dw: &mut DiplomatWrite) {
             let aids: Vec<RustAbstractNodeId> = self.0.node_keys_to_aid.right_values().cloned().collect();
-            write!(dw, "Available AIDs: {:?}", aids).unwrap();
+            write!(dw, "Available AIDs: {:#?}", aids).unwrap();
+        }
+
+        pub fn query_context(&self, dw: &mut DiplomatWrite) {
+            let last = self.0.query_path.last();
+            if let Some(grabapl::graph::operation::builder::QueryPath::Query(name)) = last {
+                write!(dw, "Currently designing query: {}. Enter true or false branch to proceed.\n", name).unwrap();
+            }
+            write!(dw, "Entire path: {:#?}", self.0.query_path).unwrap();
         }
     }
 
@@ -220,6 +228,10 @@ mod ffi {
     impl BuilderOpLike {
         pub fn new_from_id(op_id: u32) -> Box<BuilderOpLike> {
             Box::new(BuilderOpLike(Some(Instruction::FromOperationId(op_id))))
+        }
+
+        pub fn new_recurse() -> Box<BuilderOpLike> {
+            Box::new(BuilderOpLike(Some(Instruction::Recurse)))
         }
     }
 
@@ -260,6 +272,22 @@ mod ffi {
             );
             Box::new(AbstractNodeId(aid))
         }
+
+        pub fn new_from_str(aid: &str) -> Box<AbstractNodeId> {
+            // P() is param, O(op_marker, node_marker) is output
+            let aid = if aid.starts_with("P(") {
+                RustAbstractNodeId::ParameterMarker(aid[2..aid.len() - 1].parse().unwrap())
+            } else if aid.starts_with("O(") {
+                let parts: Vec<&str> = aid[2..aid.len() - 1].split(',').collect();
+                RustAbstractNodeId::DynamicOutputMarker(
+                    (&*parts[0].trim().to_string().leak()).into(),
+                    (&*parts[1].trim().to_string().leak()).into(),
+                )
+            } else {
+                panic!("Invalid AbstractNodeId format: {}", aid);
+            };
+            Box::new(AbstractNodeId(aid))
+        }
     }
 
     #[diplomat::opaque]
@@ -279,6 +307,7 @@ mod ffi {
     pub struct OperationBuilderError(RustOperationBuilderError);
 
     impl OperationBuilderError {
+        #[diplomat::attr(auto, stringifier)]
         pub fn message(&self, dw: &mut DiplomatWrite) {
             write!(dw, "{}", self.0).unwrap();
         }

@@ -1,4 +1,4 @@
-import {AbstractGraph, ConcreteGraph, DotCollector, OpCtx, Runner} from "simple-semantics";
+import {AbstractGraph, AbstractNodeId, ConcreteGraph, DotCollector, OpCtx, Runner} from "simple-semantics";
 import {Graphviz} from "@hpcc-js/wasm";
 
 const graphviz = await Graphviz.load();
@@ -11,6 +11,7 @@ let concrete = ConcreteGraph.create()
 
 const runner = Runner.create();
 let opCtx = OpCtx.create();
+
 
 const showGraph = () => {
     let dc = DotCollector.create()
@@ -182,3 +183,6 @@ function openTab(evt, tabId) {
 }
 
 
+/// Below here: the operation builder tab
+
+import "./op_builder"

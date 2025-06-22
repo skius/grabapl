@@ -62,6 +62,20 @@ export class IntermediateState {
         }
     }
 
+    queryContext() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.IntermediateState_query_context(this.ffiValue, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            write.free();
+        }
+    }
+
     constructor(symbol, ptr, selfEdge) {
         return this.#internalConstructor(...arguments)
     }

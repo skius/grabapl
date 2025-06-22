@@ -46,6 +46,18 @@ export class BuilderOpLike {
         }
     }
 
+    static newRecurse() {
+
+        const result = wasm.BuilderOpLike_new_recurse();
+
+        try {
+            return new BuilderOpLike(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+        }
+    }
+
     constructor(symbol, ptr, selfEdge) {
         return this.#internalConstructor(...arguments)
     }

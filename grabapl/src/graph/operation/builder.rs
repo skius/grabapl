@@ -8,11 +8,14 @@ use crate::graph::semantics::{AbstractGraph, SemanticsClone};
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, OperationContext, OperationId, SubstMarker};
 use std::collections::HashMap;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::iter::Peekable;
 use std::marker::PhantomData;
 use std::mem;
 use std::slice::Iter;
+use petgraph::dot;
+use petgraph::dot::Dot;
+use petgraph::prelude::GraphMap;
 use thiserror::Error;
 use crate::graph::operation::{get_substitution, BuiltinOperation, OperationError};
 /*
@@ -97,6 +100,8 @@ pub enum OperationBuilderError {
         OperationId,
         OperationError,
     ),
+    #[error("Superfluous instruction {0}")]
+    SuperfluousInstruction(String),
 }
 
 pub struct OperationBuilder<'a, S: SemanticsClone> {
@@ -120,7 +125,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
     ) -> Result<(), OperationBuilderError> {
         self.instructions
             .push(BuilderInstruction::ExpectParameterNode(marker, node));
-        self.check_instructions()
+        self.check_instructions_or_rollback()
     }
 
     pub fn expect_context_node(
@@ -131,7 +136,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         self.instructions
             .push(BuilderInstruction::ExpectContextNode(marker, node));
         // TODO: check if subst marker does not exist yet
-        self.check_instructions()
+        self.check_instructions_or_rollback()
     }
 
     pub fn expect_parameter_edge(
@@ -147,7 +152,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
                 edge,
             ));
         // TODO: check if both subst markers are valid
-        self.check_instructions()
+        self.check_instructions_or_rollback()
     }
 
     pub fn start_query(
@@ -158,19 +163,19 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         // todo!()
         self.instructions
             .push(BuilderInstruction::StartQuery(query, args));
-        self.check_instructions()
+        self.check_instructions_or_rollback()
     }
 
     pub fn enter_true_branch(&mut self) -> Result<(), OperationBuilderError> {
         // todo!()
         self.instructions.push(BuilderInstruction::EnterTrueBranch);
-        self.check_instructions()
+        self.check_instructions_or_rollback()
     }
 
     pub fn enter_false_branch(&mut self) -> Result<(), OperationBuilderError> {
         // todo!()
         self.instructions.push(BuilderInstruction::EnterFalseBranch);
-        self.check_instructions()
+        self.check_instructions_or_rollback()
     }
 
     // TODO: get rid of AbstractOperationResultMarker requirement. Either completely or make it optional and autogenerate one.
@@ -182,13 +187,13 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         // todo!()
         self.instructions
             .push(BuilderInstruction::StartShapeQuery(op_marker));
-        self.check_instructions()
+        self.check_instructions_or_rollback()
     }
 
     pub fn end_query(&mut self) -> Result<(), OperationBuilderError> {
         // todo!()
         self.instructions.push(BuilderInstruction::EndQuery);
-        self.check_instructions()
+        self.check_instructions_or_rollback()
     }
 
     // TODO: should expect_*_node really expect a marker? maybe it should instead return a marker?
@@ -201,7 +206,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         // TODO: check that any shape nodes are not free floating. maybe this should be in a GraphShapeQuery validator?
         self.instructions
             .push(BuilderInstruction::ExpectShapeNode(marker, node));
-        self.check_instructions()
+        self.check_instructions_or_rollback()
     }
 
     pub fn expect_shape_edge(
@@ -213,7 +218,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         // TODO:
         self.instructions
             .push(BuilderInstruction::ExpectShapeEdge(source, target, edge));
-        self.check_instructions()
+        self.check_instructions_or_rollback()
     }
 
     pub fn add_named_instruction(
@@ -229,7 +234,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
                 instruction,
                 args,
             ));
-        self.check_instructions()
+        self.check_instructions_or_rollback()
     }
 
     pub fn add_instruction(
@@ -240,9 +245,11 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         // todo!()
         self.instructions
             .push(BuilderInstruction::AddInstruction(instruction, args));
-        self.check_instructions()
+        self.check_instructions_or_rollback()
     }
 
+    // TODO: This should run further post processing checks.
+    //  Stuff like Context nodes must be connected, etc.
     pub fn build(
         self,
         self_op_id: OperationId,
@@ -261,6 +268,22 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         let user_def_op = interpreter.create_user_defined_operation(instructions)?;
 
         Ok(user_def_op)
+    }
+
+    fn check_instructions_or_rollback(
+        &mut self,
+    ) -> Result<(), OperationBuilderError> {
+        match self.check_instructions() {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                // If the instructions are invalid, we rollback the last instruction.
+                // This is a simple rollback mechanism, but could be improved.
+                if !self.instructions.is_empty() {
+                    self.instructions.pop();
+                }
+                Err(e)
+            }
+        }
     }
 
     fn check_instructions(
@@ -290,9 +313,13 @@ impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug, BuiltinOper
 
         let mut path_iter = path.iter().peekable().cloned();
 
-        let intermediate_state = get_state_for_path(&interpreter.initial_state, &interp_instructions, &mut path_iter).expect(
+        let mut intermediate_state = get_state_for_path(&interpreter.initial_state, &interp_instructions, &mut path_iter).expect(
             "internal error: Failed to get intermediate state for path",
         );
+
+        let query_path = get_query_path_for_path::<S>(&mut path.iter().peekable().cloned());
+        // TODO: make this prettier. should be automatically computed.
+        intermediate_state.query_path = query_path;
 
         // let dot = intermediate_state.graph.dot();
         // let mapping = intermediate_state.node_keys_to_aid.into_inner().0;
@@ -564,6 +591,13 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
 
         let instructions = builder.build_many_instructions(&mut iter)?;
 
+        // assert our iter is empty
+        if let Some(next_instruction) = iter.peek() {
+            return Err(OperationBuilderError::SuperfluousInstruction(
+                format!("{next_instruction:?}"),
+            ));
+        }
+
         Ok((op_parameter, instructions, builder.path))
     }
 
@@ -633,7 +667,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
             BuilderInstruction::StartQuery(query, args) => {
                 iter.next();
                 // Start a new query state
-                self.path.push(IntermediateStatePath::StartQuery);
+                self.path.push(IntermediateStatePath::StartQuery(None));
                 let query_instructions = self.build_query_instruction(iter)?;
                 Ok((
                     None,
@@ -646,7 +680,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
             }
             BuilderInstruction::StartShapeQuery(op_marker) => {
                 iter.next();
-                self.path.push(IntermediateStatePath::StartQuery);
+                self.path.push(IntermediateStatePath::StartQuery(Some(format!("{op_marker:?}"))));
                 // Start a new shape query state
                 let (gsq_instructions, branch_instructions) =
                     self.build_shape_query(iter, *op_marker)?;
@@ -893,7 +927,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                 // we found the branch, so we can stop
                 found = true;
             }
-            if last == &IntermediateStatePath::StartQuery {
+            if matches!(last, IntermediateStatePath::StartQuery(..)) {
                 // we reached the start of the query, so we cannot find the branch
                 break;
             }
@@ -913,7 +947,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
 
     fn remove_until_query_start(&mut self) {
         while let Some(last) = self.path.pop() {
-            if last == IntermediateStatePath::StartQuery {
+            if matches!(last, IntermediateStatePath::StartQuery(..)) {
                 break;
             }
         }
@@ -928,7 +962,7 @@ enum IntermediateStatePath {
     EnterFalse,
     // TODO: is this the same as Advance?
     SkipQuery,
-    StartQuery,
+    StartQuery(Option<String>), // the query name, if any
 }
 
 // TODO: here make the intermediate state interpreter have points at which it knows the state
@@ -957,11 +991,16 @@ But, for time reasons, let's just store a copy of the entire state from above af
 */
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-enum QueryPath {
+pub enum QueryPath {
     Query(String),
     TrueBranch,
     FalseBranch,
 }
+
+// TODO: Store more information like:
+//  - Are we still building the parameter graph?
+//  - If we are inside a query, which branches have we not entered yet?
+//  - Are we making a shape/non-shape query?
 
 pub struct IntermediateState<S: SemanticsClone> {
     pub graph: AbstractGraph<S>,
@@ -982,6 +1021,53 @@ impl<S: SemanticsClone> Clone for IntermediateState<S> {
     }
 }
 
+impl<S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S> {
+    pub fn dot_with_aid(&self) -> String {
+        struct PrettyAid<'a>(&'a AbstractNodeId);
+
+        impl Debug for PrettyAid<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self.0 {
+                    AbstractNodeId::ParameterMarker(subst) => write!(f, "P({})", subst),
+                    AbstractNodeId::DynamicOutputMarker(marker, node_marker) => {
+                        let op_marker = match marker {
+                            AbstractOperationResultMarker::Custom(c) => {c}
+                            AbstractOperationResultMarker::Implicit(num) => {"<unnamed>"}
+                        };
+                        write!(f, "O({}, {})", op_marker, node_marker.0)
+                    }
+                }
+            }
+        }
+
+        // TODO: handle edge order...
+
+        format!(
+            "{:?}",
+            Dot::with_attr_getters(
+                &self.graph.graph,
+                &[dot::Config::EdgeNoLabel, dot::Config::NodeNoLabel],
+                &|g, (src, target, attr)| {
+                    let dbg_attr_format = format!("{:?}", attr.edge_attr);
+                    let dbg_attr_replaced = dbg_attr_format.escape_debug();
+                    format!("label = \"{dbg_attr_replaced}\"")
+                },
+                &|g, (node, _)| {
+                    let aid = self.node_keys_to_aid.get_left(&node).expect("NodeKey not found in node_keys_to_aid");
+                    let aid = PrettyAid(aid);
+                    let aid = format!("{aid:?}");
+                    let aid_replaced = aid.escape_debug();
+                    let av = self.graph.get_node_attr(node).expect("NodeKey not found in graph");
+                    let dbg_attr_format = format!("{:?}", av);
+                    let dbg_attr_replaced = dbg_attr_format.escape_debug();
+
+                    format!("label = \"{aid_replaced}|{dbg_attr_replaced}\"")
+                }
+            )
+        )
+    }
+}
+
 
 enum InterpretedInstruction<S: SemanticsClone> {
     OpLike,
@@ -990,6 +1076,7 @@ enum InterpretedInstruction<S: SemanticsClone> {
 
 struct InterpretedQueryInstructions<S: SemanticsClone> {
     initial_state_true_branch: IntermediateState<S>,
+    initial_state_false_branch: IntermediateState<S>,
     true_branch: InterpretedInstructions<S>,
     false_branch: InterpretedInstructions<S>,
 }
@@ -1201,14 +1288,13 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         let false_branch_state = self.current_state.clone();
 
         let initial_true_branch_state = self.current_state.clone();
-
+        let initial_false_branch_state = self.current_state.clone();
 
         // interpret the instructions in the true and false branches
         let (ud_true_branch, interp_true_branch) = self.interpret_instructions(query_instructions.true_branch)?;
         let after_true_branch_state = mem::replace(&mut self.current_state, false_branch_state);
         let (ud_false_branch, interp_false_branch) = self.interpret_instructions(query_instructions.false_branch)?;
         let after_false_branch_state = mem::replace(&mut self.current_state, state_before);
-        //
 
 
         // TODO: update current state etc...
@@ -1231,6 +1317,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         let interp_instruction = InterpretedInstruction::Query(
             InterpretedQueryInstructions {
                 initial_state_true_branch: initial_true_branch_state,
+                initial_state_false_branch: initial_false_branch_state,
                 true_branch: interp_true_branch,
                 false_branch: interp_false_branch,
             },
@@ -1250,6 +1337,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
 
         // preparation for false branch
         let false_branch_state = self.current_state.clone();
+        let initial_false_branch_state = false_branch_state.clone();
 
         // first pass: collect the initial graph (the parameter)
         let mut param = OperationParameter::<S> {
@@ -1264,15 +1352,16 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         let mut arg_aid_to_param_subst: BiMap<AbstractNodeId, SubstMarker> = BiMap::new();
         let mut arg_aid_to_node_keys: BiMap<AbstractNodeId, NodeKey> = BiMap::new();
 
-        let mut collect_aid = |aid| -> Result<(), OperationBuilderError> {
-            if arg_aid_to_param_subst.contains_left(aid) {
+        /// Collects the AID and adds it to all relevant mappings.
+        let mut collect_aid = |aid: AbstractNodeId| -> Result<(), OperationBuilderError> {
+            if arg_aid_to_param_subst.contains_left(&aid) {
                 // we already processed this
                 return Ok(());
             }
             let subst_marker = SubstMarker::from(param.explicit_input_nodes.len() as u32);
-            let key = self.current_state.node_keys_to_aid.get_right(aid)
+            let key = self.current_state.node_keys_to_aid.get_right(&aid)
                 .cloned()
-                .ok_or(OperationBuilderError::NotFoundAid(*aid))?;
+                .ok_or(OperationBuilderError::NotFoundAid(aid.clone()))?;
             let abstract_value = self.current_state.graph.get_node_attr(key)
                 .expect("internal error: node key should be in state graph since it is in the mapping")
                 .clone();
@@ -1286,6 +1375,23 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             Ok(())
         };
 
+        /// Collects the AID if it is part of the pre-existing graph.
+        let mut collect_non_shape_ident = |aid: &AbstractNodeId| -> Result<(), OperationBuilderError> {
+            match aid {
+                AbstractNodeId::ParameterMarker(_) => {
+                    // we need this.
+                    collect_aid(*aid)?;
+                }
+                AbstractNodeId::DynamicOutputMarker(orm, node_marker) => {
+                    // we need this, but only if it is not from the current graph shape query.
+                    if orm != &gsq_op_marker {
+                        collect_aid(*aid)?;
+                    }
+                }
+            }
+            Ok(())
+        };
+
         for instruction in &gsq_instructions {
             match instruction {
                 GraphShapeQueryInstruction::ExpectShapeNode(_, _) => {
@@ -1293,18 +1399,8 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 }
                 GraphShapeQueryInstruction::ExpectShapeEdge(src, target, _) => {
                     // we need both src and target to be in the initial graph, assuming they dont come from `gsq_op_marker`
-                    match src {
-                        AbstractNodeId::ParameterMarker(_) => {
-                            // we need this.
-                            collect_aid(src)?;
-                        }
-                        AbstractNodeId::DynamicOutputMarker(orm, node_marker) => {
-                            // we need this, but only if it is not from the current graph shape query.
-                            if orm != &gsq_op_marker {
-                                collect_aid(src)?;
-                            }
-                        }
-                    }
+                    collect_non_shape_ident(src)?;
+                    collect_non_shape_ident(target)?;
                 }
             }
         }
@@ -1399,6 +1495,9 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             shape_idents_to_node_keys,
         };
 
+        // TODO: need to validate GSQ somewhere.
+        //  Most importantly, that there are no free floating shape nodes.
+
         let mut initial_true_branch_state = self.current_state.clone();
 
         let (ud_true_branch, interp_true_branch) = self.interpret_instructions(query_instructions.true_branch)?;
@@ -1425,6 +1524,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         let interp_instruction = InterpretedInstruction::Query(
             InterpretedQueryInstructions {
                 initial_state_true_branch: initial_true_branch_state,
+                initial_state_false_branch: initial_false_branch_state,
                 true_branch: interp_true_branch,
                 false_branch: interp_false_branch,
             },
@@ -1487,9 +1587,10 @@ fn get_state_for_path<S: SemanticsClone>(initial_state: &IntermediateState<S>, i
                         // this should not happen
                         panic!("internal error: unexpected path element: {:?}", path_element);
                     }
-                    IntermediateStatePath::StartQuery => {
+                    IntermediateStatePath::StartQuery(..) => {
                         if let InterpretedInstruction::Query(query_instructions) = &instruction.instruction {
                             // we are entering a query, so we need to check the true branch
+                            // TODO: perhaps here we should have a third option .state_inside_query_view ?
                             current_state = &query_instructions.initial_state_true_branch;
 
                             // now we need either enter true or enter false
@@ -1504,6 +1605,7 @@ fn get_state_for_path<S: SemanticsClone>(initial_state: &IntermediateState<S>, i
                                 }
                                 Some(IntermediateStatePath::EnterFalse) => {
                                     // we are entering the false branch, so we need to check the false branch instructions
+                                    current_state = &query_instructions.initial_state_false_branch;
                                     return get_state_for_path(
                                         &current_state,
                                         &query_instructions.false_branch,
@@ -1527,4 +1629,27 @@ fn get_state_for_path<S: SemanticsClone>(initial_state: &IntermediateState<S>, i
     }
 
     Some(current_state.clone())
+}
+
+fn get_query_path_for_path<S: SemanticsClone>(
+    path: &mut impl Iterator<Item = IntermediateStatePath>,
+) -> Vec<QueryPath> {
+    let mut query_path = Vec::new();
+
+    for pe in path {
+        match pe {
+            IntermediateStatePath::EnterTrue => {
+                query_path.push(QueryPath::TrueBranch)
+            }
+            IntermediateStatePath::EnterFalse => {
+                query_path.push(QueryPath::FalseBranch)
+            }
+            IntermediateStatePath::StartQuery(name) => {
+                query_path.push(QueryPath::Query(name.unwrap_or("<unnamed query>".to_string())));
+            }
+            _ => {}
+        }
+    }
+
+    query_path
 }

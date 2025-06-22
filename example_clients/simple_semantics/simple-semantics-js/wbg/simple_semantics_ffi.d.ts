@@ -11,8 +11,10 @@ export interface InitOutput {
   readonly AbstractGraph_destroy: (a: number) => void;
   readonly AbstractNodeId_new_parameter: (a: number) => number;
   readonly AbstractNodeId_new_from_output: (a: number, b: number, c: number, d: number) => number;
+  readonly AbstractNodeId_new_from_str: (a: number, b: number) => number;
   readonly AbstractNodeId_destroy: (a: number) => void;
   readonly BuilderOpLike_new_from_id: (a: number) => number;
+  readonly BuilderOpLike_new_recurse: () => number;
   readonly BuilderOpLike_destroy: (a: number) => void;
   readonly BuiltinQuery_new_is_value_gt: (a: number) => number;
   readonly BuiltinQuery_new_is_value_eq: (a: number) => number;
@@ -33,6 +35,7 @@ export interface InitOutput {
   readonly EdgeAbstract_destroy: (a: number) => void;
   readonly IntermediateState_get_dot: (a: number, b: number) => void;
   readonly IntermediateState_available_aids: (a: number, b: number) => void;
+  readonly IntermediateState_query_context: (a: number, b: number) => void;
   readonly IntermediateState_destroy: (a: number) => void;
   readonly OpCtx_create: () => number;
   readonly OpCtx_destroy: (a: number) => void;
