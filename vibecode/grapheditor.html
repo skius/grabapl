@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Graph Builder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        canvas {
+            cursor: grab;
+        }
+        canvas.grabbing {
+            cursor: grabbing;
+        }
+        input[type="color"] {
+            -webkit-appearance: none; -moz-appearance: none; appearance: none;
+            width: 4rem; height: 2.5rem; padding: 0.25rem;
+            background-color: transparent; border: 1px solid #d1d5db;
+            border-radius: 0.5rem; cursor: pointer;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: none; border-radius: 0.375rem; }
+        input[type="color"]::-moz-color-swatch { border: none; border-radius: 0.375rem; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+<div class="container mx-auto p-4 lg:p-8">
+    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+        <h1 class="text-3xl font-bold text-center text-gray-900 mb-2">Graph Builder</h1>
+        <p class="text-center text-gray-500 mb-6">Create, visualize, and now save/load graphs using a custom JSON format.</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Controls Column -->
+        <div class="lg:col-span-1 bg-white rounded-xl shadow-lg p-6 h-fit">
+            <h2 class="text-xl font-semibold mb-4 border-b pb-2">Controls</h2>
+
+            <div class="mb-6">
+                <h3 id="node-form-title" class="font-semibold text-lg mb-2">Add Node</h3>
+                <div class="flex flex-col space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label for="node-color" class="font-medium text-gray-700">Node Color</label>
+                        <input type="color" id="node-color" value="#3b82f6">
+                    </div>
+                    <input type="text" id="node-value" placeholder="Node Value (e.g., A)" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 transition">
+                    <button id="node-action-btn" class="w-full font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-200 shadow-md">Add Node</button>
+                </div>
+            </div>
+
+            <div class="border-t pt-6 mb-6">
+                <h3 class="font-semibold text-lg mb-2">Save & Load Graph</h3>
+                <div class="flex flex-col space-y-3">
+                    <textarea id="graph-data-input" placeholder="Paste graph data here to load..." class="w-full h-24 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 transition"></textarea>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="import-text-btn" class="w-full bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-md">Load from Text</button>
+                        <button id="import-file-btn" class="w-full bg-teal-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition shadow-md">Load from File</button>
+                    </div>
+                    <button id="export-btn" class="w-full bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition shadow-md">Save Graph</button>
+                    <input type="file" id="file-picker" class="hidden" accept=".json,application/json">
+                </div>
+            </div>
+
+            <div class="border-t pt-6">
+                <h3 class="font-semibold text-lg mb-2">Instructions</h3>
+                <ul class="list-disc list-inside text-gray-600 space-y-1">
+                    <li>Select a node to edit its properties.</li>
+                    <li>Click a node, then a second to create an edge.</li>
+                    <li>Drag nodes to rearrange them.</li>
+                    <li>Loading a graph will replace the current one.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Canvas Column -->
+        <div class="lg:col-span-2 bg-white rounded-xl shadow-lg">
+            <canvas id="graph-canvas" class="w-full h-full block rounded-xl"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Modals -->
+<div id="message-modal" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden items-center justify-center z-50">
+    <div class="relative mx-auto p-6 border w-full max-w-sm shadow-xl rounded-xl bg-white">
+        <div class="mt-3 text-center">
+            <h3 class="text-xl leading-6 font-bold text-gray-900" id="modal-title">Notification</h3>
+            <div class="mt-2 px-7 py-4"><p class="text-base text-gray-600" id="modal-message"></p></div>
+            <div class="items-center px-4 py-2"><button id="modal-close-btn" class="w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700">OK</button></div>
+        </div>
+    </div>
+</div>
+
+<div id="prompt-modal" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden items-center justify-center z-50">
+    <div class="relative mx-auto p-6 border w-full max-w-sm shadow-xl rounded-xl bg-white">
+        <div class="mt-3">
+            <h3 class="text-xl leading-6 font-bold text-gray-900 text-center" id="prompt-title"></h3>
+            <div class="mt-4">
+                <p class="text-sm text-gray-500 mb-2" id="prompt-subtitle"></p>
+                <input type="text" id="prompt-input" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 transition">
+            </div>
+            <div class="flex items-center justify-end mt-4 space-x-3">
+                <button id="prompt-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg shadow-md hover:bg-gray-300">Cancel</button>
+                <button id="prompt-ok-btn" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="export-modal" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden items-center justify-center z-50">
+    <div class="relative mx-auto p-6 border w-full max-w-lg shadow-xl rounded-xl bg-white">
+        <h3 class="text-xl leading-6 font-bold text-gray-900">Save Graph Data</h3>
+        <div class="mt-4">
+            <textarea id="export-output" readonly class="w-full h-48 p-2 border bg-gray-100 border-gray-300 rounded-lg font-mono text-sm"></textarea>
+        </div>
+        <div class="mt-4 flex flex-wrap justify-end gap-3">
+            <button id="download-btn" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700">Download as file</button>
+            <button id="copy-btn" class="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700">Copy to Clipboard</button>
+            <button id="export-close-btn" class="px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg shadow-md hover:bg-gray-300">Close</button>
+        </div>
+    </div>
+</div>
+
+<div id="confirm-modal" class="fixed inset-0 bg-gray-900 bg-opacity-60 hidden items-center justify-center z-50">
+    <div class="relative mx-auto p-6 border w-full max-w-sm shadow-xl rounded-xl bg-white">
+        <div class="mt-3 text-center">
+            <h3 class="text-xl leading-6 font-bold text-gray-900" id="confirm-title">Are you sure?</h3>
+            <div class="mt-2 px-7 py-4"><p class="text-base text-gray-600" id="confirm-message"></p></div>
+            <div class="flex items-center justify-center space-x-4 px-4 py-2">
+                <button id="confirm-cancel-btn" class="w-1/2 px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-lg shadow-md hover:bg-gray-300">Cancel</button>
+                <button id="confirm-ok-btn" class="w-1/2 px-4 py-2 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const canvas = document.getElementById('graph-canvas'), ctx = canvas.getContext('2d');
+
+        // --- Graph Data ---
+        let nodes = [], edges = [], nodeIdCounter = 0;
+
+        // --- UI Elements & State ---
+        const nodeFormTitle = document.getElementById('node-form-title');
+        const nodeValueInput = document.getElementById('node-value'), nodeColorInput = document.getElementById('node-color');
+        const nodeActionBtn = document.getElementById('node-action-btn');
+        const graphDataInput = document.getElementById('graph-data-input');
+        const importTextBtn = document.getElementById('import-text-btn');
+        const importFileBtn = document.getElementById('import-file-btn');
+        const filePicker = document.getElementById('file-picker');
+        const exportBtn = document.getElementById('export-btn');
+        const NODE_RADIUS = 30;
+        let selectedNode = null;
+
+        // --- Modal Elements ---
+        const messageModal = document.getElementById('message-modal'), modalMessage = document.getElementById('modal-message'), modalCloseBtn = document.getElementById('modal-close-btn');
+        const promptModal = document.getElementById('prompt-modal'), promptTitle = document.getElementById('prompt-title'), promptSubtitle = document.getElementById('prompt-subtitle'), promptInput = document.getElementById('prompt-input'), promptOkBtn = document.getElementById('prompt-ok-btn'), promptCancelBtn = document.getElementById('prompt-cancel-btn');
+        const exportModal = document.getElementById('export-modal'), exportOutput = document.getElementById('export-output'), copyBtn = document.getElementById('copy-btn'), downloadBtn = document.getElementById('download-btn'), exportCloseBtn = document.getElementById('export-close-btn');
+        const confirmModal = document.getElementById('confirm-modal'), confirmTitle = document.getElementById('confirm-title'), confirmMessage = document.getElementById('confirm-message'), confirmOkBtn = document.getElementById('confirm-ok-btn'), confirmCancelBtn = document.getElementById('confirm-cancel-btn');
+        let promptResolver = null, confirmResolver = null;
+
+        // --- Modal Logic ---
+        function showMessage(message) {
+            modalMessage.textContent = message;
+            messageModal.classList.remove('hidden'); messageModal.classList.add('flex');
+        }
+        modalCloseBtn.addEventListener('click', () => messageModal.classList.add('hidden'));
+
+        function showCustomPrompt(title, subtitle = '') {
+            promptTitle.textContent = title; promptSubtitle.textContent = subtitle; promptInput.value = '';
+            promptModal.classList.remove('hidden'); promptModal.classList.add('flex');
+            setTimeout(() => promptInput.focus(), 50);
+            return new Promise(resolve => { promptResolver = resolve; });
+        }
+        function closePrompt(value) {
+            if (promptResolver) { promptResolver(value); promptResolver = null; }
+            promptModal.classList.add('hidden');
+        }
+        promptOkBtn.addEventListener('click', () => closePrompt(promptInput.value));
+        promptCancelBtn.addEventListener('click', () => closePrompt(null));
+        promptInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') closePrompt(promptInput.value); if (e.key === 'Escape') closePrompt(null); });
+
+        function showConfirm(title, message) {
+            confirmTitle.textContent = title;
+            confirmMessage.textContent = message;
+            confirmModal.classList.remove('hidden'); confirmModal.classList.add('flex');
+            return new Promise(resolve => { confirmResolver = resolve; });
+        }
+        function closeConfirm(value) {
+            if (confirmResolver) { confirmResolver(value); confirmResolver = null; }
+            confirmModal.classList.add('hidden');
+        }
+        confirmOkBtn.addEventListener('click', () => closeConfirm(true));
+        confirmCancelBtn.addEventListener('click', () => closeConfirm(false));
+
+        // Export Modal Logic
+        exportCloseBtn.addEventListener('click', () => exportModal.classList.add('hidden'));
+        copyBtn.addEventListener('click', () => {
+            exportOutput.select(); document.execCommand('copy');
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => { copyBtn.textContent = 'Copy to Clipboard'; }, 2000);
+        });
+        downloadBtn.addEventListener('click', () => {
+            const text = exportOutput.value;
+            const blob = new Blob([text], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `graph-${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        // --- UI Control Logic ---
+        function setControlMode(mode, node = null) {
+            if (mode === 'edit') {
+                nodeFormTitle.textContent = 'Edit Node';
+                nodeActionBtn.textContent = 'Update Node';
+                nodeActionBtn.className = 'w-full font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-200 shadow-md bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-500';
+                nodeValueInput.value = node.value;
+                nodeColorInput.value = node.color;
+            } else { // 'add' mode
+                nodeFormTitle.textContent = 'Add Node';
+                nodeActionBtn.textContent = 'Add Node';
+                nodeActionBtn.className = 'w-full font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-200 shadow-md bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500';
+                nodeValueInput.value = '';
+            }
+        }
+
+
+        // --- Drawing Functions ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            edges.forEach(edge => drawEdge(edge));
+            nodes.forEach(node => drawNode(node));
+        }
+
+        function drawNode(node) {
+            const nodeColor = node.color || '#3b82f6';
+            ctx.beginPath(); ctx.arc(node.x, node.y, NODE_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = nodeColor; ctx.fill();
+            ctx.strokeStyle = (selectedNode && selectedNode.id === node.id) ? '#f59e0b' : darkenColor(nodeColor, 30);
+            ctx.lineWidth = (selectedNode && selectedNode.id === node.id) ? 5 : 3;
+            ctx.stroke(); ctx.closePath();
+            ctx.fillStyle = getContrastColor(nodeColor); ctx.font = 'bold 16px Inter';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(node.value, node.x, node.y);
+        }
+
+        function drawEdge(edge) {
+            const fromNode = findNodeById(edge.from), toNode = findNodeById(edge.to);
+            if (!fromNode || !toNode) return;
+            const reciprocal = edges.some(e => e.from === toNode.id && e.to === fromNode.id);
+            const headlen = 10; let angle, endX, endY, controlX, controlY;
+            ctx.strokeStyle = '#4b5563'; ctx.fillStyle = '#4b5563'; ctx.lineWidth = 2;
+
+            if (reciprocal) {
+                const curveOffset = 20, dx = toNode.x - fromNode.x, dy = toNode.y - fromNode.y, lineAngle = Math.atan2(dy, dx);
+                const midX = (fromNode.x + toNode.x) / 2, midY = (fromNode.y + toNode.y) / 2;
+                controlX = midX + curveOffset * Math.cos(lineAngle + Math.PI / 2); controlY = midY + curveOffset * Math.sin(lineAngle + Math.PI / 2);
+                const startAngle = Math.atan2(controlY - fromNode.y, controlX - fromNode.x), endAngle = Math.atan2(toNode.y - controlY, toNode.x - controlX);
+                const startX = fromNode.x + NODE_RADIUS * Math.cos(startAngle), startY = fromNode.y + NODE_RADIUS * Math.sin(startAngle);
+                endX = toNode.x - NODE_RADIUS * Math.cos(endAngle); endY = toNode.y - NODE_RADIUS * Math.sin(endAngle);
+                ctx.beginPath(); ctx.moveTo(startX, startY); ctx.quadraticCurveTo(controlX, controlY, endX, endY); ctx.stroke();
+                angle = Math.atan2(endY - controlY, endX - controlX);
+            } else {
+                const dx = toNode.x - fromNode.x, dy = toNode.y - fromNode.y; angle = Math.atan2(dy, dx);
+                const startX = fromNode.x + NODE_RADIUS * Math.cos(angle), startY = fromNode.y + NODE_RADIUS * Math.sin(angle);
+                endX = toNode.x - NODE_RADIUS * Math.cos(angle); endY = toNode.y - NODE_RADIUS * Math.sin(angle);
+                ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(endX, endY); ctx.stroke();
+            }
+            ctx.beginPath(); ctx.moveTo(endX, endY);
+            ctx.lineTo(endX - headlen * Math.cos(angle - Math.PI / 6), endY - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(endX - headlen * Math.cos(angle + Math.PI / 6), endY - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.lineTo(endX, endY); ctx.fill();
+            if (edge.value) {
+                ctx.save();
+                const labelPos = reciprocal ? { x: controlX, y: controlY } : { x: (fromNode.x + toNode.x) / 2, y: (fromNode.y + toNode.y) / 2 };
+                ctx.translate(labelPos.x, labelPos.y);
+                const textAngle = Math.atan2(toNode.y - fromNode.y, toNode.x - fromNode.x);
+                ctx.rotate(textAngle); if (Math.abs(textAngle) > Math.PI / 2) ctx.rotate(Math.PI);
+                ctx.fillStyle = '#111827'; ctx.font = '14px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+                ctx.fillText(edge.value, 0, -5); ctx.restore();
+            }
+        }
+
+        // --- Helper Functions ---
+        const findNodeById = (id) => nodes.find(node => node.id === id);
+        function darkenColor(hex, p) {
+            hex = hex.replace('#', ''); let r=parseInt(hex.substring(0,2),16),g=parseInt(hex.substring(2,4),16),b=parseInt(hex.substring(4,6),16);
+            r=parseInt(r*(1-p/100));g=parseInt(g*(1-p/100));b=parseInt(b*(1-p/100));
+            return `#${((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1).padStart(6,'0')}`;
+        }
+        function getContrastColor(hex) {
+            const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+            return ((r*299)+(g*587)+(b*114))/1000>=128?'#000':'#fff';
+        }
+        const getMousePos = (c,e) => ({ x: e.clientX-c.getBoundingClientRect().left, y: e.clientY-c.getBoundingClientRect().top });
+
+        // --- Sizing Logic ---
+        const resizeObserver = new ResizeObserver(entries => {
+            const entry = entries[0];
+            const { width, height } = entry.contentRect;
+            canvas.width = width;
+            canvas.height = height;
+            draw();
+        });
+        resizeObserver.observe(canvas);
+
+        // --- Save/Load Logic ---
+        exportBtn.addEventListener('click', () => {
+            if (nodes.length === 0) return showMessage("Graph is empty. Nothing to save.");
+            const graphState = { nodes, edges };
+            exportOutput.value = JSON.stringify(graphState, null, 2);
+            exportModal.classList.remove('hidden');
+        });
+
+        async function loadGraphState(stateString) {
+            if (nodes.length > 0) {
+                const confirmed = await showConfirm('Replace Graph?', 'Loading a new graph will replace your current work. Continue?');
+                if (!confirmed) return;
+            }
+            try {
+                const loadedState = JSON.parse(stateString);
+                if (!loadedState.nodes || !loadedState.edges || !Array.isArray(loadedState.nodes) || !Array.isArray(loadedState.edges)) {
+                    throw new Error("Invalid format. Must include 'nodes' and 'edges' arrays.");
+                }
+                nodes = loadedState.nodes; edges = loadedState.edges;
+                nodeIdCounter = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 0;
+                selectedNode = null;
+                setControlMode('add');
+                draw();
+                showMessage(`Successfully loaded ${nodes.length} nodes and ${edges.length} edges.`);
+            } catch (e) {
+                showMessage("Failed to load graph. Invalid JSON data or format. " + e.message);
+            }
+        }
+
+        importTextBtn.addEventListener('click', () => {
+            const stateString = graphDataInput.value.trim();
+            if (!stateString) return showMessage("Text area is empty. Paste graph data to load.");
+            loadGraphState(stateString);
+        });
+
+        importFileBtn.addEventListener('click', () => {
+            filePicker.click();
+        });
+
+        filePicker.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const stateString = event.target.result;
+                loadGraphState(stateString);
+            };
+            reader.readAsText(file);
+            e.target.value = null; // Reset picker
+        });
+
+        // --- Event Handlers ---
+        nodeActionBtn.addEventListener('click', () => {
+            const value = nodeValueInput.value.trim();
+            if (!value) {
+                showMessage('Node value cannot be empty.');
+                return;
+            }
+            const color = nodeColorInput.value;
+
+            if (selectedNode) { // Update existing node
+                const nodeToUpdate = findNodeById(selectedNode.id);
+                if (nodeToUpdate) {
+                    nodeToUpdate.value = value;
+                    nodeToUpdate.color = color;
+                }
+                selectedNode = null;
+                setControlMode('add');
+            } else { // Add new node
+                nodes.push({ id: nodeIdCounter++, value, color, x: Math.random()*(canvas.width-NODE_RADIUS*2)+NODE_RADIUS, y: Math.random()*(canvas.height-NODE_RADIUS*2)+NODE_RADIUS, radius: NODE_RADIUS });
+                nodeValueInput.value = '';
+            }
+            draw();
+        });
+
+        canvas.addEventListener('dblclick', async (e) => {
+            const mousePos = getMousePos(canvas, e);
+            if (nodes.some(n => Math.sqrt((mousePos.x-n.x)**2+(mousePos.y-n.y)**2) < n.radius)) return;
+            const value = await showCustomPrompt('Enter New Node Value');
+            if (value && value.trim()) {
+                nodes.push({ id: nodeIdCounter++, value: value.trim(), color: nodeColorInput.value, x: mousePos.x, y: mousePos.y, radius: NODE_RADIUS });
+                draw();
+            }
+        });
+
+        // --- Click & Drag Logic ---
+        let nodeUnderCursor = null, isDragging = false, dragStartPos = {x:0,y:0}, nodeStartPos = {x:0,y:0};
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return; // Only main left click
+            const mousePos = getMousePos(canvas, e);
+            isDragging = false;
+            nodeUnderCursor = null;
+            for (const node of nodes) {
+                if (Math.sqrt((mousePos.x - node.x)**2 + (mousePos.y - node.y)**2) < node.radius) {
+                    nodeUnderCursor = node;
+                    break;
+                }
+            }
+            if (nodeUnderCursor) {
+                dragStartPos = mousePos;
+                nodeStartPos = { x: nodeUnderCursor.x, y: nodeUnderCursor.y };
+                canvas.classList.add('grabbing');
+            } else { // Clicked on background
+                if (selectedNode) {
+                    selectedNode = null;
+                    setControlMode('add');
+                    draw();
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!nodeUnderCursor) return;
+            const mousePos = getMousePos(canvas, e);
+            if (!isDragging && (Math.abs(mousePos.x - dragStartPos.x) > 5 || Math.abs(mousePos.y - dragStartPos.y) > 5)) {
+                isDragging = true;
+                if (selectedNode) {
+                    selectedNode = null;
+                    setControlMode('add');
+                }
+            }
+            if (isDragging) {
+                nodeUnderCursor.x = nodeStartPos.x + (mousePos.x - dragStartPos.x);
+                nodeUnderCursor.y = nodeStartPos.y + (mousePos.y - dragStartPos.y);
+                draw();
+            }
+        });
+
+        canvas.addEventListener('mouseup', async (e) => {
+            if (nodeUnderCursor && !isDragging) {
+                await handleNodeClick(nodeUnderCursor);
+            }
+            canvas.classList.remove('grabbing');
+            nodeUnderCursor = null;
+            isDragging = false;
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            if (nodeUnderCursor) {
+                canvas.classList.remove('grabbing');
+                nodeUnderCursor = null;
+                isDragging = false;
+            }
+        });
+
+        async function handleNodeClick(clickedNode) {
+            if (!selectedNode) {
+                selectedNode = clickedNode;
+                setControlMode('edit', selectedNode);
+            } else if (selectedNode.id === clickedNode.id) {
+                selectedNode = null;
+                setControlMode('add');
+            } else {
+                const fromId = selectedNode.id, toId = clickedNode.id;
+                const fromNode = findNodeById(fromId);
+                const edgeExists = edges.some(e => e.from === fromId && e.to === toId);
+                if (edgeExists) { showMessage(`An edge from "${fromNode.value}" to "${clickedNode.value}" already exists.`); }
+                else {
+                    // Deselect first to prevent ghost dragging
+                    const tempSelectedNode = selectedNode;
+                    selectedNode = null;
+                    setControlMode('add');
+                    draw();
+
+                    const edgeValue = await showCustomPrompt('Create Edge', `Enter value for edge: ${tempSelectedNode.value} → ${clickedNode.value}`);
+                    if (edgeValue !== null) edges.push({ from: fromId, to: toId, value: edgeValue.trim() });
+                }
+            }
+            draw();
+        }
+
+        // Set initial control state
+        setControlMode('add');
+    });
+</script>
+</body>
+</html>
