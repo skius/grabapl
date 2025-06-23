@@ -82,7 +82,10 @@
                         <button id="import-text-btn" class="w-full bg-indigo-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition shadow-md">Load from Text</button>
                         <button id="import-file-btn" class="w-full bg-teal-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 transition shadow-md">Load from File</button>
                     </div>
-                    <button id="export-btn" class="w-full bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition shadow-md">Save Graph</button>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button id="export-btn" class="w-full bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition shadow-md">Save Graph</button>
+                        <button id="clear-btn" class="w-full bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition shadow-md">Clear Canvas</button>
+                    </div>
                     <input type="file" id="file-picker" class="hidden" accept=".json,application/json">
                 </div>
             </div>
@@ -145,21 +148,7 @@
         let nodes = [], edges = [], nodeIdCounter = 0;
 
         // --- UI Elements & State ---
-        const nodeForm=document.getElementById('node-form');
-        const multiSelectForm=document.getElementById('multi-select-form');
-        const selectionCountSpan=document.getElementById('selection-count');
-        const multiNodeColorInput=document.getElementById('multi-node-color');
-        const applyColorBtn=document.getElementById('apply-color-btn');
-        const duplicateBtn=document.getElementById('duplicate-btn');
-        const nodeFormTitle=document.getElementById('node-form-title');
-        const nodeValueInput=document.getElementById('node-value');
-        const nodeColorInput=document.getElementById('node-color');
-        const nodeActionBtn=document.getElementById('node-action-btn');
-        const graphDataInput=document.getElementById('graph-data-input');
-        const importTextBtn=document.getElementById('import-text-btn');
-        const importFileBtn=document.getElementById('import-file-btn');
-        const filePicker=document.getElementById('file-picker');
-        const exportBtn=document.getElementById('export-btn');
+        const nodeForm=document.getElementById('node-form'), multiSelectForm=document.getElementById('multi-select-form'), selectionCountSpan=document.getElementById('selection-count'), multiNodeColorInput=document.getElementById('multi-node-color'), applyColorBtn=document.getElementById('apply-color-btn'), duplicateBtn=document.getElementById('duplicate-btn'), nodeFormTitle=document.getElementById('node-form-title'), nodeValueInput=document.getElementById('node-value'), nodeColorInput=document.getElementById('node-color'), nodeActionBtn=document.getElementById('node-action-btn'), graphDataInput=document.getElementById('graph-data-input'), importTextBtn=document.getElementById('import-text-btn'), importFileBtn=document.getElementById('import-file-btn'), filePicker=document.getElementById('file-picker'), exportBtn=document.getElementById('export-btn'), clearBtn=document.getElementById('clear-btn');
         const NODE_RADIUS = 30;
         let selection = { nodes: new Set(), edges: new Set() };
         let selectionBox = null;
@@ -201,10 +190,10 @@
             ctx.strokeStyle = '#e5e7eb'; // gray-200
 
             let startX = camera.x % gridSize;
-            while (startX > 0) startX -= gridSize;
+            while (startX < 0) startX += gridSize;
 
             let startY = camera.y % gridSize;
-            while (startY > 0) startY -= gridSize;
+            while (startY < 0) startY += gridSize;
 
             for (let x = startX; x < canvas.width; x += gridSize) {
                 ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
@@ -249,12 +238,39 @@
         const resizeObserver=new ResizeObserver(e=>{const{width,height}=e[0].contentRect;canvas.width=width;canvas.height=height;draw();});
         resizeObserver.observe(canvas.parentElement);
 
-        // --- Save/Load Logic ---
-        exportBtn.addEventListener('click', () => { if (nodes.length === 0) return showMessage("Graph empty."); exportOutput.value = JSON.stringify({ nodes, edges }, null, 2); exportModal.classList.remove('hidden'); });
-        async function loadGraphState(s) { if (nodes.length > 0) { const c = await showConfirm('Replace Graph?', 'This will replace your current work.'); if (!c) return; } try { const l = JSON.parse(s); if (!l.nodes || !l.edges || !Array.isArray(l.nodes) || !Array.isArray(l.edges)) { throw new Error("Invalid format."); } nodes = l.nodes; edges = l.edges; nodeIdCounter = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 0; clearSelection(); camera = { x: 0, y: 0 }; draw(); showMessage(`Loaded ${nodes.length} nodes and ${edges.length} edges.`); } catch (e) { showMessage("Failed to load: " + e.message); } }
+        // --- Save/Load & Persistence Logic ---
+        function saveState() {
+            localStorage.setItem('graphBuilderSave', JSON.stringify({ nodes, edges, camera }));
+        }
+        function loadStateFromStorage() {
+            const savedState = localStorage.getItem('graphBuilderSave');
+            if (savedState) {
+                try {
+                    const l = JSON.parse(savedState);
+                    if (!l.nodes || !l.edges || !Array.isArray(l.nodes) || !Array.isArray(l.edges)) return;
+                    nodes = l.nodes;
+                    edges = l.edges;
+                    camera = l.camera || { x: 0, y: 0 };
+                    nodeIdCounter = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 0;
+                } catch(e) {
+                    console.error("Failed to load from local storage:", e);
+                }
+            }
+        }
+        exportBtn.addEventListener('click', () => { if (nodes.length === 0) return showMessage("Graph empty."); exportOutput.value = JSON.stringify({ nodes, edges, camera }, null, 2); exportModal.classList.remove('hidden'); });
+        async function loadGraphState(s) { if (nodes.length > 0) { const c = await showConfirm('Replace Graph?', 'This will replace your current work.'); if (!c) return; } try { const l = JSON.parse(s); if (!l.nodes || !l.edges || !Array.isArray(l.nodes) || !Array.isArray(l.edges)) { throw new Error("Invalid format."); } nodes = l.nodes; edges = l.edges; nodeIdCounter = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 0; camera = l.camera || { x: 0, y: 0 }; clearSelection(); draw(); saveState(); showMessage(`Loaded ${nodes.length} nodes and ${edges.length} edges.`); } catch (e) { showMessage("Failed to load: " + e.message); } }
         importTextBtn.addEventListener('click', () => { const s = graphDataInput.value.trim(); if (!s) return showMessage("Text area is empty."); loadGraphState(s); });
         importFileBtn.addEventListener('click', () => filePicker.click());
         filePicker.addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = e => loadGraphState(e.target.result); r.readAsText(f); e.target.value = null; });
+        clearBtn.addEventListener('click', async () => {
+            const confirmed = await showConfirm('Clear Canvas?', 'This will delete all nodes and edges. This action cannot be undone.');
+            if (confirmed) {
+                nodes = []; edges = []; camera = { x: 0, y: 0 }; nodeIdCounter = 0;
+                clearSelection();
+                saveState();
+                draw();
+            }
+        });
 
         // --- Selection and Duplication Logic ---
         function clearSelection() { selection.nodes.clear(); selection.edges.clear(); updateControlPanel(); }
@@ -270,7 +286,7 @@
             edges.forEach(e => { if (selection.nodes.has(e.from) && selection.nodes.has(e.to)) { selection.edges.add(e); } });
             updateControlPanel();
         }
-        duplicateBtn.addEventListener('click', () => { if (selection.nodes.size === 0) return; const o = 30, idMap = new Map(), newSel = new Set(); selection.nodes.forEach(id => { const oN = findNodeById(id), nN = { ...oN, id: nodeIdCounter++, x: oN.x + o, y: oN.y + o }; nodes.push(nN); idMap.set(id, nN.id); newSel.add(nN.id); }); selection.edges.forEach(e => { const nF = idMap.get(e.from), nT = idMap.get(e.to); if (nF !== undefined && nT !== undefined) { edges.push({ ...e, from: nF, to: nT }); } }); clearSelection(); newSel.forEach(id => selection.nodes.add(id)); edges.forEach(e => { if (selection.nodes.has(e.from) && selection.nodes.has(e.to)) { selection.edges.add(e); } }); updateControlPanel(); draw(); });
+        duplicateBtn.addEventListener('click', () => { if (selection.nodes.size === 0) return; const o = 30, idMap = new Map(), newSel = new Set(); selection.nodes.forEach(id => { const oN = findNodeById(id), nN = { ...oN, id: nodeIdCounter++, x: oN.x + o, y: oN.y + o }; nodes.push(nN); idMap.set(id, nN.id); newSel.add(nN.id); }); selection.edges.forEach(e => { const nF = idMap.get(e.from), nT = idMap.get(e.to); if (nF !== undefined && nT !== undefined) { edges.push({ ...e, from: nF, to: nT }); } }); clearSelection(); newSel.forEach(id => selection.nodes.add(id)); edges.forEach(e => { if (selection.nodes.has(e.from) && selection.nodes.has(e.to)) { selection.edges.add(e); } }); updateControlPanel(); draw(); saveState(); });
         applyColorBtn.addEventListener('click', () => {
             const color = multiNodeColorInput.value;
             selection.nodes.forEach(id => {
@@ -278,16 +294,17 @@
                 if (node) node.color = color;
             });
             draw();
+            saveState();
         });
 
 
         // --- Event Handlers ---
-        nodeActionBtn.addEventListener('click', () => { const v = nodeValueInput.value.trim(); if (!v) return showMessage('Node value required.'); const c = nodeColorInput.value; if (selection.nodes.size === 1) { const n = findNodeById(selection.nodes.values().next().value); if (n) { n.value = v; n.color = c; } clearSelection(); } else { const wP = screenToWorld(canvas.width / 2, canvas.height / 2); nodes.push({ id: nodeIdCounter++, value: v, color: c, x: wP.x, y: wP.y, radius: NODE_RADIUS }); nodeValueInput.value = ''; } draw(); });
+        nodeActionBtn.addEventListener('click', () => { const v = nodeValueInput.value.trim(); if (!v) return showMessage('Node value required.'); const c = nodeColorInput.value; if (selection.nodes.size === 1) { const n = findNodeById(selection.nodes.values().next().value); if (n) { n.value = v; n.color = c; } clearSelection(); } else { const wP = screenToWorld(canvas.width / 2, canvas.height / 2); nodes.push({ id: nodeIdCounter++, value: v, color: c, x: wP.x, y: wP.y, radius: NODE_RADIUS }); nodeValueInput.value = ''; } draw(); saveState(); });
         canvas.addEventListener('dblclick', async e => {
             const mP = getMousePos(canvas, e);
             const wP = screenToWorld(mP.x, mP.y);
             if (nodes.some(n => Math.sqrt((wP.x - n.x) ** 2 + (wP.y - n.y) ** 2) < n.radius)) return;
-            const v = await showCustomPrompt('New Node Value'); if (v && v.trim()) { nodes.push({ id: nodeIdCounter++, value: v.trim(), color: nodeColorInput.value, x: wP.x, y: wP.y, radius: NODE_RADIUS }); draw(); }
+            const v = await showCustomPrompt('New Node Value'); if (v && v.trim()) { nodes.push({ id: nodeIdCounter++, value: v.trim(), color: nodeColorInput.value, x: wP.x, y: wP.y, radius: NODE_RADIUS }); draw(); saveState(); }
         });
 
         // --- Click, Drag, Pan Logic ---
@@ -322,16 +339,18 @@
             else if (nodeUnderCursor && !isDragging) { await handleNodeClick(nodeUnderCursor, e.ctrlKey || e.metaKey); }
             else if (selectionBox && isDragging) { selectItemsInRect(selectionBox); }
             else if (!nodeUnderCursor && !isDragging) { clearSelection(); }
+            if (isDragging) saveState();
             dragStartPos = null; isDragging = false; selectionBox = null; draw();
         });
         canvas.addEventListener('mouseleave', () => { if (dragStartPos) { canvas.classList.remove('node-cursor', 'node-cursor-grabbing', 'panning-cursor'); dragStartPos = null; isDragging = false; isPanning = false; selectionBox = null; draw(); } });
 
         async function handleNodeClick(clickedNode, isCtrlClick = false) {
-            if (isCtrlClick) { if (selection.nodes.has(clickedNode.id)) { selection.nodes.delete(clickedNode.id); } else { selection.nodes.add(clickedNode.id); } } else { if (selection.nodes.size <= 1 && !selection.nodes.has(clickedNode.id)) { const pId = selection.nodes.values().next().value; if (pId !== undefined) { const fN = findNodeById(pId), eE = edges.some(e => e.from === fN.id && e.to === clickedNode.id); if (eE) { showMessage(`Edge from "${fN.value}" to "${clickedNode.value}" exists.`); clearSelection(); } else { clearSelection(); draw(); const eV = await showCustomPrompt('Create Edge', `Edge: ${fN.value} → ${clickedNode.value}`); if (eV !== null) edges.push({ from: fN.id, to: clickedNode.id, value: eV.trim() }); } } else { clearSelection(); selection.nodes.add(clickedNode.id); } } else { clearSelection(); selection.nodes.add(clickedNode.id); } }
+            if (isCtrlClick) { if (selection.nodes.has(clickedNode.id)) { selection.nodes.delete(clickedNode.id); } else { selection.nodes.add(clickedNode.id); } } else { if (selection.nodes.size <= 1 && !selection.nodes.has(clickedNode.id)) { const pId = selection.nodes.values().next().value; if (pId !== undefined) { const fN = findNodeById(pId), eE = edges.some(e => e.from === fN.id && e.to === clickedNode.id); if (eE) { showMessage(`Edge from "${fN.value}" to "${clickedNode.value}" exists.`); clearSelection(); } else { clearSelection(); draw(); const eV = await showCustomPrompt('Create Edge', `Edge: ${fN.value} → ${clickedNode.value}`); if (eV !== null) { edges.push({ from: fN.id, to: clickedNode.id, value: eV.trim() }); saveState(); } } } else { clearSelection(); selection.nodes.add(clickedNode.id); } } else { clearSelection(); selection.nodes.add(clickedNode.id); } }
             selection.edges.clear(); edges.forEach(e => { if (selection.nodes.has(e.from) && selection.nodes.has(e.to)) { selection.edges.add(e); } }); updateControlPanel(); draw();
         }
 
         // Init
+        loadStateFromStorage();
         updateControlPanel();
         draw();
     });
