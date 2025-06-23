@@ -44,6 +44,50 @@ This would work, however:
 5. After query: reconciled abstract graph is `a -> child`, both for the operation builder and also for any
    calling code.
 
+### Additive changes in the shape query true branch
+Inside the shape query true branch, we may want to make some _additive_ changes to
+the abstract graph that can be returned to the caller.
+
+For example, if we _add_ a new node in the true branch and also have a new node in the false branch,
+those can be reconciled.
+
+However, edges cannot be reconciled if one of their endpoints is a shape-matched node.
+
+What happens in the following case?
+
+```
+// state: a
+if a (-> b)? {
+  add node c;
+  add node d;
+  add edge b -> c;
+  add edge c -> d;
+  // a -> b -> c -> d, with "-> b" being a shape match
+} else {
+  add node b, c, d;
+  add edge a -> b;
+  add edge b -> c;
+  add edge c -> d;
+  // a -> b -> c -> d, with b,c,d new
+}
+// what is the reconciled state here? (**that can be returned to the caller**, not just the state visible in the op builder)
+// Options:
+// 1. a (we ignore everything attached to b since that was a shape match)
+// 2. a, c -> d (we ignore all edges from b, but include the new nodes)
+```
+
+Option 1 is the easiest and clearly the most sound.
+
+Option 2 carries the question if there is any aliasing risk now?
+Basically, the two connected components a and c->d may or may not be connected in the concrete.
+So, if we were doing any "connectedness-analysis", we'd have to say they were "potentially connected".
+
+If we don't do a connectedness-analysis, is it a problem to have both graphs?
+
+**TODO**: revisit after revisiting the connectedness semantics design 
+
+
+
 ## Recursion in operation builder
 *More information in MT Report Notes gdoc*
 
