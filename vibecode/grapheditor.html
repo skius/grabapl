@@ -175,17 +175,33 @@
             ctx.restore(); // Restore before drawing screen-space elements
             if (selectionBox) drawSelectionBox();
         }
+
         function drawGrid() {
             const gridSize = 50;
-            const startX = -camera.x % gridSize;
-            const startY = -camera.y % gridSize;
             ctx.beginPath();
             ctx.strokeStyle = '#e5e7eb'; // gray-200
-            for (let x = startX; x < canvas.width; x += gridSize) {
-                ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
+
+            // Correctly calculate the starting points based on camera offset
+            let startX = camera.x % gridSize;
+            while (startX < 0) {
+                startX += gridSize;
             }
+
+            let startY = camera.y % gridSize;
+            while (startY < 0) {
+                startY += gridSize;
+            }
+
+            // Draw vertical lines
+            for (let x = startX; x < canvas.width; x += gridSize) {
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+            }
+
+            // Draw horizontal lines
             for (let y = startY; y < canvas.height; y += gridSize) {
-                ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
             }
             ctx.stroke();
         }
