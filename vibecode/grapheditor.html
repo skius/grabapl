@@ -58,6 +58,7 @@
                     </div>
                     <input type="text" id="node-value" placeholder="Node Value (e.g., A)" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 transition">
                     <button id="node-action-btn" class="w-full font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-200 shadow-md">Add Node</button>
+                    <button id="delete-single-btn" class="w-full font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-200 shadow-md bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 hidden">Delete Node</button>
                 </div>
             </div>
 
@@ -71,6 +72,7 @@
                     </div>
                     <button id="apply-color-btn" class="w-full font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-200 shadow-md bg-sky-600 text-white hover:bg-sky-700 focus:ring-sky-500">Apply Color</button>
                     <button id="duplicate-btn" class="w-full font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-200 shadow-md bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500">Duplicate Selection</button>
+                    <button id="delete-multi-btn" class="w-full font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-200 shadow-md bg-red-600 text-white hover:bg-red-700 focus:ring-red-500">Delete Selection</button>
                 </div>
             </div>
 
@@ -95,7 +97,7 @@
                 <ul class="list-disc list-inside text-gray-600 space-y-1">
                     <li>Hold <kbd class="px-2 py-1.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg">Space</kbd> and drag to pan.</li>
                     <li>Drag on empty space to multi-select.</li>
-                    <li>Select a node to edit its properties.</li>
+                    <li>Press <kbd class="px-2 py-1.5 text-xs font-semibold text-gray-800 bg-gray-100 border border-gray-200 rounded-lg">Del</kbd> to delete selection.</li>
                 </ul>
             </div>
         </div>
@@ -148,7 +150,7 @@
         let nodes = [], edges = [], nodeIdCounter = 0;
 
         // --- UI Elements & State ---
-        const nodeForm=document.getElementById('node-form'), multiSelectForm=document.getElementById('multi-select-form'), selectionCountSpan=document.getElementById('selection-count'), multiNodeColorInput=document.getElementById('multi-node-color'), applyColorBtn=document.getElementById('apply-color-btn'), duplicateBtn=document.getElementById('duplicate-btn'), nodeFormTitle=document.getElementById('node-form-title'), nodeValueInput=document.getElementById('node-value'), nodeColorInput=document.getElementById('node-color'), nodeActionBtn=document.getElementById('node-action-btn'), graphDataInput=document.getElementById('graph-data-input'), importTextBtn=document.getElementById('import-text-btn'), importFileBtn=document.getElementById('import-file-btn'), filePicker=document.getElementById('file-picker'), exportBtn=document.getElementById('export-btn'), clearBtn=document.getElementById('clear-btn');
+        const nodeForm=document.getElementById('node-form'), multiSelectForm=document.getElementById('multi-select-form'), selectionCountSpan=document.getElementById('selection-count'), multiNodeColorInput=document.getElementById('multi-node-color'), applyColorBtn=document.getElementById('apply-color-btn'), duplicateBtn=document.getElementById('duplicate-btn'), nodeFormTitle=document.getElementById('node-form-title'), nodeValueInput=document.getElementById('node-value'), nodeColorInput=document.getElementById('node-color'), nodeActionBtn=document.getElementById('node-action-btn'), deleteSingleBtn=document.getElementById('delete-single-btn'), deleteMultiBtn=document.getElementById('delete-multi-btn'), graphDataInput=document.getElementById('graph-data-input'), importTextBtn=document.getElementById('import-text-btn'), importFileBtn=document.getElementById('import-file-btn'), filePicker=document.getElementById('file-picker'), exportBtn=document.getElementById('export-btn'), clearBtn=document.getElementById('clear-btn');
         const NODE_RADIUS = 30;
         let selection = { nodes: new Set(), edges: new Set() };
         let selectionBox = null;
@@ -170,7 +172,14 @@
 
         // --- UI Control Logic ---
         function updateControlPanel() { const s=selection.nodes.size; if(s===1){const n=findNodeById(selection.nodes.values().next().value);setControlMode('edit',n);}else if(s>1){setControlMode('multi');}else{setControlMode('add');}}
-        function setControlMode(m,n=null){nodeForm.classList.toggle('hidden',m==='multi');multiSelectForm.classList.toggle('hidden',m!=='multi');if(m==='edit'){nodeFormTitle.textContent='Edit Node';nodeActionBtn.textContent='Update';nodeActionBtn.className='w-full font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-200 shadow-md bg-amber-500 text-white hover:bg-amber-600';nodeValueInput.value=n.value;nodeColorInput.value=n.color;}else if(m==='add'){nodeFormTitle.textContent='Add Node';nodeActionBtn.textContent='Add';nodeActionBtn.className='w-full font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-200 shadow-md bg-blue-600 text-white hover:bg-blue-700';nodeValueInput.value='';}else if(m==='multi'){selectionCountSpan.textContent=selection.nodes.size;}}
+        function setControlMode(m,n=null){
+            nodeForm.classList.toggle('hidden',m==='multi');
+            multiSelectForm.classList.toggle('hidden',m!=='multi');
+            deleteSingleBtn.classList.toggle('hidden', m !== 'edit');
+            if(m==='edit'){nodeFormTitle.textContent='Edit Node';nodeActionBtn.textContent='Update';nodeActionBtn.className='w-full font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-200 shadow-md bg-amber-500 text-white hover:bg-amber-600';nodeValueInput.value=n.value;nodeColorInput.value=n.color;}
+            else if(m==='add'){nodeFormTitle.textContent='Add Node';nodeActionBtn.textContent='Add';nodeActionBtn.className='w-full font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-200 shadow-md bg-blue-600 text-white hover:bg-blue-700';nodeValueInput.value='';}
+            else if(m==='multi'){selectionCountSpan.textContent=selection.nodes.size;}
+        }
 
         // --- Drawing Functions ---
         function draw() {
@@ -180,27 +189,20 @@
             ctx.translate(camera.x, camera.y);
             edges.forEach(edge => drawEdge(edge));
             nodes.forEach(node => drawNode(node));
-            ctx.restore(); // Restore before drawing screen-space elements
+            ctx.restore();
             if (selectionBox) drawSelectionBox();
         }
 
         function drawGrid() {
             const gridSize = 50;
             ctx.beginPath();
-            ctx.strokeStyle = '#e5e7eb'; // gray-200
-
+            ctx.strokeStyle = '#e5e7eb';
             let startX = camera.x % gridSize;
             while (startX < 0) startX += gridSize;
-
             let startY = camera.y % gridSize;
             while (startY < 0) startY += gridSize;
-
-            for (let x = startX; x < canvas.width; x += gridSize) {
-                ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
-            }
-            for (let y = startY; y < canvas.height; y += gridSize) {
-                ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
-            }
+            for (let x = startX; x < canvas.width; x += gridSize) { ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); }
+            for (let y = startY; y < canvas.height; y += gridSize) { ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); }
             ctx.stroke();
         }
 
@@ -239,70 +241,29 @@
         resizeObserver.observe(canvas.parentElement);
 
         // --- Save/Load & Persistence Logic ---
-        function saveState() {
-            localStorage.setItem('graphBuilderSave', JSON.stringify({ nodes, edges, camera }));
-        }
-        function loadStateFromStorage() {
-            const savedState = localStorage.getItem('graphBuilderSave');
-            if (savedState) {
-                try {
-                    const l = JSON.parse(savedState);
-                    if (!l.nodes || !l.edges || !Array.isArray(l.nodes) || !Array.isArray(l.edges)) return;
-                    nodes = l.nodes;
-                    edges = l.edges;
-                    camera = l.camera || { x: 0, y: 0 };
-                    nodeIdCounter = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 0;
-                } catch(e) {
-                    console.error("Failed to load from local storage:", e);
-                }
-            }
-        }
+        function saveState() { localStorage.setItem('graphBuilderSave', JSON.stringify({ nodes, edges, camera })); }
+        function loadStateFromStorage() { const s=localStorage.getItem('graphBuilderSave');if(s){try{const l=JSON.parse(s);if(!l.nodes||!l.edges||!Array.isArray(l.nodes)||!Array.isArray(l.edges))return;nodes=l.nodes;edges=l.edges;camera=l.camera||{x:0,y:0};nodeIdCounter=nodes.length>0?Math.max(...nodes.map(n=>n.id))+1:0;}catch(e){console.error("Failed to load from local storage:",e);}}}
         exportBtn.addEventListener('click', () => { if (nodes.length === 0) return showMessage("Graph empty."); exportOutput.value = JSON.stringify({ nodes, edges, camera }, null, 2); exportModal.classList.remove('hidden'); });
         async function loadGraphState(s) { if (nodes.length > 0) { const c = await showConfirm('Replace Graph?', 'This will replace your current work.'); if (!c) return; } try { const l = JSON.parse(s); if (!l.nodes || !l.edges || !Array.isArray(l.nodes) || !Array.isArray(l.edges)) { throw new Error("Invalid format."); } nodes = l.nodes; edges = l.edges; nodeIdCounter = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 0; camera = l.camera || { x: 0, y: 0 }; clearSelection(); draw(); saveState(); showMessage(`Loaded ${nodes.length} nodes and ${edges.length} edges.`); } catch (e) { showMessage("Failed to load: " + e.message); } }
         importTextBtn.addEventListener('click', () => { const s = graphDataInput.value.trim(); if (!s) return showMessage("Text area is empty."); loadGraphState(s); });
         importFileBtn.addEventListener('click', () => filePicker.click());
         filePicker.addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = e => loadGraphState(e.target.result); r.readAsText(f); e.target.value = null; });
-        clearBtn.addEventListener('click', async () => {
-            const confirmed = await showConfirm('Clear Canvas?', 'This will delete all nodes and edges. This action cannot be undone.');
-            if (confirmed) {
-                nodes = []; edges = []; camera = { x: 0, y: 0 }; nodeIdCounter = 0;
-                clearSelection();
-                saveState();
-                draw();
-            }
-        });
+        clearBtn.addEventListener('click', async () => {const c=await showConfirm('Clear Canvas?','This will delete all nodes and edges. This action cannot be undone.');if(c){nodes=[];edges=[];camera={x:0,y:0};nodeIdCounter=0;clearSelection();saveState();draw();}});
 
-        // --- Selection and Duplication Logic ---
+        // --- Selection, Deletion, and Duplication Logic ---
         function clearSelection() { selection.nodes.clear(); selection.edges.clear(); updateControlPanel(); }
-        function selectItemsInRect(rect) {
-            const worldRectStart = screenToWorld(rect.x, rect.y);
-            const worldRectEnd = screenToWorld(rect.x + rect.w, rect.y + rect.h);
-            const x1 = Math.min(worldRectStart.x, worldRectEnd.x);
-            const y1 = Math.min(worldRectStart.y, worldRectEnd.y);
-            const x2 = Math.max(worldRectStart.x, worldRectEnd.x);
-            const y2 = Math.max(worldRectStart.y, worldRectEnd.y);
-            clearSelection();
-            nodes.forEach(n => { if (n.x > x1 && n.x < x2 && n.y > y1 && n.y < y2) { selection.nodes.add(n.id); } });
-            edges.forEach(e => { if (selection.nodes.has(e.from) && selection.nodes.has(e.to)) { selection.edges.add(e); } });
-            updateControlPanel();
-        }
+        function selectItemsInRect(rect) { const wS=screenToWorld(rect.x,rect.y),wE=screenToWorld(rect.x+rect.w,rect.y+rect.h);const x1=Math.min(wS.x,wE.x),y1=Math.min(wS.y,wE.y),x2=Math.max(wS.x,wE.x),y2=Math.max(wS.y,wE.y);clearSelection();nodes.forEach(n=>{if(n.x>x1&&n.x<x2&&n.y>y1&&n.y<y2){selection.nodes.add(n.id);}});edges.forEach(e=>{if(selection.nodes.has(e.from)&&selection.nodes.has(e.to)){selection.edges.add(e);}});updateControlPanel(); }
+        async function deleteSelection(){const c=selection.nodes.size;if(c===0)return;const d=await showConfirm(`Delete ${c} Node(s)?`,`This will also remove connected edges and cannot be undone.`);if(d){const ids=new Set(selection.nodes);nodes=nodes.filter(n=>!ids.has(n.id));edges=edges.filter(e=>!ids.has(e.from)&&!ids.has(e.to));clearSelection();saveState();draw();}}
         duplicateBtn.addEventListener('click', () => { if (selection.nodes.size === 0) return; const o = 30, idMap = new Map(), newSel = new Set(); selection.nodes.forEach(id => { const oN = findNodeById(id), nN = { ...oN, id: nodeIdCounter++, x: oN.x + o, y: oN.y + o }; nodes.push(nN); idMap.set(id, nN.id); newSel.add(nN.id); }); selection.edges.forEach(e => { const nF = idMap.get(e.from), nT = idMap.get(e.to); if (nF !== undefined && nT !== undefined) { edges.push({ ...e, from: nF, to: nT }); } }); clearSelection(); newSel.forEach(id => selection.nodes.add(id)); edges.forEach(e => { if (selection.nodes.has(e.from) && selection.nodes.has(e.to)) { selection.edges.add(e); } }); updateControlPanel(); draw(); saveState(); });
-        applyColorBtn.addEventListener('click', () => {
-            const color = multiNodeColorInput.value;
-            selection.nodes.forEach(id => {
-                const node = findNodeById(id);
-                if (node) node.color = color;
-            });
-            draw();
-            saveState();
-        });
+        applyColorBtn.addEventListener('click', () => { const c = multiNodeColorInput.value; selection.nodes.forEach(id => { const n = findNodeById(id); if (n) n.color = c; }); draw(); saveState(); });
+        deleteSingleBtn.addEventListener('click', deleteSelection);
+        deleteMultiBtn.addEventListener('click', deleteSelection);
 
 
         // --- Event Handlers ---
         nodeActionBtn.addEventListener('click', () => { const v = nodeValueInput.value.trim(); if (!v) return showMessage('Node value required.'); const c = nodeColorInput.value; if (selection.nodes.size === 1) { const n = findNodeById(selection.nodes.values().next().value); if (n) { n.value = v; n.color = c; } clearSelection(); } else { const wP = screenToWorld(canvas.width / 2, canvas.height / 2); nodes.push({ id: nodeIdCounter++, value: v, color: c, x: wP.x, y: wP.y, radius: NODE_RADIUS }); nodeValueInput.value = ''; } draw(); saveState(); });
         canvas.addEventListener('dblclick', async e => {
-            const mP = getMousePos(canvas, e);
-            const wP = screenToWorld(mP.x, mP.y);
+            const mP = getMousePos(canvas, e); const wP = screenToWorld(mP.x, mP.y);
             if (nodes.some(n => Math.sqrt((wP.x - n.x) ** 2 + (wP.y - n.y) ** 2) < n.radius)) return;
             const v = await showCustomPrompt('New Node Value'); if (v && v.trim()) { nodes.push({ id: nodeIdCounter++, value: v.trim(), color: nodeColorInput.value, x: wP.x, y: wP.y, radius: NODE_RADIUS }); draw(); saveState(); }
         });
@@ -310,7 +271,13 @@
         // --- Click, Drag, Pan Logic ---
         let nodeUnderCursor = null, isDragging = false, dragStartPos = { x: 0, y: 0 }, panStartPos = { x: 0, y: 0 }, nodeStartPositions = new Map();
 
-        window.addEventListener('keydown', e => { if (e.code === 'Space') { e.preventDefault(); spacebarPressed = true; if (!isPanning && !nodeUnderCursor && !selectionBox) canvas.classList.add('panning-cursor'); } });
+        window.addEventListener('keydown', e => {
+            if (e.code === 'Space') { e.preventDefault(); spacebarPressed = true; if (!isPanning && !nodeUnderCursor && !selectionBox) canvas.classList.add('panning-cursor'); }
+            const isModalOpen = document.querySelector('#message-modal:not(.hidden), #prompt-modal:not(.hidden), #export-modal:not(.hidden), #confirm-modal:not(.hidden)');
+            const isTyping = document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA';
+            if(isModalOpen || isTyping) return;
+            if((e.key === 'Delete' || e.key === 'Backspace') && selection.nodes.size > 0){ e.preventDefault(); deleteSelection(); }
+        });
         window.addEventListener('keyup', e => { if (e.code === 'Space') { spacebarPressed = false; canvas.classList.remove('panning-cursor'); } });
 
         canvas.addEventListener('mousedown', e => {
@@ -335,7 +302,7 @@
         });
         canvas.addEventListener('mouseup', async e => {
             canvas.classList.remove('node-cursor', 'node-cursor-grabbing', 'panning-cursor');
-            if (isPanning) { isPanning = false; }
+            if (isPanning) { isPanning = false; saveState(); }
             else if (nodeUnderCursor && !isDragging) { await handleNodeClick(nodeUnderCursor, e.ctrlKey || e.metaKey); }
             else if (selectionBox && isDragging) { selectItemsInRect(selectionBox); }
             else if (!nodeUnderCursor && !isDragging) { clearSelection(); }
