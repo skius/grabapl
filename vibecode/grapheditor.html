@@ -65,6 +65,11 @@
                 <h3 class="font-semibold text-lg mb-2">Selection Actions</h3>
                 <div class="flex flex-col space-y-3">
                     <p class="text-center text-gray-600"><span id="selection-count">0</span> items selected</p>
+                    <div class="flex items-center justify-between">
+                        <label for="multi-node-color" class="font-medium text-gray-700">Group Color</label>
+                        <input type="color" id="multi-node-color" value="#3b82f6">
+                    </div>
+                    <button id="apply-color-btn" class="w-full font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-200 shadow-md bg-sky-600 text-white hover:bg-sky-700 focus:ring-sky-500">Apply Color</button>
                     <button id="duplicate-btn" class="w-full font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-200 shadow-md bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500">Duplicate Selection</button>
                 </div>
             </div>
@@ -140,7 +145,21 @@
         let nodes = [], edges = [], nodeIdCounter = 0;
 
         // --- UI Elements & State ---
-        const nodeForm=document.getElementById('node-form'), multiSelectForm=document.getElementById('multi-select-form'), selectionCountSpan=document.getElementById('selection-count'), duplicateBtn=document.getElementById('duplicate-btn'), nodeFormTitle=document.getElementById('node-form-title'), nodeValueInput=document.getElementById('node-value'), nodeColorInput=document.getElementById('node-color'), nodeActionBtn=document.getElementById('node-action-btn'), graphDataInput=document.getElementById('graph-data-input'), importTextBtn=document.getElementById('import-text-btn'), importFileBtn=document.getElementById('import-file-btn'), filePicker=document.getElementById('file-picker'), exportBtn=document.getElementById('export-btn');
+        const nodeForm=document.getElementById('node-form');
+        const multiSelectForm=document.getElementById('multi-select-form');
+        const selectionCountSpan=document.getElementById('selection-count');
+        const multiNodeColorInput=document.getElementById('multi-node-color');
+        const applyColorBtn=document.getElementById('apply-color-btn');
+        const duplicateBtn=document.getElementById('duplicate-btn');
+        const nodeFormTitle=document.getElementById('node-form-title');
+        const nodeValueInput=document.getElementById('node-value');
+        const nodeColorInput=document.getElementById('node-color');
+        const nodeActionBtn=document.getElementById('node-action-btn');
+        const graphDataInput=document.getElementById('graph-data-input');
+        const importTextBtn=document.getElementById('import-text-btn');
+        const importFileBtn=document.getElementById('import-file-btn');
+        const filePicker=document.getElementById('file-picker');
+        const exportBtn=document.getElementById('export-btn');
         const NODE_RADIUS = 30;
         let selection = { nodes: new Set(), edges: new Set() };
         let selectionBox = null;
@@ -181,27 +200,17 @@
             ctx.beginPath();
             ctx.strokeStyle = '#e5e7eb'; // gray-200
 
-            // Correctly calculate the starting points based on camera offset
             let startX = camera.x % gridSize;
-            while (startX < 0) {
-                startX += gridSize;
-            }
+            while (startX > 0) startX -= gridSize;
 
             let startY = camera.y % gridSize;
-            while (startY < 0) {
-                startY += gridSize;
-            }
+            while (startY > 0) startY -= gridSize;
 
-            // Draw vertical lines
             for (let x = startX; x < canvas.width; x += gridSize) {
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
+                ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height);
             }
-
-            // Draw horizontal lines
             for (let y = startY; y < canvas.height; y += gridSize) {
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
+                ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
             }
             ctx.stroke();
         }
@@ -262,6 +271,15 @@
             updateControlPanel();
         }
         duplicateBtn.addEventListener('click', () => { if (selection.nodes.size === 0) return; const o = 30, idMap = new Map(), newSel = new Set(); selection.nodes.forEach(id => { const oN = findNodeById(id), nN = { ...oN, id: nodeIdCounter++, x: oN.x + o, y: oN.y + o }; nodes.push(nN); idMap.set(id, nN.id); newSel.add(nN.id); }); selection.edges.forEach(e => { const nF = idMap.get(e.from), nT = idMap.get(e.to); if (nF !== undefined && nT !== undefined) { edges.push({ ...e, from: nF, to: nT }); } }); clearSelection(); newSel.forEach(id => selection.nodes.add(id)); edges.forEach(e => { if (selection.nodes.has(e.from) && selection.nodes.has(e.to)) { selection.edges.add(e); } }); updateControlPanel(); draw(); });
+        applyColorBtn.addEventListener('click', () => {
+            const color = multiNodeColorInput.value;
+            selection.nodes.forEach(id => {
+                const node = findNodeById(id);
+                if (node) node.color = color;
+            });
+            draw();
+        });
+
 
         // --- Event Handlers ---
         nodeActionBtn.addEventListener('click', () => { const v = nodeValueInput.value.trim(); if (!v) return showMessage('Node value required.'); const c = nodeColorInput.value; if (selection.nodes.size === 1) { const n = findNodeById(selection.nodes.values().next().value); if (n) { n.value = v; n.color = c; } clearSelection(); } else { const wP = screenToWorld(canvas.width / 2, canvas.height / 2); nodes.push({ id: nodeIdCounter++, value: v, color: c, x: wP.x, y: wP.y, radius: NODE_RADIUS }); nodeValueInput.value = ''; } draw(); });
