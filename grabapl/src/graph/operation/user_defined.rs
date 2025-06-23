@@ -132,7 +132,13 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
         abstract_g: &mut AbstractGraph<S>,
         subst: &ParameterSubstitution,
     ) -> OperationResult<OperationOutput> {
-        todo!("Implement apply_abstract for UserDefinedOperation");
+        let mut output = OperationOutput {
+            new_nodes: HashMap::new(),
+        };
+        
+        //todo!("Implement apply_abstract for UserDefinedOperation");
+        
+        Ok(output)
     }
 
     pub(crate) fn apply(
