@@ -11,9 +11,12 @@
             font-family: 'Inter', sans-serif;
         }
         canvas {
+            cursor: default;
+        }
+        .node-cursor {
             cursor: grab;
         }
-        canvas.grabbing {
+        .node-cursor-grabbing {
             cursor: grabbing;
         }
         input[type="color"] {
@@ -40,7 +43,7 @@
         <div class="lg:col-span-1 bg-white rounded-xl shadow-lg p-6 h-fit">
             <h2 class="text-xl font-semibold mb-4 border-b pb-2">Controls</h2>
 
-            <div class="mb-6">
+            <div id="node-form" class="mb-6">
                 <h3 id="node-form-title" class="font-semibold text-lg mb-2">Add Node</h3>
                 <div class="flex flex-col space-y-3">
                     <div class="flex items-center justify-between">
@@ -49,6 +52,14 @@
                     </div>
                     <input type="text" id="node-value" placeholder="Node Value (e.g., A)" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 transition">
                     <button id="node-action-btn" class="w-full font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-200 shadow-md">Add Node</button>
+                </div>
+            </div>
+
+            <div id="multi-select-form" class="hidden mb-6">
+                <h3 class="font-semibold text-lg mb-2">Selection Actions</h3>
+                <div class="flex flex-col space-y-3">
+                    <p class="text-center text-gray-600"><span id="selection-count">0</span> items selected</p>
+                    <button id="duplicate-btn" class="w-full font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-200 shadow-md bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500">Duplicate Selection</button>
                 </div>
             </div>
 
@@ -68,10 +79,10 @@
             <div class="border-t pt-6">
                 <h3 class="font-semibold text-lg mb-2">Instructions</h3>
                 <ul class="list-disc list-inside text-gray-600 space-y-1">
+                    <li>Drag on empty space to multi-select.</li>
                     <li>Select a node to edit its properties.</li>
                     <li>Click a node, then a second to create an edge.</li>
                     <li>Drag nodes to rearrange them.</li>
-                    <li>Loading a graph will replace the current one.</li>
                 </ul>
             </div>
         </div>
@@ -145,6 +156,10 @@
         let nodes = [], edges = [], nodeIdCounter = 0;
 
         // --- UI Elements & State ---
+        const nodeForm = document.getElementById('node-form');
+        const multiSelectForm = document.getElementById('multi-select-form');
+        const selectionCountSpan = document.getElementById('selection-count');
+        const duplicateBtn = document.getElementById('duplicate-btn');
         const nodeFormTitle = document.getElementById('node-form-title');
         const nodeValueInput = document.getElementById('node-value'), nodeColorInput = document.getElementById('node-color');
         const nodeActionBtn = document.getElementById('node-action-btn');
@@ -154,7 +169,9 @@
         const filePicker = document.getElementById('file-picker');
         const exportBtn = document.getElementById('export-btn');
         const NODE_RADIUS = 30;
-        let selectedNode = null;
+
+        let selection = { nodes: new Set(), edges: new Set() };
+        let selectionBox = null;
 
         // --- Modal Elements ---
         const messageModal = document.getElementById('message-modal'), modalMessage = document.getElementById('modal-message'), modalCloseBtn = document.getElementById('modal-close-btn');
@@ -218,18 +235,34 @@
         });
 
         // --- UI Control Logic ---
+        function updateControlPanel() {
+            const selectionSize = selection.nodes.size;
+            if (selectionSize === 1) {
+                const singleNode = findNodeById(selection.nodes.values().next().value);
+                setControlMode('edit', singleNode);
+            } else if (selectionSize > 1) {
+                setControlMode('multi');
+            } else {
+                setControlMode('add');
+            }
+        }
         function setControlMode(mode, node = null) {
+            nodeForm.classList.toggle('hidden', mode === 'multi');
+            multiSelectForm.classList.toggle('hidden', mode !== 'multi');
+
             if (mode === 'edit') {
                 nodeFormTitle.textContent = 'Edit Node';
                 nodeActionBtn.textContent = 'Update Node';
                 nodeActionBtn.className = 'w-full font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-200 shadow-md bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-500';
                 nodeValueInput.value = node.value;
                 nodeColorInput.value = node.color;
-            } else { // 'add' mode
+            } else if (mode === 'add') {
                 nodeFormTitle.textContent = 'Add Node';
                 nodeActionBtn.textContent = 'Add Node';
                 nodeActionBtn.className = 'w-full font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-200 shadow-md bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500';
                 nodeValueInput.value = '';
+            } else if (mode === 'multi') {
+                selectionCountSpan.textContent = selection.nodes.size;
             }
         }
 
@@ -239,14 +272,16 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             edges.forEach(edge => drawEdge(edge));
             nodes.forEach(node => drawNode(node));
+            if (selectionBox) drawSelectionBox();
         }
 
         function drawNode(node) {
+            const isSelected = selection.nodes.has(node.id);
             const nodeColor = node.color || '#3b82f6';
             ctx.beginPath(); ctx.arc(node.x, node.y, NODE_RADIUS, 0, Math.PI * 2);
             ctx.fillStyle = nodeColor; ctx.fill();
-            ctx.strokeStyle = (selectedNode && selectedNode.id === node.id) ? '#f59e0b' : darkenColor(nodeColor, 30);
-            ctx.lineWidth = (selectedNode && selectedNode.id === node.id) ? 5 : 3;
+            ctx.strokeStyle = isSelected ? '#f59e0b' : darkenColor(nodeColor, 30);
+            ctx.lineWidth = isSelected ? 5 : 3;
             ctx.stroke(); ctx.closePath();
             ctx.fillStyle = getContrastColor(nodeColor); ctx.font = 'bold 16px Inter';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -256,9 +291,13 @@
         function drawEdge(edge) {
             const fromNode = findNodeById(edge.from), toNode = findNodeById(edge.to);
             if (!fromNode || !toNode) return;
+
+            const isSelected = selection.edges.has(edge);
             const reciprocal = edges.some(e => e.from === toNode.id && e.to === fromNode.id);
             const headlen = 10; let angle, endX, endY, controlX, controlY;
-            ctx.strokeStyle = '#4b5563'; ctx.fillStyle = '#4b5563'; ctx.lineWidth = 2;
+            ctx.strokeStyle = isSelected ? '#f59e0b' : '#4b5563';
+            ctx.fillStyle = isSelected ? '#f59e0b' : '#4b5563';
+            ctx.lineWidth = isSelected ? 4 : 2;
 
             if (reciprocal) {
                 const curveOffset = 20, dx = toNode.x - fromNode.x, dy = toNode.y - fromNode.y, lineAngle = Math.atan2(dy, dx);
@@ -288,6 +327,14 @@
                 ctx.fillStyle = '#111827'; ctx.font = '14px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
                 ctx.fillText(edge.value, 0, -5); ctx.restore();
             }
+        }
+
+        function drawSelectionBox() {
+            ctx.fillStyle = 'rgba(147, 197, 253, 0.3)'; // blue-300 with opacity
+            ctx.strokeStyle = 'rgba(59, 130, 246, 1)'; // blue-500
+            ctx.lineWidth = 1;
+            ctx.fillRect(selectionBox.x, selectionBox.y, selectionBox.w, selectionBox.h);
+            ctx.strokeRect(selectionBox.x, selectionBox.y, selectionBox.w, selectionBox.h);
         }
 
         // --- Helper Functions ---
@@ -333,8 +380,7 @@
                 }
                 nodes = loadedState.nodes; edges = loadedState.edges;
                 nodeIdCounter = nodes.length > 0 ? Math.max(...nodes.map(n => n.id)) + 1 : 0;
-                selectedNode = null;
-                setControlMode('add');
+                clearSelection();
                 draw();
                 showMessage(`Successfully loaded ${nodes.length} nodes and ${edges.length} edges.`);
             } catch (e) {
@@ -348,40 +394,102 @@
             loadGraphState(stateString);
         });
 
-        importFileBtn.addEventListener('click', () => {
-            filePicker.click();
-        });
+        importFileBtn.addEventListener('click', () => filePicker.click());
 
         filePicker.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
-
             const reader = new FileReader();
-            reader.onload = (event) => {
-                const stateString = event.target.result;
-                loadGraphState(stateString);
-            };
+            reader.onload = (event) => loadGraphState(event.target.result);
             reader.readAsText(file);
             e.target.value = null; // Reset picker
+        });
+
+        // --- Selection and Duplication Logic ---
+        function clearSelection() {
+            selection.nodes.clear();
+            selection.edges.clear();
+            updateControlPanel();
+        }
+
+        function selectItemsInRect(rect) {
+            const { x, y, w, h } = rect;
+            const x1 = Math.min(x, x + w);
+            const y1 = Math.min(y, y + h);
+            const x2 = Math.max(x, x + w);
+            const y2 = Math.max(y, y + h);
+
+            clearSelection();
+
+            nodes.forEach(node => {
+                if (node.x > x1 && node.x < x2 && node.y > y1 && node.y < y2) {
+                    selection.nodes.add(node.id);
+                }
+            });
+
+            edges.forEach(edge => {
+                if (selection.nodes.has(edge.from) && selection.nodes.has(edge.to)) {
+                    selection.edges.add(edge);
+                }
+            });
+            updateControlPanel();
+        }
+
+        duplicateBtn.addEventListener('click', () => {
+            if (selection.nodes.size === 0) return;
+            const offset = 30;
+            const idMap = new Map();
+            const newSelection = new Set();
+
+            // Duplicate nodes
+            selection.nodes.forEach(nodeId => {
+                const originalNode = findNodeById(nodeId);
+                const newNode = {
+                    ...originalNode,
+                    id: nodeIdCounter++,
+                    x: originalNode.x + offset,
+                    y: originalNode.y + offset
+                };
+                nodes.push(newNode);
+                idMap.set(nodeId, newNode.id);
+                newSelection.add(newNode.id);
+            });
+
+            // Duplicate internal edges
+            selection.edges.forEach(edge => {
+                const newFrom = idMap.get(edge.from);
+                const newTo = idMap.get(edge.to);
+                if (newFrom !== undefined && newTo !== undefined) {
+                    edges.push({ ...edge, from: newFrom, to: newTo });
+                }
+            });
+
+            // Select the newly created items
+            clearSelection();
+            newSelection.forEach(id => selection.nodes.add(id));
+            edges.forEach(edge => {
+                if (selection.nodes.has(edge.from) && selection.nodes.has(edge.to)) {
+                    selection.edges.add(edge);
+                }
+            });
+
+            updateControlPanel();
+            draw();
         });
 
         // --- Event Handlers ---
         nodeActionBtn.addEventListener('click', () => {
             const value = nodeValueInput.value.trim();
-            if (!value) {
-                showMessage('Node value cannot be empty.');
-                return;
-            }
+            if (!value) return showMessage('Node value cannot be empty.');
             const color = nodeColorInput.value;
 
-            if (selectedNode) { // Update existing node
-                const nodeToUpdate = findNodeById(selectedNode.id);
+            if (selection.nodes.size === 1) { // Update existing node
+                const nodeToUpdate = findNodeById(selection.nodes.values().next().value);
                 if (nodeToUpdate) {
                     nodeToUpdate.value = value;
                     nodeToUpdate.color = color;
                 }
-                selectedNode = null;
-                setControlMode('add');
+                clearSelection();
             } else { // Add new node
                 nodes.push({ id: nodeIdCounter++, value, color, x: Math.random()*(canvas.width-NODE_RADIUS*2)+NODE_RADIUS, y: Math.random()*(canvas.height-NODE_RADIUS*2)+NODE_RADIUS, radius: NODE_RADIUS });
                 nodeValueInput.value = '';
@@ -400,94 +508,157 @@
         });
 
         // --- Click & Drag Logic ---
-        let nodeUnderCursor = null, isDragging = false, dragStartPos = {x:0,y:0}, nodeStartPos = {x:0,y:0};
+        let nodeUnderCursor = null, isDragging = false, dragStartPos = {x:0,y:0};
+        let nodeStartPositions = new Map();
 
         canvas.addEventListener('mousedown', (e) => {
-            if (e.button !== 0) return; // Only main left click
+            if (e.button !== 0) return;
             const mousePos = getMousePos(canvas, e);
             isDragging = false;
             nodeUnderCursor = null;
+
+            canvas.classList.remove('node-cursor', 'node-cursor-grabbing');
+            let overNode = false;
             for (const node of nodes) {
                 if (Math.sqrt((mousePos.x - node.x)**2 + (mousePos.y - node.y)**2) < node.radius) {
                     nodeUnderCursor = node;
+                    overNode = true;
                     break;
                 }
             }
-            if (nodeUnderCursor) {
-                dragStartPos = mousePos;
-                nodeStartPos = { x: nodeUnderCursor.x, y: nodeUnderCursor.y };
-                canvas.classList.add('grabbing');
-            } else { // Clicked on background
-                if (selectedNode) {
-                    selectedNode = null;
-                    setControlMode('add');
-                    draw();
+
+            if (overNode) canvas.classList.add('node-cursor');
+
+            dragStartPos = mousePos;
+
+            if (nodeUnderCursor) { // Start drag on a node
+                if (selection.nodes.size > 1 && selection.nodes.has(nodeUnderCursor.id)) {
+                    // Dragging a multi-selection
+                    nodeStartPositions.clear();
+                    selection.nodes.forEach(id => {
+                        const n = findNodeById(id);
+                        nodeStartPositions.set(id, { x: n.x, y: n.y });
+                    });
+                } else {
+                    // Dragging a single node
+                    nodeStartPositions.clear();
+                    nodeStartPositions.set(nodeUnderCursor.id, { x: nodeUnderCursor.x, y: nodeUnderCursor.y });
                 }
+            } else { // Start drag on background for selection box
+                selectionBox = { x: mousePos.x, y: mousePos.y, w: 0, h: 0 };
             }
         });
 
         canvas.addEventListener('mousemove', (e) => {
-            if (!nodeUnderCursor) return;
             const mousePos = getMousePos(canvas, e);
+            if (!dragStartPos) return;
+
             if (!isDragging && (Math.abs(mousePos.x - dragStartPos.x) > 5 || Math.abs(mousePos.y - dragStartPos.y) > 5)) {
                 isDragging = true;
-                if (selectedNode) {
-                    selectedNode = null;
-                    setControlMode('add');
-                }
+                if(nodeUnderCursor) canvas.classList.add('node-cursor-grabbing');
             }
+
             if (isDragging) {
-                nodeUnderCursor.x = nodeStartPos.x + (mousePos.x - dragStartPos.x);
-                nodeUnderCursor.y = nodeStartPos.y + (mousePos.y - dragStartPos.y);
+                if (nodeUnderCursor) { // Dragging nodes
+                    const dx = mousePos.x - dragStartPos.x, dy = mousePos.y - dragStartPos.y;
+
+                    if(selection.nodes.size > 1 && selection.nodes.has(nodeUnderCursor.id)) {
+                        // Drag all selected nodes
+                        selection.nodes.forEach(id => {
+                            const startPos = nodeStartPositions.get(id);
+                            const n = findNodeById(id);
+                            n.x = startPos.x + dx;
+                            n.y = startPos.y + dy;
+                        });
+                    } else {
+                        // Drag a single node
+                        const startPos = nodeStartPositions.get(nodeUnderCursor.id);
+                        nodeUnderCursor.x = startPos.x + dx;
+                        nodeUnderCursor.y = startPos.y + dy;
+                    }
+                } else if (selectionBox) { // Drawing selection box
+                    selectionBox.w = mousePos.x - selectionBox.x;
+                    selectionBox.h = mousePos.y - selectionBox.y;
+                }
                 draw();
             }
         });
 
         canvas.addEventListener('mouseup', async (e) => {
-            if (nodeUnderCursor && !isDragging) {
-                await handleNodeClick(nodeUnderCursor);
+            canvas.classList.remove('node-cursor', 'node-cursor-grabbing');
+
+            if (nodeUnderCursor && !isDragging) { // This was a click, not a drag
+                await handleNodeClick(nodeUnderCursor, e.ctrlKey || e.metaKey);
+            } else if (selectionBox && isDragging) { // Finished drawing selection box
+                selectItemsInRect(selectionBox);
+            } else if (!nodeUnderCursor && !isDragging) { // Clicked on background
+                clearSelection();
             }
-            canvas.classList.remove('grabbing');
-            nodeUnderCursor = null;
+
+            dragStartPos = null;
             isDragging = false;
+            selectionBox = null;
+            draw();
         });
 
         canvas.addEventListener('mouseleave', () => {
-            if (nodeUnderCursor) {
-                canvas.classList.remove('grabbing');
-                nodeUnderCursor = null;
+            if (dragStartPos) {
+                canvas.classList.remove('node-cursor', 'node-cursor-grabbing');
+                dragStartPos = null;
                 isDragging = false;
+                selectionBox = null;
+                draw();
             }
         });
 
-        async function handleNodeClick(clickedNode) {
-            if (!selectedNode) {
-                selectedNode = clickedNode;
-                setControlMode('edit', selectedNode);
-            } else if (selectedNode.id === clickedNode.id) {
-                selectedNode = null;
-                setControlMode('add');
-            } else {
-                const fromId = selectedNode.id, toId = clickedNode.id;
-                const fromNode = findNodeById(fromId);
-                const edgeExists = edges.some(e => e.from === fromId && e.to === toId);
-                if (edgeExists) { showMessage(`An edge from "${fromNode.value}" to "${clickedNode.value}" already exists.`); }
-                else {
-                    // Deselect first to prevent ghost dragging
-                    const tempSelectedNode = selectedNode;
-                    selectedNode = null;
-                    setControlMode('add');
-                    draw();
-
-                    const edgeValue = await showCustomPrompt('Create Edge', `Enter value for edge: ${tempSelectedNode.value} → ${clickedNode.value}`);
-                    if (edgeValue !== null) edges.push({ from: fromId, to: toId, value: edgeValue.trim() });
+        async function handleNodeClick(clickedNode, isCtrlClick = false) {
+            if (isCtrlClick) { // Add/remove from selection
+                if(selection.nodes.has(clickedNode.id)) {
+                    selection.nodes.delete(clickedNode.id);
+                } else {
+                    selection.nodes.add(clickedNode.id);
+                }
+            } else { // Normal click logic
+                if (selection.nodes.size <= 1 && !selection.nodes.has(clickedNode.id)) {
+                    // This is a new click to create an edge or select a single node
+                    const previouslySelectedNodeId = selection.nodes.values().next().value;
+                    if(previouslySelectedNodeId !== undefined) {
+                        const fromNode = findNodeById(previouslySelectedNodeId);
+                        const edgeExists = edges.some(e => e.from === fromNode.id && e.to === clickedNode.id);
+                        if (edgeExists) {
+                            showMessage(`An edge from "${fromNode.value}" to "${clickedNode.value}" already exists.`);
+                            clearSelection();
+                        } else {
+                            clearSelection();
+                            draw(); // Deselect first to prevent ghost dragging
+                            const edgeValue = await showCustomPrompt('Create Edge', `Enter value for edge: ${fromNode.value} → ${clickedNode.value}`);
+                            if (edgeValue !== null) edges.push({ from: fromNode.id, to: clickedNode.id, value: edgeValue.trim() });
+                        }
+                    } else {
+                        // No previous selection, just select this one node
+                        clearSelection();
+                        selection.nodes.add(clickedNode.id);
+                    }
+                } else {
+                    // Clicked on a node that's part of a multi-selection, or deselecting a single node
+                    clearSelection();
+                    selection.nodes.add(clickedNode.id);
                 }
             }
+
+            // Update internal edge selection based on node selection
+            selection.edges.clear();
+            edges.forEach(edge => {
+                if (selection.nodes.has(edge.from) && selection.nodes.has(edge.to)) {
+                    selection.edges.add(edge);
+                }
+            });
+            updateControlPanel();
             draw();
         }
 
         // Set initial control state
-        setControlMode('add');
+        updateControlPanel();
     });
 </script>
 </body>
