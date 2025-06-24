@@ -71,7 +71,9 @@ impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> BiMap<L, 
 }
 
 // implement IntoIterator for BiMap
-impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> IntoIterator for BiMap<L, R> {
+impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> IntoIterator
+    for BiMap<L, R>
+{
     type Item = (L, R);
     type IntoIter = std::collections::hash_map::IntoIter<L, R>;
 

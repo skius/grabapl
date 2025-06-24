@@ -43,7 +43,7 @@ pub trait AbstractMatcher {
 /// # Example
 /// If you have a type system with two types, `a` and `b`, where `a <: b`, then this Join will
 /// return `a` when joining `a` and `a`, and `b` when joining `a` and `b`.
-/// 
+///
 /// However, if you have a third type `c` with `c <: b`, i.e., `c` is not comparable to `a`, then
 /// the join will not be able to join `a` and `c`, even though `b` would be a valid join.
 #[derive(Default)]
@@ -54,10 +54,7 @@ pub struct MatchJoiner<M: AbstractMatcher<Abstract: Clone>> {
 impl<M: AbstractMatcher<Abstract: Clone>> AbstractJoin for MatchJoiner<M> {
     type Abstract = M::Abstract;
 
-    fn join(
-        a: &Self::Abstract,
-        b: &Self::Abstract,
-    ) -> Option<Self::Abstract> {
+    fn join(a: &Self::Abstract, b: &Self::Abstract) -> Option<Self::Abstract> {
         if M::matches(a, b) {
             // a <: b, so we return b
             Some(b.clone())
@@ -78,11 +75,7 @@ pub trait AbstractJoin {
 
     /// Returns the abstract type that is the join of the two abstract types, i.e.,
     /// the most specific type that is a supertype of both, if it exists.
-    fn join(
-        a: &Self::Abstract,
-        b: &Self::Abstract,
-    ) -> Option<Self::Abstract>
-    {
+    fn join(a: &Self::Abstract, b: &Self::Abstract) -> Option<Self::Abstract> {
         // Default implementation returns None, meaning no join exists.
         // Note that this is probably a bit absurd, as in the very least if two nodes are equal
         // (either via Eq or via mathes(a,b) and matches(b,a)), then the join is the same node.
@@ -136,18 +129,12 @@ pub trait Semantics {
     fn new_abstract_graph() -> AbstractGraph<Self> {
         Graph::new()
     }
-    
-    fn join_edges(
-        a: &Self::EdgeAbstract,
-        b: &Self::EdgeAbstract,
-    ) -> Option<Self::EdgeAbstract> {
+
+    fn join_edges(a: &Self::EdgeAbstract, b: &Self::EdgeAbstract) -> Option<Self::EdgeAbstract> {
         Self::EdgeJoin::join(a, b)
     }
-    
-    fn join_nodes(
-        a: &Self::NodeAbstract,
-        b: &Self::NodeAbstract,
-    ) -> Option<Self::NodeAbstract> {
+
+    fn join_nodes(a: &Self::NodeAbstract, b: &Self::NodeAbstract) -> Option<Self::NodeAbstract> {
         Self::NodeJoin::join(a, b)
     }
 }

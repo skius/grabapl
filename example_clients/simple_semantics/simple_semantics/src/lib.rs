@@ -8,7 +8,10 @@ use grabapl::graph::operation::run_operation;
 use grabapl::graph::pattern::{
     OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution,
 };
-use grabapl::graph::semantics::{AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, MatchJoiner, Semantics};
+use grabapl::graph::semantics::{
+    AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, MatchJoiner,
+    Semantics,
+};
 use grabapl::{DotCollector, EdgeInsertionOrder, OperationContext, WithSubstMarker};
 use std::collections::HashMap;
 use std::fmt::Debug;

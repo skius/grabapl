@@ -1327,11 +1327,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         //  ==> we must manually change the abstract graph ourselves here!
         //  ==> we must reconcile into self.current_state
 
-        let merged_state = merge_states(
-            false,
-            &after_true_branch_state,
-            &after_false_branch_state,
-        );
+        let merged_state = merge_states(false, &after_true_branch_state, &after_false_branch_state);
         self.current_state = merged_state;
 
         let ud_instr = UDInstruction::BuiltinQuery(
@@ -1555,11 +1551,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         // current situation: self.current_state is before both branches, and we have the true and false branch states
         // available to reconcile.
 
-        let merged_state = merge_states(
-            true,
-            &after_true_branch_state,
-            &after_false_branch_state,
-        );
+        let merged_state = merge_states(true, &after_true_branch_state, &after_false_branch_state);
         self.current_state = merged_state;
 
         let ud_instruction = UDInstruction::ShapeQuery(
@@ -1709,7 +1701,6 @@ fn get_query_path_for_path<S: SemanticsClone>(
     query_path
 }
 
-
 /// Takes two intermediate states and computes the smallest subgraph and most general abstract values
 /// such that the resulting state is a sound approximation of the two states.
 ///
@@ -1752,12 +1743,24 @@ fn merge_states<S: SemanticsClone>(
 
     // Now, for each common AID, we need to merge the nodes from both states.
     for aid in common_aids {
-        let key_true = *state_true.node_keys_to_aid.get_right(&aid).expect("internal error: AID should be in mapping");
-        let key_false = *state_false.node_keys_to_aid.get_right(&aid).expect("internal error: AID should be in mapping");
+        let key_true = *state_true
+            .node_keys_to_aid
+            .get_right(&aid)
+            .expect("internal error: AID should be in mapping");
+        let key_false = *state_false
+            .node_keys_to_aid
+            .get_right(&aid)
+            .expect("internal error: AID should be in mapping");
 
         // Get the abstract values from both states.
-        let av_true = state_true.graph.get_node_attr(key_true).expect("internal error: Key should be in graph");
-        let av_false = state_false.graph.get_node_attr(key_false).expect("internal error: Key should be in graph");
+        let av_true = state_true
+            .graph
+            .get_node_attr(key_true)
+            .expect("internal error: Key should be in graph");
+        let av_false = state_false
+            .graph
+            .get_node_attr(key_false)
+            .expect("internal error: Key should be in graph");
 
         // Merge the abstract values.
         let Some(merged_av) = S::join_nodes(av_true, av_false) else {
@@ -1772,8 +1775,14 @@ fn merge_states<S: SemanticsClone>(
 
     // Now we merge the edges.
     for (from_key_true, to_key_true, attr) in state_true.graph.graph.all_edges() {
-        let from_aid = state_true.node_keys_to_aid.get_left(&from_key_true).expect("internal error: from key should be in mapping");
-        let to_aid = state_true.node_keys_to_aid.get_left(&to_key_true).expect("internal error: to key should be in mapping");
+        let from_aid = state_true
+            .node_keys_to_aid
+            .get_left(&from_key_true)
+            .expect("internal error: from key should be in mapping");
+        let to_aid = state_true
+            .node_keys_to_aid
+            .get_left(&to_key_true)
+            .expect("internal error: to key should be in mapping");
         let Some(from_key_merged) = new_state.node_keys_to_aid.get_right(from_aid) else {
             // If the from AID has not been merged, we skip this edge.
             continue;
@@ -1782,9 +1791,11 @@ fn merge_states<S: SemanticsClone>(
             // If the to AID has not been merged, we skip this edge.
             continue;
         };
-        let av_true = state_true.graph.get_edge_attr((from_key_true, to_key_true))
+        let av_true = state_true
+            .graph
+            .get_edge_attr((from_key_true, to_key_true))
             .expect("internal error: edge should be in graph");
-        
+
         // Skip edges whose endpoints are not in the common AIDs.
         // because of the above new_state let else check, this should always succeed, though.
         let Some(from_key_false) = state_false.node_keys_to_aid.get_right(from_aid) else {
@@ -1793,54 +1804,23 @@ fn merge_states<S: SemanticsClone>(
         let Some(to_key_false) = state_false.node_keys_to_aid.get_right(to_aid) else {
             continue;
         };
-        
+
         // Check if the edge exists in the false state.
-        if let Some(av_false) = state_false.graph.get_edge_attr((*from_key_false, *to_key_false)) {
+        if let Some(av_false) = state_false
+            .graph
+            .get_edge_attr((*from_key_false, *to_key_false))
+        {
             // Try to merge the edges.
             if let Some(merged_av) = S::join_edges(av_true, av_false) {
                 // If we can merge the edges, add the merged edge to the new state.
-                new_state.graph.add_edge(*from_key_merged, *to_key_merged, merged_av);
+                new_state
+                    .graph
+                    .add_edge(*from_key_merged, *to_key_merged, merged_av);
             }
         }
-        
 
         // TODO: edge orders need to be handled here.
     }
 
-
     new_state
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
