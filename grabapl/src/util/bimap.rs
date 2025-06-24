@@ -60,11 +60,11 @@ impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> BiMap<L, 
             None
         }
     }
-    
+
     pub fn right_values(&self) -> impl Iterator<Item = &R> {
         self.left_to_right.values()
     }
-    
+
     pub fn left_values(&self) -> impl Iterator<Item = &L> {
         self.right_to_left.values()
     }

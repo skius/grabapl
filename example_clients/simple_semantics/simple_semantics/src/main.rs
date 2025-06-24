@@ -493,7 +493,6 @@ fn main() {
     //     .unwrap();
     // dot_collector.collect(&g);
 
-
     // repeat the BST experiement but with op 15
     let bst_root = g.add_node(-1);
     dot_collector.collect(&g);
@@ -506,7 +505,7 @@ fn main() {
         15,
         vec![bst_root, value_to_insert],
     )
-        .unwrap();
+    .unwrap();
     dot_collector.collect(&g);
     // insert 3
     let value_to_insert = g.add_node(3);
@@ -517,7 +516,7 @@ fn main() {
         15,
         vec![bst_root, value_to_insert],
     )
-        .unwrap();
+    .unwrap();
     dot_collector.collect(&g);
     // insert 7
     let value_to_insert = g.add_node(7);
@@ -528,7 +527,7 @@ fn main() {
         15,
         vec![bst_root, value_to_insert],
     )
-        .unwrap();
+    .unwrap();
     dot_collector.collect(&g);
     // insert 1
     let value_to_insert = g.add_node(1);
@@ -540,7 +539,7 @@ fn main() {
         15,
         vec![bst_root, value_to_insert],
     )
-        .unwrap();
+    .unwrap();
     dot_collector.collect(&g);
     // insert 2
     let value_to_insert = g.add_node(2);
@@ -551,7 +550,7 @@ fn main() {
         15,
         vec![bst_root, value_to_insert],
     )
-        .unwrap();
+    .unwrap();
     dot_collector.collect(&g);
     // insert 4
     let value_to_insert = g.add_node(4);
@@ -562,10 +561,8 @@ fn main() {
         15,
         vec![bst_root, value_to_insert],
     )
-        .unwrap();
+    .unwrap();
     dot_collector.collect(&g);
-
-
 
     println!("{}", dot_collector.finalize());
 }

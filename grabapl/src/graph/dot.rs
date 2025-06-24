@@ -14,7 +14,7 @@ impl<NA: Debug, EA: Debug> Graph<NA, EA> {
         // TODO: accept a mapping from NodeKey to String that we could accept here
         //  and then use in the operation builder to print AIDs instead of NodeKeys?
         //  also, it would be really nice if petgraph didn't require a Debug bound on Dot...
-        
+
         format!(
             "{:?}",
             Dot::with_attr_getters(

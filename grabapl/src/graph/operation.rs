@@ -101,7 +101,7 @@ impl<'a, S: SemanticsClone> Operation<'a, S> {
             Operation::Custom(op) => op.parameter.clone(),
         }
     }
-    
+
     pub fn apply_abstract(
         &self,
         op_ctx: &OperationContext<S>,
@@ -119,7 +119,6 @@ impl<'a, S: SemanticsClone> Operation<'a, S> {
 // also,
 
 pub type OperationId = u32;
-
 
 #[derive(Error, Debug)]
 pub enum SubstitutionError {

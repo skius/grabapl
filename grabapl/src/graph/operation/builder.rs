@@ -3,21 +3,21 @@ use crate::graph::operation::user_defined::{
     AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, QueryInstructions,
     UserDefinedOperation,
 };
+use crate::graph::operation::{BuiltinOperation, OperationError, get_substitution};
 use crate::graph::pattern::{AbstractOutputNodeMarker, OperationParameter, ParameterSubstitution};
 use crate::graph::semantics::{AbstractGraph, SemanticsClone};
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, OperationContext, OperationId, SubstMarker};
+use petgraph::dot;
+use petgraph::dot::Dot;
+use petgraph::prelude::GraphMap;
 use std::collections::HashMap;
 use std::fmt::{Debug, Display};
 use std::iter::Peekable;
 use std::marker::PhantomData;
 use std::mem;
 use std::slice::Iter;
-use petgraph::dot;
-use petgraph::dot::Dot;
-use petgraph::prelude::GraphMap;
 use thiserror::Error;
-use crate::graph::operation::{get_substitution, BuiltinOperation, OperationError};
 /*
 General overview:
 
@@ -101,10 +101,7 @@ pub enum OperationBuilderError {
     #[error("Could not apply operation due to mismatched arguments: {0}")]
     SubstitutionError(#[from] crate::graph::operation::SubstitutionError),
     #[error("Could not abstractly apply operation {0} due to: {1}")]
-    AbstractApplyOperationError(
-        OperationId,
-        OperationError,
-    ),
+    AbstractApplyOperationError(OperationId, OperationError),
     #[error("Superfluous instruction {0}")]
     SuperfluousInstruction(String),
 }
@@ -262,22 +259,18 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         // Here we would typically finalize the operation and return it.
         // For now, we just return Ok to indicate success.
 
-        let (param, instructions, _state_path) = IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
+        let (param, instructions, _state_path) =
+            IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
 
-        let mut interpreter = IntermediateInterpreter::new_for_self_op_id(
-            self_op_id,
-            param,
-            self.op_ctx,
-        );
+        let mut interpreter =
+            IntermediateInterpreter::new_for_self_op_id(self_op_id, param, self.op_ctx);
 
         let user_def_op = interpreter.create_user_defined_operation(instructions)?;
 
         Ok(user_def_op)
     }
 
-    fn check_instructions_or_rollback(
-        &mut self,
-    ) -> Result<(), OperationBuilderError> {
+    fn check_instructions_or_rollback(&mut self) -> Result<(), OperationBuilderError> {
         match self.check_instructions() {
             Ok(_) => Ok(()),
             Err(e) => {
@@ -291,9 +284,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         }
     }
 
-    fn check_instructions(
-        &self,
-    ) -> Result<(), OperationBuilderError> {
+    fn check_instructions(&self) -> Result<(), OperationBuilderError> {
         let (param, instrs, _) = IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
         let mut interpreter = IntermediateInterpreter::new_for_self_op_id(
             0, // Unused. TODO: make prettier...
@@ -305,9 +296,21 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
     }
 }
 
-impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug, BuiltinOperation: Clone, BuiltinQuery: Clone>> OperationBuilder<'a, S> {
-    fn get_intermediate_state(&self) -> Result<(IntermediateState<S>, Vec<IntermediateStatePath>), OperationBuilderError> {
-        let (param, instructions, path) = IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
+impl<
+    'a,
+    S: SemanticsClone<
+            NodeAbstract: Debug,
+            EdgeAbstract: Debug,
+            BuiltinOperation: Clone,
+            BuiltinQuery: Clone,
+        >,
+> OperationBuilder<'a, S>
+{
+    fn get_intermediate_state(
+        &self,
+    ) -> Result<(IntermediateState<S>, Vec<IntermediateStatePath>), OperationBuilderError> {
+        let (param, instructions, path) =
+            IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
         let mut interpreter = IntermediateInterpreter::new_for_self_op_id(
             0, // TODO: use a real operation ID here
             param,
@@ -318,9 +321,12 @@ impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug, BuiltinOper
 
         let mut path_iter = path.iter().peekable().cloned();
 
-        let mut intermediate_state = get_state_for_path(&interpreter.initial_state, &interp_instructions, &mut path_iter).expect(
-            "internal error: Failed to get intermediate state for path",
-        );
+        let mut intermediate_state = get_state_for_path(
+            &interpreter.initial_state,
+            &interp_instructions,
+            &mut path_iter,
+        )
+        .expect("internal error: Failed to get intermediate state for path");
 
         let query_path = get_query_path_for_path::<S>(&mut path.iter().peekable().cloned());
         // TODO: make this prettier. should be automatically computed.
@@ -357,7 +363,6 @@ impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug, BuiltinOper
         let mapping = state.node_keys_to_aid.into_inner().0;
         let query_path = state.query_path;
         format!("\nIntermediate State:\n{dot}\nmapping: {mapping:#?}\nTODO query path")
-
     }
 
     fn build_debug_graph_at_current_point(
@@ -400,7 +405,7 @@ impl<'a, S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug, BuiltinOper
 
 struct IntermediateStateBuilder<'a, S: SemanticsClone> {
     path: Vec<IntermediateStatePath>,
-    _phantom_data: PhantomData<&'a S>
+    _phantom_data: PhantomData<&'a S>,
 }
 
 use super::user_defined::Instruction as UDInstruction;
@@ -459,7 +464,17 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
     fn run(
         builder_instructions: &'a [BuilderInstruction<S>],
         op_ctx: &'a OperationContext<S>,
-    ) -> Result<(OperationParameter<S>, Vec<(Option<AbstractOperationResultMarker>, IntermediateInstruction<S>)>, Vec<IntermediateStatePath>), OperationBuilderError> {
+    ) -> Result<
+        (
+            OperationParameter<S>,
+            Vec<(
+                Option<AbstractOperationResultMarker>,
+                IntermediateInstruction<S>,
+            )>,
+            Vec<IntermediateStatePath>,
+        ),
+        OperationBuilderError,
+    > {
         /*
         General idea:
         Whenever we see start_query (or start_shape_query), we push a query state onto a stack.
@@ -598,9 +613,9 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
 
         // assert our iter is empty
         if let Some(next_instruction) = iter.peek() {
-            return Err(OperationBuilderError::SuperfluousInstruction(
-                format!("{next_instruction:?}"),
-            ));
+            return Err(OperationBuilderError::SuperfluousInstruction(format!(
+                "{next_instruction:?}"
+            )));
         }
 
         Ok((op_parameter, instructions, builder.path))
@@ -685,7 +700,10 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
             }
             BuilderInstruction::StartShapeQuery(op_marker) => {
                 iter.next();
-                self.path.push(IntermediateStatePath::StartQuery(Some(format!("{op_marker:?}"))));
+                self.path
+                    .push(IntermediateStatePath::StartQuery(Some(format!(
+                        "{op_marker:?}"
+                    ))));
                 // Start a new shape query state
                 let (gsq_instructions, branch_instructions) =
                     self.build_shape_query(iter, *op_marker)?;
@@ -943,8 +961,9 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
         }
 
         while let Some(last) = self.path.pop() {
-            if (branch && last == IntermediateStatePath::EnterTrue) ||
-               (!branch && last == IntermediateStatePath::EnterFalse) {
+            if (branch && last == IntermediateStatePath::EnterTrue)
+                || (!branch && last == IntermediateStatePath::EnterFalse)
+            {
                 break;
             }
         }
@@ -1036,8 +1055,8 @@ impl<S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateSt
                     AbstractNodeId::ParameterMarker(subst) => write!(f, "P({})", subst),
                     AbstractNodeId::DynamicOutputMarker(marker, node_marker) => {
                         let op_marker = match marker {
-                            AbstractOperationResultMarker::Custom(c) => {c}
-                            AbstractOperationResultMarker::Implicit(num) => {"<unnamed>"}
+                            AbstractOperationResultMarker::Custom(c) => c,
+                            AbstractOperationResultMarker::Implicit(num) => "<unnamed>",
                         };
                         write!(f, "O({}, {})", op_marker, node_marker.0)
                     }
@@ -1058,11 +1077,17 @@ impl<S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateSt
                     format!("label = \"{dbg_attr_replaced}\"")
                 },
                 &|g, (node, _)| {
-                    let aid = self.node_keys_to_aid.get_left(&node).expect("NodeKey not found in node_keys_to_aid");
+                    let aid = self
+                        .node_keys_to_aid
+                        .get_left(&node)
+                        .expect("NodeKey not found in node_keys_to_aid");
                     let aid = PrettyAid(aid);
                     let aid = format!("{aid:?}");
                     let aid_replaced = aid.escape_debug();
-                    let av = self.graph.get_node_attr(node).expect("NodeKey not found in graph");
+                    let av = self
+                        .graph
+                        .get_node_attr(node)
+                        .expect("NodeKey not found in graph");
                     let dbg_attr_format = format!("{:?}", av);
                     let dbg_attr_replaced = dbg_attr_format.escape_debug();
 
@@ -1072,7 +1097,6 @@ impl<S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateSt
         )
     }
 }
-
 
 enum InterpretedInstruction<S: SemanticsClone> {
     OpLike,
@@ -1101,10 +1125,7 @@ struct IntermediateInterpreter<'a, S: SemanticsClone> {
     counter: u64,
 }
 
-type UDInstructionsWithMarker<S> = Vec<(
-    Option<AbstractOperationResultMarker>,
-    UDInstruction<S>,
-)>;
+type UDInstructionsWithMarker<S> = Vec<(Option<AbstractOperationResultMarker>, UDInstruction<S>)>;
 
 type InterpretedInstructions<S> = Vec<(
     Option<AbstractOperationResultMarker>,
@@ -1149,13 +1170,12 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
     fn create_user_defined_operation(
         &mut self,
         intermediate_instructions: Vec<(
-        Option<AbstractOperationResultMarker>,
-        IntermediateInstruction<S>,
+            Option<AbstractOperationResultMarker>,
+            IntermediateInstruction<S>,
         )>,
     ) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
-
-
-        let (ud_instructions, _interp_instructions) = self.interpret_instructions(intermediate_instructions)?;
+        let (ud_instructions, _interp_instructions) =
+            self.interpret_instructions(intermediate_instructions)?;
 
         Ok(UserDefinedOperation {
             parameter: self.op_param.clone(),
@@ -1169,11 +1189,13 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             Option<AbstractOperationResultMarker>,
             IntermediateInstruction<S>,
         )>,
-    ) -> Result<(UDInstructionsWithMarker<S>, InterpretedInstructions<S>), OperationBuilderError> {
+    ) -> Result<(UDInstructionsWithMarker<S>, InterpretedInstructions<S>), OperationBuilderError>
+    {
         let mut ud_instructions = Vec::new();
         let mut interpreted_instructions = Vec::new();
         for (marker, instruction) in intermediate_instructions {
-            let (ud_instruction, interpreted_instruction) = self.interpret_single_instruction(marker, instruction)?;
+            let (ud_instruction, interpreted_instruction) =
+                self.interpret_single_instruction(marker, instruction)?;
             ud_instructions.push((marker, ud_instruction));
             interpreted_instructions.push((
                 marker,
@@ -1192,9 +1214,10 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         instruction: IntermediateInstruction<S>,
     ) -> Result<(UDInstruction<S>, InterpretedInstruction<S>), OperationBuilderError> {
         match instruction {
-            IntermediateInstruction::OpLike(oplike) => {
-                Ok((self.interpret_op_like(marker, oplike)?, InterpretedInstruction::OpLike))
-            }
+            IntermediateInstruction::OpLike(oplike) => Ok((
+                self.interpret_op_like(marker, oplike)?,
+                InterpretedInstruction::OpLike,
+            )),
             IntermediateInstruction::BuiltinQuery(query, args, query_instructions) => {
                 self.interpret_builtin_query(query, args, query_instructions)
             }
@@ -1202,9 +1225,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 op_marker,
                 gsq_instructions,
                 query_instructions,
-            ) => {
-                self.interpret_graph_shape_query(op_marker, gsq_instructions, query_instructions)
-            }
+            ) => self.interpret_graph_shape_query(op_marker, gsq_instructions, query_instructions),
         }
     }
 
@@ -1221,39 +1242,35 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 // now apply op and store result
                 let operation_output = op.apply_abstract(&mut self.current_state.graph, &subst);
                 // go over new nodes
-                let marker = marker.unwrap_or_else(|| self.get_new_unnamed_abstract_operation_marker());
+                let marker =
+                    marker.unwrap_or_else(|| self.get_new_unnamed_abstract_operation_marker());
                 for (node_marker, node_key) in operation_output.new_nodes {
                     let aid = AbstractNodeId::DynamicOutputMarker(marker, node_marker);
                     self.current_state.node_keys_to_aid.insert(node_key, aid);
                 }
 
-                Ok(UDInstruction::Builtin(
-                    op,
-                    abstract_arg,
-                ))
+                Ok(UDInstruction::Builtin(op, abstract_arg))
             }
             IntermediateOpLike::Operation(id, args) => {
-                let op = self.op_ctx.get(id).ok_or(OperationBuilderError::NotFoundOperationId(id))?;
+                let op = self
+                    .op_ctx
+                    .get(id)
+                    .ok_or(OperationBuilderError::NotFoundOperationId(id))?;
                 let param = op.parameter();
                 let (subst, abstract_arg) = self.get_current_substitution(&param, args)?;
 
-                let operation_output = op.apply_abstract(self.op_ctx, &mut self.current_state.graph, &subst);
+                let operation_output =
+                    op.apply_abstract(self.op_ctx, &mut self.current_state.graph, &subst);
                 // go over new nodes
-                let marker = marker.unwrap_or_else(|| self.get_new_unnamed_abstract_operation_marker());
-                let operation_output = operation_output.map_err(|e| {
-                    OperationBuilderError::AbstractApplyOperationError(
-                        id,
-                        e,
-                    )
-                })?;
+                let marker =
+                    marker.unwrap_or_else(|| self.get_new_unnamed_abstract_operation_marker());
+                let operation_output = operation_output
+                    .map_err(|e| OperationBuilderError::AbstractApplyOperationError(id, e))?;
                 for (node_marker, node_key) in operation_output.new_nodes {
                     let aid = AbstractNodeId::DynamicOutputMarker(marker, node_marker);
                     self.current_state.node_keys_to_aid.insert(node_key, aid);
                 }
-                Ok(UDInstruction::Operation(
-                    id,
-                    abstract_arg,
-                ))
+                Ok(UDInstruction::Operation(id, abstract_arg))
             }
             IntermediateOpLike::Recurse(args) => {
                 // TODO: recursion is actually tricky. because at this point we have not finished interpreting the current operation yet.
@@ -1280,10 +1297,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         let (subst, arg) = self.get_current_substitution(&param, args)?;
 
         // apply the query to the current graph
-        query.apply_abstract(
-            &mut self.current_state.graph,
-            &subst,
-        );
+        query.apply_abstract(&mut self.current_state.graph, &subst);
 
         // TODO: is this right? do we want to snapshot the state _after_ the query?
         //  I think so, because right now (weirdly enough) the query can modify. and the modifications
@@ -1296,11 +1310,12 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         let initial_false_branch_state = self.current_state.clone();
 
         // interpret the instructions in the true and false branches
-        let (ud_true_branch, interp_true_branch) = self.interpret_instructions(query_instructions.true_branch)?;
+        let (ud_true_branch, interp_true_branch) =
+            self.interpret_instructions(query_instructions.true_branch)?;
         let after_true_branch_state = mem::replace(&mut self.current_state, false_branch_state);
-        let (ud_false_branch, interp_false_branch) = self.interpret_instructions(query_instructions.false_branch)?;
+        let (ud_false_branch, interp_false_branch) =
+            self.interpret_instructions(query_instructions.false_branch)?;
         let after_false_branch_state = mem::replace(&mut self.current_state, state_before);
-
 
         // TODO: update current state etc...
 
@@ -1319,14 +1334,12 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             },
         );
 
-        let interp_instruction = InterpretedInstruction::Query(
-            InterpretedQueryInstructions {
-                initial_state_true_branch: initial_true_branch_state,
-                initial_state_false_branch: initial_false_branch_state,
-                true_branch: interp_true_branch,
-                false_branch: interp_false_branch,
-            },
-        );
+        let interp_instruction = InterpretedInstruction::Query(InterpretedQueryInstructions {
+            initial_state_true_branch: initial_true_branch_state,
+            initial_state_false_branch: initial_false_branch_state,
+            true_branch: interp_true_branch,
+            false_branch: interp_false_branch,
+        });
 
         Ok((ud_instr, interp_instruction))
     }
@@ -1337,7 +1350,6 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         gsq_instructions: Vec<GraphShapeQueryInstruction<S>>,
         query_instructions: IntermediateQueryInstructions<S>,
     ) -> Result<(UDInstruction<S>, InterpretedInstruction<S>), OperationBuilderError> {
-
         let mut state_before = self.current_state.clone();
 
         // preparation for false branch
@@ -1364,11 +1376,19 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 return Ok(());
             }
             let subst_marker = SubstMarker::from(param.explicit_input_nodes.len() as u32);
-            let key = self.current_state.node_keys_to_aid.get_right(&aid)
+            let key = self
+                .current_state
+                .node_keys_to_aid
+                .get_right(&aid)
                 .cloned()
                 .ok_or(OperationBuilderError::NotFoundAid(aid.clone()))?;
-            let abstract_value = self.current_state.graph.get_node_attr(key)
-                .expect("internal error: node key should be in state graph since it is in the mapping")
+            let abstract_value = self
+                .current_state
+                .graph
+                .get_node_attr(key)
+                .expect(
+                    "internal error: node key should be in state graph since it is in the mapping",
+                )
                 .clone();
             let param_key = param.parameter_graph.add_node(abstract_value);
             param.subst_to_node_keys.insert(subst_marker, param_key);
@@ -1381,21 +1401,22 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         };
 
         /// Collects the AID if it is part of the pre-existing graph.
-        let mut collect_non_shape_ident = |aid: &AbstractNodeId| -> Result<(), OperationBuilderError> {
-            match aid {
-                AbstractNodeId::ParameterMarker(_) => {
-                    // we need this.
-                    collect_aid(*aid)?;
-                }
-                AbstractNodeId::DynamicOutputMarker(orm, node_marker) => {
-                    // we need this, but only if it is not from the current graph shape query.
-                    if orm != &gsq_op_marker {
+        let mut collect_non_shape_ident =
+            |aid: &AbstractNodeId| -> Result<(), OperationBuilderError> {
+                match aid {
+                    AbstractNodeId::ParameterMarker(_) => {
+                        // we need this.
                         collect_aid(*aid)?;
                     }
+                    AbstractNodeId::DynamicOutputMarker(orm, node_marker) => {
+                        // we need this, but only if it is not from the current graph shape query.
+                        if orm != &gsq_op_marker {
+                            collect_aid(*aid)?;
+                        }
+                    }
                 }
-            }
-            Ok(())
-        };
+                Ok(())
+            };
 
         for instruction in &gsq_instructions {
             match instruction {
@@ -1440,22 +1461,23 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         // TODO: ugly. fix. needed because the above closure approach does not work due to borrowing issues.
         macro_rules! aid_to_node_key_hack {
             ($aid:expr) => {
-                arg_aid_to_node_keys.get_left(&$aid)
-                .cloned()
-                .or_else(|| {
-                    if let AbstractNodeId::DynamicOutputMarker(orm, node_marker) = $aid {
-                        if orm == gsq_op_marker {
-                            // this is a new node from the graph shape query.
-                            let sni: ShapeNodeIdentifier = node_marker.0.into();
-                            node_keys_to_shape_idents.get_right(&sni).copied()
+                arg_aid_to_node_keys
+                    .get_left(&$aid)
+                    .cloned()
+                    .or_else(|| {
+                        if let AbstractNodeId::DynamicOutputMarker(orm, node_marker) = $aid {
+                            if orm == gsq_op_marker {
+                                // this is a new node from the graph shape query.
+                                let sni: ShapeNodeIdentifier = node_marker.0.into();
+                                node_keys_to_shape_idents.get_right(&sni).copied()
+                            } else {
+                                None
+                            }
                         } else {
                             None
                         }
-                    } else {
-                        None
-                    }
-                })
-                .ok_or(OperationBuilderError::NotFoundAid($aid))
+                    })
+                    .ok_or(OperationBuilderError::NotFoundAid($aid))
             };
         }
 
@@ -1471,7 +1493,9 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                     // now update the state for the true branch.
                     let state_key = self.current_state.graph.add_node(av);
                     let aid = AbstractNodeId::DynamicOutputMarker(gsq_op_marker, marker);
-                    self.current_state.node_keys_to_aid.insert(state_key, aid.clone());
+                    self.current_state
+                        .node_keys_to_aid
+                        .insert(state_key, aid.clone());
                 }
                 GraphShapeQueryInstruction::ExpectShapeEdge(src, target, av) => {
                     let src_key = aid_to_node_key_hack!(src)?;
@@ -1479,20 +1503,25 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                     expected_graph.add_edge(src_key, target_key, av.clone());
 
                     // now update the state for the true branch.
-                    let state_src_key = *self.current_state.node_keys_to_aid.get_right(&src).ok_or(OperationBuilderError::NotFoundAid(src))?;
-                    let state_target_key = *self.current_state.node_keys_to_aid.get_right(&target).ok_or(OperationBuilderError::NotFoundAid(target))?;
-                    self.current_state.graph.add_edge(
-                        state_src_key,
-                        state_target_key,
-                        av,
-                    );
+                    let state_src_key = *self
+                        .current_state
+                        .node_keys_to_aid
+                        .get_right(&src)
+                        .ok_or(OperationBuilderError::NotFoundAid(src))?;
+                    let state_target_key = *self
+                        .current_state
+                        .node_keys_to_aid
+                        .get_right(&target)
+                        .ok_or(OperationBuilderError::NotFoundAid(target))?;
+                    self.current_state
+                        .graph
+                        .add_edge(state_src_key, state_target_key, av);
                 }
             }
         }
 
         let (node_keys_to_shape_idents, shape_idents_to_node_keys) =
-            node_keys_to_shape_idents
-                .into_inner();
+            node_keys_to_shape_idents.into_inner();
         let gsq = GraphShapeQuery {
             parameter: param,
             expected_graph,
@@ -1505,10 +1534,12 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
 
         let mut initial_true_branch_state = self.current_state.clone();
 
-        let (ud_true_branch, interp_true_branch) = self.interpret_instructions(query_instructions.true_branch)?;
+        let (ud_true_branch, interp_true_branch) =
+            self.interpret_instructions(query_instructions.true_branch)?;
         // switch back to the other state
         let after_true_branch_state = mem::replace(&mut self.current_state, false_branch_state);
-        let (ud_false_branch, interp_false_branch) = self.interpret_instructions(query_instructions.false_branch)?;
+        let (ud_false_branch, interp_false_branch) =
+            self.interpret_instructions(query_instructions.false_branch)?;
         let after_false_branch_state = mem::replace(&mut self.current_state, state_before);
         // TODO: reconcile the states of both branches. same as in query.
 
@@ -1526,21 +1557,20 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             },
         );
 
-        let interp_instruction = InterpretedInstruction::Query(
-            InterpretedQueryInstructions {
-                initial_state_true_branch: initial_true_branch_state,
-                initial_state_false_branch: initial_false_branch_state,
-                true_branch: interp_true_branch,
-                false_branch: interp_false_branch,
-            },
-        );
+        let interp_instruction = InterpretedInstruction::Query(InterpretedQueryInstructions {
+            initial_state_true_branch: initial_true_branch_state,
+            initial_state_false_branch: initial_false_branch_state,
+            true_branch: interp_true_branch,
+            false_branch: interp_false_branch,
+        });
 
         Ok((ud_instruction, interp_instruction))
     }
 
-    fn get_current_substitution(&self,
-                                param: &OperationParameter<S>,
-                                args: Vec<AbstractNodeId>,
+    fn get_current_substitution(
+        &self,
+        param: &OperationParameter<S>,
+        args: Vec<AbstractNodeId>,
     ) -> Result<(ParameterSubstitution, AbstractOperationArgument), OperationBuilderError> {
         let selected_inputs = args
             .iter()
@@ -1574,7 +1604,11 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
     }
 }
 
-fn get_state_for_path<S: SemanticsClone>(initial_state: &IntermediateState<S>, interpreted_instructions: &InterpretedInstructions<S>, path: &mut impl Iterator<Item =IntermediateStatePath>) -> Option<IntermediateState<S>> {
+fn get_state_for_path<S: SemanticsClone>(
+    initial_state: &IntermediateState<S>,
+    interpreted_instructions: &InterpretedInstructions<S>,
+    path: &mut impl Iterator<Item = IntermediateStatePath>,
+) -> Option<IntermediateState<S>> {
     let mut current_state = initial_state;
 
     for (_, instruction) in interpreted_instructions {
@@ -1590,10 +1624,15 @@ fn get_state_for_path<S: SemanticsClone>(initial_state: &IntermediateState<S>, i
                     }
                     IntermediateStatePath::EnterTrue | IntermediateStatePath::EnterFalse => {
                         // this should not happen
-                        panic!("internal error: unexpected path element: {:?}", path_element);
+                        panic!(
+                            "internal error: unexpected path element: {:?}",
+                            path_element
+                        );
                     }
                     IntermediateStatePath::StartQuery(..) => {
-                        if let InterpretedInstruction::Query(query_instructions) = &instruction.instruction {
+                        if let InterpretedInstruction::Query(query_instructions) =
+                            &instruction.instruction
+                        {
                             // we are entering a query, so we need to check the true branch
                             // TODO: perhaps here we should have a third option .state_inside_query_view ?
                             current_state = &query_instructions.initial_state_true_branch;
@@ -1622,7 +1661,6 @@ fn get_state_for_path<S: SemanticsClone>(initial_state: &IntermediateState<S>, i
                                     return Some(current_state.clone());
                                 }
                             }
-
                         } else {
                             // this should not happen, since we only enter queries here
                             return None;
@@ -1643,14 +1681,12 @@ fn get_query_path_for_path<S: SemanticsClone>(
 
     for pe in path {
         match pe {
-            IntermediateStatePath::EnterTrue => {
-                query_path.push(QueryPath::TrueBranch)
-            }
-            IntermediateStatePath::EnterFalse => {
-                query_path.push(QueryPath::FalseBranch)
-            }
+            IntermediateStatePath::EnterTrue => query_path.push(QueryPath::TrueBranch),
+            IntermediateStatePath::EnterFalse => query_path.push(QueryPath::FalseBranch),
             IntermediateStatePath::StartQuery(name) => {
-                query_path.push(QueryPath::Query(name.unwrap_or("<unnamed query>".to_string())));
+                query_path.push(QueryPath::Query(
+                    name.unwrap_or("<unnamed query>".to_string()),
+                ));
             }
             _ => {}
         }

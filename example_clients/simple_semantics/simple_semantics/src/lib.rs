@@ -125,11 +125,7 @@ impl BuiltinQueryTrait for BuiltinQuery {
         }
     }
 
-    fn apply_abstract(
-        &self,
-        g: &mut AbstractGraph<Self::S>,
-        substitution: &ParameterSubstitution,
-    ) {
+    fn apply_abstract(&self, g: &mut AbstractGraph<Self::S>, substitution: &ParameterSubstitution) {
         match self {
             BuiltinQuery::HasChild => {
                 // let parent = substitution.mapping[&0];

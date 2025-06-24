@@ -1,6 +1,6 @@
-use wasm_bindgen::prelude::wasm_bindgen;
 use grabapl::Semantics;
 use simple_semantics::SimpleSemantics;
+use wasm_bindgen::prelude::wasm_bindgen;
 
 #[wasm_bindgen]
 extern "C" {
@@ -17,23 +17,23 @@ use grabapl::SubstMarker;
 #[diplomat::bridge]
 mod ffi {
     use super::prompt;
-    use ::grabapl::{Semantics};
+    use ::grabapl::Semantics;
+    use ::grabapl::graph::operation::builder::{
+        OperationBuilder as RustOperationBuilder,
+        OperationBuilderError as RustOperationBuilderError,
+    };
     use ::grabapl::graph::semantics::AbstractGraph as RustAbstractGraph;
     use ::grabapl::graph::semantics::ConcreteGraph as RustConcreteGraph;
-    use ::grabapl::graph::operation::builder::{OperationBuilder as RustOperationBuilder, OperationBuilderError as RustOperationBuilderError};
-    use simple_semantics::{BuiltinOperation, SimpleSemantics, BuiltinQuery as RustBuiltinQuery};
+    use simple_semantics::{BuiltinOperation, BuiltinQuery as RustBuiltinQuery, SimpleSemantics};
     use std::fmt::Write;
 
+    use super::{RustEdgeAbstract, RustEdgeConcrete, RustNodeAbstract, RustNodeConcrete};
     use ::grabapl::graph::operation::user_defined::AbstractNodeId as RustAbstractNodeId;
     use grabapl::graph::operation::builder::Instruction;
     use grabapl::graph::operation::user_defined::AbstractOperationResultMarker;
     use grabapl::graph::pattern::AbstractOutputNodeMarker;
-    use super::{
-        RustEdgeAbstract, RustNodeAbstract, RustNodeConcrete, RustEdgeConcrete,
-    };
 
     use grabapl::graph::operation::builder::IntermediateState as RustIntermediateState;
-
 
     #[diplomat::opaque]
     pub struct ConcreteGraph(RustConcreteGraph<SimpleSemantics>);
@@ -73,7 +73,8 @@ mod ffi {
         // TODO: dangerous function because it needs a mutable OpCtx while at the same time we store a reference
         //  to OpCtx in the OperationBuilder.
         pub fn add_custom_operation(&mut self, op_id: u32, operation: &mut UserDefinedOperation) {
-            self.0.add_custom_operation(op_id, operation.0.take().unwrap());
+            self.0
+                .add_custom_operation(op_id, operation.0.take().unwrap());
         }
     }
 
@@ -139,80 +140,145 @@ mod ffi {
             Box::new(OperationBuilder(RustOperationBuilder::new(&op_ctx.0)))
         }
 
-        pub fn expect_parameter_node(&mut self, marker: u32) -> Result<(), Box<OperationBuilderError>> {
-            self.0.expect_parameter_node(marker, ()).map_err(|e| Box::new(OperationBuilderError(e)))
+        pub fn expect_parameter_node(
+            &mut self,
+            marker: u32,
+        ) -> Result<(), Box<OperationBuilderError>> {
+            self.0
+                .expect_parameter_node(marker, ())
+                .map_err(|e| Box::new(OperationBuilderError(e)))
         }
 
-        pub fn expect_context_node(&mut self, marker: u32) -> Result<(), Box<OperationBuilderError>> {
-            self.0.expect_context_node(marker, ()).map_err(|e| Box::new(OperationBuilderError(e)))
+        pub fn expect_context_node(
+            &mut self,
+            marker: u32,
+        ) -> Result<(), Box<OperationBuilderError>> {
+            self.0
+                .expect_context_node(marker, ())
+                .map_err(|e| Box::new(OperationBuilderError(e)))
         }
 
-        pub fn expect_parameter_edge(&mut self, src: u32, dst: u32, av: &EdgeAbstract) -> Result<(), Box<OperationBuilderError>> {
-            self.0.expect_parameter_edge(src, dst, av.0.clone()).map_err(|e| Box::new(OperationBuilderError(e)))
+        pub fn expect_parameter_edge(
+            &mut self,
+            src: u32,
+            dst: u32,
+            av: &EdgeAbstract,
+        ) -> Result<(), Box<OperationBuilderError>> {
+            self.0
+                .expect_parameter_edge(src, dst, av.0.clone())
+                .map_err(|e| Box::new(OperationBuilderError(e)))
         }
 
-        pub fn start_query(&mut self, query: &BuiltinQuery, args: &AbstractArgList) -> Result<(), Box<OperationBuilderError>> {
-            self.0.start_query(query.0.clone(), args.0.clone()).map_err(|e| Box::new(OperationBuilderError(e)))
+        pub fn start_query(
+            &mut self,
+            query: &BuiltinQuery,
+            args: &AbstractArgList,
+        ) -> Result<(), Box<OperationBuilderError>> {
+            self.0
+                .start_query(query.0.clone(), args.0.clone())
+                .map_err(|e| Box::new(OperationBuilderError(e)))
         }
 
         pub fn enter_true_branch(&mut self) -> Result<(), Box<OperationBuilderError>> {
-            self.0.enter_true_branch().map_err(|e| Box::new(OperationBuilderError(e)))
+            self.0
+                .enter_true_branch()
+                .map_err(|e| Box::new(OperationBuilderError(e)))
         }
 
         pub fn enter_false_branch(&mut self) -> Result<(), Box<OperationBuilderError>> {
-            self.0.enter_false_branch().map_err(|e| Box::new(OperationBuilderError(e)))
+            self.0
+                .enter_false_branch()
+                .map_err(|e| Box::new(OperationBuilderError(e)))
         }
 
-        pub fn start_shape_query(&mut self, query_name: &str) -> Result<(), Box<OperationBuilderError>> {
+        pub fn start_shape_query(
+            &mut self,
+            query_name: &str,
+        ) -> Result<(), Box<OperationBuilderError>> {
             // TODO: make the marker non-copy and owned
             let leaked = query_name.to_string().leak();
             let marker = AbstractOperationResultMarker::Custom(leaked);
-            self.0.start_shape_query(marker).map_err(|e| Box::new(OperationBuilderError(e)))
+            self.0
+                .start_shape_query(marker)
+                .map_err(|e| Box::new(OperationBuilderError(e)))
         }
 
         pub fn end_query(&mut self) -> Result<(), Box<OperationBuilderError>> {
-            self.0.end_query().map_err(|e| Box::new(OperationBuilderError(e)))
+            self.0
+                .end_query()
+                .map_err(|e| Box::new(OperationBuilderError(e)))
         }
 
-        pub fn expect_shape_node(&mut self, node_name: &str) -> Result<(), Box<OperationBuilderError>> {
+        pub fn expect_shape_node(
+            &mut self,
+            node_name: &str,
+        ) -> Result<(), Box<OperationBuilderError>> {
             // TODO: make the marker non-copy and owned
             let node_marker = AbstractOutputNodeMarker(node_name.to_string().leak());
-            self.0.expect_shape_node(node_marker, ()).map_err(|e| Box::new(OperationBuilderError(e)))
+            self.0
+                .expect_shape_node(node_marker, ())
+                .map_err(|e| Box::new(OperationBuilderError(e)))
         }
 
-        pub fn expect_shape_edge(&mut self, src: &AbstractNodeId, dst: &AbstractNodeId, av: &EdgeAbstract) -> Result<(), Box<OperationBuilderError>> {
-            self.0.expect_shape_edge(src.0.clone(), dst.0.clone(), av.0.clone()).map_err(|e| Box::new(OperationBuilderError(e)))
+        pub fn expect_shape_edge(
+            &mut self,
+            src: &AbstractNodeId,
+            dst: &AbstractNodeId,
+            av: &EdgeAbstract,
+        ) -> Result<(), Box<OperationBuilderError>> {
+            self.0
+                .expect_shape_edge(src.0.clone(), dst.0.clone(), av.0.clone())
+                .map_err(|e| Box::new(OperationBuilderError(e)))
         }
 
-        pub fn add_instruction(&mut self, name: Option<&str>, instruction: &mut BuilderOpLike, args: &AbstractArgList) -> Result<(), Box<OperationBuilderError>> {
-            let instruction = instruction.0.take().expect("internal error: instruction missing");
+        pub fn add_instruction(
+            &mut self,
+            name: Option<&str>,
+            instruction: &mut BuilderOpLike,
+            args: &AbstractArgList,
+        ) -> Result<(), Box<OperationBuilderError>> {
+            let instruction = instruction
+                .0
+                .take()
+                .expect("internal error: instruction missing");
             let args = args.0.clone();
             match name {
                 Some(name) => {
                     let marker = AbstractOperationResultMarker::Custom(name.to_string().leak());
-                    self.0.add_named_instruction(marker, instruction, args).map_err(|e| Box::new(OperationBuilderError(e)))
+                    self.0
+                        .add_named_instruction(marker, instruction, args)
+                        .map_err(|e| Box::new(OperationBuilderError(e)))
                 }
-                None => {
-                    self.0.add_instruction(instruction, args).map_err(|e| Box::new(OperationBuilderError(e)))
-
-                }
+                None => self
+                    .0
+                    .add_instruction(instruction, args)
+                    .map_err(|e| Box::new(OperationBuilderError(e))),
             }
         }
 
         pub fn show(&self) -> Result<Box<IntermediateState>, Box<OperationBuilderError>> {
-            self.0.show_state().map(|s| Box::new(IntermediateState(s))).map_err(|e| Box::new(OperationBuilderError(e)))
+            self.0
+                .show_state()
+                .map(|s| Box::new(IntermediateState(s)))
+                .map_err(|e| Box::new(OperationBuilderError(e)))
         }
 
-        pub fn finalize(&self, op_id: u32) -> Result<Box<UserDefinedOperation>, Box<OperationBuilderError>> {
-            self.0.build(op_id).map(|op| Box::new(UserDefinedOperation(Some(op)))).map_err(|e| Box::new(OperationBuilderError(e)))
+        pub fn finalize(
+            &self,
+            op_id: u32,
+        ) -> Result<Box<UserDefinedOperation>, Box<OperationBuilderError>> {
+            self.0
+                .build(op_id)
+                .map(|op| Box::new(UserDefinedOperation(Some(op))))
+                .map_err(|e| Box::new(OperationBuilderError(e)))
         }
-
     }
 
     // Option again because cloning is difficult so we want to take.
     #[diplomat::opaque]
-    pub struct UserDefinedOperation(Option<grabapl::graph::operation::user_defined::UserDefinedOperation<SimpleSemantics>>);
-
+    pub struct UserDefinedOperation(
+        Option<grabapl::graph::operation::user_defined::UserDefinedOperation<SimpleSemantics>>,
+    );
 
     #[diplomat::opaque]
     pub struct IntermediateState(RustIntermediateState<SimpleSemantics>);
@@ -224,14 +290,20 @@ mod ffi {
 
         pub fn available_aids(&self, dw: &mut DiplomatWrite) {
             // TODO: sort this to have a stable debug output
-            let aids: Vec<RustAbstractNodeId> = self.0.node_keys_to_aid.right_values().cloned().collect();
+            let aids: Vec<RustAbstractNodeId> =
+                self.0.node_keys_to_aid.right_values().cloned().collect();
             write!(dw, "Available AIDs: {:#?}", aids).unwrap();
         }
 
         pub fn query_context(&self, dw: &mut DiplomatWrite) {
             let last = self.0.query_path.last();
             if let Some(grabapl::graph::operation::builder::QueryPath::Query(name)) = last {
-                write!(dw, "Currently designing query: {}. Enter true or false branch to proceed.\n", name).unwrap();
+                write!(
+                    dw,
+                    "Currently designing query: {}. Enter true or false branch to proceed.\n",
+                    name
+                )
+                .unwrap();
             }
             write!(dw, "Entire path: {:#?}", self.0.query_path).unwrap();
         }
@@ -251,15 +323,21 @@ mod ffi {
         }
 
         pub fn new_add_node() -> Box<BuilderOpLike> {
-            Box::new(BuilderOpLike(Some(Instruction::Builtin(BuiltinOperation::AddNode))))
+            Box::new(BuilderOpLike(Some(Instruction::Builtin(
+                BuiltinOperation::AddNode,
+            ))))
         }
 
         pub fn new_add_edge() -> Box<BuilderOpLike> {
-            Box::new(BuilderOpLike(Some(Instruction::Builtin(BuiltinOperation::AddEdge))))
+            Box::new(BuilderOpLike(Some(Instruction::Builtin(
+                BuiltinOperation::AddEdge,
+            ))))
         }
 
         pub fn new_set_edge_value(value: &str) -> Box<BuilderOpLike> {
-            Box::new(BuilderOpLike(Some(Instruction::Builtin(BuiltinOperation::SetEdgeValue(value.to_string())))))
+            Box::new(BuilderOpLike(Some(Instruction::Builtin(
+                BuiltinOperation::SetEdgeValue(value.to_string()),
+            ))))
         }
     }
 
@@ -283,7 +361,6 @@ mod ffi {
             Box::new(BuiltinQuery(RustBuiltinQuery::FirstGtSnd))
         }
     }
-
 
     #[diplomat::opaque]
     pub struct AbstractNodeId(RustAbstractNodeId);
@@ -353,5 +430,4 @@ mod ffi {
             Box::new(EdgeAbstract(RustEdgeAbstract::Exact(exact.to_string())))
         }
     }
-
 }

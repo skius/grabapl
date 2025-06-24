@@ -1,6 +1,6 @@
 use crate::graph::EdgeAttribute;
+use crate::graph::operation::OperationResult;
 use crate::graph::operation::user_defined::{AbstractOperationResultMarker, QueryInstructions};
-use crate::graph::operation::{OperationResult};
 use crate::graph::pattern::{
     AbstractOutputNodeMarker, OperationArgument, OperationParameter, ParameterSubstitution,
 };
@@ -87,11 +87,7 @@ pub trait BuiltinQuery {
     // TODO: add invariant (checked?) that the abstract graph does not get new nodes or deleted nodes.
     //  actually, do we really need modification at all? ...
 
-    fn apply_abstract(
-        &self,
-        g: &mut AbstractGraph<Self::S>,
-        substitution: &ParameterSubstitution,
-    );
+    fn apply_abstract(&self, g: &mut AbstractGraph<Self::S>, substitution: &ParameterSubstitution);
     // ) -> AbstractQueryOutput<Self::S>;
 
     fn query(
