@@ -89,6 +89,23 @@ pub struct AbstractOutputNodeMarker(pub &'static str);
 //  I guess: for Builtins, we can just run the apply_abstract and try to do some
 //  'merge'. Well, actually, the apply_abstract does the merge for us.
 //  For UserDefinedOp, we need to determine the least common ancestor
+/// Keeps track of node changes that happened during the operation execution.
+///
+/// This is mainly useful for keeping track of which nodes still exist after the operation,
+/// without needing to scan the entire graph for changes.
+///
+/// It also allows operations to name their output nodes with `AbstractOutputNodeMarker`.
 pub struct OperationOutput {
     pub new_nodes: HashMap<AbstractOutputNodeMarker, NodeKey>,
+    pub removed_nodes: Vec<NodeKey>,
 }
+// TODO(severe): since this is basically an AID output, we must make sure that during *concrete* execution,
+//  we don't accidentally overwrite the mapping from AID to NodeKey from some existing operation.
+//  This is because the OperationOutput of an `abstract_apply` could be empty, so we *dont know* that
+//  we actually got an output node in the concrete graph. If that new concrete graph node has a clashing
+//  name, we overwrite the potential existing mapping, which would cause a logic bug.
+// TODO: add ^ to problems-testcases.md
+// TODO: Would we fix this if we said OperationOutput is stored by userdefinedoperation
+//  in the abstract, i.e., it has to store the mapping?
+//  Then at concrete execution time, the user defined op only updates mappings for nodes that
+//  it actually expects from the abstract output.

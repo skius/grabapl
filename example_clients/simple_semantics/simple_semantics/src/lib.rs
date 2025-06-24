@@ -431,6 +431,7 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
         substitution: &ParameterSubstitution,
     ) -> OperationOutput {
         let mut new_nodes = HashMap::new();
+        let mut deleted_nodes = Vec::new();
         match self {
             BuiltinOperation::AddNode => {
                 let new_key = g.add_node(());
@@ -497,12 +498,13 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
             BuiltinOperation::DeleteNode => {
                 let a = substitution.mapping[&0];
                 g.remove_node(a);
+                deleted_nodes.push(a);
             }
             BuiltinOperation::SetSndToMaxOfFstSnd => {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
             }
         }
-        OperationOutput { new_nodes }
+        OperationOutput { new_nodes, removed_nodes: deleted_nodes }
     }
 
     fn apply(
@@ -511,6 +513,7 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
         substitution: &ParameterSubstitution,
     ) -> OperationOutput {
         let mut new_nodes = HashMap::new();
+        let mut removed_nodes = Vec::new();
         match self {
             BuiltinOperation::AddNode => {
                 let new_concrete_node = graph.add_node(0);
@@ -584,6 +587,7 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
             BuiltinOperation::DeleteNode => {
                 let a = substitution.mapping[&0];
                 graph.remove_node(a);
+                removed_nodes.push(a);
             }
             BuiltinOperation::SetSndToMaxOfFstSnd => {
                 let a = substitution.mapping[&0];
@@ -594,7 +598,7 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
             }
         }
 
-        OperationOutput { new_nodes }
+        OperationOutput { new_nodes, removed_nodes }
     }
 }
 

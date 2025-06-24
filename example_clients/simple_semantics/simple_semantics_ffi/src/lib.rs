@@ -67,6 +67,7 @@ mod ffi {
                     ),
                 ]));
             operation_ctx.add_custom_operation(5, simple_semantics::sample_user_defined_operations::get_labeled_edges_insert_bst_user_defined_operation(5));
+            operation_ctx.add_builtin_operation(6, BuiltinOperation::DeleteNode);
             Box::new(OpCtx(operation_ctx))
         }
 

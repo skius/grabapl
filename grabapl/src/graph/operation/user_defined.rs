@@ -125,6 +125,8 @@ pub struct UserDefinedOperation<S: Semantics> {
     // TODO: need to define output changes.
 }
 
+// TODO: use a private runner struct that keeps all the necessary mappings on self for easier methods.
+
 impl<S: SemanticsClone> UserDefinedOperation<S> {
     pub(crate) fn apply_abstract(
         &self,
@@ -134,9 +136,10 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
     ) -> OperationResult<OperationOutput> {
         let mut output = OperationOutput {
             new_nodes: HashMap::new(),
+            removed_nodes: Vec::new(),
         };
 
-        //todo!("Implement apply_abstract for UserDefinedOperation");
+        // TODO: Implement apply_abstract for UserDefinedOperation
 
         Ok(output)
     }
@@ -167,6 +170,8 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
         //  probably should be part of the UserDefinedOperation struct. AbstractNodeId should be used, and then we get the actual node key based on what's happening.
         Ok(OperationOutput {
             new_nodes: our_output_map,
+            // TODO: populate this
+            removed_nodes: vec![],
         })
     }
 }
@@ -205,6 +210,7 @@ fn run_instructions<S: SemanticsClone>(
                 };
                 if let Some(abstract_output_id) = abstract_output_id {
                     previous_results.insert(*abstract_output_id, output.new_nodes);
+                    // TODO: also handle output.removed_nodes.
                 }
             }
             Instruction::BuiltinQuery(query, arg, query_instr) => {

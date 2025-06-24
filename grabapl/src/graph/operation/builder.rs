@@ -1246,6 +1246,10 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                     let aid = AbstractNodeId::DynamicOutputMarker(marker, node_marker);
                     self.current_state.node_keys_to_aid.insert(node_key, aid);
                 }
+                for node_key in operation_output.removed_nodes {
+                    // remove the node from the mapping
+                    self.current_state.node_keys_to_aid.remove_left(&node_key);
+                }
 
                 Ok(UDInstruction::Builtin(op, abstract_arg))
             }
@@ -1267,6 +1271,10 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 for (node_marker, node_key) in operation_output.new_nodes {
                     let aid = AbstractNodeId::DynamicOutputMarker(marker, node_marker);
                     self.current_state.node_keys_to_aid.insert(node_key, aid);
+                }
+                for node_key in operation_output.removed_nodes {
+                    // remove the node from the mapping
+                    self.current_state.node_keys_to_aid.remove_left(&node_key);
                 }
                 Ok(UDInstruction::Operation(id, abstract_arg))
             }
