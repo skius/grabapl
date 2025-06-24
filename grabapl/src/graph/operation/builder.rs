@@ -229,11 +229,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
     ) -> Result<(), OperationBuilderError> {
         // TODO
         self.instructions
-            .push(BuilderInstruction::AddNamedOperation(
-                name,
-                op,
-                args,
-            ));
+            .push(BuilderInstruction::AddNamedOperation(name, op, args));
         self.check_instructions_or_rollback()
     }
 

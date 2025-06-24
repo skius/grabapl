@@ -316,7 +316,9 @@ mod ffi {
 
     impl BuilderOpLike {
         pub fn new_from_id(op_id: u32) -> Box<BuilderOpLike> {
-            Box::new(BuilderOpLike(Some(RustBuilderOpLike::FromOperationId(op_id))))
+            Box::new(BuilderOpLike(Some(RustBuilderOpLike::FromOperationId(
+                op_id,
+            ))))
         }
 
         pub fn new_recurse() -> Box<BuilderOpLike> {

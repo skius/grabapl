@@ -504,7 +504,10 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
             }
         }
-        OperationOutput { new_nodes, removed_nodes: deleted_nodes }
+        OperationOutput {
+            new_nodes,
+            removed_nodes: deleted_nodes,
+        }
     }
 
     fn apply(
@@ -598,7 +601,10 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
             }
         }
 
-        OperationOutput { new_nodes, removed_nodes }
+        OperationOutput {
+            new_nodes,
+            removed_nodes,
+        }
     }
 }
 
