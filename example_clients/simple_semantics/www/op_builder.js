@@ -163,7 +163,7 @@ const initCommands = () => {
             "invoke": (op_marker) => {
                 let op = BuilderOpLike.newAddNode();
                 let args = AbstractArgList.create();
-                op_builder.addInstruction(op_marker, op, args);
+                op_builder.addOperation(op_marker, op, args);
             }
         },
         {
@@ -176,7 +176,7 @@ const initCommands = () => {
                 let args = AbstractArgList.create();
                 args.push(from_id);
                 args.push(to_id);
-                op_builder.addInstruction(null, op, args);
+                op_builder.addOperation(null, op, args);
             }
         },
         {
@@ -189,7 +189,7 @@ const initCommands = () => {
                 let args = AbstractArgList.create();
                 args.push(from_id);
                 args.push(to_id);
-                op_builder.addInstruction(null, op, args);
+                op_builder.addOperation(null, op, args);
             }
         },
         {
@@ -208,7 +208,7 @@ const initCommands = () => {
                 });
                 console.log(`Running operation with id ${op_id} and inputs: ${input_list}`);
                 let op = BuilderOpLike.newFromId(op_id);
-                op_builder.addInstruction(name, op, args);
+                op_builder.addOperation(name, op, args);
             }
         },
         // copy paste me

@@ -48,7 +48,7 @@ export const OperationBuilder_start_shape_query: (a: number, b: number, c: numbe
 export const OperationBuilder_end_query: (a: number, b: number) => void;
 export const OperationBuilder_expect_shape_node: (a: number, b: number, c: number, d: number) => void;
 export const OperationBuilder_expect_shape_edge: (a: number, b: number, c: number, d: number, e: number) => void;
-export const OperationBuilder_add_instruction: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
+export const OperationBuilder_add_operation: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
 export const OperationBuilder_show: (a: number, b: number) => void;
 export const OperationBuilder_finalize: (a: number, b: number, c: number) => void;
 export const OperationBuilder_destroy: (a: number) => void;

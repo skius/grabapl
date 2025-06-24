@@ -29,7 +29,7 @@ mod ffi {
 
     use super::{RustEdgeAbstract, RustEdgeConcrete, RustNodeAbstract, RustNodeConcrete};
     use ::grabapl::graph::operation::user_defined::AbstractNodeId as RustAbstractNodeId;
-    use grabapl::graph::operation::builder::Instruction;
+    use grabapl::graph::operation::builder::BuilderOpLike as RustBuilderOpLike;
     use grabapl::graph::operation::user_defined::AbstractOperationResultMarker;
     use grabapl::graph::pattern::AbstractOutputNodeMarker;
 
@@ -231,7 +231,7 @@ mod ffi {
                 .map_err(|e| Box::new(OperationBuilderError(e)))
         }
 
-        pub fn add_instruction(
+        pub fn add_operation(
             &mut self,
             name: Option<&str>,
             instruction: &mut BuilderOpLike,
@@ -246,12 +246,12 @@ mod ffi {
                 Some(name) => {
                     let marker = AbstractOperationResultMarker::Custom(name.to_string().leak());
                     self.0
-                        .add_named_instruction(marker, instruction, args)
+                        .add_named_operation(marker, instruction, args)
                         .map_err(|e| Box::new(OperationBuilderError(e)))
                 }
                 None => self
                     .0
-                    .add_instruction(instruction, args)
+                    .add_operation(instruction, args)
                     .map_err(|e| Box::new(OperationBuilderError(e))),
             }
         }
@@ -311,31 +311,31 @@ mod ffi {
 
     // NOTE: The Option<> to take ownership of the inner value. Because cloning an operation may be difficult.
     #[diplomat::opaque]
-    pub struct BuilderOpLike(Option<Instruction<SimpleSemantics>>);
+    pub struct BuilderOpLike(Option<RustBuilderOpLike<SimpleSemantics>>);
 
     impl BuilderOpLike {
         pub fn new_from_id(op_id: u32) -> Box<BuilderOpLike> {
-            Box::new(BuilderOpLike(Some(Instruction::FromOperationId(op_id))))
+            Box::new(BuilderOpLike(Some(RustBuilderOpLike::FromOperationId(op_id))))
         }
 
         pub fn new_recurse() -> Box<BuilderOpLike> {
-            Box::new(BuilderOpLike(Some(Instruction::Recurse)))
+            Box::new(BuilderOpLike(Some(RustBuilderOpLike::Recurse)))
         }
 
         pub fn new_add_node() -> Box<BuilderOpLike> {
-            Box::new(BuilderOpLike(Some(Instruction::Builtin(
+            Box::new(BuilderOpLike(Some(RustBuilderOpLike::Builtin(
                 BuiltinOperation::AddNode,
             ))))
         }
 
         pub fn new_add_edge() -> Box<BuilderOpLike> {
-            Box::new(BuilderOpLike(Some(Instruction::Builtin(
+            Box::new(BuilderOpLike(Some(RustBuilderOpLike::Builtin(
                 BuiltinOperation::AddEdge,
             ))))
         }
 
         pub fn new_set_edge_value(value: &str) -> Box<BuilderOpLike> {
-            Box::new(BuilderOpLike(Some(Instruction::Builtin(
+            Box::new(BuilderOpLike(Some(RustBuilderOpLike::Builtin(
                 BuiltinOperation::SetEdgeValue(value.to_string()),
             ))))
         }

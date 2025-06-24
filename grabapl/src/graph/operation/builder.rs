@@ -37,9 +37,7 @@ This is the same routine that can provide state feedback to the user like:
 The intermediate state returns a graph and a hashmap from nodes and edges to additional metadata, like their abstract node id.
 */
 
-// TODO: rename this into BuilderOpLike, because that's what it is.
-//  'Instruction' is reserved for _all_ kinds of things you can do in a user defined op
-pub enum Instruction<S: SemanticsClone> {
+pub enum BuilderOpLike<S: SemanticsClone> {
     Builtin(S::BuiltinOperation),
     FromOperationId(OperationId),
     Recurse,
@@ -72,14 +70,14 @@ enum BuilderInstruction<S: SemanticsClone> {
     ExpectShapeNode(AbstractOutputNodeMarker, S::NodeAbstract),
     #[debug("ExpectShapeEdge({_0:?}, {_1:?}, ???)")]
     ExpectShapeEdge(AbstractNodeId, AbstractNodeId, S::EdgeAbstract),
-    #[debug("AddNamedInstruction({_0:?}, ???, args: {_2:?})")]
-    AddNamedInstruction(
+    #[debug("AddNamedOperation({_0:?}, ???, args: {_2:?})")]
+    AddNamedOperation(
         AbstractOperationResultMarker,
-        Instruction<S>,
+        BuilderOpLike<S>,
         Vec<AbstractNodeId>,
     ),
-    #[debug("AddInstruction(???, args: {_1:?})")]
-    AddInstruction(Instruction<S>, Vec<AbstractNodeId>),
+    #[debug("AddOperation(???, args: {_1:?})")]
+    AddOperation(BuilderOpLike<S>, Vec<AbstractNodeId>),
 }
 
 #[derive(Error, Debug)]
@@ -223,30 +221,30 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         self.check_instructions_or_rollback()
     }
 
-    pub fn add_named_instruction(
+    pub fn add_named_operation(
         &mut self,
         name: AbstractOperationResultMarker,
-        instruction: Instruction<S>,
+        op: BuilderOpLike<S>,
         args: Vec<AbstractNodeId>,
     ) -> Result<(), OperationBuilderError> {
         // TODO
         self.instructions
-            .push(BuilderInstruction::AddNamedInstruction(
+            .push(BuilderInstruction::AddNamedOperation(
                 name,
-                instruction,
+                op,
                 args,
             ));
         self.check_instructions_or_rollback()
     }
 
-    pub fn add_instruction(
+    pub fn add_operation(
         &mut self,
-        instruction: Instruction<S>,
+        op: BuilderOpLike<S>,
         args: Vec<AbstractNodeId>,
     ) -> Result<(), OperationBuilderError> {
         // todo!()
         self.instructions
-            .push(BuilderInstruction::AddInstruction(instruction, args));
+            .push(BuilderInstruction::AddOperation(op, args));
         self.check_instructions_or_rollback()
     }
 
@@ -662,24 +660,24 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
             .peek()
             .expect("should only be called when there is an instruction");
         match next_instruction {
-            BuilderInstruction::AddNamedInstruction(_, instruction, args)
-            | BuilderInstruction::AddInstruction(instruction, args) => {
+            BuilderInstruction::AddNamedOperation(_, oplike, args)
+            | BuilderInstruction::AddOperation(oplike, args) => {
                 let name =
-                    if let BuilderInstruction::AddNamedInstruction(name, _, _) = next_instruction {
+                    if let BuilderInstruction::AddNamedOperation(name, _, _) = next_instruction {
                         Some(*name)
                     } else {
                         None
                     };
                 iter.next();
 
-                let oplike = match instruction {
-                    Instruction::Builtin(builtin_op) => {
+                let oplike = match oplike {
+                    BuilderOpLike::Builtin(builtin_op) => {
                         IntermediateOpLike::Builtin(builtin_op.clone(), args.clone())
                     }
-                    Instruction::FromOperationId(op_id) => {
+                    BuilderOpLike::FromOperationId(op_id) => {
                         IntermediateOpLike::Operation(op_id.clone(), args.clone())
                     }
-                    Instruction::Recurse => IntermediateOpLike::Recurse(args.clone()),
+                    BuilderOpLike::Recurse => IntermediateOpLike::Recurse(args.clone()),
                 };
                 self.path.push(IntermediateStatePath::Advance);
                 Ok((name, IntermediateInstruction::OpLike(oplike)))

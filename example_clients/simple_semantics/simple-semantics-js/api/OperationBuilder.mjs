@@ -250,13 +250,13 @@ export class OperationBuilder {
         }
     }
 
-    addInstruction(name, instruction, args) {
+    addOperation(name, instruction, args) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
 
-        const result = wasm.OperationBuilder_add_instruction(diplomatReceive.buffer, this.ffiValue, ...diplomatRuntime.optionToArgsForCalling(name, 8, 4, (arrayBuffer, offset, jsValue) => [functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.str8(wasm, jsValue)).writePtrLenToArrayBuffer(arrayBuffer, offset + 0)]), instruction.ffiValue, args.ffiValue);
+        const result = wasm.OperationBuilder_add_operation(diplomatReceive.buffer, this.ffiValue, ...diplomatRuntime.optionToArgsForCalling(name, 8, 4, (arrayBuffer, offset, jsValue) => [functionCleanupArena.alloc(diplomatRuntime.DiplomatBuf.str8(wasm, jsValue)).writePtrLenToArrayBuffer(arrayBuffer, offset + 0)]), instruction.ffiValue, args.ffiValue);
 
         try {
             if (!diplomatReceive.resultFlag) {

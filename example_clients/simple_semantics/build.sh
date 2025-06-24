@@ -1,5 +1,13 @@
 set -e
 
+# assert we are in the same directory as this script
+SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+CUR_DIR=$(pwd)
+if [ "$SCRIPT_DIR" != "$CUR_DIR" ]; then
+  echo "Please run this script from the directory it is located in: $SCRIPT_DIR"
+  exit 1
+fi
+
 # build #[wasm_bindgen] JS imports as basic JavaScript module into `simple-semantics-js/wbg`
 wasm-pack build -t web -d "../simple-semantics-js/wbg" simple_semantics_ffi/
 

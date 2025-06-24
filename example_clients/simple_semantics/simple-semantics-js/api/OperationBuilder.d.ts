@@ -38,7 +38,7 @@ export class OperationBuilder {
 
     expectShapeEdge(src: AbstractNodeId, dst: AbstractNodeId, av: EdgeAbstract): void;
 
-    addInstruction(name: string | null, instruction: BuilderOpLike, args: AbstractArgList): void;
+    addOperation(name: string | null, instruction: BuilderOpLike, args: AbstractArgList): void;
 
     show(): IntermediateState;
 

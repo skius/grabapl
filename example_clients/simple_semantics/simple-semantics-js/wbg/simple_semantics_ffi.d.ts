@@ -52,7 +52,7 @@ export interface InitOutput {
   readonly OperationBuilder_end_query: (a: number, b: number) => void;
   readonly OperationBuilder_expect_shape_node: (a: number, b: number, c: number, d: number) => void;
   readonly OperationBuilder_expect_shape_edge: (a: number, b: number, c: number, d: number, e: number) => void;
-  readonly OperationBuilder_add_instruction: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
+  readonly OperationBuilder_add_operation: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
   readonly OperationBuilder_show: (a: number, b: number) => void;
   readonly OperationBuilder_finalize: (a: number, b: number, c: number) => void;
   readonly OperationBuilder_destroy: (a: number) => void;

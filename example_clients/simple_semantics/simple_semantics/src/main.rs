@@ -1,5 +1,5 @@
 use grabapl::graph::EdgeAttribute;
-use grabapl::graph::operation::builder::{Instruction, OperationBuilder};
+use grabapl::graph::operation::builder::{BuilderOpLike, OperationBuilder};
 use grabapl::graph::operation::query::{GraphShapeQuery, ShapeNodeIdentifier};
 use grabapl::graph::operation::user_defined::{
     AbstractNodeId, QueryInstructions, QueryTaken, UserDefinedOperation,
@@ -31,8 +31,8 @@ fn insert_bst_builder_test(
     let node_to_insert = AbstractNodeId::ParameterMarker(node_to_insert_marker);
     let mk_delete = |op_builder: &mut OperationBuilder<SimpleSemantics>| {
         op_builder
-            .add_instruction(
-                Instruction::Builtin(BuiltinOperation::DeleteNode),
+            .add_operation(
+                BuilderOpLike::Builtin(BuiltinOperation::DeleteNode),
                 vec![node_to_insert],
             )
             .unwrap();
@@ -59,8 +59,8 @@ fn insert_bst_builder_test(
         show(&op_builder);
         {
             op_builder
-                .add_instruction(
-                    Instruction::Builtin(BuiltinOperation::CopyNodeValueTo),
+                .add_operation(
+                    BuilderOpLike::Builtin(BuiltinOperation::CopyNodeValueTo),
                     vec![node_to_insert, root_node],
                 )
                 .unwrap();
@@ -104,8 +104,8 @@ fn insert_bst_builder_test(
                         {
                             // If it exists, we need to recurse into the right subtree.
                             op_builder
-                                .add_instruction(
-                                    Instruction::Recurse,
+                                .add_operation(
+                                    BuilderOpLike::Recurse,
                                     vec![child_id, node_to_insert],
                                 )
                                 .unwrap();
@@ -120,9 +120,9 @@ fn insert_bst_builder_test(
                                 "new".into(),
                             );
                             op_builder
-                                .add_named_instruction(
+                                .add_named_operation(
                                     "add_node".into(),
-                                    Instruction::Builtin(BuiltinOperation::AddNode),
+                                    BuilderOpLike::Builtin(BuiltinOperation::AddNode),
                                     vec![],
                                 )
                                 .unwrap();
@@ -130,22 +130,22 @@ fn insert_bst_builder_test(
                             // TODO: in above^ show of the intermediate state, we should "see" `add_node:new` as a node with the metadata of that
                             // AbstractNodeId.
                             op_builder
-                                .add_instruction(
-                                    Instruction::Builtin(BuiltinOperation::CopyNodeValueTo),
+                                .add_operation(
+                                    BuilderOpLike::Builtin(BuiltinOperation::CopyNodeValueTo),
                                     vec![node_to_insert, new_node],
                                 )
                                 .unwrap();
                             show(&op_builder);
                             op_builder
-                                .add_instruction(
-                                    Instruction::Builtin(BuiltinOperation::AddEdge),
+                                .add_operation(
+                                    BuilderOpLike::Builtin(BuiltinOperation::AddEdge),
                                     vec![root_node, new_node],
                                 )
                                 .unwrap();
                             show(&op_builder);
                             op_builder
-                                .add_instruction(
-                                    Instruction::Builtin(BuiltinOperation::SetEdgeValue(
+                                .add_operation(
+                                    BuilderOpLike::Builtin(BuiltinOperation::SetEdgeValue(
                                         "right".to_string(),
                                     )),
                                     vec![root_node, new_node],
@@ -183,8 +183,8 @@ fn insert_bst_builder_test(
                         {
                             // if it exists, recurse into the left subtree
                             op_builder
-                                .add_instruction(
-                                    Instruction::Recurse,
+                                .add_operation(
+                                    BuilderOpLike::Recurse,
                                     vec![child_id, node_to_insert],
                                 )
                                 .unwrap();
@@ -199,30 +199,30 @@ fn insert_bst_builder_test(
                                 "new".into(),
                             );
                             op_builder
-                                .add_named_instruction(
+                                .add_named_operation(
                                     "add_node".into(),
-                                    Instruction::Builtin(BuiltinOperation::AddNode),
+                                    BuilderOpLike::Builtin(BuiltinOperation::AddNode),
                                     vec![],
                                 )
                                 .unwrap();
                             show(&op_builder);
                             op_builder
-                                .add_instruction(
-                                    Instruction::Builtin(BuiltinOperation::CopyNodeValueTo),
+                                .add_operation(
+                                    BuilderOpLike::Builtin(BuiltinOperation::CopyNodeValueTo),
                                     vec![node_to_insert, new_node],
                                 )
                                 .unwrap();
                             show(&op_builder);
                             op_builder
-                                .add_instruction(
-                                    Instruction::Builtin(BuiltinOperation::AddEdge),
+                                .add_operation(
+                                    BuilderOpLike::Builtin(BuiltinOperation::AddEdge),
                                     vec![root_node, new_node],
                                 )
                                 .unwrap();
                             show(&op_builder);
                             op_builder
-                                .add_instruction(
-                                    Instruction::Builtin(BuiltinOperation::SetEdgeValue(
+                                .add_operation(
+                                    BuilderOpLike::Builtin(BuiltinOperation::SetEdgeValue(
                                         "left".to_string(),
                                     )),
                                     vec![root_node, new_node],
