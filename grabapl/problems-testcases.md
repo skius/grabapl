@@ -87,6 +87,12 @@ If we don't do a connectedness-analysis, is it a problem to have both graphs?
 **TODO**: revisit after revisiting the connectedness semantics design 
 
 
+### Output node names
+We could make it so the user defines the names of abstract output nodes (and which ones are actually returned)
+by a "post-processing" step at the end of the op builder, where the user is asked
+for every automatically determined abstract output node
+(a UI could eg have a checkbox) whether it should be returned, and if so,
+what name it should have.
 
 ## Recursion in operation builder
 *More information in MT Report Notes gdoc*
