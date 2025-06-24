@@ -26,3 +26,5 @@ cargo check --target wasm32-unknown-unknown
 - [ ] Just add Debug constraints and simplify a lot of code?
 - [ ] Fix the 'static lifetime from markers and turn it into an owned String
 - [ ] Add the CustomName variant for AbstractNodeId?
+- [ ] Temporary nodes should be first class!
+  - See meeting nodes gdoc. 

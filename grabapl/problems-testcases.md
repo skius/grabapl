@@ -95,6 +95,7 @@ If we don't do a connectedness-analysis, is it a problem to have both graphs?
   built recursively.
 * Positive: The built operation cannot abstractly _always_ eg add a new node, since that would be an infinite loop.
   Hence we know for sure that the operation will not abstractly add a new node.
+  Removing a node should also not be possible in every branch simultaneously.
 * But: How do we know the new _abstract values_ to set in the abstract graph after recursing?
 
 For user defined operations, we could make the user say which (sound) changes they want to be visible.
@@ -110,7 +111,15 @@ Caveats:
    recurse, we must already know the abstract values that will change.
    * This is bad user experience, but let's try it for now.
 
+
+Also, we need to tell the user why something doesn't work.
+
 [//]: # (TODO: make this better user experience.)
+
+### Examples
+See meeting notes gdoc.
+
+
 
 ## Merging query branch abstract states after the query - Edge Order
 *Assuming we make edge order a thing*, we must consider the specific edge order of a common
@@ -144,6 +153,50 @@ Perhaps there should be some "last_invisible" marker that refers to the last edg
 abstract graph does not see, and then the new edge would be "last_invisible + 1", another edge after that
 "last_invisible + 2", etc.
 
+### Customizability
+What if we supported custom edge orders? `Semantics` would additionally need to provide 
+types for the concrete and abstract edge orders.
+
+How would this be stored in the graph? We could provide the user two possibilities:
+1. Storing additional data on the node
+2. Storing additional data on an edge
+
+(not mutually exclusive). 
+
+And this would be different data for concrete and abstract.
+
+For matching an abstract parameter graph to an abstract argument graph, we would then ask the user for
+every node pair (param, arg), together with an iterator over all edges from param and arg,
+whether arg can be given to param.
+
+Because both are potentially abstract, matching needs to happen (like for node/edge values) on
+abstract values. So, e.g., the arg might say "this is edge `binding`+1",
+and the param might say "this is the last edge", and then the matching algorithm would need
+to determine if this matches. 
+Personally, in this example I think it should not necessarly match, since we have no guarantee
+that binding+1 is the last edge (assuming the semantics say that edge orders are based on the concrete).
+
+Because this affects the actual graph, the Graph API needs to actually support
+receiving concrete/abstract edge orders on edge adding.
+
+This is easy for orders stored in edges, since when we add an edge we can give it the static edge order data,
+but for orders stored in nodes, this requires some modification to data in both node endpoints.
+
+Maybe turn this into some sort of builder?
+
+```rust
+// assume `graph` is a concrete graph
+let mut edge_builder = graph.add_edge(a, b);
+edge_builder.set_edge_order(ConcreteEdgeOrderStoredInEdge::...); 
+let a_data: &mut ConcreteEdgeOrderStoredInNode = edge_builder.get_node_a_data();
+// modify a_data, which contains other edges as well
+let b_data: &mut ConcreteEdgeOrderStoredInNode = edge_builder.get_node_b_data();
+// modify b_data
+// commit can be called at any time - the edge orders need to implement `Default`
+// Drop also commits.
+edge_builder.commit(); 
+```
+
 ## Prettier Operation Builder
 The current approach mirrors parsing a stream of tokens via a recursive descent parser with multiple passes through
 different structs.
@@ -164,3 +217,10 @@ It uses a lot of tuples, introducing structs could make it more readable.
 
 Really, if we could just have a Debug constraint on the BuiltinOperation and BuiltinQuery types, the actual IntermediateState
 that we can print would potentially be more helpful.
+
+## Node formatting
+Maybe it would be helpful to have a "where this comes from" string for abstract nodes.
+
+This would be an additional mapping from AID -> String, and it would be computed by every operation.
+For example, the "add(a,b,c)" operation would have have a format function that takes
+debug representation for all arguments (in order) and returns a string, e.g., `{i1} <- {i2} + {i3}`.
