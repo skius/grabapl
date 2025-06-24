@@ -8,9 +8,7 @@ use grabapl::graph::operation::run_operation;
 use grabapl::graph::pattern::{
     OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution,
 };
-use grabapl::graph::semantics::{
-    AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, Semantics,
-};
+use grabapl::graph::semantics::{AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, MatchJoiner, Semantics};
 use grabapl::{DotCollector, EdgeInsertionOrder, OperationContext, WithSubstMarker};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -31,6 +29,21 @@ impl AbstractMatcher for EdgeMatcher {
             (_, EdgePattern::Wildcard) => true,
             (EdgePattern::Exact(a), EdgePattern::Exact(b)) => a == b,
             (_, _) => false,
+        }
+    }
+}
+
+pub struct EdgeJoiner;
+impl grabapl::graph::semantics::AbstractJoin for EdgeJoiner {
+    type Abstract = EdgePattern;
+
+    fn join(a: &Self::Abstract, b: &Self::Abstract) -> Option<Self::Abstract> {
+        if EdgeMatcher::matches(a, b) {
+            Some(b.clone())
+        } else if EdgeMatcher::matches(b, a) {
+            Some(a.clone())
+        } else {
+            Some(EdgePattern::Wildcard) // If they don't match, we return a wildcard edge.
         }
     }
 }
@@ -207,6 +220,8 @@ impl Semantics for SimpleSemantics {
     type EdgeAbstract = EdgePattern;
     type NodeMatcher = AnyMatcher<()>;
     type EdgeMatcher = EdgeMatcher;
+    type NodeJoin = MatchJoiner<Self::NodeMatcher>;
+    type EdgeJoin = EdgeJoiner;
 
     type NodeConcreteToAbstract = NodeConcreteToAbstract;
     type EdgeConcreteToAbstract = EdgeConcreteToAbstract;

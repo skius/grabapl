@@ -69,3 +69,13 @@ impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> BiMap<L, 
         self.right_to_left.values()
     }
 }
+
+// implement IntoIterator for BiMap
+impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> IntoIterator for BiMap<L, R> {
+    type Item = (L, R);
+    type IntoIter = std::collections::hash_map::IntoIter<L, R>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.left_to_right.into_iter()
+    }
+}

@@ -11,7 +11,7 @@ use crate::{Graph, NodeKey, OperationContext, OperationId, SubstMarker};
 use petgraph::dot;
 use petgraph::dot::Dot;
 use petgraph::prelude::GraphMap;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display};
 use std::iter::Peekable;
 use std::marker::PhantomData;
@@ -1327,6 +1327,13 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         //  ==> we must manually change the abstract graph ourselves here!
         //  ==> we must reconcile into self.current_state
 
+        let merged_state = merge_states(
+            false,
+            &after_true_branch_state,
+            &after_false_branch_state,
+        );
+        self.current_state = merged_state;
+
         let ud_instr = UDInstruction::BuiltinQuery(
             query,
             arg,
@@ -1548,7 +1555,12 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         // current situation: self.current_state is before both branches, and we have the true and false branch states
         // available to reconcile.
 
-        // TODO: we will need to make sure we pass down the correct current state to the true/false branches.
+        let merged_state = merge_states(
+            true,
+            &after_true_branch_state,
+            &after_false_branch_state,
+        );
+        self.current_state = merged_state;
 
         let ud_instruction = UDInstruction::ShapeQuery(
             gsq,
@@ -1696,3 +1708,139 @@ fn get_query_path_for_path<S: SemanticsClone>(
 
     query_path
 }
+
+
+/// Takes two intermediate states and computes the smallest subgraph and most general abstract values
+/// such that the resulting state is a sound approximation of the two states.
+///
+/// Nodes are only merged if they have exactly the same abstract node ID in both branches.
+///
+/// Also, abstract type merging is fallible, so if two nodes are incompatible with each other, they don't appear in the resulting state.
+///
+/// # Example:
+/// 1. Initial state is `P(0)|String`
+/// 2. We branch:
+/// 2a. True branch ends with graph `P(0)|String -> O(c1)|String -> O(c2)|String`
+/// 2b. False branch ends with graph `P(0)|String -> O(c1)|Integer -> O(c3)|Object`
+/// 3. The resulting state will be `P(0)|String -> O(c1)|Object`
+///
+/// Note how the second added node from the true branch is not present *with the same name* in the false branch, and
+/// therefore is not present in the resulting state. Same for `O(c3)` from the false branch.
+/// Also note how the node that exists in both branches, `O(c1)`, is present in the resulting state with the
+/// least common supertype of the two branches, which is `Object` in this case.
+fn merge_states<S: SemanticsClone>(
+    is_true_shape: bool,
+    state_true: &IntermediateState<S>,
+    state_false: &IntermediateState<S>,
+) -> IntermediateState<S> {
+    // TODO: handle `is_true_shape`.
+
+    let mut new_state = IntermediateState {
+        graph: Graph::new(),
+        node_keys_to_aid: BiMap::new(),
+        // TODO: should probably remove query_path from the state struct, and add it to a final returned StateWithQueryPath struct?
+        query_path: Vec::new(),
+    };
+
+    let mut common_aids = HashSet::new();
+    // First, collect all AIDs that are present in both states.
+    for aid in state_true.node_keys_to_aid.right_values() {
+        if state_false.node_keys_to_aid.contains_right(aid) {
+            common_aids.insert(aid.clone());
+        }
+    }
+
+    // Now, for each common AID, we need to merge the nodes from both states.
+    for aid in common_aids {
+        let key_true = *state_true.node_keys_to_aid.get_right(&aid).expect("internal error: AID should be in mapping");
+        let key_false = *state_false.node_keys_to_aid.get_right(&aid).expect("internal error: AID should be in mapping");
+
+        // Get the abstract values from both states.
+        let av_true = state_true.graph.get_node_attr(key_true).expect("internal error: Key should be in graph");
+        let av_false = state_false.graph.get_node_attr(key_false).expect("internal error: Key should be in graph");
+
+        // Merge the abstract values.
+        let Some(merged_av) = S::join_nodes(av_true, av_false) else {
+            // If we cannot merge the abstract values, we skip this AID.
+            continue;
+        };
+
+        // Add the merged node to the new state.
+        let new_key = new_state.graph.add_node(merged_av);
+        new_state.node_keys_to_aid.insert(new_key, aid.clone());
+    }
+
+    // Now we merge the edges.
+    for (from_key_true, to_key_true, attr) in state_true.graph.graph.all_edges() {
+        let from_aid = state_true.node_keys_to_aid.get_left(&from_key_true).expect("internal error: from key should be in mapping");
+        let to_aid = state_true.node_keys_to_aid.get_left(&to_key_true).expect("internal error: to key should be in mapping");
+        let Some(from_key_merged) = new_state.node_keys_to_aid.get_right(from_aid) else {
+            // If the from AID has not been merged, we skip this edge.
+            continue;
+        };
+        let Some(to_key_merged) = new_state.node_keys_to_aid.get_right(to_aid) else {
+            // If the to AID has not been merged, we skip this edge.
+            continue;
+        };
+        let av_true = state_true.graph.get_edge_attr((from_key_true, to_key_true))
+            .expect("internal error: edge should be in graph");
+        
+        // Skip edges whose endpoints are not in the common AIDs.
+        // because of the above new_state let else check, this should always succeed, though.
+        let Some(from_key_false) = state_false.node_keys_to_aid.get_right(from_aid) else {
+            continue;
+        };
+        let Some(to_key_false) = state_false.node_keys_to_aid.get_right(to_aid) else {
+            continue;
+        };
+        
+        // Check if the edge exists in the false state.
+        if let Some(av_false) = state_false.graph.get_edge_attr((*from_key_false, *to_key_false)) {
+            // Try to merge the edges.
+            if let Some(merged_av) = S::join_edges(av_true, av_false) {
+                // If we can merge the edges, add the merged edge to the new state.
+                new_state.graph.add_edge(*from_key_merged, *to_key_merged, merged_av);
+            }
+        }
+        
+
+        // TODO: edge orders need to be handled here.
+    }
+
+
+    new_state
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
