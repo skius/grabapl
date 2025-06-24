@@ -316,10 +316,104 @@
             selection.edges.clear(); edges.forEach(e => { if (selection.nodes.has(e.from) && selection.nodes.has(e.to)) { selection.edges.add(e); } }); updateControlPanel(); draw();
         }
 
+        /**
+         * Adds nodes and edges from iterables to the existing graph.
+         * Automatically handles ID mapping and node placement.
+         * @param {Iterable<Object>} nodesIter An iterable of node objects.
+         * Each node object should have: { id, value }
+         * @param {Iterable<Object>} edgesIter An iterable of edge objects.
+         * Each edge object should have: { from, to, value }
+         */
+        function loadFromNodesAndEdges(nodesIter, edgesIter) {
+            try {
+                const newNodesInput = Array.from(nodesIter);
+                const newEdgesInput = Array.from(edgesIter);
+
+                // --- Basic validation of input format ---
+                if (newNodesInput.some(n => n.id === undefined || n.value === undefined)) {
+                    throw new Error("Invalid node data. Each node must have at least an 'id' and 'value'.");
+                }
+                if (newEdgesInput.some(e => e.from === undefined || e.to === undefined)) {
+                    throw new Error("Invalid edge data. Each edge must have 'from' and 'to' properties.");
+                }
+
+                const idMap = new Map();
+                const addedNodes = [];
+
+                // --- Determine placement for the new nodes ---
+                const numNewNodes = newNodesInput.length;
+                const layoutRadius = numNewNodes > 1 ? numNewNodes * 40 : 0; // Heuristic for circle radius
+                const center = screenToWorld(canvas.width / 2, canvas.height / 2);
+
+                // --- Create and map new nodes ---
+                newNodesInput.forEach((nodeInput, index) => {
+                    const localId = nodeInput.id;
+                    const globalId = nodeIdCounter++;
+                    idMap.set(localId, globalId);
+
+                    // Calculate position in a circle
+                    const angle = (index / numNewNodes) * 2 * Math.PI;
+                    const x = center.x + layoutRadius * Math.cos(angle);
+                    const y = center.y + layoutRadius * Math.sin(angle);
+
+                    const newNode = {
+                        id: globalId,
+                        value: nodeInput.value,
+                        color: nodeColorInput.value, // Use color from UI
+                        x: x,
+                        y: y,
+                        radius: NODE_RADIUS
+                    };
+                    addedNodes.push(newNode);
+                });
+
+                // Add all new nodes to the main array
+                nodes.push(...addedNodes);
+
+                // --- Create new edges using the mapped IDs ---
+                newEdgesInput.forEach(edgeInput => {
+                    const globalFrom = idMap.get(edgeInput.from);
+                    const globalTo = idMap.get(edgeInput.to);
+
+                    // Only add the edge if both its nodes were successfully created
+                    if (globalFrom !== undefined && globalTo !== undefined) {
+                        edges.push({
+                            from: globalFrom,
+                            to: globalTo,
+                            value: edgeInput.value || ''
+                        });
+                    }
+                });
+
+
+
+                draw();
+                saveState();
+
+                showMessage(`Added ${newNodesInput.length} new nodes and ${newEdgesInput.length} new edges.`);
+
+            } catch (e) {
+                showMessage("Failed to load graph: " + e.message);
+                console.error("Error in loadFromNodesAndEdges:", e);
+            }
+        }
+
+
+
         // Init
         loadStateFromStorage();
         updateControlPanel();
         draw();
+
+        // const myNodes = [
+        //     { id: 0, value: 'Start' },
+        //     { id: 1, value: 'End' }
+        // ];
+        //
+        // const myEdges = [
+        //     { from: 0, to: 1, value: 'transition' }
+        // ];
+        // loadFromNodesAndEdges(myNodes, myEdges);
     });
 </script>
 </body>
