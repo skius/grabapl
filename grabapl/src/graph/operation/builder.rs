@@ -1041,6 +1041,28 @@ impl<S: SemanticsClone> Clone for IntermediateState<S> {
     }
 }
 
+impl<S: SemanticsClone> IntermediateState<S> {
+    pub fn node_av_of_aid(
+        &self,
+        aid: &AbstractNodeId,
+    ) -> Option<&S::NodeAbstract> {
+        let node_key = self
+            .node_keys_to_aid
+            .get_right(aid)?;
+        self.graph.get_node_attr(*node_key)
+    }
+    
+    pub fn edge_av_of_aid(
+        &self,
+        source: &AbstractNodeId,
+        target: &AbstractNodeId,
+    ) -> Option<&S::EdgeAbstract> {
+        let source_key = self.node_keys_to_aid.get_right(source)?;
+        let target_key = self.node_keys_to_aid.get_right(target)?;
+        self.graph.get_edge_attr((*source_key, *target_key))
+    }
+}
+
 impl<S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S> {
     pub fn dot_with_aid(&self) -> String {
         struct PrettyAid<'a>(&'a AbstractNodeId);

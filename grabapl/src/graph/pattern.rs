@@ -9,7 +9,6 @@ pub struct OperationParameter<S: Semantics> {
     /// The ordered input nodes that must be explicitly selected.
     pub explicit_input_nodes: Vec<SubstMarker>,
     /// The initial abstract state that the operation expects.
-    // TODO: do we need WithSubstMarker? cant we just use the hashmap?
     pub parameter_graph: AbstractGraph<S>,
     // TODO: Use a BidiHashMap
     // TODO: Actually, because an operation may accept the same node multiple times, we may want to to have the inverse actually be a multimap? so NodeKey -> Vec<SubstMarker>
@@ -100,6 +99,17 @@ pub struct OperationOutput {
     pub removed_nodes: Vec<NodeKey>,
 }
 
+impl OperationOutput {
+    pub fn no_changes() -> Self {
+        OperationOutput {
+            new_nodes: HashMap::new(),
+            removed_nodes: Vec::new(),
+        }
+    }
+}
+
+
+// TODO: this is a "signature" arguably. rename?
 pub struct AbstractOperationOutput<S: Semantics> {
     pub new_nodes: HashMap<AbstractOutputNodeMarker, NodeKey>,
     pub removed_nodes: Vec<NodeKey>,

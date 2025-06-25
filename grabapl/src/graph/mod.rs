@@ -270,6 +270,28 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
             .get_mut(&node_key)
             .map(|attr| &mut attr.node_attr)
     }
+    
+    pub fn set_node_attr(&mut self, node_key: NodeKey, node_attr: NodeAttr) -> Option<NodeAttr> {
+        if let Some(attr) = self.node_attr_map.get_mut(&node_key) {
+            let old_attr = std::mem::replace(&mut attr.node_attr, node_attr);
+            Some(old_attr)
+        } else {
+            None
+        }
+    }
+    
+    pub fn set_edge_attr(
+        &mut self,
+        (src, target): EdgeKey,
+        edge_attr: EdgeAttr,
+    ) -> Option<EdgeAttr> {
+        if let Some(ea) = self.graph.edge_weight_mut(src, target) {
+            let old_attr = std::mem::replace(&mut ea.edge_attr, edge_attr);
+            Some(old_attr)
+        } else {
+            None
+        }
+    }
 
     // TODO: delete. outdated.
     // /// Attempts to match the pattern to the graph on the specified inputs.
