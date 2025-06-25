@@ -4,7 +4,10 @@ import type { pointer, codepoint } from "./diplomat-runtime.d.ts";
 
 
 export class BuilderOpLike {
+    /** @internal */
     get ffiValue(): pointer;
+    /** @internal */
+    constructor();
 
 
     static newFromId(opId: number): BuilderOpLike;

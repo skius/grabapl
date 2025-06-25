@@ -30,6 +30,7 @@ export class OpCtx {
 
         return this;
     }
+    /** @internal */
     get ffiValue() {
         return this.#ptr;
     }

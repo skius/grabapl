@@ -9,8 +9,8 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 console_error_panic_hook = "0.1.7"
 wasm-bindgen = "0.2"
-diplomat = "0.10.0"
-diplomat-runtime = { version = "0.10.0", features = ["log"] }
+diplomat = "0.12.0"
+diplomat-runtime = { version = "0.12.0", features = ["log"] }
 log = "0.4"
 grabapl = { path = "../../../grabapl" }
 simple_semantics = { path = "../simple_semantics" }

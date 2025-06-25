@@ -6,7 +6,10 @@ import type { pointer, codepoint } from "./diplomat-runtime.d.ts";
 
 
 export class Runner {
+    /** @internal */
     get ffiValue(): pointer;
+    /** @internal */
+    constructor();
 
 
     static create(): Runner;

@@ -4,7 +4,10 @@ import type { pointer, codepoint } from "./diplomat-runtime.d.ts";
 
 
 export class AbstractNodeId {
+    /** @internal */
     get ffiValue(): pointer;
+    /** @internal */
+    constructor();
 
 
     static newParameter(marker: number): AbstractNodeId;

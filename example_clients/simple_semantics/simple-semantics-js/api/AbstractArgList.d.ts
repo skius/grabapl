@@ -5,7 +5,10 @@ import type { pointer, codepoint } from "./diplomat-runtime.d.ts";
 
 
 export class AbstractArgList {
+    /** @internal */
     get ffiValue(): pointer;
+    /** @internal */
+    constructor();
 
 
     static create(): AbstractArgList;

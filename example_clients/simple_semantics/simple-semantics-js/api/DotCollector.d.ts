@@ -5,7 +5,10 @@ import type { pointer, codepoint } from "./diplomat-runtime.d.ts";
 
 
 export class DotCollector {
+    /** @internal */
     get ffiValue(): pointer;
+    /** @internal */
+    constructor();
 
 
     static create(): DotCollector;

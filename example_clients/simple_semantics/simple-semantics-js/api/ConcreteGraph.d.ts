@@ -4,7 +4,10 @@ import type { pointer, codepoint } from "./diplomat-runtime.d.ts";
 
 
 export class ConcreteGraph {
+    /** @internal */
     get ffiValue(): pointer;
+    /** @internal */
+    constructor();
 
 
     static create(): ConcreteGraph;

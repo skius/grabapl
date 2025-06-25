@@ -31,6 +31,7 @@ export class Runner {
 
         return this;
     }
+    /** @internal */
     get ffiValue() {
         return this.#ptr;
     }

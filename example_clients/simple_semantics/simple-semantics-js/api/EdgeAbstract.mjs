@@ -29,6 +29,7 @@ export class EdgeAbstract {
 
         return this;
     }
+    /** @internal */
     get ffiValue() {
         return this.#ptr;
     }

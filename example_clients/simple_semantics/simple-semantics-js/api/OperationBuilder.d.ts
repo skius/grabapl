@@ -13,7 +13,10 @@ import type { pointer, codepoint } from "./diplomat-runtime.d.ts";
 
 
 export class OperationBuilder {
+    /** @internal */
     get ffiValue(): pointer;
+    /** @internal */
+    constructor();
 
 
     static create(opCtx: OpCtx): OperationBuilder;

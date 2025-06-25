@@ -12,7 +12,8 @@ fi
 wasm-pack build -t web -d "../simple-semantics-js/wbg" simple_semantics_ffi/
 
 # run diplomat-tool for #[diplomat::bridge] modules
-diplomat-tool -e simple_semantics_ffi/src/lib.rs js "simple-semantics-js/api"
+# TODO: remove the legacy config once the stable rust compiler switches to the C spec abi
+diplomat-tool --config js.abi="legacy" -e simple_semantics_ffi/src/lib.rs js "simple-semantics-js/api"
 
 # fix diplomat generated code
 cp simple-semantics-js/diplomat-wasm.mjs.template simple-semantics-js/api/diplomat-wasm.mjs
