@@ -117,6 +117,8 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
             op_ctx,
         }
     }
+    
+    // TODO: add undo_one_instruction method that just pops the last instruction.
 
     pub fn expect_parameter_node(
         &mut self,

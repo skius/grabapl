@@ -98,6 +98,9 @@ pub struct AbstractOutputNodeMarker(pub &'static str);
 pub struct OperationOutput {
     pub new_nodes: HashMap<AbstractOutputNodeMarker, NodeKey>,
     pub removed_nodes: Vec<NodeKey>,
+    // TODO: we actually do need to keep track of changed abstract values.
+    //  The reason for this is so that we can determine an userdefined operation's abstract changes as well,
+    //  without needing to simulate it every time we want to abstractly apply it.
 }
 // TODO(severe): since this is basically an AID output, we must make sure that during *concrete* execution,
 //  we don't accidentally overwrite the mapping from AID to NodeKey from some existing operation.
