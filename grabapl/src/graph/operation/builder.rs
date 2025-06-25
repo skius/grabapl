@@ -117,7 +117,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
             op_ctx,
         }
     }
-    
+
     // TODO: add undo_one_instruction method that just pops the last instruction.
 
     pub fn expect_parameter_node(
@@ -1042,16 +1042,11 @@ impl<S: SemanticsClone> Clone for IntermediateState<S> {
 }
 
 impl<S: SemanticsClone> IntermediateState<S> {
-    pub fn node_av_of_aid(
-        &self,
-        aid: &AbstractNodeId,
-    ) -> Option<&S::NodeAbstract> {
-        let node_key = self
-            .node_keys_to_aid
-            .get_right(aid)?;
+    pub fn node_av_of_aid(&self, aid: &AbstractNodeId) -> Option<&S::NodeAbstract> {
+        let node_key = self.node_keys_to_aid.get_right(aid)?;
         self.graph.get_node_attr(*node_key)
     }
-    
+
     pub fn edge_av_of_aid(
         &self,
         source: &AbstractNodeId,

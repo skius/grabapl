@@ -270,7 +270,7 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
             .get_mut(&node_key)
             .map(|attr| &mut attr.node_attr)
     }
-    
+
     pub fn set_node_attr(&mut self, node_key: NodeKey, node_attr: NodeAttr) -> Option<NodeAttr> {
         if let Some(attr) = self.node_attr_map.get_mut(&node_key) {
             let old_attr = std::mem::replace(&mut attr.node_attr, node_attr);
@@ -279,7 +279,7 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
             None
         }
     }
-    
+
     pub fn set_edge_attr(
         &mut self,
         (src, target): EdgeKey,

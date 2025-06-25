@@ -1,8 +1,8 @@
-use thiserror::Error;
-use crate::{Graph, NodeKey, Semantics, SubstMarker};
 use crate::graph::pattern::OperationParameter;
 use crate::graph::semantics::AbstractGraph;
 use crate::util::bimap::BiMap;
+use crate::{Graph, NodeKey, Semantics, SubstMarker};
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ParameterBuilderError {
@@ -12,7 +12,6 @@ pub enum ParameterBuilderError {
     DestinationMarkerNotFound(SubstMarker),
     #[error("Duplicate marker found in the parameter graph: {0}")]
     DuplicateMarker(SubstMarker),
-    
 }
 
 pub struct OperationParameterBuilder<S: Semantics> {
@@ -30,7 +29,11 @@ impl<S: Semantics> OperationParameterBuilder<S> {
         }
     }
 
-    pub fn expect_explicit_input_node(&mut self, marker: SubstMarker, av: S::NodeAbstract) -> Result<(), ParameterBuilderError> {
+    pub fn expect_explicit_input_node(
+        &mut self,
+        marker: SubstMarker,
+        av: S::NodeAbstract,
+    ) -> Result<(), ParameterBuilderError> {
         if self.subst_to_node_keys.contains_left(&marker) {
             return Err(ParameterBuilderError::DuplicateMarker(marker));
         }
@@ -40,7 +43,11 @@ impl<S: Semantics> OperationParameterBuilder<S> {
         Ok(())
     }
 
-    pub fn expect_context_node(&mut self, marker: SubstMarker, av: S::NodeAbstract) -> Result<(), ParameterBuilderError> {
+    pub fn expect_context_node(
+        &mut self,
+        marker: SubstMarker,
+        av: S::NodeAbstract,
+    ) -> Result<(), ParameterBuilderError> {
         // Context nodes are not explicitly input nodes, but they are still part of the parameter graph.
         if self.subst_to_node_keys.contains_left(&marker) {
             return Err(ParameterBuilderError::DuplicateMarker(marker));
@@ -49,16 +56,20 @@ impl<S: Semantics> OperationParameterBuilder<S> {
         self.subst_to_node_keys.insert(marker, node_key);
         Ok(())
     }
-    
+
     pub fn expect_edge(
         &mut self,
         src_marker: SubstMarker,
         dst_marker: SubstMarker,
         edge_attr: S::EdgeAbstract,
     ) -> Result<(), ParameterBuilderError> {
-        let src_key = self.subst_to_node_keys.get_left(&src_marker)
+        let src_key = self
+            .subst_to_node_keys
+            .get_left(&src_marker)
             .ok_or(ParameterBuilderError::SourceMarkerNotFound(src_marker))?;
-        let dst_key = self.subst_to_node_keys.get_left(&dst_marker)
+        let dst_key = self
+            .subst_to_node_keys
+            .get_left(&dst_marker)
             .ok_or(ParameterBuilderError::DestinationMarkerNotFound(dst_marker))?;
         self.parameter_graph.add_edge(*src_key, *dst_key, edge_attr);
         Ok(())
@@ -66,7 +77,7 @@ impl<S: Semantics> OperationParameterBuilder<S> {
 
     pub fn build(self) -> Result<OperationParameter<S>, ParameterBuilderError> {
         // TODO: check that all context nodes are linked with edges to explicit input nodes.
-        
+
         let (subst_to_node_keys, node_keys_to_subst) = self.subst_to_node_keys.into_inner();
         Ok(OperationParameter {
             explicit_input_nodes: self.explicit_input_nodes,

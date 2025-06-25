@@ -108,7 +108,6 @@ impl OperationOutput {
     }
 }
 
-
 // TODO: this is a "signature" arguably. rename?
 pub struct AbstractOperationOutput<S: Semantics> {
     pub new_nodes: HashMap<AbstractOutputNodeMarker, NodeKey>,
