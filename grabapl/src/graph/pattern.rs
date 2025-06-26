@@ -92,6 +92,20 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         key
     }
 
+    // TODO: disgusting. switch from SubstMarker to an explicit NewMarker or something in a separate namespace.
+    //  these substs have nothing to do with ParameterSubstitution, they are just used to refer to give newly added nodes
+    //  a name other than their NodeKey.
+    pub fn new_subst_marker(&mut self) -> SubstMarker {
+        // Generate a new SubstMarker that is not already in the substitution mapping.
+        let mut max_marker = 0;
+        for marker in self.subst.mapping.keys() {
+            if *marker > max_marker {
+                max_marker = *marker;
+            }
+        }
+        max_marker + 1
+    }
+
     pub fn add_node(
         &mut self,
         marker: SubstMarker,

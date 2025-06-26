@@ -1,4 +1,4 @@
-use grabapl::graph::operation::BuiltinOperation;
+use grabapl::graph::operation::{run_from_concrete, BuiltinOperation};
 use grabapl::graph::operation::builder::{BuilderOpLike, OperationBuilder};
 use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
 use grabapl::graph::operation::query::{BuiltinQuery, ConcreteQueryOutput};
@@ -118,6 +118,7 @@ enum TestOperation {
         node_type: NodeType,
         value: NodeValue,
     },
+    CopyValueFromTo,
 }
 
 impl BuiltinOperation for TestOperation {
@@ -144,6 +145,14 @@ impl BuiltinOperation for TestOperation {
                 node_type,
                 value,
             } => {}
+            TestOperation::CopyValueFromTo => {
+                param_builder
+                    .expect_explicit_input_node(0, NodeType::Object)
+                    .unwrap();
+                param_builder
+                    .expect_explicit_input_node(1, NodeType::Object)
+                    .unwrap();
+            }
         }
         param_builder.build().unwrap()
     }
@@ -173,6 +182,11 @@ impl BuiltinOperation for TestOperation {
                 g.add_node(0, node_type.clone());
                 new_node_names.insert(0, "new".into());
             }
+            TestOperation::CopyValueFromTo => {
+                // Copy the value from one node to another.
+                let value = g.get_node_value(0).unwrap();
+                g.set_node_value(1, value.clone()).unwrap();
+            }
         }
         g.get_concrete_output(new_node_names)
     }
@@ -201,6 +215,11 @@ impl BuiltinOperation for TestOperation {
                 // Add a new node with the specified type and value.
                 g.add_node(0, value.clone());
                 new_node_names.insert(0, "new".into());
+            }
+            TestOperation::CopyValueFromTo => {
+                // Copy the value from one node to another.
+                let value = g.get_node_value(0).unwrap();
+                g.set_node_value(1, value.clone()).unwrap();
             }
         }
         g.get_concrete_output(new_node_names)
@@ -490,6 +509,8 @@ fn get_custom_op_new_node_in_regular_query_branches() -> UserDefinedOperation<Te
     builder.end_query().unwrap();
 
     // TODO: define the new node to be visible in the output
+    let output_aid = AbstractNodeId::DynamicOutputMarker("new".into(), "new".into());
+    builder.return_node(output_aid, "output".into(), NodeType::Object).unwrap();
 
     builder.build(0).unwrap()
 }
@@ -525,6 +546,8 @@ fn get_custom_op_new_node_in_shape_query_branches() -> UserDefinedOperation<Test
 
     // TODO: define the new node to be visible in the output
     //  or try to? I guess the builder should ensure that's not the case and fail
+    let output_aid = AbstractNodeId::DynamicOutputMarker("new".into(), "new".into());
+    builder.return_node(output_aid, "output".into(), NodeType::Object).unwrap();
 
     builder.build(0).unwrap()
 }
@@ -548,6 +571,23 @@ fn new_node_from_both_branches_is_visible_for_regular_query() {
         num_after,
         num_before + 1,
         "Expected a new node to be visible"
+    );
+
+    let returned_node = AbstractNodeId::DynamicOutputMarker("helper".into(), "output".into());
+    
+    // test that I can actually use the returned node
+    builder.add_operation(BuilderOpLike::Builtin(TestOperation::CopyValueFromTo), vec![returned_node, p0]).unwrap();
+    let operation = builder.build(1).unwrap();
+    op_ctx.add_custom_operation(1, operation);
+    
+    let mut concrete_graph = ConcreteGraph::<TestSemantics>::new();
+    let p0_key = concrete_graph.add_node(NodeValue::Integer(0));
+    run_from_concrete(&mut concrete_graph, &op_ctx, 1, vec![p0_key]).unwrap();
+    let new_node_value = concrete_graph.get_node_attr(p0_key).unwrap();
+    assert_eq!(
+        new_node_value,
+        &NodeValue::String("x".to_string()),
+        "Expected the new node to have the value 'x'"
     );
 }
 

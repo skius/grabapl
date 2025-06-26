@@ -114,30 +114,57 @@ pub type InstructionWithResultMarker<S> = (Option<AbstractOperationResultMarker>
 //  This requires thinking about how to keep statically defined mappings in check when running the operation concretely.
 //  ==> see big-picture-todos.md for a solution. TL;DR: store implicitly matched context nodes in the form of an explicit mapping from AbstractNodeId to the context nodes.
 
+pub struct AbstractUserDefinedOperationOutput<S: Semantics> {
+    pub new_nodes: HashMap<AbstractNodeId, (AbstractOutputNodeMarker, S::NodeAbstract)>,
+}
+
+impl<S: Semantics> AbstractUserDefinedOperationOutput<S> {
+    pub fn new() -> Self {
+        AbstractUserDefinedOperationOutput {
+            new_nodes: HashMap::new(),
+        }
+    }
+}
+
 // A 'custom'/user-defined operation
 pub struct UserDefinedOperation<S: Semantics> {
     pub parameter: OperationParameter<S>,
     // TODO: add preprocessing (checking) step to see if the instructions make sense and are well formed wrt which nodes they access statically.
     pub instructions: Vec<InstructionWithResultMarker<S>>,
     // TODO: need to define output changes.
+    pub output_changes: AbstractUserDefinedOperationOutput<S>,
 }
 
 // TODO: use a private runner struct that keeps all the necessary mappings on self for easier methods.
 
 impl<S: SemanticsClone> UserDefinedOperation<S> {
+    pub fn new(
+        parameter: OperationParameter<S>,
+        instructions: Vec<InstructionWithResultMarker<S>>,
+    ) -> Self {
+        UserDefinedOperation {
+            parameter,
+            instructions,
+            output_changes: AbstractUserDefinedOperationOutput::new(),
+        }
+    }
+    
     pub(crate) fn apply_abstract(
         &self,
         op_ctx: &OperationContext<S>,
         g: &mut GraphWithSubstitution<AbstractGraph<S>>,
     ) -> OperationResult<OperationOutput> {
-        let mut output = OperationOutput {
-            new_nodes: HashMap::new(),
-            removed_nodes: Vec::new(),
-        };
+        let mut output_names = HashMap::new();
 
         // TODO: Implement apply_abstract for UserDefinedOperation
 
-        Ok(output)
+        for (aid, (name, av)) in &self.output_changes.new_nodes {
+            let sm = g.new_subst_marker();
+            g.add_node(sm, av.clone());
+            output_names.insert(sm, name.clone());
+        }
+        
+        Ok(g.get_concrete_output(output_names))
     }
 
     pub(crate) fn apply(
@@ -161,6 +188,11 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
             &self.instructions,
             subst,
         )?;
+        
+        for (aid, (name, _)) in &self.output_changes.new_nodes {
+            let node_key = aid_to_node_key(*aid, subst, &previous_results)?;
+            our_output_map.insert(name.clone(), node_key);
+        }
 
         // TODO: How to define a good output here?
         //  probably should be part of the UserDefinedOperation struct. AbstractNodeId should be used, and then we get the actual node key based on what's happening.

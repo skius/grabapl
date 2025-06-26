@@ -1,11 +1,8 @@
 use crate::graph::operation::query::{BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier};
-use crate::graph::operation::user_defined::{
-    AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, QueryInstructions,
-    UserDefinedOperation,
-};
+use crate::graph::operation::user_defined::{AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, AbstractUserDefinedOperationOutput, QueryInstructions, UserDefinedOperation};
 use crate::graph::operation::{BuiltinOperation, OperationError, get_substitution};
 use crate::graph::pattern::{AbstractOutputNodeMarker, GraphWithSubstitution, OperationParameter, ParameterSubstitution};
-use crate::graph::semantics::{AbstractGraph, SemanticsClone};
+use crate::graph::semantics::{AbstractGraph, AbstractMatcher, SemanticsClone};
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, OperationContext, OperationId, SubstMarker};
 use petgraph::dot;
@@ -108,6 +105,10 @@ pub enum OperationBuilderError {
     SuperfluousInstruction(String),
     #[error("Already selected to return node {0:?}")]
     AlreadySelectedReturnNode(AbstractNodeId),
+    #[error("Could not find AID {0:?} for return node")]
+    NotFoundReturnNode(AbstractNodeId),
+    #[error("Invalid return node type for AID {0:?}, must be more generic")]
+    InvalidReturnNodeType(AbstractNodeId)
 }
 
 pub struct OperationBuilder<'a, S: SemanticsClone> {
@@ -125,6 +126,12 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
     }
 
     // TODO: add undo_one_instruction method that just pops the last instruction.
+    pub fn undo_last_instruction(&mut self) {
+        if !self.instructions.is_empty() {
+            self.instructions.pop();
+        }
+        self.check_instructions().expect("internal error: a prefix slice of instructions should always be valid");
+    }
 
     pub fn expect_parameter_node(
         &mut self,
@@ -289,7 +296,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         let mut interpreter =
             IntermediateInterpreter::new_for_self_op_id(self_op_id, param, self.op_ctx);
 
-        let user_def_op = interpreter.create_user_defined_operation(instructions)?;
+        let user_def_op = interpreter.create_user_defined_operation(instructions, builder_result.return_nodes)?;
 
         Ok(user_def_op)
     }
@@ -318,7 +325,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
             builder_result.operation_parameter,
             self.op_ctx,
         );
-        let _ = interpreter.interpret_instructions(builder_result.instructions)?;
+        let _ = interpreter.create_user_defined_operation(builder_result.instructions, builder_result.return_nodes)?;
         Ok(())
     }
 }
@@ -646,6 +653,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
         if !builder.path.iter().any(|i| matches!(i, IntermediateStatePath::StartQuery(..))) {
             // we are outside all queries
             return_nodes = Self::collect_return_node_instructions(&mut iter)?;
+            // TODO: validate that we have not encountered a Recurse instruction. In recursive queries we cannot statically return.
         }
 
         // assert our iter is empty
@@ -682,6 +690,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                 BuilderInstruction::EndQuery
                     | BuilderInstruction::EnterTrueBranch
                     | BuilderInstruction::EnterFalseBranch
+                    | BuilderInstruction::ReturnNode(..)
             ) {
                 break;
             }
@@ -1251,13 +1260,34 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             Option<AbstractOperationResultMarker>,
             IntermediateInstruction<S>,
         )>,
+        return_nodes: HashMap<AbstractNodeId, (AbstractOutputNodeMarker, S::NodeAbstract)>,
     ) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
         let (ud_instructions, _interp_instructions) =
             self.interpret_instructions(intermediate_instructions)?;
 
+        // need to determine validity of return_nodes
+        let mut output = AbstractUserDefinedOperationOutput::new();
+        for (aid, (output_marker, node_abstract)) in return_nodes {
+            let Some(key) = self.current_state.node_keys_to_aid.get_right(&aid) else {
+                return Err(OperationBuilderError::NotFoundReturnNode(aid));
+            };
+            // make sure type we're deciding to return is a valid supertype
+            let inferred_av = self
+                .current_state
+                .node_av_of_aid(&aid)
+                .ok_or(OperationBuilderError::NotFoundReturnNode(aid))?;
+            if !S::NodeMatcher::matches(inferred_av, &node_abstract) {
+                return Err(OperationBuilderError::InvalidReturnNodeType(
+                    aid,
+                ));
+            }
+            output.new_nodes.insert(aid, (output_marker, node_abstract));
+        }
+
         Ok(UserDefinedOperation {
             parameter: self.op_param.clone(),
             instructions: ud_instructions,
+            output_changes: output,
         })
     }
 

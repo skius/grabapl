@@ -126,10 +126,7 @@ pub fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemanti
         ),
     ));
 
-    UserDefinedOperation {
-        parameter: param,
-        instructions,
-    }
+    UserDefinedOperation::new(param, instructions)
 }
 
 pub fn get_mk_n_to_0_list_user_defined_operation() -> UserDefinedOperation<SimpleSemantics> {
@@ -207,10 +204,8 @@ pub fn get_mk_n_to_0_list_user_defined_operation() -> UserDefinedOperation<Simpl
     //  In such a case, would we want to check that the node always gets created? probably.
     //  What if a caller wants to access a conditionally created node? the query system needs to be used to check that a node exists.
 
-    UserDefinedOperation {
-        parameter: param,
-        instructions,
-    }
+    UserDefinedOperation::new(param, instructions)
+
 }
 
 pub fn get_count_list_len_user_defined_operation(
@@ -276,10 +271,7 @@ pub fn get_count_list_len_user_defined_operation(
         ),
     ));
 
-    UserDefinedOperation {
-        parameter: param,
-        instructions,
-    }
+    UserDefinedOperation::new(param, instructions)
 }
 
 // TODO: add a new op that maybe does something with a binary tree?
@@ -431,10 +423,7 @@ pub fn get_insert_bst_user_defined_operation(
     })));
     // TODO: add remove value_node instruction
 
-    UserDefinedOperation {
-        parameter: param,
-        instructions,
-    }
+    UserDefinedOperation::new(param, instructions)
 }
 
 pub fn get_labeled_edges_insert_bst_user_defined_operation(
@@ -729,10 +718,7 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
     // TODO: this would be a good example for the abstract graph to take the under approximated view. the value node should not still have been visible abstractly, since it may have
     //  been deleted by then (eg in the recursive call).
 
-    UserDefinedOperation {
-        parameter: param,
-        instructions,
-    }
+    UserDefinedOperation::new(param, instructions)
 }
 
 pub fn get_node_heights_user_defined_operation(
@@ -865,8 +851,5 @@ pub fn get_node_heights_user_defined_operation(
         mk_builtin_instruction(BuiltinOperation::Increment, vec![root_node]),
     ));
 
-    UserDefinedOperation {
-        parameter: param,
-        instructions,
-    }
+    UserDefinedOperation::new(param, instructions)
 }
