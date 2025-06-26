@@ -313,8 +313,25 @@ fn get_abstract_value_changing_operation() -> UserDefinedOperation<TestSemantics
     builder.build(0).unwrap()
 }
 
+fn get_abstract_value_changing_operation_no_branches() -> UserDefinedOperation<TestSemantics> {
+    let op_ctx = OperationContext::<TestSemantics>::new();
+    let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx);
+    builder.expect_parameter_node(0, NodeType::Object).unwrap();
+    let p0 = AbstractNodeId::ParameterMarker(0);
+    // Add an operation that changes the abstract value
+    builder
+        .add_operation(BuilderOpLike::Builtin(TestOperation::SetTo {
+            op_typ: NodeType::Object,
+            // we *set* to the same type, which is not the same as a noop.
+            target_typ: NodeType::Object,
+            value: NodeValue::String("Changed".to_string()),
+        }), vec![p0])
+        .unwrap();
+    builder.build(0).unwrap()
+}
+
 #[test]
-fn modifications_change_abstract_value_even_if_same_internal_type() {
+fn modifications_change_abstract_value_even_if_same_internal_type_for_custom() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();
     op_ctx.add_custom_operation(0, get_abstract_value_changing_operation());
     let mut builder = OperationBuilder::new(&op_ctx);
@@ -358,7 +375,7 @@ fn modifications_change_abstract_value_even_if_same_internal_type_for_builtin() 
     builder
         .add_operation(BuilderOpLike::Builtin(TestOperation::SetTo {
             op_typ: NodeType::Object,
-            // we *set* to the same type, which is not the same as a noop. 
+            // we *set* to the same type, which is not the same as a noop.
             target_typ: NodeType::Object,
             value: NodeValue::String("Changed".to_string()),
         }), vec![a])
@@ -379,3 +396,35 @@ fn modifications_change_abstract_value_even_if_same_internal_type_for_builtin() 
         "Abstract value of node should be Object after operation"
     );
 }
+
+#[test]
+fn modifications_change_abstract_value_even_if_same_internal_type_for_custom_with_builtin() {
+    let mut op_ctx = OperationContext::<TestSemantics>::new();
+    op_ctx.add_custom_operation(0, get_abstract_value_changing_operation_no_branches());
+    let mut builder = OperationBuilder::new(&op_ctx);
+
+    builder.expect_parameter_node(0, NodeType::Integer).unwrap();
+    let a = AbstractNodeId::ParameterMarker(0);
+    let state_before = builder.show_state().unwrap();
+
+    // Add an operation that changes the abstract value
+    builder
+        .add_operation(BuilderOpLike::FromOperationId(0), vec![a])
+        .unwrap();
+
+    let state_after = builder.show_state().unwrap();
+
+    let a_type_before = state_before.node_av_of_aid(&a).unwrap();
+    let a_type_after = state_after.node_av_of_aid(&a).unwrap();
+
+    assert_ne!(
+        a_type_before, a_type_after,
+        "Abstract value of node should change after operation"
+    );
+    assert_eq!(
+        a_type_after,
+        &NodeType::Object,
+        "Abstract value of node should be Object after operation"
+    );
+}
+
