@@ -677,19 +677,24 @@ fn return_node_partially_from_shape_query_fails() {
         "Expected no new nodes to be created in the graph"
     );
 
-    // for fun, see what happens when we delete the returned node and then try to use c0
-    let returned_node = AbstractNodeId::DynamicOutputMarker("helper".into(), "child".into());
-    builder.add_operation(BuilderOpLike::Builtin(TestOperation::DeleteNode), vec![returned_node]).unwrap();
-    // now use c0 to copy from c0 to p0
-    // note: this is the operation that would crash (the concrete graph would not have the node) if we were allowed to return the node.
-    builder.add_operation(BuilderOpLike::Builtin(TestOperation::CopyValueFromTo), vec![c0, p0]).unwrap();
-    let operation = builder.build(1).unwrap();
-    op_ctx.add_custom_operation(1, operation);
+    if false {
+        // NOTE: this only exhibits the desired crash if the problem this test is checking against is not fixed.
 
-    let mut concrete_graph = ConcreteGraph::<TestSemantics>::new();
-    let p0_key = concrete_graph.add_node(NodeValue::Integer(0));
-    let c0_key = concrete_graph.add_node(NodeValue::String("context".to_string()));
-    concrete_graph.add_edge(p0_key, c0_key, "child".to_string());
+        // for fun, see what happens when we delete the returned node and then try to use c0
+        let returned_node = AbstractNodeId::DynamicOutputMarker("helper".into(), "child".into());
+        builder.add_operation(BuilderOpLike::Builtin(TestOperation::DeleteNode), vec![returned_node]).unwrap();
+        // now use c0 to copy from c0 to p0
+        // note: this is the operation that would crash (the concrete graph would not have the node) if we were allowed to return the node.
+        builder.add_operation(BuilderOpLike::Builtin(TestOperation::CopyValueFromTo), vec![c0, p0]).unwrap();
+        let operation = builder.build(1).unwrap();
+        op_ctx.add_custom_operation(1, operation);
 
-    run_from_concrete(&mut concrete_graph, &op_ctx, 1, vec![p0_key]).unwrap();
+        let mut concrete_graph = ConcreteGraph::<TestSemantics>::new();
+        let p0_key = concrete_graph.add_node(NodeValue::Integer(0));
+        let c0_key = concrete_graph.add_node(NodeValue::String("context".to_string()));
+        concrete_graph.add_edge(p0_key, c0_key, "child".to_string());
+
+        // crash, CopyValueFromTo doesn't find substmarker 0.
+        run_from_concrete(&mut concrete_graph, &op_ctx, 1, vec![p0_key]).unwrap();
+    }
 }
