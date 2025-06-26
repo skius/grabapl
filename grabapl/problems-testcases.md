@@ -283,6 +283,9 @@ How can we do that if not by deleting a shape query node?
 
 [//]: # (TODO: Visualize this in excalidraw.)
 
+**Side note**: This problem appears with edges as well. Imagine a shape query edge being removed - that's a critical
+issue as well.
+
 ### Root cause of the problem
 The root cause is that we may have two handles to the same node with at least one being mutable. I.e., we violate aliasing XOR mutability.
 For example, in the "remove child if exists" example, the problem appears if some outer operation abstract graph
@@ -300,6 +303,13 @@ delete_child_if_exists(&mut p); //internally acquires a mutable reference to `p.
 Which is disallowed by the Rust borrow checker.
 
 This is very difficult to fix without a borrow checker.
+
+Actually, Rust provides one workaround: `RefCell`.
+
+What if we decided this was the same in grabapl? We keep track of concretely deleted nodes, pass that to callers,
+and after each call the caller checks if something was deleted that we expected to still be around. If so, we crash.
+
+This would require knowledge of what we expect to still be around (i.e., the abstract graph) at concrete execution time, but that's fine.
 
 ### Pass-by-reference vs pass-by-value
 Fundamentally the above is a problem because we pass arguments by reference, i.e., changes inside the operation are visible
