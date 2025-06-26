@@ -230,3 +230,37 @@ Maybe it would be helpful to have a "where this comes from" string for abstract 
 This would be an additional mapping from AID -> String, and it would be computed by every operation.
 For example, the "add(a,b,c)" operation would have have a format function that takes
 debug representation for all arguments (in order) and returns a string, e.g., `{i1} <- {i2} + {i3}`.
+
+## Changing abstract values in shape query nodes
+**Core problem**: Because we match shape query nodes against the *concrete*, changes to their abstract values cannot
+really be reasoned about abstractly.
+
+Imagine this:
+1. Helper operation with input node `p0`
+2. Shape query that checks if `p0` has a child `c:Object`
+2a. True branch: set `c` to `String`
+2b. False branch: add a new node `c` with type `Integer` and make it a child of `p0`
+3. After the query, the abstract graph is `p0 -> c`, where `c` is a Object.
+
+Now this helper operation is called somewhere:
+1. input graph `a -> child:Integer`
+2. call helper with `a` as `p0`
+3. What abstract value should `child` have?
+
+The problem is that depending on which node is selected concretely, `child` may or may not be a `String`, since
+it may be the child that is found by the shape query in the helper.
+
+The problem is exacerbated in case the helper is hidden behind another helper, i.e., the caller does not even directly
+see a shape query and would instead have to traverse the entire call stack to find out.
+
+**Potential fixes**:
+1. Shape queries are not allowed to change the abstract values of their matched nodes.
+   - This is the simplest solution, but it is also quite limiting.
+2. Shape queries match invariantly, i.e., if some abstract value `t_s` is expected, then concrete values only
+   match that query if their type is exactly `t_s`.
+   - Subsequent modifications would be allowed to change the abstract value to something more precise, i.e. a subtype of `t_s`,
+    but not to something more general.
+
+In all cases, special care has to be taken when passing the matched node to an inner operation.
+In particular, the inner operation must not change the abstract value of the matched node.
+==> We must have some static guarantees that an operation does not change the abstract value of a parameter node.
