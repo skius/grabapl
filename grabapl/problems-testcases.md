@@ -311,6 +311,8 @@ and after each call the caller checks if something was deleted that we expected 
 
 This would require knowledge of what we expect to still be around (i.e., the abstract graph) at concrete execution time, but that's fine.
 
+Also, we would need a way to "forget" a node/edge, so that we don't crash even if we actually want to delete it.
+
 ### Pass-by-reference vs pass-by-value
 Fundamentally the above is a problem because we pass arguments by reference, i.e., changes inside the operation are visible
 by the caller.
