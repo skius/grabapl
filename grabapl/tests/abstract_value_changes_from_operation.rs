@@ -114,6 +114,10 @@ enum TestOperation {
         target_typ: NodeType,
         value: NodeValue,
     },
+    AddNode {
+        node_type: NodeType,
+        value: NodeValue,
+    },
 }
 
 impl BuiltinOperation for TestOperation {
@@ -136,6 +140,10 @@ impl BuiltinOperation for TestOperation {
                     .expect_explicit_input_node(0, *op_typ)
                     .unwrap();
             }
+            TestOperation::AddNode {
+                node_type,
+                value,
+            } => {}
         }
         param_builder.build().unwrap()
     }
@@ -157,6 +165,14 @@ impl BuiltinOperation for TestOperation {
                 // Set the abstract value of the node to the specified type.
                 g.set_node_value(0, *target_typ).unwrap();
             }
+            TestOperation::AddNode {
+                node_type,
+                value,
+            } => {
+                // Add a new node with the specified type and value.
+                g.add_node(0, node_type.clone());
+                new_node_names.insert(0, "new".into());
+            }
         }
         g.get_concrete_output(new_node_names)
     }
@@ -177,6 +193,14 @@ impl BuiltinOperation for TestOperation {
             } => {
                 // Set the concrete value of the node to the specified value.
                 g.set_node_value(0, value.clone()).unwrap();
+            }
+            TestOperation::AddNode {
+                node_type,
+                value,
+            } => {
+                // Add a new node with the specified type and value.
+                g.add_node(0, value.clone());
+                new_node_names.insert(0, "new".into());
             }
         }
         g.get_concrete_output(new_node_names)
@@ -428,3 +452,123 @@ fn modifications_change_abstract_value_even_if_same_internal_type_for_custom_wit
     );
 }
 
+fn get_custom_op_new_node_in_regular_query_branches() -> UserDefinedOperation<TestSemantics> {
+    let op_ctx = OperationContext::<TestSemantics>::new();
+    let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx);
+    builder.expect_parameter_node(0, NodeType::Object).unwrap();
+    let p0 = AbstractNodeId::ParameterMarker(0);
+
+    // Start a query that will create a new node in both branches
+    builder.start_query(TestQuery::ValueEqualTo(NodeValue::Integer(0)), vec![p0]).unwrap();
+
+    // True branch
+    builder.enter_true_branch().unwrap();
+    builder
+        .add_named_operation(
+            "new".into(),
+            BuilderOpLike::Builtin(TestOperation::AddNode {
+                node_type: NodeType::String,
+                value: NodeValue::String("x".to_string()),
+            }),
+            vec![],
+        )
+        .unwrap();
+
+    // False branch
+    builder.enter_false_branch().unwrap();
+    builder
+        .add_named_operation(
+            "new".into(),
+            BuilderOpLike::Builtin(TestOperation::AddNode {
+                node_type: NodeType::Integer,
+                value: NodeValue::Integer(42),
+            }),
+            vec![],
+        )
+        .unwrap();
+
+    builder.end_query().unwrap();
+
+    // TODO: define the new node to be visible in the output
+
+    builder.build(0).unwrap()
+}
+
+fn get_custom_op_new_node_in_shape_query_branches() -> UserDefinedOperation<TestSemantics> {
+    let op_ctx = OperationContext::<TestSemantics>::new();
+    let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx);
+    builder.expect_parameter_node(0, NodeType::Object).unwrap();
+    let p0 = AbstractNodeId::ParameterMarker(0);
+
+    // Start a query that will create a new node in both branches
+    builder.start_shape_query("new".into()).unwrap();
+    builder.expect_shape_node("new".into(), NodeType::String).unwrap();
+
+    // True branch
+    builder.enter_true_branch().unwrap();
+    // TODO: rename
+
+    // False branch
+    builder.enter_false_branch().unwrap();
+    builder
+        .add_named_operation(
+            "new".into(),
+            BuilderOpLike::Builtin(TestOperation::AddNode {
+                node_type: NodeType::Integer,
+                value: NodeValue::Integer(42),
+            }),
+            vec![],
+        )
+        .unwrap();
+
+    builder.end_query().unwrap();
+
+    // TODO: define the new node to be visible in the output
+    //  or try to? I guess the builder should ensure that's not the case and fail
+
+    builder.build(0).unwrap()
+}
+
+#[test]
+fn new_node_from_both_branches_is_visible_for_regular_query() {
+    let mut op_ctx = OperationContext::<TestSemantics>::new();
+    op_ctx.add_custom_operation(0, get_custom_op_new_node_in_regular_query_branches());
+    let mut builder = OperationBuilder::new(&op_ctx);
+    builder.expect_parameter_node(0, NodeType::Integer).unwrap();
+    let p0 = AbstractNodeId::ParameterMarker(0);
+    let state_before = builder.show_state().unwrap();
+    // Add an operation that creates a new node in both branches
+    builder
+        .add_named_operation("helper".into(), BuilderOpLike::FromOperationId(0), vec![p0])
+        .unwrap();
+    let state_after = builder.show_state().unwrap();
+    let num_before = state_before.graph.nodes().count();
+    let num_after = state_after.graph.nodes().count();
+    assert_eq!(
+        num_after,
+        num_before + 1,
+        "Expected a new node to be visible"
+    );
+}
+
+#[test]
+fn new_node_from_both_branches_is_invisible_for_shape_query() {
+    let mut op_ctx = OperationContext::<TestSemantics>::new();
+    op_ctx.add_custom_operation(0, get_custom_op_new_node_in_shape_query_branches());
+    let mut builder = OperationBuilder::new(&op_ctx);
+    builder.expect_parameter_node(0, NodeType::Integer).unwrap();
+    let p0 = AbstractNodeId::ParameterMarker(0);
+    let state_before = builder.show_state().unwrap();
+    // Add an operation that creates a new node in both branches
+    builder
+        .add_named_operation("helper".into(), BuilderOpLike::FromOperationId(0), vec![p0])
+        .unwrap();
+    let state_after = builder.show_state().unwrap();
+    let num_before = state_before.graph.nodes().count();
+    let num_after = state_after.graph.nodes().count();
+    assert_eq!(
+        num_after,
+        num_before,
+        "Expected no new nodes to be visible"
+    );
+}
