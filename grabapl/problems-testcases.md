@@ -260,7 +260,32 @@ see a shape query and would instead have to traverse the entire call stack to fi
    match that query if their type is exactly `t_s`.
    - Subsequent modifications would be allowed to change the abstract value to something more precise, i.e. a subtype of `t_s`,
     but not to something more general.
+3. Specify potential changes to shape nodes and what they look like, and then over-approximatingly change
+   **all** abstract values in the entire call stack upwards.
+   - I.e., if some operation has a shape query that does something to that node, that must be stored in its signature,
+   and if some operation calls that operation, that signature must also keep track of the shape node change, etc.
+   - Very overkill.
 
 In all cases, special care has to be taken when passing the matched node to an inner operation.
 In particular, the inner operation must not change the abstract value of the matched node.
 ==> We must have some static guarantees that an operation does not change the abstract value of a parameter node.
+
+**Next problem**: How to delete a shape query node? It almost seems like deleting a shape query node is not possible
+unless we use potential fix #3 from above.
+
+[//]: # (TODO: add tests for these problems)
+
+And deleting a node from a shape query probably something we want to support?
+
+Yeah: imagine removing a node from a binary search tree.
+
+How can we do that if not by deleting a shape query node?
+
+[//]: # (TODO: Visualize this in excalidraw.)
+
+
+## Thoughts about abstract graph changes in terms of function signatures
+Any static changes must be inside some signature.
+* Want to write to a node? The fact that you're setting its abstract value must be specified.
+* Add, delete a node? Specify it.
+* Add, delete, or modify an edge? Specify it.

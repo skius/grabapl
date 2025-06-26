@@ -113,6 +113,8 @@ pub enum OperationBuilderError {
     //  in general, add lots more documentation.
     #[error("Returned {0:?} node may have been created by a shape query, which is not allowed")]
     ReturnNodeMayOriginateFromShapeQuery(AbstractNodeId),
+    #[error("Cannot return a parameter node: {0:?}")]
+    CannotReturnParameter(AbstractNodeId),
 }
 
 pub struct OperationBuilder<'a, S: SemanticsClone> {
@@ -276,6 +278,10 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         output_marker: AbstractOutputNodeMarker,
         node: S::NodeAbstract,
     ) -> Result<(), OperationBuilderError> {
+        // dont support returning parameter nodes
+        if let AbstractNodeId::ParameterMarker(..) = &aid {
+            return Err(OperationBuilderError::CannotReturnParameter(aid));
+        }
         self.instructions.push(
             BuilderInstruction::ReturnNode(aid, output_marker, node),
         );
@@ -1107,6 +1113,8 @@ pub struct IntermediateState<S: SemanticsClone> {
     //  could be done by, whenever adding a new node, unconditionally removing the AID from this set as long as we're not in a shape query.
     //  since we have a different state at that point, it would get merged correctly (assuming we take the union).
     pub may_originate_from_shape_query: HashSet<AbstractNodeId>,
+    // TODO: keep track of may_deleted_nodes etc.
+
     // TODO: make query path
     pub query_path: Vec<QueryPath>,
 }
