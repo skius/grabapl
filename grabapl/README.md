@@ -27,4 +27,8 @@ cargo check --target wasm32-unknown-unknown
 - [ ] Fix the 'static lifetime from markers and turn it into an owned String
 - [ ] Add the CustomName variant for AbstractNodeId?
 - [ ] Temporary nodes should be first class!
-  - See meeting nodes gdoc. 
+  - See meeting nodes gdoc.
+  - It would be nice if we could infer which node is temporary by checking
+    if it is somehow connected to the existing graph, and if not it is temporary, but since we may not see an edge, this would potentially delete nodes connected in the concrete but not the abstract.
+  - However! We could perform this check in the concrete, i.e., collect abstractly determined candidates, then
+    check if they are connected to either explicit output nodes or parameter nodes in the concrete graph, if not, then they are temporary and can be removed.

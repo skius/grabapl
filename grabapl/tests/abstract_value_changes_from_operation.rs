@@ -8,7 +8,7 @@ use grabapl::graph::semantics::{
     AbstractGraph, AbstractJoin, AbstractMatcher, ConcreteGraph, ConcreteToAbstract,
 };
 use grabapl::{Graph, OperationContext, Semantics};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 struct TestSemantics;
 
@@ -119,6 +119,7 @@ enum TestOperation {
         value: NodeValue,
     },
     CopyValueFromTo,
+    DeleteNode,
 }
 
 impl BuiltinOperation for TestOperation {
@@ -151,6 +152,11 @@ impl BuiltinOperation for TestOperation {
                     .unwrap();
                 param_builder
                     .expect_explicit_input_node(1, NodeType::Object)
+                    .unwrap();
+            }
+            TestOperation::DeleteNode => {
+                param_builder
+                    .expect_explicit_input_node(0, NodeType::Object)
                     .unwrap();
             }
         }
@@ -187,6 +193,10 @@ impl BuiltinOperation for TestOperation {
                 let value = g.get_node_value(0).unwrap();
                 g.set_node_value(1, value.clone()).unwrap();
             }
+            TestOperation::DeleteNode => {
+                // Delete the node.
+                g.delete_node(0).unwrap();
+            }
         }
         g.get_concrete_output(new_node_names)
     }
@@ -220,6 +230,10 @@ impl BuiltinOperation for TestOperation {
                 // Copy the value from one node to another.
                 let value = g.get_node_value(0).unwrap();
                 g.set_node_value(1, value.clone()).unwrap();
+            }
+            TestOperation::DeleteNode => {
+                // Delete the node.
+                g.delete_node(0).unwrap();
             }
         }
         g.get_concrete_output(new_node_names)
@@ -574,12 +588,12 @@ fn new_node_from_both_branches_is_visible_for_regular_query() {
     );
 
     let returned_node = AbstractNodeId::DynamicOutputMarker("helper".into(), "output".into());
-    
+
     // test that I can actually use the returned node
     builder.add_operation(BuilderOpLike::Builtin(TestOperation::CopyValueFromTo), vec![returned_node, p0]).unwrap();
     let operation = builder.build(1).unwrap();
     op_ctx.add_custom_operation(1, operation);
-    
+
     let mut concrete_graph = ConcreteGraph::<TestSemantics>::new();
     let p0_key = concrete_graph.add_node(NodeValue::Integer(0));
     run_from_concrete(&mut concrete_graph, &op_ctx, 1, vec![p0_key]).unwrap();
@@ -611,4 +625,71 @@ fn new_node_from_both_branches_is_invisible_for_shape_query() {
         num_before,
         "Expected no new nodes to be visible"
     );
+}
+
+#[test]
+fn return_node_partially_from_shape_query_fails() {
+    let mut op_ctx = OperationContext::<TestSemantics>::new();
+    let helper_op = {
+        let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx);
+        builder.expect_parameter_node(0, NodeType::Integer).unwrap();
+        let p0 = AbstractNodeId::ParameterMarker(0);
+        // Start a shape query to check if p0 has a child with edge 'child'
+        builder.start_shape_query("child".into()).unwrap();
+        builder.expect_shape_node("new".into(), NodeType::String).unwrap();
+        let child_aid = AbstractNodeId::DynamicOutputMarker("child".into(), "new".into());
+        builder.expect_shape_edge(p0, child_aid, EdgeType::Exact("child".to_string())).unwrap();
+        builder.enter_false_branch().unwrap();
+        // if we don't have a child node, create one
+        builder
+            .add_named_operation(
+                "child".into(),
+                BuilderOpLike::Builtin(TestOperation::AddNode {
+                    node_type: NodeType::String,
+                    value: NodeValue::String("x".to_string()),
+                }),
+                vec![],
+            )
+            .unwrap();
+        builder.end_query().unwrap();
+
+        // Return the child node
+        let res = builder.return_node(child_aid, "child".into(), NodeType::String);
+        assert!(res.is_err(), "Expected returning a node partially originating from a shape query to fail");
+        builder.build(0).unwrap()
+    };
+    op_ctx.add_custom_operation(0, helper_op);
+
+    // now see what happens if we try to run this in a builder
+    let mut builder = OperationBuilder::new(&op_ctx);
+    builder.expect_parameter_node(0, NodeType::Integer).unwrap();
+    let p0 = AbstractNodeId::ParameterMarker(0);
+    builder.expect_context_node(1, NodeType::String).unwrap();
+    let c0 = AbstractNodeId::ParameterMarker(1);
+    builder.expect_parameter_edge(0, 1, EdgeType::Exact("child".to_string())).unwrap();
+    let state_before = builder.show_state().unwrap();
+    builder.add_named_operation("helper".into(), BuilderOpLike::FromOperationId(0), vec![p0]).unwrap();
+    let state_after = builder.show_state().unwrap();
+    let aids_before = state_before.node_keys_to_aid.right_values().collect::<HashSet<_>>();
+    let aids_after = state_after.node_keys_to_aid.right_values().collect::<HashSet<_>>();
+    assert_eq!(
+        aids_before, aids_after,
+        "Expected no new nodes to be created in the graph"
+    );
+
+    // for fun, see what happens when we delete the returned node and then try to use c0
+    let returned_node = AbstractNodeId::DynamicOutputMarker("helper".into(), "child".into());
+    builder.add_operation(BuilderOpLike::Builtin(TestOperation::DeleteNode), vec![returned_node]).unwrap();
+    // now use c0 to copy from c0 to p0
+    // note: this is the operation that would crash (the concrete graph would not have the node) if we were allowed to return the node.
+    builder.add_operation(BuilderOpLike::Builtin(TestOperation::CopyValueFromTo), vec![c0, p0]).unwrap();
+    let operation = builder.build(1).unwrap();
+    op_ctx.add_custom_operation(1, operation);
+
+    let mut concrete_graph = ConcreteGraph::<TestSemantics>::new();
+    let p0_key = concrete_graph.add_node(NodeValue::Integer(0));
+    let c0_key = concrete_graph.add_node(NodeValue::String("context".to_string()));
+    concrete_graph.add_edge(p0_key, c0_key, "child".to_string());
+
+    run_from_concrete(&mut concrete_graph, &op_ctx, 1, vec![p0_key]).unwrap();
 }
