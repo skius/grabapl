@@ -285,7 +285,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
 
         let param = builder_result.operation_parameter;
         let instructions = builder_result.instructions;
-        
+
         let mut interpreter =
             IntermediateInterpreter::new_for_self_op_id(self_op_id, param, self.op_ctx);
 
@@ -310,6 +310,9 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
 
     fn check_instructions(&self) -> Result<(), OperationBuilderError> {
         let builder_result = IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
+        // TODO: how do we pass builder_result.return_nodes to the interpreter?
+        //  maybe have a check_validity function?
+        //  Or we could just call create_user_defined_operation directly here and check its result.
         let mut interpreter = IntermediateInterpreter::new_for_self_op_id(
             0, // Unused. TODO: make prettier...
             builder_result.operation_parameter,
