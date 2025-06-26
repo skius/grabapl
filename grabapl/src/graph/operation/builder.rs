@@ -78,6 +78,8 @@ enum BuilderInstruction<S: SemanticsClone> {
     ),
     #[debug("AddOperation(???, args: {_1:?})")]
     AddOperation(BuilderOpLike<S>, Vec<AbstractNodeId>),
+    #[debug("ReturnNode({_0:?}, {_1:?}, ???)")]
+    ReturnNode(AbstractNodeId, AbstractOutputNodeMarker, S::NodeAbstract)
 }
 
 #[derive(Error, Debug)]
@@ -90,6 +92,8 @@ pub enum OperationBuilderError {
     ReusedShapeIdent(ShapeNodeIdentifier),
     #[error("Cannot call this while in a query context")]
     InvalidInQuery,
+    #[error("Expected an operation or query")]
+    ExpectedOperationOrQuery,
     #[error("Already visited the {0} branch of the active query")]
     AlreadyVisitedBranch(bool),
     #[error("Could not find abstract node id: {0:?}")]
@@ -102,6 +106,8 @@ pub enum OperationBuilderError {
     AbstractApplyOperationError(OperationId, OperationError),
     #[error("Superfluous instruction {0}")]
     SuperfluousInstruction(String),
+    #[error("Already selected to return node {0:?}")]
+    AlreadySelectedReturnNode(AbstractNodeId),
 }
 
 pub struct OperationBuilder<'a, S: SemanticsClone> {
@@ -243,6 +249,25 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         // todo!()
         self.instructions
             .push(BuilderInstruction::AddOperation(op, args));
+        self.check_instructions_or_rollback()
+    }
+
+    /// Indicate that a node should be marked in the output with the given abstract value.
+    ///
+    /// Note that the abstract value must be a supertype of the node's statically determined type.
+    /// Also, the node must be visible in the end context of the operation, and must never have
+    /// been statically determined by a shape query.
+    ///
+    /// These instructions must be the very last instructions in the operation builder.
+    pub fn return_node(
+        &mut self,
+        aid: AbstractNodeId,
+        output_marker: AbstractOutputNodeMarker,
+        node: S::NodeAbstract,
+    ) -> Result<(), OperationBuilderError> {
+        self.instructions.push(
+            BuilderInstruction::ReturnNode(aid, output_marker, node),
+        );
         self.check_instructions_or_rollback()
     }
 
@@ -607,6 +632,13 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
 
         let instructions = builder.build_many_instructions(&mut iter)?;
 
+        let mut return_nodes = HashMap::new();
+        // if we are outside all queries, check for ReturnNode instructions.
+        if !builder.path.iter().any(|i| matches!(i, IntermediateStatePath::StartQuery(..))) {
+            // we are outside all queries
+            return_nodes = Self::collect_return_node_instructions(&mut iter)?;
+        }
+
         // assert our iter is empty
         if let Some(next_instruction) = iter.peek() {
             return Err(OperationBuilderError::SuperfluousInstruction(format!(
@@ -713,7 +745,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     ),
                 ))
             }
-            _ => Err(OperationBuilderError::InvalidInQuery),
+            _ => Err(OperationBuilderError::ExpectedOperationOrQuery),
         }
     }
 
@@ -930,6 +962,25 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
         }
 
         Ok(operation_parameter)
+    }
+
+    fn collect_return_node_instructions(
+        iter: &mut Peekable<Iter<BuilderInstruction<S>>>,
+    ) -> Result<HashMap<AbstractNodeId, (AbstractOutputNodeMarker, S::NodeAbstract)>, OperationBuilderError> {
+        let mut return_nodes = HashMap::new();
+        while let Some(instruction) = iter.peek() {
+            match instruction {
+                BuilderInstruction::ReturnNode(aid, output_marker, node) => {
+                    iter.next();
+                    if return_nodes.contains_key(aid) {
+                        return Err(OperationBuilderError::AlreadySelectedReturnNode(*aid));
+                    }
+                    return_nodes.insert(*aid, (*output_marker, node.clone()));
+                }
+                _ => break,
+            }
+        }
+        Ok(return_nodes)
     }
 
     fn remove_until_branch(&mut self, branch: bool) {
