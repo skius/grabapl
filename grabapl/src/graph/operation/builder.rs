@@ -280,9 +280,12 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         // Here we would typically finalize the operation and return it.
         // For now, we just return Ok to indicate success.
 
-        let (param, instructions, _state_path) =
+        let builder_result =
             IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
 
+        let param = builder_result.operation_parameter;
+        let instructions = builder_result.instructions;
+        
         let mut interpreter =
             IntermediateInterpreter::new_for_self_op_id(self_op_id, param, self.op_ctx);
 
@@ -306,13 +309,13 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
     }
 
     fn check_instructions(&self) -> Result<(), OperationBuilderError> {
-        let (param, instrs, _) = IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
+        let builder_result = IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
         let mut interpreter = IntermediateInterpreter::new_for_self_op_id(
             0, // Unused. TODO: make prettier...
-            param,
+            builder_result.operation_parameter,
             self.op_ctx,
         );
-        let _ = interpreter.interpret_instructions(instrs)?;
+        let _ = interpreter.interpret_instructions(builder_result.instructions)?;
         Ok(())
     }
 }
@@ -330,16 +333,16 @@ impl<
     fn get_intermediate_state(
         &self,
     ) -> Result<(IntermediateState<S>, Vec<IntermediateStatePath>), OperationBuilderError> {
-        let (param, instructions, path) =
+        let builder_result =
             IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
         let mut interpreter = IntermediateInterpreter::new_for_self_op_id(
             0, // TODO: use a real operation ID here
-            param,
+            builder_result.operation_parameter,
             self.op_ctx,
         );
 
-        let (_, interp_instructions) = interpreter.interpret_instructions(instructions)?;
-
+        let (_, interp_instructions) = interpreter.interpret_instructions(builder_result.instructions)?;
+        let path = builder_result.state_path;
         let mut path_iter = path.iter().peekable().cloned();
 
         let mut intermediate_state = get_state_for_path(
@@ -478,6 +481,16 @@ enum GraphShapeQueryInstruction<S: SemanticsClone> {
     ExpectShapeEdge(AbstractNodeId, AbstractNodeId, S::EdgeAbstract),
 }
 
+struct BuilderResult<S: SemanticsClone> {
+    operation_parameter: OperationParameter<S>,
+    instructions: Vec<(
+        Option<AbstractOperationResultMarker>,
+        IntermediateInstruction<S>,
+    )>,
+    state_path: Vec<IntermediateStatePath>,
+    return_nodes: HashMap<AbstractNodeId, (AbstractOutputNodeMarker, S::NodeAbstract)>,
+}
+
 // TODO: maybe this is not *intermediate* but actually the final state as well potentially?
 impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
     IntermediateStateBuilder<'a, S>
@@ -486,14 +499,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
         builder_instructions: &'a [BuilderInstruction<S>],
         op_ctx: &'a OperationContext<S>,
     ) -> Result<
-        (
-            OperationParameter<S>,
-            Vec<(
-                Option<AbstractOperationResultMarker>,
-                IntermediateInstruction<S>,
-            )>,
-            Vec<IntermediateStatePath>,
-        ),
+        BuilderResult<S>,
         OperationBuilderError,
     > {
         /*
@@ -646,7 +652,12 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
             )));
         }
 
-        Ok((op_parameter, instructions, builder.path))
+        Ok(BuilderResult {
+            operation_parameter: op_parameter,
+            instructions,
+            state_path: builder.path,
+            return_nodes,
+        })
     }
 
     fn build_many_instructions(
