@@ -3,7 +3,7 @@ use grabapl::graph::operation::builder::{BuilderOpLike, OperationBuilder};
 use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
 use grabapl::graph::operation::query::{BuiltinQuery, ConcreteQueryOutput};
 use grabapl::graph::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
-use grabapl::graph::pattern::{OperationOutput, OperationParameter, ParameterSubstitution};
+use grabapl::graph::pattern::{GraphWithSubstitution, OperationOutput, OperationParameter, ParameterSubstitution};
 use grabapl::graph::semantics::{
     AbstractGraph, AbstractJoin, AbstractMatcher, ConcreteGraph, ConcreteToAbstract,
 };
@@ -142,13 +142,12 @@ impl BuiltinOperation for TestOperation {
 
     fn apply_abstract(
         &self,
-        g: &mut AbstractGraph<Self::S>,
-        substitution: &ParameterSubstitution,
+        g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>,
     ) -> OperationOutput {
+        let mut new_node_names = HashMap::new();
         match self {
             TestOperation::NoOp => {
                 // No operation, so no changes to the abstract graph.
-                OperationOutput::no_changes()
             }
             TestOperation::SetTo {
                 op_typ,
@@ -156,25 +155,20 @@ impl BuiltinOperation for TestOperation {
                 value,
             } => {
                 // Set the abstract value of the node to the specified type.
-                let node_id = substitution.mapping[&0];
-                g.set_node_attr(node_id, *target_typ).unwrap();
-                OperationOutput {
-                    removed_nodes: vec![],
-                    new_nodes: HashMap::new(),
-                }
+                g.set_node_value(0, *target_typ).unwrap();
             }
         }
+        g.get_concrete_output(new_node_names)
     }
 
     fn apply(
         &self,
-        g: &mut ConcreteGraph<Self::S>,
-        substitution: &ParameterSubstitution,
+        g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>,
     ) -> OperationOutput {
+        let mut new_node_names = HashMap::new();
         match self {
             TestOperation::NoOp => {
                 // No operation, so no changes to the concrete graph.
-                OperationOutput::no_changes()
             }
             TestOperation::SetTo {
                 op_typ,
@@ -182,14 +176,10 @@ impl BuiltinOperation for TestOperation {
                 value,
             } => {
                 // Set the concrete value of the node to the specified value.
-                let node_id = substitution.mapping[&0];
-                g.set_node_attr(node_id, value.clone()).unwrap();
-                OperationOutput {
-                    removed_nodes: vec![],
-                    new_nodes: HashMap::new(),
-                }
+                g.set_node_value(0, value.clone()).unwrap();
             }
         }
+        g.get_concrete_output(new_node_names)
     }
 }
 
@@ -222,28 +212,24 @@ impl BuiltinQuery for TestQuery {
         param_builder.build().unwrap()
     }
 
-    fn apply_abstract(&self, g: &mut AbstractGraph<Self::S>, substitution: &ParameterSubstitution) {
+    fn apply_abstract(&self, g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>) {
         // does nothing, not testing side-effect-ful queries here
     }
 
     fn query(
         &self,
-        g: &mut ConcreteGraph<Self::S>,
-        substitution: &ParameterSubstitution,
+        g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>,
     ) -> ConcreteQueryOutput {
         match self {
             TestQuery::ValuesEqual => {
-                let node1 = substitution.mapping[&0];
-                let node2 = substitution.mapping[&0];
-                let value1 = g.get_node_attr(node1).unwrap();
-                let value2 = g.get_node_attr(node2).unwrap();
+                let value1 = g.get_node_value(0).unwrap();
+                let value2 = g.get_node_value(1).unwrap();
                 ConcreteQueryOutput {
                     taken: value1 == value2,
                 }
             }
             TestQuery::ValueEqualTo(value) => {
-                let node = substitution.mapping[&0];
-                let node_value = g.get_node_attr(node).unwrap();
+                let node_value = g.get_node_value(0).unwrap();
                 ConcreteQueryOutput {
                     taken: node_value == value,
                 }
@@ -340,6 +326,42 @@ fn modifications_change_abstract_value_even_if_same_internal_type() {
     // Add an operation that changes the abstract value
     builder
         .add_operation(BuilderOpLike::FromOperationId(0), vec![a])
+        .unwrap();
+
+    let state_after = builder.show_state().unwrap();
+
+    let a_type_before = state_before.node_av_of_aid(&a).unwrap();
+    let a_type_after = state_after.node_av_of_aid(&a).unwrap();
+
+    assert_ne!(
+        a_type_before, a_type_after,
+        "Abstract value of node should change after operation"
+    );
+    assert_eq!(
+        a_type_after,
+        &NodeType::Object,
+        "Abstract value of node should be Object after operation"
+    );
+}
+
+
+#[test]
+fn modifications_change_abstract_value_even_if_same_internal_type_for_builtin() {
+    let mut op_ctx = OperationContext::<TestSemantics>::new();
+    let mut builder = OperationBuilder::new(&op_ctx);
+
+    builder.expect_parameter_node(0, NodeType::Integer).unwrap();
+    let a = AbstractNodeId::ParameterMarker(0);
+    let state_before = builder.show_state().unwrap();
+
+    // Add an operation that changes the abstract value
+    builder
+        .add_operation(BuilderOpLike::Builtin(TestOperation::SetTo {
+            op_typ: NodeType::Object,
+            // we *set* to the same type, which is not the same as a noop. 
+            target_typ: NodeType::Object,
+            value: NodeValue::String("Changed".to_string()),
+        }), vec![a])
         .unwrap();
 
     let state_after = builder.show_state().unwrap();

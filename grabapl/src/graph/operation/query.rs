@@ -1,9 +1,7 @@
 use crate::graph::EdgeAttribute;
 use crate::graph::operation::OperationResult;
 use crate::graph::operation::user_defined::{AbstractOperationResultMarker, QueryInstructions};
-use crate::graph::pattern::{
-    AbstractOutputNodeMarker, OperationArgument, OperationParameter, ParameterSubstitution,
-};
+use crate::graph::pattern::{AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationParameter, ParameterSubstitution};
 use crate::graph::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, SemanticsClone};
 use crate::{Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
 use derive_more::From;
@@ -87,13 +85,14 @@ pub trait BuiltinQuery {
     // TODO: add invariant (checked?) that the abstract graph does not get new nodes or deleted nodes.
     //  actually, do we really need modification at all? ...
 
-    fn apply_abstract(&self, g: &mut AbstractGraph<Self::S>, substitution: &ParameterSubstitution);
+    fn apply_abstract(&self, g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>);
     // ) -> AbstractQueryOutput<Self::S>;
 
+    // TODO: if we decide to actually support modification, we need to include an OperationOutput so that we can support new nodes and can keep track of
+    //  changes of av's.
     fn query(
         &self,
-        g: &mut ConcreteGraph<Self::S>,
-        substitution: &ParameterSubstitution,
+        g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>,
     ) -> ConcreteQueryOutput;
 }
 
@@ -184,7 +183,8 @@ pub(crate) fn run_builtin_query<S: SemanticsClone>(
     // let param = query.parameter();
     // let abstract_graph = S::concrete_to_abstract(g);
     // let subst = get_substitution(&abstract_graph, &param, &selected_inputs)?;
-    let output = query.query(g, &arg.subst);
+    let mut gws = GraphWithSubstitution::new(g, &arg.subst);
+    let output = query.query(&mut gws);
     Ok(output)
 }
 

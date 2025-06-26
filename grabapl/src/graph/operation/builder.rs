@@ -4,7 +4,7 @@ use crate::graph::operation::user_defined::{
     UserDefinedOperation,
 };
 use crate::graph::operation::{BuiltinOperation, OperationError, get_substitution};
-use crate::graph::pattern::{AbstractOutputNodeMarker, OperationParameter, ParameterSubstitution};
+use crate::graph::pattern::{AbstractOutputNodeMarker, GraphWithSubstitution, OperationParameter, ParameterSubstitution};
 use crate::graph::semantics::{AbstractGraph, SemanticsClone};
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, OperationContext, OperationId, SubstMarker};
@@ -1253,7 +1253,10 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 let (subst, abstract_arg) = self.get_current_substitution(&param, args)?;
 
                 // now apply op and store result
-                let operation_output = op.apply_abstract(&mut self.current_state.graph, &subst);
+                let operation_output = {
+                    let mut gws = GraphWithSubstitution::new(&mut self.current_state.graph, &subst);
+                    op.apply_abstract(&mut gws)
+                };
                 // go over new nodes
                 let marker =
                     marker.unwrap_or_else(|| self.get_new_unnamed_abstract_operation_marker());
@@ -1276,8 +1279,10 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 let param = op.parameter();
                 let (subst, abstract_arg) = self.get_current_substitution(&param, args)?;
 
-                let operation_output =
-                    op.apply_abstract(self.op_ctx, &mut self.current_state.graph, &subst);
+                let operation_output = {
+                    let mut gws = GraphWithSubstitution::new(&mut self.current_state.graph, &subst);
+                    op.apply_abstract(self.op_ctx, &mut gws)
+                };
                 // go over new nodes
                 let marker =
                     marker.unwrap_or_else(|| self.get_new_unnamed_abstract_operation_marker());
@@ -1318,7 +1323,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         let (subst, arg) = self.get_current_substitution(&param, args)?;
 
         // apply the query to the current graph
-        query.apply_abstract(&mut self.current_state.graph, &subst);
+        query.apply_abstract(&mut GraphWithSubstitution::new(&mut self.current_state.graph, &subst));
 
         // TODO: is this right? do we want to snapshot the state _after_ the query?
         //  I think so, because right now (weirdly enough) the query can modify. and the modifications

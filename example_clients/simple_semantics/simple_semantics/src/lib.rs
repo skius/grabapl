@@ -5,14 +5,12 @@ use grabapl::graph::operation::query::{
     ConcreteQueryOutput, EdgeChange, NodeChange,
 };
 use grabapl::graph::operation::run_operation;
-use grabapl::graph::pattern::{
-    OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution,
-};
+use grabapl::graph::pattern::{GraphWithSubstitution, OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution};
 use grabapl::graph::semantics::{
     AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, MatchJoiner,
     Semantics,
 };
-use grabapl::{DotCollector, EdgeInsertionOrder, OperationContext, WithSubstMarker};
+use grabapl::{DotCollector, EdgeInsertionOrder, OperationContext, SubstMarker, WithSubstMarker};
 use std::collections::HashMap;
 use std::fmt::Debug;
 
@@ -141,7 +139,7 @@ impl BuiltinQueryTrait for BuiltinQuery {
         }
     }
 
-    fn apply_abstract(&self, g: &mut AbstractGraph<Self::S>, substitution: &ParameterSubstitution) {
+    fn apply_abstract(&self, g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>) {
         match self {
             BuiltinQuery::HasChild => {
                 // let parent = substitution.mapping[&0];
@@ -175,8 +173,7 @@ impl BuiltinQueryTrait for BuiltinQuery {
 
     fn query(
         &self,
-        g: &mut ConcreteGraph<Self::S>,
-        substitution: &ParameterSubstitution,
+        g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>
     ) -> ConcreteQueryOutput {
         let mut taken = false;
         match self {
@@ -186,28 +183,22 @@ impl BuiltinQueryTrait for BuiltinQuery {
                 )
             }
             BuiltinQuery::IsValueGt(val) => {
-                let a = substitution.mapping[&0];
-                if *g.get_node_attr(a).unwrap() > *val {
+                if *g.get_node_value(0).unwrap() > *val {
                     taken = true;
                 }
             }
             BuiltinQuery::IsValueEq(val) => {
-                let a = substitution.mapping[&0];
-                if *g.get_node_attr(a).unwrap() == *val {
+                if *g.get_node_value(0).unwrap() == *val {
                     taken = true;
                 }
             }
             BuiltinQuery::ValuesEqual => {
-                let a = substitution.mapping[&0];
-                let b = substitution.mapping[&1];
-                if g.get_node_attr(a) == g.get_node_attr(b) {
+                if g.get_node_value(0) == g.get_node_value(1) {
                     taken = true;
                 }
             }
             BuiltinQuery::FirstGtSnd => {
-                let a = substitution.mapping[&0];
-                let b = substitution.mapping[&1];
-                if g.get_node_attr(a) > g.get_node_attr(b) {
+                if g.get_node_value(0) > g.get_node_value(1) {
                     taken = true;
                 }
             }
@@ -241,7 +232,6 @@ pub enum BuiltinOperation {
     IndexCycle,
     SetValue(Box<dyn Fn() -> i32>),
     AddEdge,
-    SetEdgeValueToCycle,
     SetEdgeValue(String),
     SetNodeValue(i32),
     CopyNodeValueTo,
@@ -260,7 +250,6 @@ impl Debug for BuiltinOperation {
             BuiltinOperation::IndexCycle => write!(f, "IndexCycle"),
             BuiltinOperation::SetValue(_) => write!(f, "SetValue"),
             BuiltinOperation::AddEdge => write!(f, "AddEdge"),
-            BuiltinOperation::SetEdgeValueToCycle => write!(f, "SetEdgeValueToCycle"),
             BuiltinOperation::SetEdgeValue(val) => write!(f, "SetEdgeValue({})", val),
             BuiltinOperation::SetNodeValue(val) => write!(f, "SetNodeValue({})", val),
             BuiltinOperation::CopyNodeValueTo => write!(f, "CopyNodeValueTo"),
@@ -280,7 +269,6 @@ impl Clone for BuiltinOperation {
             BuiltinOperation::IndexCycle => BuiltinOperation::IndexCycle,
             BuiltinOperation::SetValue(f) => BuiltinOperation::SetNodeValue(0), // TODO: fix?
             BuiltinOperation::AddEdge => BuiltinOperation::AddEdge,
-            BuiltinOperation::SetEdgeValueToCycle => BuiltinOperation::SetEdgeValueToCycle,
             BuiltinOperation::SetEdgeValue(val) => BuiltinOperation::SetEdgeValue(val.clone()),
             BuiltinOperation::SetNodeValue(val) => BuiltinOperation::SetNodeValue(*val),
             BuiltinOperation::CopyNodeValueTo => BuiltinOperation::CopyNodeValueTo,
@@ -347,18 +335,6 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 let mut g = grabapl::graph::Graph::new();
                 let a = g.add_node(());
                 let b = g.add_node(());
-                OperationParameter {
-                    explicit_input_nodes: vec![0, 1],
-                    parameter_graph: g,
-                    subst_to_node_keys: HashMap::from([(0, a), (1, b)]),
-                    node_keys_to_subst: HashMap::from([(a, 0), (b, 1)]),
-                }
-            }
-            BuiltinOperation::SetEdgeValueToCycle => {
-                let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(());
-                let b = g.add_node(());
-                g.add_edge(a, b, EdgePattern::Wildcard);
                 OperationParameter {
                     explicit_input_nodes: vec![0, 1],
                     parameter_graph: g,
@@ -445,31 +421,29 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
 
     fn apply_abstract(
         &self,
-        g: &mut AbstractGraph<Self::S>,
-        substitution: &ParameterSubstitution,
+        g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>,
     ) -> OperationOutput {
         let mut new_nodes = HashMap::new();
-        let mut deleted_nodes = Vec::new();
         match self {
             BuiltinOperation::AddNode => {
-                let new_key = g.add_node(());
-                new_nodes.insert("new".into(), new_key);
+                const NEW_NODE: SubstMarker = 0;
+                g.add_node(NEW_NODE, ());
+                new_nodes.insert(NEW_NODE, "new".into());
             }
             BuiltinOperation::AppendChild => {
-                let parent = substitution.mapping[&0];
-                let child = g.add_node(());
+                const PARENT: SubstMarker = 0;
+                const CHILD: SubstMarker = 1;
+                g.add_node(CHILD, ());
                 // TODO: this EdgePattern is weird.
                 //  On the one hand, we know for a fact this is an exact "" that will be added, so in type-theory, we correctly add the most precise type (Exact instead of Wildcard)
                 //  But if this ever used as a _pattern_ (parameter), it is a *decision* we're making here. Exact will permit fewer matches.
                 //  Realistically this is not a problem, because we don't run builtin operations on parameters. But we should be careful.
-                g.add_edge_ordered(
-                    parent,
-                    child,
+                g.add_edge(
+                    PARENT,
+                    CHILD,
                     EdgePattern::Exact("".to_string()),
-                    EdgeInsertionOrder::Append,
-                    EdgeInsertionOrder::Append,
                 );
-                new_nodes.insert("child".into(), child);
+                new_nodes.insert(CHILD, "child".into());
             }
             BuiltinOperation::IndexCycle => {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
@@ -478,34 +452,28 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
             }
             BuiltinOperation::AddEdge => {
-                let a = substitution.mapping[&0];
-                let b = substitution.mapping[&1];
-                g.add_edge_ordered(
-                    a,
-                    b,
+                const SRC: SubstMarker = 0;
+                const DST: SubstMarker = 1;
+                g.add_edge(
+                    SRC,
+                    DST,
                     EdgePattern::Exact("".to_string()),
-                    EdgeInsertionOrder::Append,
-                    EdgeInsertionOrder::Append,
                 );
             }
-            BuiltinOperation::SetEdgeValueToCycle => {
-                let a = substitution.mapping[&0];
-                let b = substitution.mapping[&1];
-                *g.get_mut_edge_attr((a, b)).unwrap() = EdgePattern::Exact("cycle".to_string());
-            }
             BuiltinOperation::SetEdgeValue(val) => {
-                let a = substitution.mapping[&0];
-                let b = substitution.mapping[&1];
-                *g.get_mut_edge_attr((a, b)).unwrap() = EdgePattern::Exact(val.clone());
+                const SRC: SubstMarker = 0;
+                const DST: SubstMarker = 1;
+                g.set_edge_value(SRC, DST, EdgePattern::Exact(val.clone()));
             }
             BuiltinOperation::SetNodeValue(val) => {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
             }
             BuiltinOperation::CopyNodeValueTo => {
-                let a = substitution.mapping[&0];
-                let b = substitution.mapping[&1];
+                const SRC: SubstMarker = 0;
+                const DST: SubstMarker = 1;
                 // Noop as long as the abstract value is just the unit type...
-                *g.get_mut_node_attr(b).unwrap() = *g.get_node_attr(a).unwrap();
+                let src_value = g.get_node_value(SRC).unwrap();
+                g.set_node_value(DST, *src_value);
             }
             BuiltinOperation::Decrement => {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
@@ -514,115 +482,100 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
             }
             BuiltinOperation::DeleteNode => {
-                let a = substitution.mapping[&0];
-                g.remove_node(a);
-                deleted_nodes.push(a);
+                const NODE_TO_DELETE: SubstMarker = 0;
+                g.delete_node(NODE_TO_DELETE);
             }
             BuiltinOperation::SetSndToMaxOfFstSnd => {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
             }
         }
-        OperationOutput {
-            new_nodes,
-            removed_nodes: deleted_nodes,
-        }
+        g.get_concrete_output(new_nodes)
     }
 
     fn apply(
         &self,
-        graph: &mut ConcreteGraph<SimpleSemantics>,
-        substitution: &ParameterSubstitution,
+        g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>
     ) -> OperationOutput {
         let mut new_nodes = HashMap::new();
-        let mut removed_nodes = Vec::new();
         match self {
             BuiltinOperation::AddNode => {
-                let new_concrete_node = graph.add_node(0);
-                new_nodes.insert("new".into(), new_concrete_node);
+                const NEW_NODE: SubstMarker = 0;
+                g.add_node(NEW_NODE, 0);
+                new_nodes.insert(NEW_NODE, "new".into());
             }
             BuiltinOperation::AppendChild => {
-                let parent = substitution.mapping[&0];
-                let child = graph.add_node(0);
-                graph.add_edge_ordered(
-                    parent,
-                    child,
+                const PARENT: SubstMarker = 0;
+                const CHILD: SubstMarker = 1;
+                g.add_node(CHILD, 0);
+                g.add_edge(
+                    PARENT,
+                    CHILD,
                     "".to_string(),
-                    EdgeInsertionOrder::Append,
-                    EdgeInsertionOrder::Append,
                 );
-                new_nodes.insert("child".into(), child);
+                new_nodes.insert(CHILD, "child".into());
             }
             BuiltinOperation::IndexCycle => {
-                let a = substitution.mapping[&0];
-                let b = substitution.mapping[&1];
-                let c = substitution.mapping[&2];
-                *graph.get_mut_node_attr(a).unwrap() = 1;
-                *graph.get_mut_node_attr(b).unwrap() = 2;
-                *graph.get_mut_node_attr(c).unwrap() = 3;
+                const A: SubstMarker = 0;
+                const B: SubstMarker = 1;
+                const C: SubstMarker = 2;
+                g.set_node_value(A, 1);
+                g.set_node_value(B, 2);
+                g.set_node_value(C, 3);
             }
             BuiltinOperation::SetValue(f) => {
-                let a = substitution.mapping[&0];
-                *graph.get_mut_node_attr(a).unwrap() = f();
+                const A: SubstMarker = 0;
+                g.set_node_value(A, f());
             }
             BuiltinOperation::AddEdge => {
-                let a = substitution.mapping[&0];
-                let b = substitution.mapping[&1];
-                graph.add_edge_ordered(
-                    a,
-                    b,
+                const SRC: SubstMarker = 0;
+                const DST: SubstMarker = 1;
+                g.add_edge(
+                    SRC,
+                    DST,
                     "".to_string(),
-                    EdgeInsertionOrder::Append,
-                    EdgeInsertionOrder::Append,
                 );
             }
-            // TODO: make this generic over its value
-            BuiltinOperation::SetEdgeValueToCycle => {
-                let a = substitution.mapping[&0];
-                let b = substitution.mapping[&1];
-                *graph.get_mut_edge_attr((a, b)).unwrap() = "cycle".to_string();
-            }
             BuiltinOperation::SetEdgeValue(val) => {
-                let a = substitution.mapping[&0];
-                let b = substitution.mapping[&1];
-                *graph.get_mut_edge_attr((a, b)).unwrap() = val.clone();
+                const SRC: SubstMarker = 0;
+                const DST: SubstMarker = 1;
+                g.set_edge_value(SRC, DST, val.clone());
+
             }
             BuiltinOperation::SetNodeValue(val) => {
-                let a = substitution.mapping[&0];
-                *graph.get_mut_node_attr(a).unwrap() = *val;
+                const A: SubstMarker = 0;
+                g.set_node_value(A, *val);
             }
             BuiltinOperation::CopyNodeValueTo => {
-                let a = substitution.mapping[&0];
-                let b = substitution.mapping[&1];
-                *graph.get_mut_node_attr(b).unwrap() = *graph.get_node_attr(a).unwrap();
+                const SRC: SubstMarker = 0;
+                const DST: SubstMarker = 1;
+                let src_value = g.get_node_value(SRC).unwrap();
+                g.set_node_value(DST, *src_value);
             }
             BuiltinOperation::Decrement => {
-                let a = substitution.mapping[&0];
-                let val = graph.get_node_attr(a).unwrap();
-                *graph.get_mut_node_attr(a).unwrap() = val - 1;
+                const A: SubstMarker = 0;
+                let val = g.get_node_value(A).unwrap();
+                g.set_node_value(A, val - 1);
             }
             BuiltinOperation::Increment => {
-                let a = substitution.mapping[&0];
-                let val = graph.get_node_attr(a).unwrap();
-                *graph.get_mut_node_attr(a).unwrap() = val + 1;
+                const A: SubstMarker = 0;
+                let val = g.get_node_value(A).unwrap();
+                g.set_node_value(A, val + 1);
             }
             BuiltinOperation::DeleteNode => {
-                let a = substitution.mapping[&0];
-                graph.remove_node(a);
-                removed_nodes.push(a);
+                const NODE_TO_DELETE: SubstMarker = 0;
+                g.delete_node(NODE_TO_DELETE);
             }
             BuiltinOperation::SetSndToMaxOfFstSnd => {
-                let a = substitution.mapping[&0];
-                let b = substitution.mapping[&1];
-                let fst = graph.get_node_attr(a).unwrap();
-                let snd = graph.get_node_attr(b).unwrap();
-                *graph.get_mut_node_attr(b).unwrap() = std::cmp::max(*fst, *snd);
+                const FST: SubstMarker = 0;
+                const SND: SubstMarker = 1;
+                let fst_value = g.get_node_value(FST).unwrap();
+                let snd_value = g.get_node_value(SND).unwrap();
+                let max_value = std::cmp::max(*fst_value, *snd_value);
+                g.set_node_value(SND, max_value);
             }
         }
 
-        OperationOutput {
-            new_nodes,
-            removed_nodes,
-        }
+        g.get_concrete_output(new_nodes)
     }
 }
 

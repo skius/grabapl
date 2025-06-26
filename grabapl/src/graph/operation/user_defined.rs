@@ -4,10 +4,7 @@ use crate::graph::operation::query::{
 use crate::graph::operation::{
     OperationError, OperationResult, run_builtin_operation, run_operation,
 };
-use crate::graph::pattern::{
-    AbstractOutputNodeMarker, OperationArgument, OperationOutput, OperationParameter,
-    ParameterSubstitution,
-};
+use crate::graph::pattern::{AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution};
 use crate::graph::semantics::{AbstractGraph, ConcreteGraph, SemanticsClone};
 use crate::{NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
 use derive_more::with_trait::From;
@@ -131,8 +128,7 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
     pub(crate) fn apply_abstract(
         &self,
         op_ctx: &OperationContext<S>,
-        abstract_g: &mut AbstractGraph<S>,
-        subst: &ParameterSubstitution,
+        g: &mut GraphWithSubstitution<AbstractGraph<S>>,
     ) -> OperationResult<OperationOutput> {
         let mut output = OperationOutput {
             new_nodes: HashMap::new(),

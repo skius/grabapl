@@ -271,6 +271,7 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
             .map(|attr| &mut attr.node_attr)
     }
 
+    /// Sets the node attribute for the given node key that already exists in the graph.
     pub fn set_node_attr(&mut self, node_key: NodeKey, node_attr: NodeAttr) -> Option<NodeAttr> {
         if let Some(attr) = self.node_attr_map.get_mut(&node_key) {
             let old_attr = std::mem::replace(&mut attr.node_attr, node_attr);
@@ -280,6 +281,7 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
         }
     }
 
+    /// Sets the edge attribute for the given edge key that already exists in the graph.
     pub fn set_edge_attr(
         &mut self,
         (src, target): EdgeKey,
@@ -363,6 +365,87 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
     //
     //     None
     // }
+}
+
+pub trait GraphTrait {
+    type NodeAttr;
+    type EdgeAttr;
+
+    fn add_node(&mut self, node_attr: Self::NodeAttr) -> NodeKey;
+    fn delete_node(&mut self, node_key: NodeKey) -> Option<Self::NodeAttr>;
+    fn add_edge(
+        &mut self,
+        source: NodeKey,
+        target: NodeKey,
+        edge_attr: Self::EdgeAttr,
+    ) -> Option<Self::EdgeAttr>;
+    fn delete_edge(&mut self, source: NodeKey, target: NodeKey) -> Option<Self::EdgeAttr>;
+    fn get_node_attr(&self, node_key: NodeKey) -> Option<&Self::NodeAttr>;
+    fn get_mut_node_attr(&mut self, node_key: NodeKey) -> Option<&mut Self::NodeAttr>;
+    /// Sets the node attribute for the given node key that already exists in the graph.
+    fn set_node_attr(&mut self, node_key: NodeKey, node_attr: Self::NodeAttr) -> Option<Self::NodeAttr>;
+    fn get_edge_attr(&self, edge_key: EdgeKey) -> Option<&Self::EdgeAttr>;
+    fn get_mut_edge_attr(&mut self, edge_key: EdgeKey) -> Option<&mut Self::EdgeAttr>;
+    /// Sets the edge attribute for the given edge key that already exists in the graph.
+    fn set_edge_attr(
+        &mut self,
+        edge_key: EdgeKey,
+        edge_attr: Self::EdgeAttr,
+    ) -> Option<Self::EdgeAttr>;
+}
+
+impl<NodeAttr, EdgeAttr> GraphTrait for Graph<NodeAttr, EdgeAttr> {
+    type NodeAttr = NodeAttr;
+    type EdgeAttr = EdgeAttr;
+
+    fn add_node(&mut self, node_attr: Self::NodeAttr) -> NodeKey {
+        self.add_node(node_attr)
+    }
+    
+    fn delete_node(&mut self, node_key: NodeKey) -> Option<Self::NodeAttr> {
+        self.remove_node(node_key)
+    }
+
+    fn add_edge(
+        &mut self,
+        source: NodeKey,
+        target: NodeKey,
+        edge_attr: Self::EdgeAttr,
+    ) -> Option<Self::EdgeAttr> {
+        self.add_edge(source, target, edge_attr)
+    }
+    
+    fn delete_edge(&mut self, source: NodeKey, target: NodeKey) -> Option<Self::EdgeAttr> {
+        self.remove_edge_between(source, target)
+    }
+
+    fn get_node_attr(&self, node_key: NodeKey) -> Option<&Self::NodeAttr> {
+        self.get_node_attr(node_key)
+    }
+
+    fn get_mut_node_attr(&mut self, node_key: NodeKey) -> Option<&mut Self::NodeAttr> {
+        self.get_mut_node_attr(node_key)
+    }
+
+    fn set_node_attr(&mut self, node_key: NodeKey, node_attr: Self::NodeAttr) -> Option<Self::NodeAttr> {
+        self.set_node_attr(node_key, node_attr)
+    }
+
+    fn get_edge_attr(&self, edge_key: EdgeKey) -> Option<&Self::EdgeAttr> {
+        self.get_edge_attr(edge_key)
+    }
+
+    fn get_mut_edge_attr(&mut self, edge_key: EdgeKey) -> Option<&mut Self::EdgeAttr> {
+        self.get_mut_edge_attr(edge_key)
+    }
+
+    fn set_edge_attr(
+        &mut self,
+        edge_key: EdgeKey,
+        edge_attr: Self::EdgeAttr,
+    ) -> Option<Self::EdgeAttr> {
+        self.set_edge_attr(edge_key, edge_attr)
+    }
 }
 
 #[cfg(test)]

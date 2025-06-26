@@ -5,13 +5,8 @@ pub mod user_defined;
 
 use crate::graph::EdgeAttribute;
 use crate::graph::operation::user_defined::{AbstractOperationResultMarker, UserDefinedOperation};
-use crate::graph::pattern::{
-    AbstractOutputNodeMarker, OperationArgument, OperationOutput, OperationParameter,
-    ParameterSubstitution,
-};
-use crate::graph::semantics::{
-    AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics, SemanticsClone,
-};
+use crate::graph::pattern::{AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution};
+use crate::graph::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, ConcreteToAbstract, Semantics, SemanticsClone};
 use crate::{DotCollector, Graph, NodeKey, SubstMarker};
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
@@ -37,16 +32,14 @@ pub trait BuiltinOperation: Debug {
     /// *If the operation argument matches*, what happens to the abstract graph?
     fn apply_abstract(
         &self,
-        g: &mut AbstractGraph<Self::S>,
-        substitution: &ParameterSubstitution,
+        g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>,
     ) -> OperationOutput;
 
     // TODO: OperationOutput returned here should only represent Abstract changes. Basically the guaranteed new nodes so that other ops can refer to it.
     //  Maybe we could have something be returned in apply_abstract (just a Vec<SubstMarker>?) to indicate _which_ nodes are guaranteed to be added, and apply then returns a map with those substmarkers as keys?
     fn apply(
         &self,
-        g: &mut ConcreteGraph<Self::S>,
-        substitution: &ParameterSubstitution,
+        g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>,
     ) -> OperationOutput;
 }
 
@@ -106,12 +99,11 @@ impl<'a, S: SemanticsClone> Operation<'a, S> {
     pub fn apply_abstract(
         &self,
         op_ctx: &OperationContext<S>,
-        g: &mut AbstractGraph<S>,
-        subst: &ParameterSubstitution,
+        g: &mut GraphWithSubstitution<AbstractGraph<S>>,
     ) -> OperationResult<OperationOutput> {
         match self {
-            Operation::Builtin(op) => Ok(op.apply_abstract(g, subst)),
-            Operation::Custom(op) => op.apply_abstract(op_ctx, g, subst),
+            Operation::Builtin(op) => Ok(op.apply_abstract(g)),
+            Operation::Custom(op) => op.apply_abstract(op_ctx, g),
         }
     }
 }
@@ -225,7 +217,8 @@ fn run_builtin_operation<S: SemanticsClone>(
     // let subst = get_substitution(&abstract_g, &param, &selected_inputs)?;
 
     // TODO: we probably dont need to pass the OperationArgument down. Might just cause confusion.
-    let output = op.apply(g, &arg.subst);
+    let mut gws = GraphWithSubstitution::new(g, &arg.subst);
+    let output = op.apply(&mut gws);
 
     Ok(output)
 }

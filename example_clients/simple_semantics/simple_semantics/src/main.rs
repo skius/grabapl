@@ -265,7 +265,6 @@ fn main() {
         (1, BuiltinOperation::AppendChild),
         (2, BuiltinOperation::IndexCycle),
         (4, BuiltinOperation::AddEdge),
-        (5, BuiltinOperation::SetEdgeValueToCycle),
     ]);
     let mut operation_ctx = OperationContext::from_builtins(operation_ctx);
     operation_ctx.add_custom_operation(3, user_defined_op);
