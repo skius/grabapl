@@ -283,6 +283,40 @@ How can we do that if not by deleting a shape query node?
 
 [//]: # (TODO: Visualize this in excalidraw.)
 
+### Root cause of the problem
+The root cause is that we may have two handles to the same node with at least one being mutable. I.e., we violate aliasing XOR mutability.
+For example, in the "remove child if exists" example, the problem appears if some outer operation abstract graph
+has a handle to the child node, and then calls the chain of operations that eventually shapes query for the child and then
+removes it.
+
+In Rust this is roughly equivalent to:
+```rust
+let p = Child { child: 42 };
+let child_ref = &p.child;
+delete_child_if_exists(&mut p); //internally acquires a mutable reference to `p.child` and deletes it
+// child_ref is now dangling.
+```
+
+Which is disallowed by the Rust borrow checker.
+
+This is very difficult to fix without a borrow checker.
+
+### Pass-by-reference vs pass-by-value
+Fundamentally the above is a problem because we pass arguments by reference, i.e., changes inside the operation are visible
+by the caller.
+
+However, something like a `insert_bst_node` *needs* pass-by-reference, because otherwise how would it modify the BST?
+(ignoring the fact we could be pure/functional and return a new BST).
+
+What if nodes could be selected to be pass-by-value/pass-by-reference?
+We could locally run shape queries on pass-by-value parameters, since there won't be any side-effects outside of the operation.
+But this is limiting. I want to have a helper operation that takes some node by reference and then conditionally removes
+a shape queried node.
+
+What if we had proper "nesting-graphs" support? E.g., we may have a type that is an entire BST.
+1. Accept a BST stored in a node as pass-by-reference parameter.
+2. Call some "unpacking" operation on that BST node to get a handle on eg the actual root node of the BST.
+3. Hmm. Would still like to be allowed to call helper operations on that root node. But how to uphold aliasing XOR mutability?
 
 ## Thoughts about abstract graph changes in terms of function signatures
 Any static changes must be inside some signature.
