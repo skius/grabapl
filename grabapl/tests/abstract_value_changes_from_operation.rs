@@ -558,10 +558,9 @@ fn get_custom_op_new_node_in_shape_query_branches() -> UserDefinedOperation<Test
 
     builder.end_query().unwrap();
 
-    // TODO: define the new node to be visible in the output
-    //  or try to? I guess the builder should ensure that's not the case and fail
     let output_aid = AbstractNodeId::DynamicOutputMarker("new".into(), "new".into());
-    builder.return_node(output_aid, "output".into(), NodeType::Object).unwrap();
+    let res = builder.return_node(output_aid, "output".into(), NodeType::Object);
+    assert!(res.is_err(), "`output_aid` partially originates from a shape query, hence it may not be returned");
 
     builder.build(0).unwrap()
 }

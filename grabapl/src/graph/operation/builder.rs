@@ -108,7 +108,11 @@ pub enum OperationBuilderError {
     #[error("Could not find AID {0:?} for return node")]
     NotFoundReturnNode(AbstractNodeId),
     #[error("Invalid return node type for AID {0:?}, must be more generic")]
-    InvalidReturnNodeType(AbstractNodeId)
+    InvalidReturnNodeType(AbstractNodeId),
+    // TODO: document why this is not allowed ...
+    //  in general, add lots more documentation.
+    #[error("Returned {0:?} node may have been created by a shape query, which is not allowed")]
+    ReturnNodeMayOriginateFromShapeQuery(AbstractNodeId),
 }
 
 pub struct OperationBuilder<'a, S: SemanticsClone> {
@@ -1099,6 +1103,10 @@ pub enum QueryPath {
 pub struct IntermediateState<S: SemanticsClone> {
     pub graph: AbstractGraph<S>,
     pub node_keys_to_aid: BiMap<NodeKey, AbstractNodeId>,
+    // TODO: Somehow remove AIDs from this set if they're completely overwritten by something non-shape-query.
+    //  could be done by, whenever adding a new node, unconditionally removing the AID from this set as long as we're not in a shape query.
+    //  since we have a different state at that point, it would get merged correctly (assuming we take the union).
+    pub may_originate_from_shape_query: HashSet<AbstractNodeId>,
     // TODO: make query path
     pub query_path: Vec<QueryPath>,
 }
@@ -1110,6 +1118,7 @@ impl<S: SemanticsClone> Clone for IntermediateState<S> {
         IntermediateState {
             graph: self.graph.clone(),
             node_keys_to_aid: self.node_keys_to_aid.clone(),
+            may_originate_from_shape_query: self.may_originate_from_shape_query.clone(),
             query_path: self.query_path.clone(),
         }
     }
@@ -1237,6 +1246,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         let initial_state = IntermediateState {
             graph: initial_graph,
             node_keys_to_aid: initial_mapping,
+            may_originate_from_shape_query: HashSet::new(),
             query_path: Vec::new(),
         };
 
@@ -1280,6 +1290,9 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 return Err(OperationBuilderError::InvalidReturnNodeType(
                     aid,
                 ));
+            }
+            if self.current_state.may_originate_from_shape_query.contains(&aid) {
+                return Err(OperationBuilderError::ReturnNodeMayOriginateFromShapeQuery(aid));
             }
             output.new_nodes.insert(aid, (output_marker, node_abstract));
         }
@@ -1620,6 +1633,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                     self.current_state
                         .node_keys_to_aid
                         .insert(state_key, aid.clone());
+                    self.current_state.may_originate_from_shape_query.insert(aid.clone());
                 }
                 GraphShapeQueryInstruction::ExpectShapeEdge(src, target, av) => {
                     let src_key = aid_to_node_key_hack!(src)?;
@@ -1848,6 +1862,7 @@ fn merge_states<S: SemanticsClone>(
     let mut new_state = IntermediateState {
         graph: Graph::new(),
         node_keys_to_aid: BiMap::new(),
+        may_originate_from_shape_query: HashSet::new(),
         // TODO: should probably remove query_path from the state struct, and add it to a final returned StateWithQueryPath struct?
         query_path: Vec::new(),
     };
@@ -1857,6 +1872,15 @@ fn merge_states<S: SemanticsClone>(
     for aid in state_true.node_keys_to_aid.right_values() {
         if state_false.node_keys_to_aid.contains_right(aid) {
             common_aids.insert(aid.clone());
+        }
+    }
+
+    // if aid may come from a shape query in either branch, it may come from a shape query in the merged state.
+    for aid in &common_aids {
+        if state_true.may_originate_from_shape_query.contains(aid)
+            || state_false.may_originate_from_shape_query.contains(aid)
+        {
+            new_state.may_originate_from_shape_query.insert(aid.clone());
         }
     }
 
