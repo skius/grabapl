@@ -330,6 +330,16 @@ What if we had proper "nesting-graphs" support? E.g., we may have a type that is
 2. Call some "unpacking" operation on that BST node to get a handle on eg the actual root node of the BST.
 3. Hmm. Would still like to be allowed to call helper operations on that root node. But how to uphold aliasing XOR mutability?
 
+### Purity
+By saying that every operation call gets a copy of the graph (connected component should be enough), we can modify abstract values
+to our liking.
+
+Insert BST would create a copy and return a node corresponding to the new root, and callers would have to make sure they are now
+using the new root node.
+
+This induces requirements on some builtin operations though: We don't want "add node" or "add edge" to be pass-by-value,
+obviously, so it needs to be optional I guess?
+
 ## Thoughts about abstract graph changes in terms of function signatures
 Any static changes must be inside some signature.
 * Want to write to a node? The fact that you're setting its abstract value must be specified.
