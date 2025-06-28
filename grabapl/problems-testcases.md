@@ -403,6 +403,8 @@ Can we combine the two options?
    * **Note**: This behavior can actually be per-node/edge, i.e., if we have a shape query for two nodes `a` and `b`,
      If only `a` is modified and `b` is not touched, then `b` can be matched to anything, while `a` can only be matched according to the `ResultingT` rule above.
 
+**TODO**: Would be nice for UX if we returned _why_ a shape query did not match anything if it in fact could have matched something.
+
 ## Thoughts about abstract graph changes in terms of function signatures
 Any static changes must be inside some signature.
 * Want to write to a node? The fact that you're setting its abstract value must be specified.
