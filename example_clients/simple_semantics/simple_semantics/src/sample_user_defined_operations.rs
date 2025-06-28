@@ -208,19 +208,13 @@ pub fn get_count_list_len_user_defined_operation(
     self_op_id: OperationId,
 ) -> UserDefinedOperation<SimpleSemantics> {
     // Expects the list head as first input node, then the accumulator as second input node
-    let mut g = grabapl::graph::Graph::new();
-    let input_key = g.add_node(());
-    let acc_key = g.add_node(());
+    let mut param_builder = OperationParameterBuilder::new();
+    param_builder.expect_explicit_input_node("input", ()).unwrap();
+    param_builder.expect_explicit_input_node("acc", ()).unwrap();
+    let param = param_builder.build().unwrap();
 
-    let param = OperationParameter {
-        explicit_input_nodes: vec![0, 1],
-        parameter_graph: g,
-        subst_to_node_keys: HashMap::from([(0, input_key), (1, acc_key)]),
-        node_keys_to_subst: HashMap::from([(input_key, 0), (acc_key, 1)]),
-    };
-
-    let input_node = AbstractNodeId::ParameterMarker(0);
-    let acc_node = AbstractNodeId::ParameterMarker(1);
+    let input_node = AbstractNodeId::param("input");
+    let acc_node = AbstractNodeId::param("acc");
 
     let mut instructions = vec![];
     // Increment acc
@@ -235,10 +229,10 @@ pub fn get_count_list_len_user_defined_operation(
         let head = g.add_node(());
         let mut expected_g = g.clone();
         let param = OperationParameter {
-            explicit_input_nodes: vec![0],
+            explicit_input_nodes: vec!["input".into()],
             parameter_graph: g,
-            subst_to_node_keys: HashMap::from([(0, head)]),
-            node_keys_to_subst: HashMap::from([(head, 0)]),
+            subst_to_node_keys: HashMap::from([("input".into(), head)]),
+            node_keys_to_subst: HashMap::from([(head, "input".into())]),
         };
 
         let child = expected_g.add_node(());
@@ -282,18 +276,13 @@ pub fn get_insert_bst_user_defined_operation(
     self_op_id: OperationId,
 ) -> UserDefinedOperation<SimpleSemantics> {
     // Expects the root of the binary tree as first input node, then the value to insert as second input node
-    let mut g = grabapl::graph::Graph::new();
-    let root_key = g.add_node(());
-    let value_key = g.add_node(());
-    let param = OperationParameter {
-        explicit_input_nodes: vec![0, 1],
-        parameter_graph: g,
-        subst_to_node_keys: HashMap::from([(0, root_key), (1, value_key)]),
-        node_keys_to_subst: HashMap::from([(root_key, 0), (value_key, 1)]),
-    };
+    let mut param_builder = OperationParameterBuilder::new();
+    param_builder.expect_explicit_input_node("root", ()).unwrap();
+    param_builder.expect_explicit_input_node("value", ()).unwrap();
+    let param = param_builder.build().unwrap();
 
-    let root_node = AbstractNodeId::ParameterMarker(0);
-    let value_node = AbstractNodeId::ParameterMarker(1);
+    let root_node = AbstractNodeId::param("root");
+    let value_node = AbstractNodeId::param("value");
     let mut instructions = vec![];
     // check if the root is nil
     instructions.push((None, mk_builtin_query(BuiltinQuery::IsValueEq(-1), vec![root_node], QueryInstructions {
@@ -316,10 +305,10 @@ pub fn get_insert_bst_user_defined_operation(
                     expected_g.add_edge(head, right_child, EdgePattern::Wildcard);
                     GraphShapeQuery {
                         parameter: OperationParameter {
-                            explicit_input_nodes: vec![0],
+                            explicit_input_nodes: vec!["input".into()],
                             parameter_graph: g,
-                            subst_to_node_keys: HashMap::from([(0, head)]),
-                            node_keys_to_subst: HashMap::from([(head, 0)]),
+                            subst_to_node_keys: HashMap::from([("input".into(), head)]),
+                            node_keys_to_subst: HashMap::from([(head, "input".into())]),
                         },
                         expected_graph: expected_g,
                         node_keys_to_shape_idents: HashMap::from([
@@ -359,10 +348,10 @@ pub fn get_insert_bst_user_defined_operation(
                                 expected_g.add_edge(head, child, EdgePattern::Wildcard);
                                 GraphShapeQuery {
                                     parameter: OperationParameter {
-                                        explicit_input_nodes: vec![0],
+                                        explicit_input_nodes: vec!["input".into()],
                                         parameter_graph: g,
-                                        subst_to_node_keys: HashMap::from([(0, head)]),
-                                        node_keys_to_subst: HashMap::from([(head, 0)]),
+                                        subst_to_node_keys: HashMap::from([("input".into(), head)]),
+                                        node_keys_to_subst: HashMap::from([(head, "input".into())]),
                                     },
                                     expected_graph: expected_g,
                                     node_keys_to_shape_idents: HashMap::from([(child, "child".into())]),
@@ -428,18 +417,13 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
     // Same as the above insert bst operation, but edges have a "left" and "right" label that should make things easier
 
     // Expects the root of the binary tree as first input node, then the value to insert as second input node
-    let mut g = grabapl::graph::Graph::new();
-    let root_key = g.add_node(());
-    let value_key = g.add_node(());
-    let param = OperationParameter {
-        explicit_input_nodes: vec![0, 1],
-        parameter_graph: g,
-        subst_to_node_keys: HashMap::from([(0, root_key), (1, value_key)]),
-        node_keys_to_subst: HashMap::from([(root_key, 0), (value_key, 1)]),
-    };
+    let mut param_builder = OperationParameterBuilder::new();
+    param_builder.expect_explicit_input_node("root", ()).unwrap();
+    param_builder.expect_explicit_input_node("value", ()).unwrap();
+    let param = param_builder.build().unwrap();
 
-    let root_node = AbstractNodeId::ParameterMarker(0);
-    let value_node = AbstractNodeId::ParameterMarker(1);
+    let root_node = AbstractNodeId::param("root");
+    let value_node = AbstractNodeId::param("value");
 
     let mk_delete = || {
         (
@@ -493,13 +477,13 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                 );
                                                 GraphShapeQuery {
                                                     parameter: OperationParameter {
-                                                        explicit_input_nodes: vec![0],
+                                                        explicit_input_nodes: vec!["input".into()],
                                                         parameter_graph: g,
                                                         subst_to_node_keys: HashMap::from([(
-                                                            0, head,
+                                                            "input".into(), head,
                                                         )]),
                                                         node_keys_to_subst: HashMap::from([(
-                                                            head, 0,
+                                                            head, "input".into(),
                                                         )]),
                                                     },
                                                     expected_graph: expected_g,
@@ -605,13 +589,13 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                 );
                                                 GraphShapeQuery {
                                                     parameter: OperationParameter {
-                                                        explicit_input_nodes: vec![0],
+                                                        explicit_input_nodes: vec!["input".into()],
                                                         parameter_graph: g,
                                                         subst_to_node_keys: HashMap::from([(
-                                                            0, head,
+                                                            "input".into(), head,
                                                         )]),
                                                         node_keys_to_subst: HashMap::from([(
-                                                            head, 0,
+                                                            head, "input".into(),
                                                         )]),
                                                     },
                                                     expected_graph: expected_g,
@@ -721,15 +705,11 @@ pub fn get_node_heights_user_defined_operation(
     self_op_id: OperationId,
 ) -> UserDefinedOperation<SimpleSemantics> {
     // expects the root node of a binary tree (with left/right edges for children) as input node
-    let mut g = grabapl::graph::Graph::new();
-    let root_key = g.add_node(());
-    let param = OperationParameter {
-        explicit_input_nodes: vec![0],
-        parameter_graph: g,
-        subst_to_node_keys: HashMap::from([(0, root_key)]),
-        node_keys_to_subst: HashMap::from([(root_key, 0)]),
-    };
-    let root_node = AbstractNodeId::ParameterMarker(0);
+    let mut param_builder = OperationParameterBuilder::new();
+    param_builder.expect_explicit_input_node("root", ()).unwrap();
+    let param = param_builder.build().unwrap();
+
+    let root_node = AbstractNodeId::param("root");
     let mut instructions = vec![];
 
     // set root to 0
@@ -747,10 +727,10 @@ pub fn get_node_heights_user_defined_operation(
         expected_g.add_edge(head, left_child, EdgePattern::Exact("left".to_string()));
         GraphShapeQuery {
             parameter: OperationParameter {
-                explicit_input_nodes: vec![0],
+                explicit_input_nodes: vec!["input".into()],
                 parameter_graph: g,
-                subst_to_node_keys: HashMap::from([(0, head)]),
-                node_keys_to_subst: HashMap::from([(head, 0)]),
+                subst_to_node_keys: HashMap::from([("input".into(), head)]),
+                node_keys_to_subst: HashMap::from([(head, "input".into())]),
             },
             expected_graph: expected_g,
             node_keys_to_shape_idents: HashMap::from([(left_child, "left".into())]),
@@ -766,10 +746,10 @@ pub fn get_node_heights_user_defined_operation(
         expected_g.add_edge(head, right_child, EdgePattern::Exact("right".to_string()));
         GraphShapeQuery {
             parameter: OperationParameter {
-                explicit_input_nodes: vec![0],
+                explicit_input_nodes: vec!["input".into()],
                 parameter_graph: g,
-                subst_to_node_keys: HashMap::from([(0, head)]),
-                node_keys_to_subst: HashMap::from([(head, 0)]),
+                subst_to_node_keys: HashMap::from([("input".into(), head)]),
+                node_keys_to_subst: HashMap::from([(head, "input".into())]),
             },
             expected_graph: expected_g,
             node_keys_to_shape_idents: HashMap::from([(right_child, "right".into())]),

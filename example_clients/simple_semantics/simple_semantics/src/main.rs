@@ -25,9 +25,9 @@ fn insert_bst_builder_test(
         println!("{}\n----------", op_builder.format_state());
     };
 
-    let root_node_marker = 0;
+    let root_node_marker = "root".into();
     let root_node = AbstractNodeId::ParameterMarker(root_node_marker);
-    let node_to_insert_marker = 1;
+    let node_to_insert_marker = "node_to_insert".into();
     let node_to_insert = AbstractNodeId::ParameterMarker(node_to_insert_marker);
     let mk_delete = |op_builder: &mut OperationBuilder<SimpleSemantics>| {
         op_builder
@@ -92,7 +92,7 @@ fn insert_bst_builder_test(
                     let child_id = AbstractNodeId::DynamicOutputMarker("right_query".into(), child);
                     op_builder
                         .expect_shape_edge(
-                            AbstractNodeId::ParameterMarker(0),
+                            root_node,
                             child_id,
                             EdgePattern::Exact("right".to_string()),
                         )

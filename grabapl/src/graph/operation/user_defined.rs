@@ -10,6 +10,7 @@ use crate::{interned_string_newtype, NodeKey, OperationContext, OperationId, Sem
 use derive_more::with_trait::From;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::str::FromStr;
 use internment::Intern;
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
@@ -45,6 +46,35 @@ impl AbstractNodeId {
         let output_id = output_id.into();
         let output_marker = output_marker.into();
         AbstractNodeId::DynamicOutputMarker(output_id, output_marker)
+    }
+}
+
+impl FromStr for AbstractNodeId {
+    type Err = ();
+
+    // TODO: add tests for this
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Parse the two options into the enum variants:
+        //  1. "P(<marker:string>)" for ParameterMarker
+        //  2. "O(<output_id:string>, <output_marker:string>)" for DynamicOutputMarker
+        // Note the inner strings may not contain (, ), or commas to make it easier for us.
+        if let Some(stripped) = s.strip_prefix("P(").and_then(|s| s.strip_suffix(')')) {
+            Ok(AbstractNodeId::param(stripped))
+        } else if let Some(stripped) = s.strip_prefix("O(").and_then(|s| s.strip_suffix(')')) {
+            let mut parts = stripped.split(',');
+            if let (Some(output_id), Some(output_marker), None) = (parts.next(), parts.next(), parts.next()) {
+                let output_id = output_id.trim();
+                let output_marker = output_marker.trim();
+                Ok(AbstractNodeId::dynamic_output(
+                    output_id,
+                    output_marker,
+                ))
+            } else {
+                Err(())
+            }
+        } else {
+            Err(())
+        }
     }
 }
 

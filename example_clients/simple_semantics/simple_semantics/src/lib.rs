@@ -12,6 +12,7 @@ use grabapl::graph::semantics::{
 };
 use grabapl::{DotCollector, EdgeInsertionOrder, OperationContext, SubstMarker, WithSubstMarker};
 use std::collections::HashMap;
+use std::convert::Into;
 use std::fmt::Debug;
 use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
 

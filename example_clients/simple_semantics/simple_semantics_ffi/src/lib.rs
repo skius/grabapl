@@ -26,6 +26,7 @@ mod ffi {
     use ::grabapl::graph::semantics::ConcreteGraph as RustConcreteGraph;
     use simple_semantics::{BuiltinOperation, BuiltinQuery as RustBuiltinQuery, SimpleSemantics};
     use std::fmt::Write;
+    use std::str::FromStr;
 
     use super::{RustEdgeAbstract, RustEdgeConcrete, RustNodeAbstract, RustNodeConcrete};
     use ::grabapl::graph::operation::user_defined::AbstractNodeId as RustAbstractNodeId;
@@ -143,7 +144,7 @@ mod ffi {
 
         pub fn expect_parameter_node(
             &mut self,
-            marker: u32,
+            marker: &str,
         ) -> Result<(), Box<OperationBuilderError>> {
             self.0
                 .expect_parameter_node(marker, ())
@@ -152,7 +153,7 @@ mod ffi {
 
         pub fn expect_context_node(
             &mut self,
-            marker: u32,
+            marker: &str,
         ) -> Result<(), Box<OperationBuilderError>> {
             self.0
                 .expect_context_node(marker, ())
@@ -161,8 +162,8 @@ mod ffi {
 
         pub fn expect_parameter_edge(
             &mut self,
-            src: u32,
-            dst: u32,
+            src: &str,
+            dst: &str,
             av: &EdgeAbstract,
         ) -> Result<(), Box<OperationBuilderError>> {
             self.0
@@ -196,9 +197,7 @@ mod ffi {
             &mut self,
             query_name: &str,
         ) -> Result<(), Box<OperationBuilderError>> {
-            // TODO: make the marker non-copy and owned
-            let leaked = query_name.to_string().leak();
-            let marker = AbstractOperationResultMarker::Custom(leaked);
+            let marker = query_name.into();
             self.0
                 .start_shape_query(marker)
                 .map_err(|e| Box::new(OperationBuilderError(e)))
@@ -214,8 +213,7 @@ mod ffi {
             &mut self,
             node_name: &str,
         ) -> Result<(), Box<OperationBuilderError>> {
-            // TODO: make the marker non-copy and owned
-            let node_marker = AbstractOutputNodeMarker(node_name.to_string().leak());
+            let node_marker = node_name.into();
             self.0
                 .expect_shape_node(node_marker, ())
                 .map_err(|e| Box::new(OperationBuilderError(e)))
@@ -245,7 +243,7 @@ mod ffi {
             let args = args.0.clone();
             match name {
                 Some(name) => {
-                    let marker = AbstractOperationResultMarker::Custom(name.to_string().leak());
+                    let marker = name.into();
                     self.0
                         .add_named_operation(marker, instruction, args)
                         .map_err(|e| Box::new(OperationBuilderError(e)))
@@ -369,32 +367,20 @@ mod ffi {
     pub struct AbstractNodeId(RustAbstractNodeId);
 
     impl AbstractNodeId {
-        pub fn new_parameter(marker: u32) -> Box<AbstractNodeId> {
-            Box::new(AbstractNodeId(RustAbstractNodeId::ParameterMarker(marker)))
+        pub fn new_parameter(marker: &str) -> Box<AbstractNodeId> {
+            Box::new(AbstractNodeId(RustAbstractNodeId::param(marker)))
         }
 
         pub fn new_from_output(op_marker: &str, node_marker: &str) -> Box<AbstractNodeId> {
-            let aid = RustAbstractNodeId::DynamicOutputMarker(
-                (&*node_marker.to_string().leak()).into(),
-                (&*op_marker.to_string().leak()).into(),
+            let aid = RustAbstractNodeId::dynamic_output(
+                op_marker,
+                node_marker,
             );
             Box::new(AbstractNodeId(aid))
         }
 
         pub fn new_from_str(aid: &str) -> Box<AbstractNodeId> {
-            // P() is param, O(op_marker, node_marker) is output
-            let aid = if aid.starts_with("P(") {
-                RustAbstractNodeId::ParameterMarker(aid[2..aid.len() - 1].parse().unwrap())
-            } else if aid.starts_with("O(") {
-                let parts: Vec<&str> = aid[2..aid.len() - 1].split(',').collect();
-                RustAbstractNodeId::DynamicOutputMarker(
-                    (&*parts[0].trim().to_string().leak()).into(),
-                    (&*parts[1].trim().to_string().leak()).into(),
-                )
-            } else {
-                panic!("Invalid AbstractNodeId format: {}", aid);
-            };
-            Box::new(AbstractNodeId(aid))
+            Box::new(AbstractNodeId(RustAbstractNodeId::from_str(aid).unwrap()))
         }
     }
 
