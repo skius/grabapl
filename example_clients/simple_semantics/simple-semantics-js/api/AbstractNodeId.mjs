@@ -36,14 +36,19 @@ export class AbstractNodeId {
 
 
     static newParameter(marker) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
-        const result = wasm.AbstractNodeId_new_parameter(marker);
+        const markerSlice = diplomatRuntime.DiplomatBuf.str8(wasm, marker);
+
+        const result = wasm.AbstractNodeId_new_parameter(...markerSlice.splat());
 
         try {
             return new AbstractNodeId(diplomatRuntime.internalConstructor, result, []);
         }
 
         finally {
+            functionCleanupArena.free();
+
         }
     }
 

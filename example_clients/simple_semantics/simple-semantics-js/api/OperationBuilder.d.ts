@@ -21,11 +21,11 @@ export class OperationBuilder {
 
     static create(opCtx: OpCtx): OperationBuilder;
 
-    expectParameterNode(marker: number): void;
+    expectParameterNode(marker: string): void;
 
-    expectContextNode(marker: number): void;
+    expectContextNode(marker: string): void;
 
-    expectParameterEdge(src: number, dst: number, av: EdgeAbstract): void;
+    expectParameterEdge(src: string, dst: string, av: EdgeAbstract): void;
 
     startQuery(query: BuiltinQuery, args: AbstractArgList): void;
 

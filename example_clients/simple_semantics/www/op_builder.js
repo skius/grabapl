@@ -43,17 +43,14 @@ const initCommands = () => {
         {
             "name": "Expect Parameter Node",
             "inputs": ["SubstMarker"],
-            "invoke": (num_str) => {
-                let num = parseInt(num_str);
-                op_builder.expectParameterNode(num);
+            "invoke": (p) => {
+                op_builder.expectParameterNode(p);
             }
         },
         {
             "name": "Expect Parameter Edge",
             "inputs": ["Source", "Target", "Abstract Value"],
-            "invoke": (src, target, av) => {
-                let src_id = parseInt(src);
-                let target_id = parseInt(target);
+            "invoke": (src_id, target_id, av) => {
                 let abstract_value = av === "*" ? EdgeAbstract.newWildcard() : EdgeAbstract.newExact(av);
                 console.log(`Expecting edge from ${src_id} to ${target_id} with abstract value ${abstract_value}`);
                 op_builder.expectParameterEdge(src_id, target_id, abstract_value);
@@ -63,9 +60,8 @@ const initCommands = () => {
         {
             "name": "Expect Context Node",
             "inputs": ["SubstMarker"],
-            "invoke": (num_str) => {
-                let num = parseInt(num_str);
-                op_builder.expectContextNode(num);
+            "invoke": (c) => {
+                op_builder.expectContextNode(c);
             }
         },
         {

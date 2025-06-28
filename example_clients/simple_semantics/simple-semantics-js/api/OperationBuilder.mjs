@@ -62,10 +62,13 @@ export class OperationBuilder {
     }
 
     expectParameterNode(marker) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const markerSlice = diplomatRuntime.DiplomatBuf.str8(wasm, marker);
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
 
-        const result = wasm.OperationBuilder_expect_parameter_node(diplomatReceive.buffer, this.ffiValue, marker);
+        const result = wasm.OperationBuilder_expect_parameter_node(diplomatReceive.buffer, this.ffiValue, ...markerSlice.splat());
 
         try {
             if (!diplomatReceive.resultFlag) {
@@ -75,15 +78,20 @@ export class OperationBuilder {
         }
 
         finally {
+            functionCleanupArena.free();
+
             diplomatReceive.free();
         }
     }
 
     expectContextNode(marker) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const markerSlice = diplomatRuntime.DiplomatBuf.str8(wasm, marker);
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
 
-        const result = wasm.OperationBuilder_expect_context_node(diplomatReceive.buffer, this.ffiValue, marker);
+        const result = wasm.OperationBuilder_expect_context_node(diplomatReceive.buffer, this.ffiValue, ...markerSlice.splat());
 
         try {
             if (!diplomatReceive.resultFlag) {
@@ -93,15 +101,21 @@ export class OperationBuilder {
         }
 
         finally {
+            functionCleanupArena.free();
+
             diplomatReceive.free();
         }
     }
 
     expectParameterEdge(src, dst, av) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const srcSlice = diplomatRuntime.DiplomatBuf.str8(wasm, src);
+        const dstSlice = diplomatRuntime.DiplomatBuf.str8(wasm, dst);
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
 
-        const result = wasm.OperationBuilder_expect_parameter_edge(diplomatReceive.buffer, this.ffiValue, src, dst, av.ffiValue);
+        const result = wasm.OperationBuilder_expect_parameter_edge(diplomatReceive.buffer, this.ffiValue, ...srcSlice.splat(), ...dstSlice.splat(), av.ffiValue);
 
         try {
             if (!diplomatReceive.resultFlag) {
@@ -111,6 +125,8 @@ export class OperationBuilder {
         }
 
         finally {
+            functionCleanupArena.free();
+
             diplomatReceive.free();
         }
     }

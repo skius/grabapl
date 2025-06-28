@@ -9,7 +9,7 @@ export interface InitOutput {
   readonly AbstractArgList_push: (a: number, b: number) => void;
   readonly AbstractArgList_destroy: (a: number) => void;
   readonly AbstractGraph_destroy: (a: number) => void;
-  readonly AbstractNodeId_new_parameter: (a: number) => number;
+  readonly AbstractNodeId_new_parameter: (a: number, b: number) => number;
   readonly AbstractNodeId_new_from_output: (a: number, b: number, c: number, d: number) => number;
   readonly AbstractNodeId_new_from_str: (a: number, b: number) => number;
   readonly AbstractNodeId_destroy: (a: number) => void;
@@ -42,9 +42,9 @@ export interface InitOutput {
   readonly OpCtx_add_custom_operation: (a: number, b: number, c: number) => void;
   readonly OpCtx_destroy: (a: number) => void;
   readonly OperationBuilder_create: (a: number) => number;
-  readonly OperationBuilder_expect_parameter_node: (a: number, b: number, c: number) => void;
-  readonly OperationBuilder_expect_context_node: (a: number, b: number, c: number) => void;
-  readonly OperationBuilder_expect_parameter_edge: (a: number, b: number, c: number, d: number, e: number) => void;
+  readonly OperationBuilder_expect_parameter_node: (a: number, b: number, c: number, d: number) => void;
+  readonly OperationBuilder_expect_context_node: (a: number, b: number, c: number, d: number) => void;
+  readonly OperationBuilder_expect_parameter_edge: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
   readonly OperationBuilder_start_query: (a: number, b: number, c: number, d: number) => void;
   readonly OperationBuilder_enter_true_branch: (a: number, b: number) => void;
   readonly OperationBuilder_enter_false_branch: (a: number, b: number) => void;

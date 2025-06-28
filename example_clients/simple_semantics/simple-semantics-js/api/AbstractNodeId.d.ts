@@ -10,7 +10,7 @@ export class AbstractNodeId {
     constructor();
 
 
-    static newParameter(marker: number): AbstractNodeId;
+    static newParameter(marker: string): AbstractNodeId;
 
     static newFromOutput(opMarker: string, nodeMarker: string): AbstractNodeId;
 
