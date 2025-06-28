@@ -5,7 +5,7 @@ use grabapl::graph::operation::query::{
     ConcreteQueryOutput, EdgeChange, NodeChange,
 };
 use grabapl::graph::operation::run_operation;
-use grabapl::graph::pattern::{GraphWithSubstitution, OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution};
+use grabapl::graph::pattern::{GraphWithSubstitution, NewNodeMarker, OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution};
 use grabapl::graph::semantics::{
     AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, MatchJoiner,
     Semantics,
@@ -13,6 +13,7 @@ use grabapl::graph::semantics::{
 use grabapl::{DotCollector, EdgeInsertionOrder, OperationContext, SubstMarker, WithSubstMarker};
 use std::collections::HashMap;
 use std::fmt::Debug;
+use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
 
 pub struct SimpleSemantics;
 
@@ -79,64 +80,53 @@ pub enum BuiltinQuery {
     FirstGtSnd,
 }
 
+impl BuiltinQuery {
+    const HAS_CHILD_INPUT: &'static str = "parent";
+
+    const IS_VALUE_GT_INPUT: &'static str = "node";
+
+    const IS_VALUE_EQ_INPUT: &'static str = "node";
+
+    const VALUES_EQUAL_FIRST: &'static str = "first";
+    const VALUES_EQUAL_SECOND: &'static str = "second";
+
+    const FIRST_GT_SND_FIRST: &'static str = "first";
+    const FIRST_GT_SND_SECOND: &'static str = "second";
+}
+
 impl BuiltinQueryTrait for BuiltinQuery {
     type S = SimpleSemantics;
 
     fn parameter(&self) -> OperationParameter<Self::S> {
+        let mut builder = OperationParameterBuilder::new();
         match self {
             BuiltinQuery::HasChild => {
-                let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(());
-                OperationParameter {
-                    explicit_input_nodes: vec![0],
-                    parameter_graph: g,
-                    subst_to_node_keys: HashMap::from([(0, a)]),
-                    node_keys_to_subst: HashMap::from([(a, 0)]),
-                }
+                builder.expect_explicit_input_node(Self::HAS_CHILD_INPUT, ()).unwrap();
             }
             BuiltinQuery::IsValueGt(_) => {
-                let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(());
-                OperationParameter {
-                    explicit_input_nodes: vec![0],
-                    parameter_graph: g,
-                    subst_to_node_keys: HashMap::from([(0, a)]),
-                    node_keys_to_subst: HashMap::from([(a, 0)]),
-                }
+                builder.expect_explicit_input_node(Self::IS_VALUE_GT_INPUT, ()).unwrap();
             }
             BuiltinQuery::IsValueEq(_) => {
-                let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(());
-                OperationParameter {
-                    explicit_input_nodes: vec![0],
-                    parameter_graph: g,
-                    subst_to_node_keys: HashMap::from([(0, a)]),
-                    node_keys_to_subst: HashMap::from([(a, 0)]),
-                }
+                builder.expect_explicit_input_node(Self::IS_VALUE_EQ_INPUT, ()).unwrap();
             }
             BuiltinQuery::ValuesEqual => {
-                let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(());
-                let b = g.add_node(());
-                OperationParameter {
-                    explicit_input_nodes: vec![0, 1],
-                    parameter_graph: g,
-                    subst_to_node_keys: HashMap::from([(0, a), (1, b)]),
-                    node_keys_to_subst: HashMap::from([(a, 0), (b, 1)]),
-                }
+                builder
+                    .expect_explicit_input_node(Self::VALUES_EQUAL_FIRST, ())
+                    .unwrap();
+                builder
+                    .expect_explicit_input_node(Self::VALUES_EQUAL_SECOND, ())
+                    .unwrap();
             }
             BuiltinQuery::FirstGtSnd => {
-                let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(());
-                let b = g.add_node(());
-                OperationParameter {
-                    explicit_input_nodes: vec![0, 1],
-                    parameter_graph: g,
-                    subst_to_node_keys: HashMap::from([(0, a), (1, b)]),
-                    node_keys_to_subst: HashMap::from([(a, 0), (b, 1)]),
-                }
+                builder
+                    .expect_explicit_input_node(Self::FIRST_GT_SND_FIRST, ())
+                    .unwrap();
+                builder
+                    .expect_explicit_input_node(Self::FIRST_GT_SND_SECOND, ())
+                    .unwrap();
             }
         }
+        builder.build().unwrap()
     }
 
     fn apply_abstract(&self, g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>) {
@@ -183,22 +173,26 @@ impl BuiltinQueryTrait for BuiltinQuery {
                 )
             }
             BuiltinQuery::IsValueGt(val) => {
-                if *g.get_node_value(0).unwrap() > *val {
+                if *g.get_node_value(SubstMarker::from(Self::IS_VALUE_GT_INPUT)).unwrap() > *val {
                     taken = true;
                 }
             }
             BuiltinQuery::IsValueEq(val) => {
-                if *g.get_node_value(0).unwrap() == *val {
+                if *g.get_node_value(SubstMarker::from(Self::IS_VALUE_EQ_INPUT)).unwrap() == *val {
                     taken = true;
                 }
             }
             BuiltinQuery::ValuesEqual => {
-                if g.get_node_value(0) == g.get_node_value(1) {
+                let first = SubstMarker::from(Self::VALUES_EQUAL_FIRST);
+                let second = SubstMarker::from(Self::VALUES_EQUAL_SECOND);
+                if g.get_node_value(first) == g.get_node_value(second) {
                     taken = true;
                 }
             }
             BuiltinQuery::FirstGtSnd => {
-                if g.get_node_value(0) > g.get_node_value(1) {
+                let first = SubstMarker::from(Self::FIRST_GT_SND_FIRST);
+                let second = SubstMarker::from(Self::FIRST_GT_SND_SECOND);
+                if g.get_node_value(first) > g.get_node_value(second) {
                     taken = true;
                 }
             }
@@ -240,6 +234,26 @@ pub enum BuiltinOperation {
     DeleteNode,
     // TODO: 3-argument max: c <- max(a,b) would need to support aliasing of parameters...
     SetSndToMaxOfFstSnd,
+}
+
+impl BuiltinOperation {
+    const APPEND_CHILD_INPUT: &'static str = "parent";
+    const INDEX_CYCLE_INPUT_A: &'static str = "a";
+    const INDEX_CYCLE_INPUT_B: &'static str = "b";
+    const INDEX_CYCLE_INPUT_C: &'static str = "c";
+    const SET_VALUE_INPUT: &'static str = "target";
+    const ADD_EDGE_INPUT_SRC: &'static str = "src";
+    const ADD_EDGE_INPUT_DST: &'static str = "dst";
+    const SET_EDGE_VALUE_INPUT_SRC: &'static str = "src";
+    const SET_EDGE_VALUE_INPUT_DST: &'static str = "dst";
+    const SET_NODE_VALUE_INPUT: &'static str = "target";
+    const COPY_NODE_VALUE_TO_INPUT_SRC: &'static str = "src";
+    const COPY_NODE_VALUE_TO_INPUT_DST: &'static str = "dst";
+    const DECREMENT_INPUT: &'static str = "target";
+    const INCREMENT_INPUT: &'static str = "target";
+    const DELETE_NODE_INPUT: &'static str = "target";
+    const SET_SND_TO_MAX_OF_FST_SND_INPUT_FST: &'static str = "fst";
+    const SET_SND_TO_MAX_OF_FST_SND_INPUT_SND: &'static str = "snd";
 }
 
 impl Debug for BuiltinOperation {
@@ -284,139 +298,114 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
     type S = SimpleSemantics;
 
     fn parameter(&self) -> OperationParameter<Self::S> {
+        let mut builder = OperationParameterBuilder::new();
         match self {
             BuiltinOperation::AddNode => {
-                let mut g = grabapl::graph::Graph::new();
-                OperationParameter {
-                    explicit_input_nodes: vec![],
-                    parameter_graph: g,
-                    subst_to_node_keys: HashMap::new(),
-                    node_keys_to_subst: HashMap::new(),
-                }
+                // empty graph
             }
             BuiltinOperation::AppendChild => {
-                // Expects a child
-                let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(());
-                OperationParameter {
-                    explicit_input_nodes: vec![0],
-                    parameter_graph: g,
-                    // TODO: this is scary, because NodeKeys are not a newtype yet, and neither are SubstMarkers.
-                    subst_to_node_keys: HashMap::from([(0, a)]),
-                    node_keys_to_subst: HashMap::from([(a, 0)]),
-                }
+                builder.expect_explicit_input_node(Self::APPEND_CHILD_INPUT, ()).unwrap();
             }
             BuiltinOperation::IndexCycle => {
-                let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(());
-                let b = g.add_node(());
-                let c = g.add_node(());
-                g.add_edge(a, b, EdgePattern::Wildcard);
-                g.add_edge(b, c, EdgePattern::Wildcard);
-                g.add_edge(c, a, EdgePattern::Exact("cycle".to_string()));
-                OperationParameter {
-                    explicit_input_nodes: vec![0],
-                    parameter_graph: g,
-                    subst_to_node_keys: HashMap::from([(0, a), (1, b), (2, c)]),
-                    node_keys_to_subst: HashMap::from([(a, 0), (b, 1), (c, 2)]),
-                }
+                builder.expect_explicit_input_node(
+                    Self::INDEX_CYCLE_INPUT_A,
+                    (),
+                ).unwrap();
+                builder.expect_context_node(Self::INDEX_CYCLE_INPUT_B, ()).unwrap();
+                builder.expect_context_node(Self::INDEX_CYCLE_INPUT_C, ()).unwrap();
+                builder.expect_edge(
+                    Self::INDEX_CYCLE_INPUT_A,
+                    Self::INDEX_CYCLE_INPUT_B,
+                    EdgePattern::Wildcard,
+                ).unwrap();
+                builder.expect_edge(
+                    Self::INDEX_CYCLE_INPUT_B,
+                    Self::INDEX_CYCLE_INPUT_C,
+                    EdgePattern::Wildcard,
+                ).unwrap();
+                builder.expect_edge(
+                    Self::INDEX_CYCLE_INPUT_C,
+                    Self::INDEX_CYCLE_INPUT_A,
+                    EdgePattern::Exact("cycle".to_string()),
+                ).unwrap();
             }
             BuiltinOperation::SetValue(_) => {
-                let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(());
-                OperationParameter {
-                    explicit_input_nodes: vec![0],
-                    parameter_graph: g,
-                    subst_to_node_keys: HashMap::from([(0, a)]),
-                    node_keys_to_subst: HashMap::from([(a, 0)]),
-                }
+                builder.expect_explicit_input_node(
+                    Self::SET_VALUE_INPUT,
+                    (),
+                ).unwrap();
             }
             BuiltinOperation::AddEdge => {
-                let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(());
-                let b = g.add_node(());
-                OperationParameter {
-                    explicit_input_nodes: vec![0, 1],
-                    parameter_graph: g,
-                    subst_to_node_keys: HashMap::from([(0, a), (1, b)]),
-                    node_keys_to_subst: HashMap::from([(a, 0), (b, 1)]),
-                }
+                builder.expect_explicit_input_node(
+                    Self::ADD_EDGE_INPUT_SRC,
+                    (),
+                ).unwrap();
+                builder.expect_explicit_input_node(
+                    Self::ADD_EDGE_INPUT_DST,
+                    (),
+                ).unwrap();
             }
             BuiltinOperation::SetEdgeValue(_) => {
-                let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(());
-                let b = g.add_node(());
-                g.add_edge(a, b, EdgePattern::Wildcard);
-                OperationParameter {
-                    explicit_input_nodes: vec![0, 1],
-                    parameter_graph: g,
-                    subst_to_node_keys: HashMap::from([(0, a), (1, b)]),
-                    node_keys_to_subst: HashMap::from([(a, 0), (b, 1)]),
-                }
+                builder.expect_explicit_input_node(
+                    Self::SET_EDGE_VALUE_INPUT_SRC,
+                    (),
+                ).unwrap();
+                builder.expect_explicit_input_node(
+                    Self::SET_EDGE_VALUE_INPUT_DST,
+                    (),
+                ).unwrap();
+                builder.expect_edge(
+                    Self::SET_EDGE_VALUE_INPUT_SRC,
+                    Self::SET_EDGE_VALUE_INPUT_DST,
+                    EdgePattern::Wildcard,
+                ).unwrap();
             }
             BuiltinOperation::SetNodeValue(_) => {
-                let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(());
-                OperationParameter {
-                    explicit_input_nodes: vec![0],
-                    parameter_graph: g,
-                    subst_to_node_keys: HashMap::from([(0, a)]),
-                    node_keys_to_subst: HashMap::from([(a, 0)]),
-                }
+                builder.expect_explicit_input_node(
+                    Self::SET_NODE_VALUE_INPUT,
+                    (),
+                ).unwrap();
             }
             BuiltinOperation::CopyNodeValueTo => {
-                let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(());
-                let b = g.add_node(());
-                OperationParameter {
-                    explicit_input_nodes: vec![0, 1],
-                    parameter_graph: g,
-                    subst_to_node_keys: HashMap::from([(0, a), (1, b)]),
-                    node_keys_to_subst: HashMap::from([(a, 0), (b, 1)]),
-                }
+                builder.expect_explicit_input_node(
+                    Self::COPY_NODE_VALUE_TO_INPUT_SRC,
+                    (),
+                ).unwrap();
+                builder.expect_explicit_input_node(
+                    Self::COPY_NODE_VALUE_TO_INPUT_DST,
+                    (),
+                ).unwrap();
             }
             BuiltinOperation::Decrement => {
-                let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(());
-                OperationParameter {
-                    explicit_input_nodes: vec![0],
-                    parameter_graph: g,
-                    subst_to_node_keys: HashMap::from([(0, a)]),
-                    node_keys_to_subst: HashMap::from([(a, 0)]),
-                }
+                builder.expect_explicit_input_node(
+                    Self::DECREMENT_INPUT,
+                    (),
+                ).unwrap();
             }
             BuiltinOperation::Increment => {
-                let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(());
-                OperationParameter {
-                    explicit_input_nodes: vec![0],
-                    parameter_graph: g,
-                    subst_to_node_keys: HashMap::from([(0, a)]),
-                    node_keys_to_subst: HashMap::from([(a, 0)]),
-                }
+                builder.expect_explicit_input_node(
+                    Self::INCREMENT_INPUT,
+                    (),
+                ).unwrap();
             }
             BuiltinOperation::DeleteNode => {
-                let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(());
-                OperationParameter {
-                    explicit_input_nodes: vec![0],
-                    parameter_graph: g,
-                    subst_to_node_keys: HashMap::from([(0, a)]),
-                    node_keys_to_subst: HashMap::from([(a, 0)]),
-                }
+                builder.expect_explicit_input_node(
+                    Self::DELETE_NODE_INPUT,
+                    (),
+                ).unwrap();
             }
             BuiltinOperation::SetSndToMaxOfFstSnd => {
-                let mut g = grabapl::graph::Graph::new();
-                let a = g.add_node(());
-                let b = g.add_node(());
-                OperationParameter {
-                    explicit_input_nodes: vec![0, 1],
-                    parameter_graph: g,
-                    subst_to_node_keys: HashMap::from([(0, a), (1, b)]),
-                    node_keys_to_subst: HashMap::from([(a, 0), (b, 1)]),
-                }
+                builder.expect_explicit_input_node(
+                    Self::SET_SND_TO_MAX_OF_FST_SND_INPUT_FST,
+                    (),
+                ).unwrap();
+                builder.expect_explicit_input_node(
+                    Self::SET_SND_TO_MAX_OF_FST_SND_INPUT_SND,
+                    (),
+                ).unwrap();
             }
         }
+        builder.build().unwrap()
     }
 
     fn apply_abstract(
@@ -426,24 +415,23 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
         let mut new_nodes = HashMap::new();
         match self {
             BuiltinOperation::AddNode => {
-                const NEW_NODE: SubstMarker = 0;
+                const NEW_NODE: &'static str = "new";
                 g.add_node(NEW_NODE, ());
-                new_nodes.insert(NEW_NODE, "new".into());
+                new_nodes.insert(NEW_NODE.into(), "new".into());
             }
             BuiltinOperation::AppendChild => {
-                const PARENT: SubstMarker = 0;
-                const CHILD: SubstMarker = 1;
+                const CHILD: &'static str = "child";
                 g.add_node(CHILD, ());
                 // TODO: this EdgePattern is weird.
                 //  On the one hand, we know for a fact this is an exact "" that will be added, so in type-theory, we correctly add the most precise type (Exact instead of Wildcard)
                 //  But if this ever used as a _pattern_ (parameter), it is a *decision* we're making here. Exact will permit fewer matches.
                 //  Realistically this is not a problem, because we don't run builtin operations on parameters. But we should be careful.
                 g.add_edge(
-                    PARENT,
-                    CHILD,
+                    SubstMarker::from(Self::APPEND_CHILD_INPUT),
+                    NewNodeMarker::from(CHILD),
                     EdgePattern::Exact("".to_string()),
                 );
-                new_nodes.insert(CHILD, "child".into());
+                new_nodes.insert(CHILD.into(), "child".into());
             }
             BuiltinOperation::IndexCycle => {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
@@ -452,28 +440,28 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
             }
             BuiltinOperation::AddEdge => {
-                const SRC: SubstMarker = 0;
-                const DST: SubstMarker = 1;
+                let src = SubstMarker::from(Self::ADD_EDGE_INPUT_SRC);
+                let dest = SubstMarker::from(Self::ADD_EDGE_INPUT_DST);
                 g.add_edge(
-                    SRC,
-                    DST,
+                    src,
+                    dest,
                     EdgePattern::Exact("".to_string()),
                 );
             }
             BuiltinOperation::SetEdgeValue(val) => {
-                const SRC: SubstMarker = 0;
-                const DST: SubstMarker = 1;
-                g.set_edge_value(SRC, DST, EdgePattern::Exact(val.clone()));
+                let src = SubstMarker::from(Self::SET_EDGE_VALUE_INPUT_SRC);
+                let dst = SubstMarker::from(Self::SET_EDGE_VALUE_INPUT_DST);
+                g.set_edge_value(src, dst, EdgePattern::Exact(val.clone()));
             }
             BuiltinOperation::SetNodeValue(val) => {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
             }
             BuiltinOperation::CopyNodeValueTo => {
-                const SRC: SubstMarker = 0;
-                const DST: SubstMarker = 1;
+                let src = SubstMarker::from(Self::COPY_NODE_VALUE_TO_INPUT_SRC);
+                let dst = SubstMarker::from(Self::COPY_NODE_VALUE_TO_INPUT_DST);
                 // Noop as long as the abstract value is just the unit type...
-                let src_value = g.get_node_value(SRC).unwrap();
-                g.set_node_value(DST, *src_value);
+                let src_value = g.get_node_value(src).unwrap();
+                g.set_node_value(dst, *src_value);
             }
             BuiltinOperation::Decrement => {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
@@ -482,8 +470,7 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
             }
             BuiltinOperation::DeleteNode => {
-                const NODE_TO_DELETE: SubstMarker = 0;
-                g.delete_node(NODE_TO_DELETE);
+                g.delete_node(SubstMarker::from(Self::DELETE_NODE_INPUT));
             }
             BuiltinOperation::SetSndToMaxOfFstSnd => {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
@@ -499,79 +486,78 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
         let mut new_nodes = HashMap::new();
         match self {
             BuiltinOperation::AddNode => {
-                const NEW_NODE: SubstMarker = 0;
+                const NEW_NODE: &'static str = "new";
                 g.add_node(NEW_NODE, 0);
-                new_nodes.insert(NEW_NODE, "new".into());
+                new_nodes.insert(NEW_NODE.into(), "new".into());
             }
             BuiltinOperation::AppendChild => {
-                const PARENT: SubstMarker = 0;
-                const CHILD: SubstMarker = 1;
+                const CHILD: &'static str = "child";
                 g.add_node(CHILD, 0);
                 g.add_edge(
-                    PARENT,
-                    CHILD,
+                    SubstMarker::from(Self::APPEND_CHILD_INPUT),
+                    NewNodeMarker::from(CHILD),
                     "".to_string(),
                 );
-                new_nodes.insert(CHILD, "child".into());
+                new_nodes.insert(CHILD.into(), "child".into());
             }
             BuiltinOperation::IndexCycle => {
-                const A: SubstMarker = 0;
-                const B: SubstMarker = 1;
-                const C: SubstMarker = 2;
-                g.set_node_value(A, 1);
-                g.set_node_value(B, 2);
-                g.set_node_value(C, 3);
+                let a = SubstMarker::from(Self::INDEX_CYCLE_INPUT_A);
+                let b = SubstMarker::from(Self::INDEX_CYCLE_INPUT_B);
+                let c = SubstMarker::from(Self::INDEX_CYCLE_INPUT_C);
+                g.set_node_value(a, 1);
+                g.set_node_value(b, 2);
+                g.set_node_value(c, 3);
             }
             BuiltinOperation::SetValue(f) => {
-                const A: SubstMarker = 0;
-                g.set_node_value(A, f());
+                let a = SubstMarker::from(Self::SET_VALUE_INPUT);
+                g.set_node_value(a, f());
             }
             BuiltinOperation::AddEdge => {
-                const SRC: SubstMarker = 0;
-                const DST: SubstMarker = 1;
+                let src = SubstMarker::from(Self::ADD_EDGE_INPUT_SRC);
+                let dst = SubstMarker::from(Self::ADD_EDGE_INPUT_DST);
                 g.add_edge(
-                    SRC,
-                    DST,
+                    src,
+                    dst,
                     "".to_string(),
                 );
             }
             BuiltinOperation::SetEdgeValue(val) => {
-                const SRC: SubstMarker = 0;
-                const DST: SubstMarker = 1;
-                g.set_edge_value(SRC, DST, val.clone());
+                let src = SubstMarker::from(Self::SET_EDGE_VALUE_INPUT_SRC);
+                let dst = SubstMarker::from(Self::SET_EDGE_VALUE_INPUT_DST);
+                g.set_edge_value(src, dst, val.clone());
 
             }
             BuiltinOperation::SetNodeValue(val) => {
-                const A: SubstMarker = 0;
-                g.set_node_value(A, *val);
+                let a = SubstMarker::from(Self::SET_NODE_VALUE_INPUT);
+                g.set_node_value(a, *val);
             }
             BuiltinOperation::CopyNodeValueTo => {
-                const SRC: SubstMarker = 0;
-                const DST: SubstMarker = 1;
-                let src_value = g.get_node_value(SRC).unwrap();
-                g.set_node_value(DST, *src_value);
+                let src = SubstMarker::from(Self::COPY_NODE_VALUE_TO_INPUT_SRC);
+                let dst = SubstMarker::from(Self::COPY_NODE_VALUE_TO_INPUT_DST);
+                let src_value = g.get_node_value(src).unwrap();
+                g.set_node_value(dst, *src_value);
             }
             BuiltinOperation::Decrement => {
-                const A: SubstMarker = 0;
-                let val = g.get_node_value(A).unwrap();
-                g.set_node_value(A, val - 1);
+                let a = SubstMarker::from(Self::DECREMENT_INPUT);
+                let val = g.get_node_value(a.clone()).unwrap();
+                g.set_node_value(a, val - 1);
             }
             BuiltinOperation::Increment => {
-                const A: SubstMarker = 0;
-                let val = g.get_node_value(A).unwrap();
-                g.set_node_value(A, val + 1);
+                let a = SubstMarker::from(Self::INCREMENT_INPUT);
+                let val = g.get_node_value(a.clone()).unwrap();
+                g.set_node_value(a, val + 1);
             }
             BuiltinOperation::DeleteNode => {
-                const NODE_TO_DELETE: SubstMarker = 0;
-                g.delete_node(NODE_TO_DELETE);
+                let node_to_delete = SubstMarker::from(Self::DELETE_NODE_INPUT);
+                g.delete_node(node_to_delete);
             }
             BuiltinOperation::SetSndToMaxOfFstSnd => {
-                const FST: SubstMarker = 0;
-                const SND: SubstMarker = 1;
-                let fst_value = g.get_node_value(FST).unwrap();
-                let snd_value = g.get_node_value(SND).unwrap();
+                let fst = SubstMarker::from(Self::SET_SND_TO_MAX_OF_FST_SND_INPUT_FST);
+                let snd = SubstMarker::from(Self::SET_SND_TO_MAX_OF_FST_SND_INPUT_SND);
+                let fst_value = g.get_node_value(fst).unwrap();
+                let snd_value = g.get_node_value(snd.clone()).unwrap();
                 let max_value = std::cmp::max(*fst_value, *snd_value);
-                g.set_node_value(SND, max_value);
+                g.set_node_value(snd, max_value);
             }
         }
 

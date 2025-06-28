@@ -31,9 +31,10 @@ impl<S: Semantics> OperationParameterBuilder<S> {
 
     pub fn expect_explicit_input_node(
         &mut self,
-        marker: SubstMarker,
+        marker: impl Into<SubstMarker>,
         av: S::NodeAbstract,
     ) -> Result<(), ParameterBuilderError> {
+        let marker = marker.into();
         if self.subst_to_node_keys.contains_left(&marker) {
             return Err(ParameterBuilderError::DuplicateMarker(marker));
         }
@@ -45,9 +46,10 @@ impl<S: Semantics> OperationParameterBuilder<S> {
 
     pub fn expect_context_node(
         &mut self,
-        marker: SubstMarker,
+        marker: impl Into<SubstMarker>,
         av: S::NodeAbstract,
     ) -> Result<(), ParameterBuilderError> {
+        let marker = marker.into();
         // Context nodes are not explicitly input nodes, but they are still part of the parameter graph.
         if self.subst_to_node_keys.contains_left(&marker) {
             return Err(ParameterBuilderError::DuplicateMarker(marker));
@@ -59,10 +61,12 @@ impl<S: Semantics> OperationParameterBuilder<S> {
 
     pub fn expect_edge(
         &mut self,
-        src_marker: SubstMarker,
-        dst_marker: SubstMarker,
+        src_marker: impl Into<SubstMarker>,
+        dst_marker: impl Into<SubstMarker>,
         edge_attr: S::EdgeAbstract,
     ) -> Result<(), ParameterBuilderError> {
+        let src_marker = src_marker.into();
+        let dst_marker = dst_marker.into();
         let src_key = self
             .subst_to_node_keys
             .get_left(&src_marker)

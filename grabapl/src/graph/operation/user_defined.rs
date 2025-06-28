@@ -21,6 +21,12 @@ pub enum AbstractOperationResultMarker {
     Implicit(u64),
 }
 
+impl<'a> From<&'a str> for AbstractOperationResultMarker {
+    fn from(s: &'a str) -> Self {
+        AbstractOperationResultMarker::Custom(s.to_string())
+    }
+}
+
 /// Identifies a node in the user defined operation view.
 #[derive(Clone, From, Debug, Eq, PartialEq, Hash)]
 pub enum AbstractNodeId {
@@ -28,6 +34,21 @@ pub enum AbstractNodeId {
     ParameterMarker(SubstMarker),
     /// A node that was created as a result of another operation.
     DynamicOutputMarker(AbstractOperationResultMarker, AbstractOutputNodeMarker),
+}
+
+impl AbstractNodeId {
+    pub fn param(m: impl Into<SubstMarker>) -> Self {
+        AbstractNodeId::ParameterMarker(m.into())
+    }
+    
+    pub fn dynamic_output(
+        output_id: impl Into<AbstractOperationResultMarker>,
+        output_marker: impl Into<AbstractOutputNodeMarker>,
+    ) -> Self {
+        let output_id = output_id.into();
+        let output_marker = output_marker.into();
+        AbstractNodeId::DynamicOutputMarker(output_id, output_marker)
+    }
 }
 
 /// Represents the abstract nodes that will be passed to an operation.
@@ -159,9 +180,9 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
         // TODO: Implement apply_abstract for UserDefinedOperation
 
         for (aid, (name, av)) in &self.output_changes.new_nodes {
-            let sm = g.new_subst_marker();
-            g.add_node(sm.clone(), av.clone());
-            output_names.insert(sm, name.clone());
+            let nnm = g.new_node_marker();
+            g.add_node(nnm.clone(), av.clone());
+            output_names.insert(nnm, name.clone());
         }
 
         Ok(g.get_concrete_output(output_names))

@@ -38,7 +38,8 @@ fn mk_operation_instruction(
     args: Vec<AbstractNodeId>,
 ) -> Instruction<SimpleSemantics> {
     let subst = (0..args.len() as u32)
-        .zip(args.iter().copied())
+        .zip(args.iter().cloned())
+        .map(|(i, aid)| (i.to_string().into(), aid))
         .collect::<HashMap<_, _>>();
     let arg = AbstractOperationArgument {
         selected_input_nodes: args,
@@ -48,17 +49,16 @@ fn mk_operation_instruction(
 }
 
 pub fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemantics> {
-    // Expects a child
     let mut g = grabapl::graph::Graph::new();
     let a = g.add_node(());
     let param = OperationParameter {
-        explicit_input_nodes: vec![0],
+        explicit_input_nodes: vec![0.to_string().into()],
         parameter_graph: g,
-        subst_to_node_keys: HashMap::from([(0, a)]),
-        node_keys_to_subst: HashMap::from([(a, 0)]),
+        subst_to_node_keys: HashMap::from([(0.to_string().into(), a)]),
+        node_keys_to_subst: HashMap::from([(a, 0.to_string().into())]),
     };
 
-    let input_node = AbstractNodeId::ParameterMarker(0);
+    let input_node = AbstractNodeId::param(0.to_string());
 
     let mut instructions = vec![];
     instructions.push((
@@ -110,13 +110,13 @@ pub fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemanti
                 selected_input_nodes: vec![fourth_id],
                 // TODO: double check this hashmap. I think it's right but ...
                 subst_to_aid: HashMap::from([
-                    (0, fourth_id),
+                    (0.to_string().into(), fourth_id),
                     (
-                        1,
+                        1.to_string().into(),
                         AbstractNodeId::DynamicOutputMarker("third_child".into(), "child".into()),
                     ),
                     (
-                        2,
+                        2.to_string().into(),
                         AbstractNodeId::DynamicOutputMarker("second_child".into(), "child".into()),
                     ),
                     // (1, AbstractNodeId::DynamicOutputMarker("first_child".into(), "child".into())),

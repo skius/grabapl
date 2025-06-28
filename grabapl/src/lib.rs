@@ -54,6 +54,12 @@ pub use graph::semantics::Semantics;
 #[debug("P({_0})")]
 pub struct SubstMarker(pub String);
 
+impl<'a> From<&'a str> for SubstMarker {
+    fn from(value: &'a str) -> Self {
+        SubstMarker(value.to_string())
+    }
+}
+
 pub struct WithSubstMarker<T> {
     marker: SubstMarker,
     value: T,

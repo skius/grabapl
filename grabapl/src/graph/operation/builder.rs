@@ -141,9 +141,10 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
 
     pub fn expect_parameter_node(
         &mut self,
-        marker: SubstMarker,
+        marker: impl Into<SubstMarker>,
         node: S::NodeAbstract,
     ) -> Result<(), OperationBuilderError> {
+        let marker = marker.into();
         self.instructions
             .push(BuilderInstruction::ExpectParameterNode(marker, node));
         self.check_instructions_or_rollback()
@@ -151,9 +152,10 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
 
     pub fn expect_context_node(
         &mut self,
-        marker: SubstMarker,
+        marker: impl Into<SubstMarker>,
         node: S::NodeAbstract,
     ) -> Result<(), OperationBuilderError> {
+        let marker = marker.into();
         self.instructions
             .push(BuilderInstruction::ExpectContextNode(marker, node));
         // TODO: check if subst marker does not exist yet
@@ -162,10 +164,12 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
 
     pub fn expect_parameter_edge(
         &mut self,
-        source_marker: SubstMarker,
-        target_marker: SubstMarker,
+        source_marker: impl Into<SubstMarker>,
+        target_marker: impl Into<SubstMarker>,
         edge: S::EdgeAbstract,
     ) -> Result<(), OperationBuilderError> {
+        let source_marker = source_marker.into();
+        let target_marker = target_marker.into();
         self.instructions
             .push(BuilderInstruction::ExpectParameterEdge(
                 source_marker,

@@ -44,12 +44,34 @@ impl ParameterSubstitution {
     }
 }
 
+#[derive(Debug, Clone, From, Hash, Eq, PartialEq)]
+pub enum NewNodeMarker {
+    Named(String),
+    // TODO: hide this
+    #[from(ignore)]
+    Implicit(u32),
+}
+
+impl<'a> From<&'a str> for NewNodeMarker {
+    fn from(name: &'a str) -> Self {
+        NewNodeMarker::Named(name.to_string())
+    }
+}
+
+/// Used inside GraphWithSubstitution to refer to nodes.
+#[derive(Debug, Clone, From, Hash, Eq, PartialEq)]
+pub enum NodeMarker {
+    Subst(SubstMarker),
+    New(NewNodeMarker),
+}
+
 pub struct GraphWithSubstitution<'a, G: GraphTrait> {
     pub graph: &'a mut G,
     /// Maps operation-defined SubstMarkers to the dynamic graph node keys.
     pub subst: &'a ParameterSubstitution,
     /// Maps newly created nodes to their SubstMarker.
-    new_nodes_subst: HashMap<SubstMarker, NodeKey>,
+    new_nodes_map: HashMap<NewNodeMarker, NodeKey>,
+    max_new_node_marker: u32,
     /// Keeps track of changes done to the graph.
     new_nodes: Vec<NodeKey>,
     new_edges: Vec<(NodeKey, NodeKey)>,
@@ -67,7 +89,8 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         GraphWithSubstitution {
             graph,
             subst,
-            new_nodes_subst: HashMap::new(),
+            new_nodes_map: HashMap::new(),
+            max_new_node_marker: 0,
             new_nodes: Vec::new(),
             new_edges: Vec::new(),
             removed_nodes: Vec::new(),
@@ -79,52 +102,54 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
 
     fn get_node_key(
         &self,
-        marker: SubstMarker,
+        marker: &NodeMarker,
     ) -> Option<NodeKey> {
-        let key = self.subst.mapping.get(&marker).copied().or_else(|| {
-            // If the marker is not in the substitution, we can try to find it in the new nodes.
-            self.new_nodes_subst.get(&marker).copied()
-        });
-        if let Some(key) = key {
+        let found_key = match marker {
+            NodeMarker::Subst(sm) => {
+                // If the marker is a SubstMarker, we look it up in the substitution mapping.
+                self.subst.mapping.get(&sm).copied()
+            }
+            NodeMarker::New(nnm) => {
+                self.new_nodes_map.get(&nnm).copied()
+            }
+        };
+        if let Some(key) = found_key {
             if self.removed_nodes.contains(&key) {
+                // don't return a key that was removed
                 return None;
             }
         }
-        key
+        found_key
     }
 
-    // TODO: disgusting. switch from SubstMarker to an explicit NewMarker or something in a separate namespace.
-    //  these substs have nothing to do with ParameterSubstitution, they are just used to refer to give newly added nodes
-    //  a name other than their NodeKey.
-    pub fn new_subst_marker(&mut self) -> SubstMarker {
-        // Generate a new SubstMarker that is not already in the substitution mapping.
-        let mut max_marker = 0;
-        for marker in self.subst.mapping.keys() {
-            if *marker > max_marker {
-                max_marker = *marker;
-            }
-        }
-        max_marker + 1
+    pub fn new_node_marker(&mut self) -> NewNodeMarker {
+        let marker = NewNodeMarker::Implicit(self.max_new_node_marker);
+        self.max_new_node_marker += 1;
+        marker
     }
 
     pub fn add_node(
         &mut self,
-        marker: SubstMarker,
+        marker: impl Into<NewNodeMarker>,
         value: G::NodeAttr,
     ) {
+        let marker = marker.into();
         // TODO: make this error
-        if self.get_node_value(marker).is_some() {
-            panic!("Marker {} already exists in the substitution mapping", marker);
+        if self.get_node_key(&NodeMarker::New(marker.clone())).is_some() {
+            // TODO: should we disallow re-adding a node that was deleted? if so,
+            //  the above should be changed since it skips previously removed nodes
+            panic!("Marker {:?} already exists in the substitution mapping", marker);
         }
         let node_key = self.graph.add_node(value);
         self.new_nodes.push(node_key);
-        self.new_nodes_subst.insert(marker, node_key);
+        self.new_nodes_map.insert(marker, node_key);
     }
     pub fn delete_node(
         &mut self,
-        marker: SubstMarker,
+        marker: impl Into<NodeMarker>,
     ) -> Option<G::NodeAttr> {
-        let Some(node_key) = self.get_node_key(marker) else {
+        let marker = marker.into();
+        let Some(node_key) = self.get_node_key(&marker) else {
             return None; // Node not found in the substitution or new nodes.
         };
         let removed_value = self.graph.delete_node(node_key);
@@ -137,23 +162,27 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
 
     pub fn add_edge(
         &mut self,
-        src_marker: SubstMarker,
-        dst_marker: SubstMarker,
+        src_marker: impl Into<NodeMarker>,
+        dst_marker: impl Into<NodeMarker>,
         value: G::EdgeAttr,
     ) -> Option<G::EdgeAttr> {
-        let src_key = self.get_node_key(src_marker)?;
-        let dst_key = self.get_node_key(dst_marker)?;
+        let src_marker = src_marker.into();
+        let dst_marker = dst_marker.into();
+        let src_key = self.get_node_key(&src_marker)?;
+        let dst_key = self.get_node_key(&dst_marker)?;
         self.new_edges.push((src_key, dst_key));
         self.graph.add_edge(src_key, dst_key, value)
     }
 
     pub fn delete_edge(
         &mut self,
-        src_marker: SubstMarker,
-        dst_marker: SubstMarker,
+        src_marker: impl Into<NodeMarker>,
+        dst_marker: impl Into<NodeMarker>,
     ) -> Option<G::EdgeAttr> {
-        let src_key = self.get_node_key(src_marker)?;
-        let dst_key = self.get_node_key(dst_marker)?;
+        let src_marker = src_marker.into();
+        let dst_marker = dst_marker.into();
+        let src_key = self.get_node_key(&src_marker)?;
+        let dst_key = self.get_node_key(&dst_marker)?;
         let removed_value = self.graph.delete_edge(src_key, dst_key);
         if removed_value.is_some() {
             self.removed_edges.push((src_key, dst_key));
@@ -163,19 +192,21 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
 
     pub fn get_node_value(
         &self,
-        marker: SubstMarker,
+        marker: impl Into<NodeMarker>,
     ) -> Option<&G::NodeAttr> {
-        self.get_node_key(marker).and_then(|node_key| {
+        let marker = marker.into();
+        self.get_node_key(&marker).and_then(|node_key| {
             self.graph.get_node_attr(node_key)
         })
     }
 
     pub fn set_node_value(
         &mut self,
-        marker: SubstMarker,
+        marker: impl Into<NodeMarker>,
         value: G::NodeAttr,
     ) -> Option<G::NodeAttr> {
-        let node_key = self.get_node_key(marker)?;
+        let marker = marker.into();
+        let node_key = self.get_node_key(&marker)?;
         self.changed_node_av.insert(node_key, value.clone());
         let old_value = self.graph.set_node_attr(node_key, value.clone());
         if old_value.is_some() {
@@ -188,22 +219,26 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
 
     pub fn get_edge_value(
         &self,
-        src_marker: SubstMarker,
-        dst_marker: SubstMarker,
+        src_marker: impl Into<NodeMarker>,
+        dst_marker: impl Into<NodeMarker>,
     ) -> Option<&G::EdgeAttr> {
-        let src_key = self.get_node_key(src_marker)?;
-        let dst_key = self.get_node_key(dst_marker)?;
+        let src_marker = src_marker.into();
+        let dst_marker = dst_marker.into();
+        let src_key = self.get_node_key(&src_marker)?;
+        let dst_key = self.get_node_key(&dst_marker)?;
         self.graph.get_edge_attr((src_key, dst_key))
     }
 
     pub fn set_edge_value(
         &mut self,
-        src_marker: SubstMarker,
-        dst_marker: SubstMarker,
+        src_marker: impl Into<NodeMarker>,
+        dst_marker: impl Into<NodeMarker>,
         value: G::EdgeAttr,
     ) -> Option<G::EdgeAttr> {
-        let src_key = self.get_node_key(src_marker)?;
-        let dst_key = self.get_node_key(dst_marker)?;
+        let src_marker = src_marker.into();
+        let dst_marker = dst_marker.into();
+        let src_key = self.get_node_key(&src_marker)?;
+        let dst_key = self.get_node_key(&dst_marker)?;
         self.changed_edge_av.insert((src_key, dst_key), value.clone());
         let old_value = self.graph.set_edge_attr((src_key, dst_key), value.clone());
         if old_value.is_some() {
@@ -215,11 +250,11 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
 
     fn get_new_nodes_and_edges_from_desired_names(
         &self,
-        desired_node_output_names: &HashMap<SubstMarker, AbstractOutputNodeMarker>
+        desired_node_output_names: &HashMap<NewNodeMarker, AbstractOutputNodeMarker>
     ) -> (HashMap<AbstractOutputNodeMarker, NodeKey>, Vec<(NodeKey, NodeKey)>) {
         let mut new_nodes = HashMap::new();
-        for (marker, node_key) in &self.new_nodes_subst {
-            let Some(output_marker) = desired_node_output_names.get(marker) else {
+        for (marker, node_key) in &self.new_nodes_map {
+            let Some(output_marker) = desired_node_output_names.get(&marker) else {
                 continue;
             };
             new_nodes.insert(output_marker.clone(), *node_key);
@@ -236,7 +271,7 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
 
     pub fn get_abstract_output<S: Semantics<NodeAbstract = G::NodeAttr, EdgeAbstract = G::EdgeAttr>>(
         &self,
-        desired_node_output_names: HashMap<SubstMarker, AbstractOutputNodeMarker>
+        desired_node_output_names: HashMap<NewNodeMarker, AbstractOutputNodeMarker>
     ) -> AbstractOperationOutput<S> {
         let (new_nodes, new_edges) = self.get_new_nodes_and_edges_from_desired_names(&desired_node_output_names);
 
@@ -269,7 +304,7 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
 
     pub fn get_concrete_output(
         &self,
-        desired_node_output_names: HashMap<SubstMarker, AbstractOutputNodeMarker>
+        desired_node_output_names: HashMap<NewNodeMarker, AbstractOutputNodeMarker>
     ) -> OperationOutput {
         let (new_nodes, _new_edges) = self.get_new_nodes_and_edges_from_desired_names(&desired_node_output_names);
 
@@ -317,6 +352,12 @@ impl<'a> OperationArgument<'a> {
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq, From)]
 pub struct AbstractOutputNodeMarker(pub String);
+
+impl<'a> From<&'a str> for AbstractOutputNodeMarker {
+    fn from(name: &'a str) -> Self {
+        AbstractOutputNodeMarker(name.to_string())
+    }
+}
 
 // TODO: OperationOutput should also include substractive changes to the graph,
 //  i.e.:
