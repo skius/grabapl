@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::iter;
 use derive_more::From;
+use internment::Intern;
 pub use graph::DotCollector;
 pub use graph::EdgeInsertionOrder;
 pub use graph::EdgeKey;
@@ -50,15 +51,10 @@ pub use graph::semantics::Semantics;
 /// A marker for substitution in the graph.
 ///
 /// Useful for programmatically defined operations to know the substitution of their input pattern.
-#[derive(derive_more::Debug, Clone, PartialEq, Eq, Hash, From)]
+#[derive(derive_more::Debug, Clone, Copy, PartialEq, Eq, Hash, From)]
 #[debug("P({_0})")]
-pub struct SubstMarker(pub String);
-
-impl<'a> From<&'a str> for SubstMarker {
-    fn from(value: &'a str) -> Self {
-        SubstMarker(value.to_string())
-    }
-}
+pub struct SubstMarker(pub Intern<String>);
+interned_string_newtype!(SubstMarker);
 
 pub struct WithSubstMarker<T> {
     marker: SubstMarker,

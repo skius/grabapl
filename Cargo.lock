@@ -323,6 +323,7 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "derive_more",
+ "internment",
  "petgraph",
  "proptest",
  "rand",
@@ -363,6 +364,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cea70ddb795996207ad57735b50c5982d8844f38ba9ee5f1aedcfb708a2aa11e"
 dependencies = [
  "equivalent",
+ "hashbrown",
+]
+
+[[package]]
+name = "internment"
+version = "0.8.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "636d4b0f6a39fd684effe2a73f5310df16a3fa7954c26d36833e98f44d1977a2"
+dependencies = [
  "hashbrown",
 ]
 

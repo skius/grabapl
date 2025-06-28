@@ -3,12 +3,13 @@ use crate::graph::operation::OperationResult;
 use crate::graph::operation::user_defined::{AbstractOperationResultMarker, QueryInstructions};
 use crate::graph::pattern::{AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationParameter, ParameterSubstitution};
 use crate::graph::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, SemanticsClone};
-use crate::{Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
+use crate::{interned_string_newtype, Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
 use derive_more::From;
 use derive_more::with_trait::Into;
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
 use std::collections::HashMap;
+use internment::Intern;
 
 pub struct AbstractQueryOutput<S: Semantics> {
     pub changes: Vec<AbstractQueryChange<S>>,
@@ -102,9 +103,11 @@ pub struct ShapeQuery<S: Semantics> {
     pub changes: Vec<ShapeQueryChange<S>>,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, From, Into)]
-pub struct ShapeNodeIdentifier(String);
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From, Into)]
+pub struct ShapeNodeIdentifier(Intern<String>);
+interned_string_newtype!(ShapeNodeIdentifier);
 
+#[derive(Copy, Clone)]
 pub enum AbstractShapeNodeIdentifier {
     /// A node in the parameter graph.
     ParameterMarker(SubstMarker),

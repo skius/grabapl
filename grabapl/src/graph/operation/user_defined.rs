@@ -6,29 +6,26 @@ use crate::graph::operation::{
 };
 use crate::graph::pattern::{AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution};
 use crate::graph::semantics::{AbstractGraph, ConcreteGraph, SemanticsClone};
-use crate::{NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
+use crate::{interned_string_newtype, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
 use derive_more::with_trait::From;
 use std::collections::HashMap;
 use std::rc::Rc;
+use internment::Intern;
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
-#[derive(Debug, Clone, Hash, Eq, PartialEq, From)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
 pub enum AbstractOperationResultMarker {
-    Custom(String),
+    Custom(Intern<String>),
     // NOTE: this may not be created by the user! since this is an unstable index, if the user
     // reorders operations, this marker may suddenly point to a different operation result.
     // Custom markers must always be used for arguments!
+    #[from(ignore)]
     Implicit(u64),
 }
-
-impl<'a> From<&'a str> for AbstractOperationResultMarker {
-    fn from(s: &'a str) -> Self {
-        AbstractOperationResultMarker::Custom(s.to_string())
-    }
-}
+interned_string_newtype!(AbstractOperationResultMarker, AbstractOperationResultMarker::Custom);
 
 /// Identifies a node in the user defined operation view.
-#[derive(Clone, From, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, From, Debug, Eq, PartialEq, Hash)]
 pub enum AbstractNodeId {
     /// A node in the parameter graph.
     ParameterMarker(SubstMarker),
@@ -40,7 +37,7 @@ impl AbstractNodeId {
     pub fn param(m: impl Into<SubstMarker>) -> Self {
         AbstractNodeId::ParameterMarker(m.into())
     }
-    
+
     pub fn dynamic_output(
         output_id: impl Into<AbstractOperationResultMarker>,
         output_marker: impl Into<AbstractOutputNodeMarker>,

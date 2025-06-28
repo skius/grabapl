@@ -1,9 +1,10 @@
 use std::borrow::Cow;
 use crate::graph::operation::{OperationError, OperationResult};
 use crate::graph::semantics::{AbstractGraph, SemanticsClone};
-use crate::{Graph, NodeKey, Semantics, SubstMarker, WithSubstMarker};
+use crate::{interned_string_newtype, Graph, NodeKey, Semantics, SubstMarker, WithSubstMarker};
 use derive_more::From;
 use std::collections::HashMap;
+use internment::Intern;
 use crate::graph::GraphTrait;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
 
@@ -44,22 +45,17 @@ impl ParameterSubstitution {
     }
 }
 
-#[derive(Debug, Clone, From, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, From, Hash, Eq, PartialEq)]
 pub enum NewNodeMarker {
-    Named(String),
+    Named(Intern<String>),
     // TODO: hide this
     #[from(ignore)]
     Implicit(u32),
 }
-
-impl<'a> From<&'a str> for NewNodeMarker {
-    fn from(name: &'a str) -> Self {
-        NewNodeMarker::Named(name.to_string())
-    }
-}
+interned_string_newtype!(NewNodeMarker, NewNodeMarker::Named);
 
 /// Used inside GraphWithSubstitution to refer to nodes.
-#[derive(Debug, Clone, From, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, From, Hash, Eq, PartialEq)]
 pub enum NodeMarker {
     Subst(SubstMarker),
     New(NewNodeMarker),
@@ -135,7 +131,7 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
     ) {
         let marker = marker.into();
         // TODO: make this error
-        if self.get_node_key(&NodeMarker::New(marker.clone())).is_some() {
+        if self.get_node_key(&NodeMarker::New(marker)).is_some() {
             // TODO: should we disallow re-adding a node that was deleted? if so,
             //  the above should be changed since it skips previously removed nodes
             panic!("Marker {:?} already exists in the substitution mapping", marker);
@@ -257,7 +253,7 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
             let Some(output_marker) = desired_node_output_names.get(&marker) else {
                 continue;
             };
-            new_nodes.insert(output_marker.clone(), *node_key);
+            new_nodes.insert(*output_marker, *node_key);
         }
         let mut new_edges = Vec::new();
         // only include edges that belong to nodes that are in new_nodes and/or the existing graph
@@ -350,14 +346,9 @@ impl<'a> OperationArgument<'a> {
     }
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq, From)]
-pub struct AbstractOutputNodeMarker(pub String);
-
-impl<'a> From<&'a str> for AbstractOutputNodeMarker {
-    fn from(name: &'a str) -> Self {
-        AbstractOutputNodeMarker(name.to_string())
-    }
-}
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
+pub struct AbstractOutputNodeMarker(pub Intern<String>);
+interned_string_newtype!(AbstractOutputNodeMarker);
 
 // TODO: OperationOutput should also include substractive changes to the graph,
 //  i.e.:

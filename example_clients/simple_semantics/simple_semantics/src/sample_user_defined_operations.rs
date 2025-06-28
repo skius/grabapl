@@ -6,6 +6,7 @@ use grabapl::graph::operation::user_defined::{
 };
 use grabapl::graph::pattern::{OperationArgument, OperationParameter};
 use std::collections::HashMap;
+use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
 
 fn mk_builtin_instruction(
     op: BuiltinOperation,
@@ -131,16 +132,11 @@ pub fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemanti
 
 pub fn get_mk_n_to_0_list_user_defined_operation() -> UserDefinedOperation<SimpleSemantics> {
     // Expects one input node
-    let mut g = grabapl::graph::Graph::new();
-    let a = g.add_node(());
-    let param = OperationParameter {
-        explicit_input_nodes: vec![0],
-        parameter_graph: g,
-        subst_to_node_keys: HashMap::from([(0, a)]),
-        node_keys_to_subst: HashMap::from([(a, 0)]),
-    };
+    let mut param_builder = OperationParameterBuilder::new();
+    param_builder.expect_explicit_input_node("a", ()).unwrap();
+    let param = param_builder.build().unwrap();
 
-    let input_node = AbstractNodeId::ParameterMarker(0);
+    let input_node = AbstractNodeId::param("a");
     let mut instructions = vec![];
 
     // If the input value is 0, we do nothing, otherwise we recurse on a new child
