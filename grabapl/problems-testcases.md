@@ -405,6 +405,11 @@ Can we combine the two options?
 
 **TODO**: Would be nice for UX if we returned _why_ a shape query did not match anything if it in fact could have matched something.
 
+**TODO**: Make visual examples for this.
+
+Note: What we're saying here is it's more important that an outer operation does not get its abstract graph dynamically invalidated,
+but instead may see some operations not being called if a shape query cannot match due to existing handles.
+
 ## Thoughts about abstract graph changes in terms of function signatures
 Any static changes must be inside some signature.
 * Want to write to a node? The fact that you're setting its abstract value must be specified.
