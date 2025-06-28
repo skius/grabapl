@@ -252,21 +252,22 @@ fn insert_bst_builder_test(
 }
 
 fn main() {
+    let mut operation_ctx = OperationContext::from_builtins(
+        HashMap::from([
+            (0, BuiltinOperation::AddNode),
+            (1, BuiltinOperation::AppendChild),
+            (2, BuiltinOperation::IndexCycle),
+            (4, BuiltinOperation::AddEdge),
+        ])
+    );
     let user_defined_op = get_sample_user_defined_operation();
-    let mk_list_user_op = get_mk_n_to_0_list_user_defined_operation();
+    let mk_list_user_op = get_mk_n_to_0_list_user_defined_operation(&operation_ctx, 10);
 
-    let count_list_len_user_op = get_count_list_len_user_defined_operation(11);
-    let insert_bst_user_op = get_insert_bst_user_defined_operation(12);
-    let insert_bst_labeled_edges_user_op = get_labeled_edges_insert_bst_user_defined_operation(13);
-    let node_heights_user_op = get_node_heights_user_defined_operation(14);
-
-    let operation_ctx = HashMap::from([
-        (0, BuiltinOperation::AddNode),
-        (1, BuiltinOperation::AppendChild),
-        (2, BuiltinOperation::IndexCycle),
-        (4, BuiltinOperation::AddEdge),
-    ]);
-    let mut operation_ctx = OperationContext::from_builtins(operation_ctx);
+    let count_list_len_user_op = get_count_list_len_user_defined_operation(&operation_ctx, 11);
+    let insert_bst_user_op = get_insert_bst_user_defined_operation(&operation_ctx, 12);
+    let insert_bst_labeled_edges_user_op = get_labeled_edges_insert_bst_user_defined_operation(&operation_ctx, 13);
+    let node_heights_user_op = get_node_heights_user_defined_operation(&operation_ctx, 14);
+    
     operation_ctx.add_custom_operation(3, user_defined_op);
     operation_ctx.add_custom_operation(10, mk_list_user_op);
     operation_ctx.add_custom_operation(11, count_list_len_user_op);
@@ -334,7 +335,7 @@ fn main() {
     let list_root = g.add_node(10);
     run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 10, &[list_root]).unwrap();
     dot_collector.collect(&g);
-
+    
     // new node to count
     let accumulator = g.add_node(0);
     run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 11, &[list_root, accumulator])

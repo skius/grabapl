@@ -52,10 +52,6 @@ pub fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemanti
         subst_to_node_keys: HashMap::from([("input".into(), a)]),
         node_keys_to_subst: HashMap::from([(a, "input".into())]),
     };
-    let mk_operation_instruction =
-        |op_id: OperationId, args: Vec<AbstractNodeId>| {
-            mk_operation_instruction(op_id, &param, args)
-        };
 
     let input_node = AbstractNodeId::param("input");
 
@@ -128,16 +124,20 @@ pub fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemanti
     UserDefinedOperation::new(param, instructions)
 }
 
-pub fn get_mk_n_to_0_list_user_defined_operation() -> UserDefinedOperation<SimpleSemantics> {
+pub fn get_mk_n_to_0_list_user_defined_operation(op_ctx: &OperationContext<SimpleSemantics>, self_op_id: u32) -> UserDefinedOperation<SimpleSemantics> {
     // Expects one input node
     let mut param_builder = OperationParameterBuilder::new();
     param_builder.expect_explicit_input_node("a", ()).unwrap();
     let param = param_builder.build().unwrap();
     let mk_operation_instruction =
         |op_id: OperationId, args: Vec<AbstractNodeId>| {
-            mk_operation_instruction(op_id, &param, args)
+            mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
         };
-    
+    let mk_self_operation_instruction =
+        |args: Vec<AbstractNodeId>| {
+            crate::sample_user_defined_operations::mk_operation_instruction(self_op_id, &param, args)
+        };
+
     let input_node = AbstractNodeId::param("a");
     let mut instructions = vec![];
 
@@ -180,8 +180,7 @@ pub fn get_mk_n_to_0_list_user_defined_operation() -> UserDefinedOperation<Simpl
                     // recursive call
                     (
                         None,
-                        mk_operation_instruction(
-                            10,
+                        mk_self_operation_instruction(
                             vec![AbstractNodeId::DynamicOutputMarker(
                                 "add_child".into(),
                                 "child".into(),
@@ -207,6 +206,7 @@ pub fn get_mk_n_to_0_list_user_defined_operation() -> UserDefinedOperation<Simpl
 }
 
 pub fn get_count_list_len_user_defined_operation(
+    op_ctx: &OperationContext<SimpleSemantics>,
     self_op_id: OperationId,
 ) -> UserDefinedOperation<SimpleSemantics> {
     // Expects the list head as first input node, then the accumulator as second input node
@@ -216,9 +216,13 @@ pub fn get_count_list_len_user_defined_operation(
     let param = param_builder.build().unwrap();
     let mk_operation_instruction =
         |op_id: OperationId, args: Vec<AbstractNodeId>| {
-            mk_operation_instruction(op_id, &param, args)
+            mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
         };
-    
+    let mk_self_operation_instruction =
+        |args: Vec<AbstractNodeId>| {
+            crate::sample_user_defined_operations::mk_operation_instruction(self_op_id, &param, args)
+        };
+
     let input_node = AbstractNodeId::param("input");
     let acc_node = AbstractNodeId::param("acc");
 
@@ -261,7 +265,7 @@ pub fn get_count_list_len_user_defined_operation(
                 not_taken: vec![],
                 taken: vec![(
                     None,
-                    mk_operation_instruction(self_op_id, vec![new_child, acc_node]),
+                    mk_self_operation_instruction(vec![new_child, acc_node]),
                 )],
             },
         ),
@@ -279,6 +283,7 @@ pub fn get_count_list_len_user_defined_operation(
 // TODO: I'm pretty sure this has a (user fault, not library) bug when there's just one child and we add the second child,
 //  because we _append_ the child even if it should be the left child.
 pub fn get_insert_bst_user_defined_operation(
+    op_ctx: &OperationContext<SimpleSemantics>,
     self_op_id: OperationId,
 ) -> UserDefinedOperation<SimpleSemantics> {
     // Expects the root of the binary tree as first input node, then the value to insert as second input node
@@ -288,9 +293,13 @@ pub fn get_insert_bst_user_defined_operation(
     let param = param_builder.build().unwrap();
     let mk_operation_instruction =
         |op_id: OperationId, args: Vec<AbstractNodeId>| {
-            mk_operation_instruction(op_id, &param, args)
+            mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
         };
-    
+    let mk_self_operation_instruction =
+        |args: Vec<AbstractNodeId>| {
+            crate::sample_user_defined_operations::mk_operation_instruction(self_op_id, &param, args)
+        };
+
     let root_node = AbstractNodeId::param("root");
     let value_node = AbstractNodeId::param("value");
     let mut instructions = vec![];
@@ -338,11 +347,11 @@ pub fn get_insert_bst_user_defined_operation(
                         (None, mk_builtin_query(BuiltinQuery::FirstGtSnd, vec![value_node, root_node], QueryInstructions {
                             taken: vec![
                                 // if it is greater, we go to the right child
-                                (None, mk_operation_instruction(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("two_children_query".into(), "right".into()), value_node])),
+                                (None, mk_self_operation_instruction(vec![AbstractNodeId::DynamicOutputMarker("two_children_query".into(), "right".into()), value_node])),
                             ],
                             not_taken: vec![
                                 // if it is smaller or equal, we go to the left child
-                                (None, mk_operation_instruction(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("two_children_query".into(), "left".into()), value_node])),
+                                (None, mk_self_operation_instruction(vec![AbstractNodeId::DynamicOutputMarker("two_children_query".into(), "left".into()), value_node])),
                             ],
                         })),
                     ],
@@ -379,7 +388,7 @@ pub fn get_insert_bst_user_defined_operation(
                                             (None, mk_builtin_query(BuiltinQuery::FirstGtSnd, vec![AbstractNodeId::DynamicOutputMarker("one_child_query".into(), "child".into()), root_node], QueryInstructions {
                                                 taken: vec![
                                                     // if it is greater, we go to the right child
-                                                    (None, mk_operation_instruction(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("one_child_query".into(), "child".into()), value_node])),
+                                                    (None, mk_self_operation_instruction(vec![AbstractNodeId::DynamicOutputMarker("one_child_query".into(), "child".into()), value_node])),
                                                 ],
                                                 not_taken: vec![
                                                     // if the one child that the root has it is smaller, the value node becomes the right child
@@ -393,7 +402,7 @@ pub fn get_insert_bst_user_defined_operation(
                                             (None, mk_builtin_query(BuiltinQuery::FirstGtSnd, vec![root_node, AbstractNodeId::DynamicOutputMarker("one_child_query".into(), "child".into())], QueryInstructions {
                                                 taken: vec![
                                                     // if child < root, we go to the left child
-                                                    (None, mk_operation_instruction(self_op_id, vec![AbstractNodeId::DynamicOutputMarker("one_child_query".into(), "child".into()), value_node])),
+                                                    (None, mk_self_operation_instruction(vec![AbstractNodeId::DynamicOutputMarker("one_child_query".into(), "child".into()), value_node])),
                                                 ],
                                                 not_taken: vec![
                                                     // if the one child that the root has it is larger, the value node becomes the left child
@@ -422,6 +431,7 @@ pub fn get_insert_bst_user_defined_operation(
 }
 
 pub fn get_labeled_edges_insert_bst_user_defined_operation(
+    op_ctx: &OperationContext<SimpleSemantics>,
     self_op_id: OperationId,
 ) -> UserDefinedOperation<SimpleSemantics> {
     // Same as the above insert bst operation, but edges have a "left" and "right" label that should make things easier
@@ -433,9 +443,13 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
     let param = param_builder.build().unwrap();
     let mk_operation_instruction =
         |op_id: OperationId, args: Vec<AbstractNodeId>| {
-            mk_operation_instruction(op_id, &param, args)
+            mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
         };
-    
+    let mk_self_operation_instruction =
+        |args: Vec<AbstractNodeId>| {
+            crate::sample_user_defined_operations::mk_operation_instruction(self_op_id, &param, args)
+        };
+
     let root_node = AbstractNodeId::param("root");
     let value_node = AbstractNodeId::param("value");
 
@@ -517,8 +531,7 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                     // we have a right child, recurse on it
                                                     (
                                                         None,
-                                                        mk_operation_instruction(
-                                                            self_op_id,
+                                                        mk_self_operation_instruction(
                                                             vec![
                                                                 AbstractNodeId::DynamicOutputMarker(
                                                                     "right_child_query".into(),
@@ -629,8 +642,7 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                     // we have a left child, recurse on it
                                                     (
                                                         None,
-                                                        mk_operation_instruction(
-                                                            self_op_id,
+                                                        mk_self_operation_instruction(
                                                             vec![
                                                                 AbstractNodeId::DynamicOutputMarker(
                                                                     "left_child_query".into(),
@@ -716,6 +728,7 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
 }
 
 pub fn get_node_heights_user_defined_operation(
+    op_ctx: &OperationContext<SimpleSemantics>,
     self_op_id: OperationId,
 ) -> UserDefinedOperation<SimpleSemantics> {
     // expects the root node of a binary tree (with left/right edges for children) as input node
@@ -724,9 +737,13 @@ pub fn get_node_heights_user_defined_operation(
     let param = param_builder.build().unwrap();
     let mk_operation_instruction =
         |op_id: OperationId, args: Vec<AbstractNodeId>| {
-            mk_operation_instruction(op_id, &param, args)
+            mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
         };
-    
+    let mk_self_operation_instruction =
+        |args: Vec<AbstractNodeId>| {
+            crate::sample_user_defined_operations::mk_operation_instruction(self_op_id, &param, args)
+        };
+
     let root_node = AbstractNodeId::param("root");
     let mut instructions = vec![];
 
@@ -787,8 +804,7 @@ pub fn get_node_heights_user_defined_operation(
                     // we have a left child, recurse on it
                     (
                         None,
-                        mk_operation_instruction(
-                            self_op_id,
+                        mk_self_operation_instruction(
                             vec![AbstractNodeId::DynamicOutputMarker(
                                 "left_child_query".into(),
                                 "left".into(),
@@ -818,8 +834,7 @@ pub fn get_node_heights_user_defined_operation(
                     // we have a right child, recurse on it
                     (
                         None,
-                        mk_operation_instruction(
-                            self_op_id,
+                        mk_self_operation_instruction(
                             vec![AbstractNodeId::DynamicOutputMarker(
                                 "right_child_query".into(),
                                 "right".into(),

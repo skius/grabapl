@@ -83,7 +83,7 @@ impl<S: Semantics> OperationContext<S> {
     }
 }
 
-enum Operation<'a, S: Semantics> {
+pub enum Operation<'a, S: Semantics> {
     Builtin(&'a S::BuiltinOperation),
     Custom(&'a UserDefinedOperation<S>),
 }
