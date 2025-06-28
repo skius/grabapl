@@ -1,5 +1,5 @@
 use crate::{BuiltinOperation, BuiltinQuery, EdgePattern, SimpleSemantics};
-use grabapl::OperationId;
+use grabapl::{OperationContext, OperationId};
 use grabapl::graph::operation::query::GraphShapeQuery;
 use grabapl::graph::operation::user_defined::{
     AbstractNodeId, AbstractOperationArgument, Instruction, QueryInstructions, UserDefinedOperation,
@@ -36,16 +36,10 @@ fn mk_builtin_query(
 // Note: assumes the subst markers are 0..n
 fn mk_operation_instruction(
     op_id: OperationId,
+    param: &OperationParameter<SimpleSemantics>,
     args: Vec<AbstractNodeId>,
 ) -> Instruction<SimpleSemantics> {
-    let subst = (0..args.len() as u32)
-        .zip(args.iter().cloned())
-        .map(|(i, aid)| (i.to_string().into(), aid))
-        .collect::<HashMap<_, _>>();
-    let arg = AbstractOperationArgument {
-        selected_input_nodes: args,
-        subst_to_aid: subst,
-    };
+    let arg = AbstractOperationArgument::infer_explicit_for_param(args, param).unwrap();
     Instruction::Operation(op_id, arg)
 }
 
@@ -53,13 +47,17 @@ pub fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemanti
     let mut g = grabapl::graph::Graph::new();
     let a = g.add_node(());
     let param = OperationParameter {
-        explicit_input_nodes: vec![0.to_string().into()],
+        explicit_input_nodes: vec!["input".into()],
         parameter_graph: g,
-        subst_to_node_keys: HashMap::from([(0.to_string().into(), a)]),
-        node_keys_to_subst: HashMap::from([(a, 0.to_string().into())]),
+        subst_to_node_keys: HashMap::from([("input".into(), a)]),
+        node_keys_to_subst: HashMap::from([(a, "input".into())]),
     };
+    let mk_operation_instruction =
+        |op_id: OperationId, args: Vec<AbstractNodeId>| {
+            mk_operation_instruction(op_id, &param, args)
+        };
 
-    let input_node = AbstractNodeId::param(0.to_string());
+    let input_node = AbstractNodeId::param("input");
 
     let mut instructions = vec![];
     instructions.push((
@@ -135,7 +133,11 @@ pub fn get_mk_n_to_0_list_user_defined_operation() -> UserDefinedOperation<Simpl
     let mut param_builder = OperationParameterBuilder::new();
     param_builder.expect_explicit_input_node("a", ()).unwrap();
     let param = param_builder.build().unwrap();
-
+    let mk_operation_instruction =
+        |op_id: OperationId, args: Vec<AbstractNodeId>| {
+            mk_operation_instruction(op_id, &param, args)
+        };
+    
     let input_node = AbstractNodeId::param("a");
     let mut instructions = vec![];
 
@@ -212,7 +214,11 @@ pub fn get_count_list_len_user_defined_operation(
     param_builder.expect_explicit_input_node("input", ()).unwrap();
     param_builder.expect_explicit_input_node("acc", ()).unwrap();
     let param = param_builder.build().unwrap();
-
+    let mk_operation_instruction =
+        |op_id: OperationId, args: Vec<AbstractNodeId>| {
+            mk_operation_instruction(op_id, &param, args)
+        };
+    
     let input_node = AbstractNodeId::param("input");
     let acc_node = AbstractNodeId::param("acc");
 
@@ -280,7 +286,11 @@ pub fn get_insert_bst_user_defined_operation(
     param_builder.expect_explicit_input_node("root", ()).unwrap();
     param_builder.expect_explicit_input_node("value", ()).unwrap();
     let param = param_builder.build().unwrap();
-
+    let mk_operation_instruction =
+        |op_id: OperationId, args: Vec<AbstractNodeId>| {
+            mk_operation_instruction(op_id, &param, args)
+        };
+    
     let root_node = AbstractNodeId::param("root");
     let value_node = AbstractNodeId::param("value");
     let mut instructions = vec![];
@@ -421,7 +431,11 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
     param_builder.expect_explicit_input_node("root", ()).unwrap();
     param_builder.expect_explicit_input_node("value", ()).unwrap();
     let param = param_builder.build().unwrap();
-
+    let mk_operation_instruction =
+        |op_id: OperationId, args: Vec<AbstractNodeId>| {
+            mk_operation_instruction(op_id, &param, args)
+        };
+    
     let root_node = AbstractNodeId::param("root");
     let value_node = AbstractNodeId::param("value");
 
@@ -708,7 +722,11 @@ pub fn get_node_heights_user_defined_operation(
     let mut param_builder = OperationParameterBuilder::new();
     param_builder.expect_explicit_input_node("root", ()).unwrap();
     let param = param_builder.build().unwrap();
-
+    let mk_operation_instruction =
+        |op_id: OperationId, args: Vec<AbstractNodeId>| {
+            mk_operation_instruction(op_id, &param, args)
+        };
+    
     let root_node = AbstractNodeId::param("root");
     let mut instructions = vec![];
 

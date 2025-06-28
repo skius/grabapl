@@ -171,6 +171,7 @@ pub fn get_substitution<S: Semantics>(
         S::EdgeMatcher::matches(arg_attr, &param_attr)
     };
 
+    // TODO: error could indicate that this is not due to edge orderedness, but just general shape.
     let isos = general_subgraph_monomorphisms_iter(&param_ref, &arg_ref, &mut nm, &mut em)
         .ok_or(SubstitutionError::ArgumentDoesNotMatchParameter)?;
 
