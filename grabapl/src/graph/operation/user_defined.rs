@@ -12,9 +12,9 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, From)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, From)]
 pub enum AbstractOperationResultMarker {
-    Custom(&'static str),
+    Custom(String),
     // NOTE: this may not be created by the user! since this is an unstable index, if the user
     // reorders operations, this marker may suddenly point to a different operation result.
     // Custom markers must always be used for arguments!
@@ -22,7 +22,7 @@ pub enum AbstractOperationResultMarker {
 }
 
 /// Identifies a node in the user defined operation view.
-#[derive(Copy, Clone, From, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, From, Debug, Eq, PartialEq, Hash)]
 pub enum AbstractNodeId {
     /// A node in the parameter graph.
     ParameterMarker(SubstMarker),
@@ -66,7 +66,7 @@ impl AbstractOperationArgument {
             .explicit_input_nodes
             .iter()
             .zip(selected_nodes.iter())
-            .map(|(subst_marker, node_key)| (*subst_marker, *node_key))
+            .map(|(subst_marker, node_key)| (subst_marker.clone(), node_key.clone()))
             .collect();
         Ok(AbstractOperationArgument {
             selected_input_nodes: selected_nodes,
@@ -148,7 +148,7 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
             output_changes: AbstractUserDefinedOperationOutput::new(),
         }
     }
-    
+
     pub(crate) fn apply_abstract(
         &self,
         op_ctx: &OperationContext<S>,
@@ -160,10 +160,10 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
 
         for (aid, (name, av)) in &self.output_changes.new_nodes {
             let sm = g.new_subst_marker();
-            g.add_node(sm, av.clone());
+            g.add_node(sm.clone(), av.clone());
             output_names.insert(sm, name.clone());
         }
-        
+
         Ok(g.get_concrete_output(output_names))
     }
 
@@ -188,9 +188,9 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
             &self.instructions,
             subst,
         )?;
-        
+
         for (aid, (name, _)) in &self.output_changes.new_nodes {
-            let node_key = aid_to_node_key(*aid, subst, &previous_results)?;
+            let node_key = aid_to_node_key(aid.clone(), subst, &previous_results)?;
             our_output_map.insert(name.clone(), node_key);
         }
 
@@ -237,7 +237,7 @@ fn run_instructions<S: SemanticsClone>(
                     Instruction::BuiltinQuery(..) | Instruction::ShapeQuery(..) => unreachable!(),
                 };
                 if let Some(abstract_output_id) = abstract_output_id {
-                    previous_results.insert(*abstract_output_id, output.new_nodes);
+                    previous_results.insert(abstract_output_id.clone(), output.new_nodes);
                     // TODO: also handle output.removed_nodes.
                 }
             }
@@ -278,12 +278,12 @@ fn run_instructions<S: SemanticsClone>(
                     for (ident, node_key) in shape_idents_to_node_keys {
                         // TODO: add helper function, or add new variant to AbstractOutputNodeMarker, or just use that one for the shape query mapping and get rid of ShapeNodeIdentifier.
                         let output_marker = AbstractOutputNodeMarker(
-                            <ShapeNodeIdentifier as Into<&'static str>>::into(ident.into()),
+                            ident.into(),
                         );
                         query_result_map.insert(output_marker, node_key);
                     }
                     if let Some(abstract_output_id) = abstract_output_id {
-                        previous_results.insert(*abstract_output_id, query_result_map);
+                        previous_results.insert(abstract_output_id.clone(), query_result_map);
                     }
 
                     &query_instr.taken
@@ -317,7 +317,7 @@ fn get_concrete_arg<S: Semantics>(
 ) -> OperationResult<OperationArgument<'static>> {
     let selected_keys: Vec<NodeKey> = explicit_args
         .iter()
-        .map(|arg| aid_to_node_key(*arg, subst, previous_results))
+        .map(|arg| aid_to_node_key(arg.clone(), subst, previous_results))
         .collect::<OperationResult<_>>()?;
 
     let subst = ParameterSubstitution::new(
@@ -325,8 +325,8 @@ fn get_concrete_arg<S: Semantics>(
             .iter()
             .map(|(subst_marker, abstract_node_id)| {
                 Ok((
-                    *subst_marker,
-                    aid_to_node_key(*abstract_node_id, subst, previous_results)?,
+                    subst_marker.clone(),
+                    aid_to_node_key(abstract_node_id.clone(), subst, previous_results)?,
                 ))
             })
             .collect::<OperationResult<_>>()?,

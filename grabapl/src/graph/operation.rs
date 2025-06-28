@@ -113,7 +113,7 @@ impl<'a, S: SemanticsClone> Operation<'a, S> {
 
 pub type OperationId = u32;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum SubstitutionError {
     #[error("invalid operation argument count: expected {expected}, got {actual}")]
     InvalidOperationArgumentCount { expected: usize, actual: usize },
@@ -183,7 +183,7 @@ pub fn get_substitution<S: Semantics>(
             .map(|(param_idx, &arg_idx)| {
                 let param_node_key = param_ref.from_index(param_idx);
                 let arg_node_key = arg_ref.from_index(arg_idx);
-                (param.node_keys_to_subst[&param_node_key], arg_node_key)
+                (param.node_keys_to_subst[&param_node_key].clone(), arg_node_key)
             })
             .collect::<HashMap<_, _>>();
 
@@ -273,7 +273,7 @@ pub fn run_from_concrete<S: SemanticsClone>(
 pub type OperationResult<T> = std::result::Result<T, OperationError>;
 
 // TODO: add specific source operation id or similar to the error
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum OperationError {
     #[error("operation {0} not found")]
     InvalidOperationId(OperationId),
@@ -281,7 +281,7 @@ pub enum OperationError {
     InvalidOperationArgumentCount { expected: usize, actual: usize },
     #[error("operation argument does not match parameter")]
     ArgumentDoesNotMatchParameter,
-    #[error("unknown parameter marker: {0}")]
+    #[error("unknown parameter marker: {0:?}")]
     UnknownParameterMarker(SubstMarker),
     #[error("unknown operation result marker: {0:?}")]
     UnknownOperationResultMarker(AbstractOperationResultMarker),

@@ -4,13 +4,13 @@ use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, Semantics, SubstMarker};
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum ParameterBuilderError {
-    #[error("Source marker not found in the parameter graph: {0}")]
+    #[error("Source marker not found in the parameter graph: {0:?}")]
     SourceMarkerNotFound(SubstMarker),
-    #[error("Destination marker not found in the parameter graph: {0}")]
+    #[error("Destination marker not found in the parameter graph: {0:?}")]
     DestinationMarkerNotFound(SubstMarker),
-    #[error("Duplicate marker found in the parameter graph: {0}")]
+    #[error("Duplicate marker found in the parameter graph: {0:?}")]
     DuplicateMarker(SubstMarker),
 }
 
@@ -37,7 +37,7 @@ impl<S: Semantics> OperationParameterBuilder<S> {
         if self.subst_to_node_keys.contains_left(&marker) {
             return Err(ParameterBuilderError::DuplicateMarker(marker));
         }
-        self.explicit_input_nodes.push(marker);
+        self.explicit_input_nodes.push(marker.clone());
         let node_key = self.parameter_graph.add_node(av);
         self.subst_to_node_keys.insert(marker, node_key);
         Ok(())

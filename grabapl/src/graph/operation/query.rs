@@ -102,8 +102,8 @@ pub struct ShapeQuery<S: Semantics> {
     pub changes: Vec<ShapeQueryChange<S>>,
 }
 
-#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From, Into)]
-pub struct ShapeNodeIdentifier(&'static str);
+#[derive(Debug, Clone, Hash, Eq, PartialEq, From, Into)]
+pub struct ShapeNodeIdentifier(String);
 
 pub enum AbstractShapeNodeIdentifier {
     /// A node in the parameter graph.
@@ -299,9 +299,9 @@ fn get_shape_query_substitution<S: SemanticsClone>(
                     let desired_shape_node_key = desired_shape_ref.from_index(desired_shape_idx);
                     let dynamic_graph_node_key = dynamic_graph_ref.from_index(dynamic_graph_idx);
                     Some((
-                        *query
+                        query
                             .node_keys_to_shape_idents
-                            .get(&desired_shape_node_key)?,
+                            .get(&desired_shape_node_key)?.clone(),
                         dynamic_graph_node_key,
                     ))
                 })

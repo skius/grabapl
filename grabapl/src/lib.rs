@@ -2,6 +2,7 @@ pub mod graph;
 pub mod pattern_match;
 pub mod util;
 
+use std::borrow::Cow;
 use crate::graph::*;
 use petgraph::algo::subgraph_isomorphisms_iter;
 use petgraph::dot::Dot;
@@ -12,7 +13,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::iter;
-
+use derive_more::From;
 pub use graph::DotCollector;
 pub use graph::EdgeInsertionOrder;
 pub use graph::EdgeKey;
@@ -45,10 +46,13 @@ pub use graph::semantics::Semantics;
 // Because we'll want to work abstractly with a pattern graph, we'll want the pattern type to be the type that pattern matches against.
 // In other words, we want the pattern type to be the analogue of the PL-"type", with subtyping. eg. a wildcard is just the analogue of the Top type
 
+// TODO: intern this?
 /// A marker for substitution in the graph.
 ///
 /// Useful for programmatically defined operations to know the substitution of their input pattern.
-pub type SubstMarker = u32;
+#[derive(derive_more::Debug, Clone, PartialEq, Eq, Hash, From)]
+#[debug("P({_0})")]
+pub struct SubstMarker(pub String);
 
 pub struct WithSubstMarker<T> {
     marker: SubstMarker,
@@ -97,7 +101,7 @@ impl<P> PatternWrapper<P> {
     }
 
     pub fn get_marker(&self) -> SubstMarker {
-        self.marker
+        self.marker.clone()
     }
 
     pub fn get_kind(&self) -> &PatternKind {

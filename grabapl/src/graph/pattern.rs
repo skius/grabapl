@@ -222,7 +222,7 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
             let Some(output_marker) = desired_node_output_names.get(marker) else {
                 continue;
             };
-            new_nodes.insert(*output_marker, *node_key);
+            new_nodes.insert(output_marker.clone(), *node_key);
         }
         let mut new_edges = Vec::new();
         // only include edges that belong to nodes that are in new_nodes and/or the existing graph
@@ -306,7 +306,7 @@ impl<'a> OperationArgument<'a> {
             .explicit_input_nodes
             .iter()
             .zip(selected_nodes.iter())
-            .map(|(subst_marker, node_key)| (*subst_marker, *node_key))
+            .map(|(subst_marker, node_key)| (subst_marker.clone(), *node_key))
             .collect();
         Ok(OperationArgument {
             selected_input_nodes: selected_nodes.into(),
@@ -315,8 +315,8 @@ impl<'a> OperationArgument<'a> {
     }
 }
 
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, From)]
-pub struct AbstractOutputNodeMarker(pub &'static str);
+#[derive(Debug, Clone, Hash, Eq, PartialEq, From)]
+pub struct AbstractOutputNodeMarker(pub String);
 
 // TODO: OperationOutput should also include substractive changes to the graph,
 //  i.e.:
