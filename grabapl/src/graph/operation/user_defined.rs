@@ -268,7 +268,7 @@ fn run_instructions<S: SemanticsClone>(
                 // ShapeQueries dont have context mappings, so we can just pass an empty hashmap.
                 let concrete_arg =
                     get_concrete_arg::<S>(args, &HashMap::new(), subst, previous_results)?;
-                let result = run_shape_query(g, query, concrete_arg.selected_input_nodes)?;
+                let result = run_shape_query(g, query, &concrete_arg.selected_input_nodes)?;
                 let next_instr = if let Some(shape_idents_to_node_keys) =
                     result.shape_idents_to_node_keys
                 {
@@ -314,8 +314,8 @@ fn get_concrete_arg<S: Semantics>(
         AbstractOperationResultMarker,
         HashMap<AbstractOutputNodeMarker, NodeKey>,
     >,
-) -> OperationResult<OperationArgument> {
-    let selected_keys = explicit_args
+) -> OperationResult<OperationArgument<'static>> {
+    let selected_keys: Vec<NodeKey> = explicit_args
         .iter()
         .map(|arg| aid_to_node_key(*arg, subst, previous_results))
         .collect::<OperationResult<_>>()?;
@@ -333,7 +333,7 @@ fn get_concrete_arg<S: Semantics>(
     );
 
     Ok(OperationArgument {
-        selected_input_nodes: selected_keys,
+        selected_input_nodes: selected_keys.into(),
         subst,
     })
 }

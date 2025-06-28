@@ -92,7 +92,7 @@ mod ffi {
                 &mut graph.0,
                 &op_ctx.0,
                 op_id,
-                args.to_vec(),
+                &args.iter().copied().map(Into::into).collect::<Vec<_>>(),
             )
             .unwrap();
         }
@@ -104,7 +104,7 @@ mod ffi {
         }
 
         pub fn add_node(&mut self, value: i32) -> u32 {
-            self.0.add_node(value)
+            self.0.add_node(value).0
         }
 
         pub fn add_edge(&mut self, from: u32, to: u32, value: &str) {
@@ -117,7 +117,7 @@ mod ffi {
             if x == "panic" {
                 panic!("test {}", x);
             }
-            log::error!("doing thing {:?}", self.0.get_node_attr(0));
+            log::error!("doing thing {:?}", self.0.get_node_attr(0.into()));
         }
     }
 

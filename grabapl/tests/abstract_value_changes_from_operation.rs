@@ -595,7 +595,7 @@ fn new_node_from_both_branches_is_visible_for_regular_query() {
 
     let mut concrete_graph = ConcreteGraph::<TestSemantics>::new();
     let p0_key = concrete_graph.add_node(NodeValue::Integer(0));
-    run_from_concrete(&mut concrete_graph, &op_ctx, 1, vec![p0_key]).unwrap();
+    run_from_concrete(&mut concrete_graph, &op_ctx, 1, &[p0_key]).unwrap();
     let new_node_value = concrete_graph.get_node_attr(p0_key).unwrap();
     assert_eq!(
         new_node_value,
@@ -694,6 +694,6 @@ fn return_node_partially_from_shape_query_fails() {
         concrete_graph.add_edge(p0_key, c0_key, "child".to_string());
 
         // crash, CopyValueFromTo doesn't find substmarker 0.
-        run_from_concrete(&mut concrete_graph, &op_ctx, 1, vec![p0_key]).unwrap();
+        run_from_concrete(&mut concrete_graph, &op_ctx, 1, &[p0_key]).unwrap();
     }
 }

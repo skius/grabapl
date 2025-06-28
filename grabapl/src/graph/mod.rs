@@ -7,6 +7,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::RandomState;
+use derive_more::From;
 
 pub mod dot;
 pub mod operation;
@@ -56,7 +57,9 @@ impl<EdgeAttr> EdgeAttribute<EdgeAttr> {
 
 type EdgeOrder = i32;
 
-pub type NodeKey = u32;
+#[derive(Hash, Eq, PartialEq, derive_more::Debug, Clone, Copy, PartialOrd, Ord, derive_more::Add, derive_more::AddAssign, From)]
+#[debug("N({_0})")]
+pub struct NodeKey(pub u32);
 pub type EdgeKey = (NodeKey, NodeKey);
 
 #[derive(Debug, Copy, Clone)]
@@ -77,7 +80,7 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
     pub fn new() -> Self {
         Graph {
             graph: GraphMap::new(),
-            max_node_key: 0,
+            max_node_key: 0.into(),
             node_attr_map: HashMap::new(),
         }
     }
@@ -87,7 +90,7 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
         let node_key = self.graph.add_node(node_key);
         self.node_attr_map
             .insert(node_key, NodeAttribute::new(node_attr));
-        self.max_node_key += 1;
+        self.max_node_key += 1.into();
         node_key
     }
 
@@ -96,8 +99,8 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
     /// Same as `add_edge_ordered` with `Append` for both source and target.
     pub fn add_edge(
         &mut self,
-        source: NodeKey,
-        target: NodeKey,
+        source: impl Into<NodeKey>,
+        target: impl Into<NodeKey>,
         edge_attr: EdgeAttr,
     ) -> Option<EdgeAttr> {
         self.add_edge_ordered(
@@ -161,12 +164,14 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
 
     pub fn add_edge_ordered(
         &mut self,
-        source: NodeKey,
-        target: NodeKey,
+        source: impl Into<NodeKey>,
+        target: impl Into<NodeKey>,
         edge_attr: EdgeAttr,
         source_out_order: EdgeInsertionOrder,
         target_in_order: EdgeInsertionOrder,
     ) -> Option<EdgeAttr> {
+        let source = source.into();
+        let target = target.into();
         let new_out_order = match source_out_order {
             EdgeInsertionOrder::Append => self.max_out_edge_order_key(source).unwrap_or(0) + 1,
             EdgeInsertionOrder::Prepend => self.min_out_edge_order_key(source).unwrap_or(0) - 1,
@@ -401,7 +406,7 @@ impl<NodeAttr, EdgeAttr> GraphTrait for Graph<NodeAttr, EdgeAttr> {
     fn add_node(&mut self, node_attr: Self::NodeAttr) -> NodeKey {
         self.add_node(node_attr)
     }
-    
+
     fn delete_node(&mut self, node_key: NodeKey) -> Option<Self::NodeAttr> {
         self.remove_node(node_key)
     }
@@ -414,7 +419,7 @@ impl<NodeAttr, EdgeAttr> GraphTrait for Graph<NodeAttr, EdgeAttr> {
     ) -> Option<Self::EdgeAttr> {
         self.add_edge(source, target, edge_attr)
     }
-    
+
     fn delete_edge(&mut self, source: NodeKey, target: NodeKey) -> Option<Self::EdgeAttr> {
         self.remove_edge_between(source, target)
     }

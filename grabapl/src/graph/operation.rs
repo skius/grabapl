@@ -243,7 +243,7 @@ pub fn run_from_concrete<S: SemanticsClone>(
     g: &mut ConcreteGraph<S>,
     op_ctx: &OperationContext<S>,
     op: OperationId,
-    selected_inputs: Vec<NodeKey>,
+    selected_inputs: &[NodeKey],
 ) -> OperationResult<OperationOutput> {
     // first get substitution
     let abstract_g = S::concrete_to_abstract(g);
@@ -254,17 +254,17 @@ pub fn run_from_concrete<S: SemanticsClone>(
     {
         Operation::Builtin(builtin) => {
             let param = builtin.parameter();
-            get_substitution(&abstract_g, &param, &selected_inputs)?
+            get_substitution(&abstract_g, &param, selected_inputs)?
         }
         Operation::Custom(custom) => {
             let param = &custom.parameter;
-            get_substitution(&abstract_g, param, &selected_inputs)?
+            get_substitution(&abstract_g, param, selected_inputs)?
         }
     };
     // then run the operation
     let arg = OperationArgument {
         subst,
-        selected_input_nodes: selected_inputs,
+        selected_input_nodes: selected_inputs.into(),
     };
 
     run_operation(g, op_ctx, op, arg)

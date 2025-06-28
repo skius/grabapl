@@ -31,7 +31,7 @@ impl<NA: Debug, EA: Debug> Graph<NA, EA> {
                     let node_attr = self.node_attr_map.get(&node).unwrap();
                     let dbg_attr_format = format!("{:?}", node_attr.node_attr);
                     let dbg_attr_replaced = dbg_attr_format.escape_debug();
-                    format!("label = \"{node}|{dbg_attr_replaced}\"")
+                    format!("label = \"{node:?}|{dbg_attr_replaced}\"")
                 }
             )
         )

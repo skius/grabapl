@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use crate::graph::operation::{OperationError, OperationResult};
 use crate::graph::semantics::{AbstractGraph, SemanticsClone};
 use crate::{Graph, NodeKey, Semantics, SubstMarker, WithSubstMarker};
@@ -282,16 +283,16 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
 
 // TODO: maybe this is not needed and ParameterSubstitution is already enough?
 #[derive(Debug)]
-pub struct OperationArgument {
-    pub selected_input_nodes: Vec<NodeKey>,
+pub struct OperationArgument<'a> {
+    pub selected_input_nodes: Cow<'a, [NodeKey]>,
     /// We know this substitution statically already, since we define our parameter substitutions statically.
     /// So we can store it in this struct.
     pub subst: ParameterSubstitution,
 }
 
-impl OperationArgument {
+impl<'a> OperationArgument<'a> {
     pub fn infer_explicit_for_param(
-        selected_nodes: Vec<NodeKey>,
+        selected_nodes: &'a [NodeKey],
         param: &OperationParameter<impl Semantics>,
     ) -> OperationResult<Self> {
         if param.explicit_input_nodes.len() != selected_nodes.len() {
@@ -308,7 +309,7 @@ impl OperationArgument {
             .map(|(subst_marker, node_key)| (*subst_marker, *node_key))
             .collect();
         Ok(OperationArgument {
-            selected_input_nodes: selected_nodes,
+            selected_input_nodes: selected_nodes.into(),
             subst: ParameterSubstitution::new(subst),
         })
     }

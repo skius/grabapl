@@ -194,7 +194,7 @@ pub(crate) fn run_builtin_query<S: SemanticsClone>(
 pub(crate) fn run_shape_query<S: SemanticsClone>(
     g: &mut ConcreteGraph<S>,
     query: &GraphShapeQuery<S>,
-    selected_inputs: Vec<NodeKey>,
+    selected_inputs: &[NodeKey],
 ) -> OperationResult<ConcreteShapeQueryResult> {
     let abstract_graph = S::concrete_to_abstract(g);
     // assert that the abstract graph matches the parameter. this is not the dynamic check yet, this is just asserting
