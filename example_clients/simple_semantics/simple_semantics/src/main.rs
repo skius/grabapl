@@ -267,7 +267,7 @@ fn main() {
     let insert_bst_user_op = get_insert_bst_user_defined_operation(&operation_ctx, 12);
     let insert_bst_labeled_edges_user_op = get_labeled_edges_insert_bst_user_defined_operation(&operation_ctx, 13);
     let node_heights_user_op = get_node_heights_user_defined_operation(&operation_ctx, 14);
-    
+
     operation_ctx.add_custom_operation(3, user_defined_op);
     operation_ctx.add_custom_operation(10, mk_list_user_op);
     operation_ctx.add_custom_operation(11, count_list_len_user_op);
@@ -335,7 +335,7 @@ fn main() {
     let list_root = g.add_node(10);
     run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 10, &[list_root]).unwrap();
     dot_collector.collect(&g);
-    
+
     // new node to count
     let accumulator = g.add_node(0);
     run_from_concrete::<SimpleSemantics>(&mut g, &operation_ctx, 11, &[list_root, accumulator])

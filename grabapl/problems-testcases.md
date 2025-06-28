@@ -256,6 +256,7 @@ see a shape query and would instead have to traverse the entire call stack to fi
 **Potential fixes**:
 1. Shape queries are not allowed to change the abstract values of their matched nodes.
    - This is the simplest solution, but it is also quite limiting.
+   - It also doesn't work, because we may want to delete the node! Which is in effect a 'change'.
 2. Shape queries match invariantly, i.e., if some abstract value `t_s` is expected, then concrete values only
    match that query if their type is exactly `t_s`.
    - Subsequent modifications would be allowed to change the abstract value to something more precise, i.e. a subtype of `t_s`,
@@ -330,6 +331,8 @@ What if we had proper "nesting-graphs" support? E.g., we may have a type that is
 2. Call some "unpacking" operation on that BST node to get a handle on eg the actual root node of the BST.
 3. Hmm. Would still like to be allowed to call helper operations on that root node. But how to uphold aliasing XOR mutability?
 
+Also, existing Algot is pass-by-reference, so pas-by-value would be difficult to backwards-compatibly implement.
+
 ### Purity
 By saying that every operation call gets a copy of the graph (connected component should be enough), we can modify abstract values
 to our liking.
@@ -339,6 +342,66 @@ using the new root node.
 
 This induces requirements on some builtin operations though: We don't want "add node" or "add edge" to be pass-by-value,
 obviously, so it needs to be optional I guess?
+
+### Exclusive Access
+
+How difficult would it be to add a notion of "requires exclusive access to node X" to the operation signature?
+Would imply exclusive access to the entire connected component of X. Since two non-connected abstract nodes may or may not
+be connected, this requires us to implement connectedness analysis.
+
+### Interpreting everything
+Since shape queries are ran on the concrete graph, even if we interpret everything abstractly we will still not know
+if some inner operation's shape query will change an outer operation's abstract graph
+(because we don't know if the shape query's match corresponds to the abstract graph node)
+
+The main problem is that the shape query match is not guaranteed to have some abstract graph equivalent.
+If we tried to enforce that, though, edge orders would start to become a problem, since an outer operation changes the behavior
+of an inner operation's shape query just by having or not having the corresponding abstract node in its graph.
+Avoiding ambiguity would essentially be solving for edge orders and seeing if the outer abstract node has a potentially matching
+edge order or not.
+
+### Hiding nodes from shape queries
+What if available nodes were automatically hidden from shape queries instead? So if a parent of "delete from BST" has a handle
+to the child node, then the call will dynamically and concretely not match the child node from the parent operation.
+Again, requires 'forgetting' nodes, if an outer operation wanted to actually delete the child.
+The starting global state must have all its nodes forgotten except for the first operation's parameters, otherwise all concrete nodes
+are shape-hidden, and no shape queries will match.
+
+**I think I prefer this option the most**
+
+If we were to pick this option, how to implement abstract value changes in this framework?
+
+We could say that shape queries in general do not match hidden nodes. 
+But this is limiting, since read-only shape queries are quite useful. Imagine a "list_length" operation not working just
+because some outer operation has a handle to one of the list's elements.
+
+Really, by read-only we mean "does not change the abstract value of the matched node". In the concrete, as long as the type remains the same,
+it can be mutated just fine (assumption: pass-by-reference semantics).
+
+Actually, we run into the problem of "even if we match an Object, we may not be allowed to set it to Object", since a String node may match
+as Object, but if we then set it to Object by setting it to Integer (and then raising it to Object), then we have a problem in the outer operation
+that has a handle to the node as "String".
+
+So we do actually need to know whether or not operations set a node's value to *anything*. But we have that information for regular graphs anyway, so that's good.
+Then, we have the following options:
+1. We allow modification of the abstract value, but this induces a non-shape-hidden constraint on the matched node.
+   We do not allow _any_ changes (even same abstract value) to the matched node if we want to match nodes that may have an outside handle.
+2. We only match invariantly and allow invariant changes to the abstract value, i.e., a node that exists outside as a String can not be matched as Object.
+   * It could be that op A has a handle to the node as String, calls op B which takes an Object, so now the node exists both as String and Object.
+   * In this case, the node must only match as the greatest subtype of String and Object, which is String.
+   * But then operations that *set* the value to String would be allowed to be called on that node.
+   * Actually, we could even allow subtypes? An operation that sets the value to SubtypeOfString would be allowed to be called on that node.
+
+Can we combine the two options?
+1. Determine what we are doing with the shape matched nodes (*and edges!*)
+   * Deletions: The shape query will not match on shape-hidden nodes (i.e., ones for which previous handles exist)
+   * Modifications: Determine the resulting type that the node will have. Call it `ResultingT`.
+2. Dynamic match behavior:
+   * Neither deletions nor modifications: The shape query can match all nodes and edges.
+   * Modifications but no deletions: The shape query matches only nodes for which the existing handle is a supertype of `ResultingT`.
+   * Deletions: The shape query matches only nodes which are not shape-hidden, i.e., for which no previous handle exists at all.
+   * **Note**: This behavior can actually be per-node/edge, i.e., if we have a shape query for two nodes `a` and `b`,
+     If only `a` is modified and `b` is not touched, then `b` can be matched to anything, while `a` can only be matched according to the `ResultingT` rule above.
 
 ## Thoughts about abstract graph changes in terms of function signatures
 Any static changes must be inside some signature.
