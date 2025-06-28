@@ -1,12 +1,12 @@
 use crate::{BuiltinOperation, BuiltinQuery, EdgePattern, SimpleSemantics};
-use grabapl::{OperationContext, OperationId};
+use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
 use grabapl::graph::operation::query::GraphShapeQuery;
 use grabapl::graph::operation::user_defined::{
     AbstractNodeId, AbstractOperationArgument, Instruction, QueryInstructions, UserDefinedOperation,
 };
 use grabapl::graph::pattern::{OperationArgument, OperationParameter};
+use grabapl::{OperationContext, OperationId};
 use std::collections::HashMap;
-use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
 
 fn mk_builtin_instruction(
     op: BuiltinOperation,
@@ -124,19 +124,20 @@ pub fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemanti
     UserDefinedOperation::new(param, instructions)
 }
 
-pub fn get_mk_n_to_0_list_user_defined_operation(op_ctx: &OperationContext<SimpleSemantics>, self_op_id: u32) -> UserDefinedOperation<SimpleSemantics> {
+pub fn get_mk_n_to_0_list_user_defined_operation(
+    op_ctx: &OperationContext<SimpleSemantics>,
+    self_op_id: u32,
+) -> UserDefinedOperation<SimpleSemantics> {
     // Expects one input node
     let mut param_builder = OperationParameterBuilder::new();
     param_builder.expect_explicit_input_node("a", ()).unwrap();
     let param = param_builder.build().unwrap();
-    let mk_operation_instruction =
-        |op_id: OperationId, args: Vec<AbstractNodeId>| {
-            mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
-        };
-    let mk_self_operation_instruction =
-        |args: Vec<AbstractNodeId>| {
-            crate::sample_user_defined_operations::mk_operation_instruction(self_op_id, &param, args)
-        };
+    let mk_operation_instruction = |op_id: OperationId, args: Vec<AbstractNodeId>| {
+        mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
+    };
+    let mk_self_operation_instruction = |args: Vec<AbstractNodeId>| {
+        crate::sample_user_defined_operations::mk_operation_instruction(self_op_id, &param, args)
+    };
 
     let input_node = AbstractNodeId::param("a");
     let mut instructions = vec![];
@@ -180,12 +181,10 @@ pub fn get_mk_n_to_0_list_user_defined_operation(op_ctx: &OperationContext<Simpl
                     // recursive call
                     (
                         None,
-                        mk_self_operation_instruction(
-                            vec![AbstractNodeId::DynamicOutputMarker(
-                                "add_child".into(),
-                                "child".into(),
-                            )],
-                        ),
+                        mk_self_operation_instruction(vec![AbstractNodeId::DynamicOutputMarker(
+                            "add_child".into(),
+                            "child".into(),
+                        )]),
                     ),
                 ],
             },
@@ -202,7 +201,6 @@ pub fn get_mk_n_to_0_list_user_defined_operation(op_ctx: &OperationContext<Simpl
     //  What if a caller wants to access a conditionally created node? the query system needs to be used to check that a node exists.
 
     UserDefinedOperation::new(param, instructions)
-
 }
 
 pub fn get_count_list_len_user_defined_operation(
@@ -211,17 +209,17 @@ pub fn get_count_list_len_user_defined_operation(
 ) -> UserDefinedOperation<SimpleSemantics> {
     // Expects the list head as first input node, then the accumulator as second input node
     let mut param_builder = OperationParameterBuilder::new();
-    param_builder.expect_explicit_input_node("input", ()).unwrap();
+    param_builder
+        .expect_explicit_input_node("input", ())
+        .unwrap();
     param_builder.expect_explicit_input_node("acc", ()).unwrap();
     let param = param_builder.build().unwrap();
-    let mk_operation_instruction =
-        |op_id: OperationId, args: Vec<AbstractNodeId>| {
-            mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
-        };
-    let mk_self_operation_instruction =
-        |args: Vec<AbstractNodeId>| {
-            crate::sample_user_defined_operations::mk_operation_instruction(self_op_id, &param, args)
-        };
+    let mk_operation_instruction = |op_id: OperationId, args: Vec<AbstractNodeId>| {
+        mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
+    };
+    let mk_self_operation_instruction = |args: Vec<AbstractNodeId>| {
+        crate::sample_user_defined_operations::mk_operation_instruction(self_op_id, &param, args)
+    };
 
     let input_node = AbstractNodeId::param("input");
     let acc_node = AbstractNodeId::param("acc");
@@ -288,17 +286,19 @@ pub fn get_insert_bst_user_defined_operation(
 ) -> UserDefinedOperation<SimpleSemantics> {
     // Expects the root of the binary tree as first input node, then the value to insert as second input node
     let mut param_builder = OperationParameterBuilder::new();
-    param_builder.expect_explicit_input_node("root", ()).unwrap();
-    param_builder.expect_explicit_input_node("value", ()).unwrap();
+    param_builder
+        .expect_explicit_input_node("root", ())
+        .unwrap();
+    param_builder
+        .expect_explicit_input_node("value", ())
+        .unwrap();
     let param = param_builder.build().unwrap();
-    let mk_operation_instruction =
-        |op_id: OperationId, args: Vec<AbstractNodeId>| {
-            mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
-        };
-    let mk_self_operation_instruction =
-        |args: Vec<AbstractNodeId>| {
-            crate::sample_user_defined_operations::mk_operation_instruction(self_op_id, &param, args)
-        };
+    let mk_operation_instruction = |op_id: OperationId, args: Vec<AbstractNodeId>| {
+        mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
+    };
+    let mk_self_operation_instruction = |args: Vec<AbstractNodeId>| {
+        crate::sample_user_defined_operations::mk_operation_instruction(self_op_id, &param, args)
+    };
 
     let root_node = AbstractNodeId::param("root");
     let value_node = AbstractNodeId::param("value");
@@ -438,17 +438,19 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
 
     // Expects the root of the binary tree as first input node, then the value to insert as second input node
     let mut param_builder = OperationParameterBuilder::new();
-    param_builder.expect_explicit_input_node("root", ()).unwrap();
-    param_builder.expect_explicit_input_node("value", ()).unwrap();
+    param_builder
+        .expect_explicit_input_node("root", ())
+        .unwrap();
+    param_builder
+        .expect_explicit_input_node("value", ())
+        .unwrap();
     let param = param_builder.build().unwrap();
-    let mk_operation_instruction =
-        |op_id: OperationId, args: Vec<AbstractNodeId>| {
-            mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
-        };
-    let mk_self_operation_instruction =
-        |args: Vec<AbstractNodeId>| {
-            crate::sample_user_defined_operations::mk_operation_instruction(self_op_id, &param, args)
-        };
+    let mk_operation_instruction = |op_id: OperationId, args: Vec<AbstractNodeId>| {
+        mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
+    };
+    let mk_self_operation_instruction = |args: Vec<AbstractNodeId>| {
+        crate::sample_user_defined_operations::mk_operation_instruction(self_op_id, &param, args)
+    };
 
     let root_node = AbstractNodeId::param("root");
     let value_node = AbstractNodeId::param("value");
@@ -508,10 +510,12 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                         explicit_input_nodes: vec!["input".into()],
                                                         parameter_graph: g,
                                                         subst_to_node_keys: HashMap::from([(
-                                                            "input".into(), head,
+                                                            "input".into(),
+                                                            head,
                                                         )]),
                                                         node_keys_to_subst: HashMap::from([(
-                                                            head, "input".into(),
+                                                            head,
+                                                            "input".into(),
                                                         )]),
                                                     },
                                                     expected_graph: expected_g,
@@ -531,15 +535,13 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                     // we have a right child, recurse on it
                                                     (
                                                         None,
-                                                        mk_self_operation_instruction(
-                                                            vec![
-                                                                AbstractNodeId::DynamicOutputMarker(
-                                                                    "right_child_query".into(),
-                                                                    "right".into(),
-                                                                ),
-                                                                value_node,
-                                                            ],
-                                                        ),
+                                                        mk_self_operation_instruction(vec![
+                                                            AbstractNodeId::DynamicOutputMarker(
+                                                                "right_child_query".into(),
+                                                                "right".into(),
+                                                            ),
+                                                            value_node,
+                                                        ]),
                                                     ),
                                                 ],
                                                 not_taken: vec![
@@ -619,10 +621,12 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                         explicit_input_nodes: vec!["input".into()],
                                                         parameter_graph: g,
                                                         subst_to_node_keys: HashMap::from([(
-                                                            "input".into(), head,
+                                                            "input".into(),
+                                                            head,
                                                         )]),
                                                         node_keys_to_subst: HashMap::from([(
-                                                            head, "input".into(),
+                                                            head,
+                                                            "input".into(),
                                                         )]),
                                                     },
                                                     expected_graph: expected_g,
@@ -642,15 +646,13 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                     // we have a left child, recurse on it
                                                     (
                                                         None,
-                                                        mk_self_operation_instruction(
-                                                            vec![
-                                                                AbstractNodeId::DynamicOutputMarker(
-                                                                    "left_child_query".into(),
-                                                                    "left".into(),
-                                                                ),
-                                                                value_node,
-                                                            ],
-                                                        ),
+                                                        mk_self_operation_instruction(vec![
+                                                            AbstractNodeId::DynamicOutputMarker(
+                                                                "left_child_query".into(),
+                                                                "left".into(),
+                                                            ),
+                                                            value_node,
+                                                        ]),
                                                     ),
                                                 ],
                                                 not_taken: vec![
@@ -733,16 +735,16 @@ pub fn get_node_heights_user_defined_operation(
 ) -> UserDefinedOperation<SimpleSemantics> {
     // expects the root node of a binary tree (with left/right edges for children) as input node
     let mut param_builder = OperationParameterBuilder::new();
-    param_builder.expect_explicit_input_node("root", ()).unwrap();
+    param_builder
+        .expect_explicit_input_node("root", ())
+        .unwrap();
     let param = param_builder.build().unwrap();
-    let mk_operation_instruction =
-        |op_id: OperationId, args: Vec<AbstractNodeId>| {
-            mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
-        };
-    let mk_self_operation_instruction =
-        |args: Vec<AbstractNodeId>| {
-            crate::sample_user_defined_operations::mk_operation_instruction(self_op_id, &param, args)
-        };
+    let mk_operation_instruction = |op_id: OperationId, args: Vec<AbstractNodeId>| {
+        mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
+    };
+    let mk_self_operation_instruction = |args: Vec<AbstractNodeId>| {
+        crate::sample_user_defined_operations::mk_operation_instruction(self_op_id, &param, args)
+    };
 
     let root_node = AbstractNodeId::param("root");
     let mut instructions = vec![];
@@ -804,12 +806,10 @@ pub fn get_node_heights_user_defined_operation(
                     // we have a left child, recurse on it
                     (
                         None,
-                        mk_self_operation_instruction(
-                            vec![AbstractNodeId::DynamicOutputMarker(
-                                "left_child_query".into(),
-                                "left".into(),
-                            )],
-                        ),
+                        mk_self_operation_instruction(vec![AbstractNodeId::DynamicOutputMarker(
+                            "left_child_query".into(),
+                            "left".into(),
+                        )]),
                     ),
                     // set root to max of it and left child
                     (
@@ -834,12 +834,10 @@ pub fn get_node_heights_user_defined_operation(
                     // we have a right child, recurse on it
                     (
                         None,
-                        mk_self_operation_instruction(
-                            vec![AbstractNodeId::DynamicOutputMarker(
-                                "right_child_query".into(),
-                                "right".into(),
-                            )],
-                        ),
+                        mk_self_operation_instruction(vec![AbstractNodeId::DynamicOutputMarker(
+                            "right_child_query".into(),
+                            "right".into(),
+                        )]),
                     ),
                     // set root to max of it and right child
                     (

@@ -5,8 +5,13 @@ pub mod user_defined;
 
 use crate::graph::EdgeAttribute;
 use crate::graph::operation::user_defined::{AbstractOperationResultMarker, UserDefinedOperation};
-use crate::graph::pattern::{AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution};
-use crate::graph::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, ConcreteToAbstract, Semantics, SemanticsClone};
+use crate::graph::pattern::{
+    AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationOutput,
+    OperationParameter, ParameterSubstitution,
+};
+use crate::graph::semantics::{
+    AbstractGraph, AbstractMatcher, ConcreteGraph, ConcreteToAbstract, Semantics, SemanticsClone,
+};
 use crate::{DotCollector, Graph, NodeKey, SubstMarker};
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
@@ -37,10 +42,7 @@ pub trait BuiltinOperation: Debug {
 
     // TODO: OperationOutput returned here should only represent Abstract changes. Basically the guaranteed new nodes so that other ops can refer to it.
     //  Maybe we could have something be returned in apply_abstract (just a Vec<SubstMarker>?) to indicate _which_ nodes are guaranteed to be added, and apply then returns a map with those substmarkers as keys?
-    fn apply(
-        &self,
-        g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>,
-    ) -> OperationOutput;
+    fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>) -> OperationOutput;
 }
 
 /// Contains available operations
@@ -184,7 +186,10 @@ pub fn get_substitution<S: Semantics>(
             .map(|(param_idx, &arg_idx)| {
                 let param_node_key = param_ref.from_index(param_idx);
                 let arg_node_key = arg_ref.from_index(arg_idx);
-                (param.node_keys_to_subst[&param_node_key].clone(), arg_node_key)
+                (
+                    param.node_keys_to_subst[&param_node_key].clone(),
+                    arg_node_key,
+                )
             })
             .collect::<HashMap<_, _>>();
 

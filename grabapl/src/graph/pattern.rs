@@ -1,11 +1,11 @@
-use std::borrow::Cow;
+use crate::graph::GraphTrait;
 use crate::graph::operation::{OperationError, OperationResult};
 use crate::graph::semantics::{AbstractGraph, SemanticsClone};
-use crate::{interned_string_newtype, Graph, NodeKey, Semantics, SubstMarker, WithSubstMarker};
+use crate::{Graph, NodeKey, Semantics, SubstMarker, WithSubstMarker, interned_string_newtype};
 use derive_more::From;
-use std::collections::HashMap;
 use internment::Intern;
-use crate::graph::GraphTrait;
+use std::borrow::Cow;
+use std::collections::HashMap;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
 
 pub struct OperationParameter<S: Semantics> {
@@ -78,10 +78,7 @@ pub struct GraphWithSubstitution<'a, G: GraphTrait> {
 }
 
 impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<'a, G> {
-    pub fn new(
-        graph: &'a mut G,
-        subst: &'a ParameterSubstitution,
-    ) -> Self {
+    pub fn new(graph: &'a mut G, subst: &'a ParameterSubstitution) -> Self {
         GraphWithSubstitution {
             graph,
             subst,
@@ -96,18 +93,13 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         }
     }
 
-    fn get_node_key(
-        &self,
-        marker: &NodeMarker,
-    ) -> Option<NodeKey> {
+    fn get_node_key(&self, marker: &NodeMarker) -> Option<NodeKey> {
         let found_key = match marker {
             NodeMarker::Subst(sm) => {
                 // If the marker is a SubstMarker, we look it up in the substitution mapping.
                 self.subst.mapping.get(&sm).copied()
             }
-            NodeMarker::New(nnm) => {
-                self.new_nodes_map.get(&nnm).copied()
-            }
+            NodeMarker::New(nnm) => self.new_nodes_map.get(&nnm).copied(),
         };
         if let Some(key) = found_key {
             if self.removed_nodes.contains(&key) {
@@ -124,26 +116,22 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         marker
     }
 
-    pub fn add_node(
-        &mut self,
-        marker: impl Into<NewNodeMarker>,
-        value: G::NodeAttr,
-    ) {
+    pub fn add_node(&mut self, marker: impl Into<NewNodeMarker>, value: G::NodeAttr) {
         let marker = marker.into();
         // TODO: make this error
         if self.get_node_key(&NodeMarker::New(marker)).is_some() {
             // TODO: should we disallow re-adding a node that was deleted? if so,
             //  the above should be changed since it skips previously removed nodes
-            panic!("Marker {:?} already exists in the substitution mapping", marker);
+            panic!(
+                "Marker {:?} already exists in the substitution mapping",
+                marker
+            );
         }
         let node_key = self.graph.add_node(value);
         self.new_nodes.push(node_key);
         self.new_nodes_map.insert(marker, node_key);
     }
-    pub fn delete_node(
-        &mut self,
-        marker: impl Into<NodeMarker>,
-    ) -> Option<G::NodeAttr> {
+    pub fn delete_node(&mut self, marker: impl Into<NodeMarker>) -> Option<G::NodeAttr> {
         let marker = marker.into();
         let Some(node_key) = self.get_node_key(&marker) else {
             return None; // Node not found in the substitution or new nodes.
@@ -154,7 +142,6 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         }
         removed_value
     }
-
 
     pub fn add_edge(
         &mut self,
@@ -186,14 +173,10 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         removed_value
     }
 
-    pub fn get_node_value(
-        &self,
-        marker: impl Into<NodeMarker>,
-    ) -> Option<&G::NodeAttr> {
+    pub fn get_node_value(&self, marker: impl Into<NodeMarker>) -> Option<&G::NodeAttr> {
         let marker = marker.into();
-        self.get_node_key(&marker).and_then(|node_key| {
-            self.graph.get_node_attr(node_key)
-        })
+        self.get_node_key(&marker)
+            .and_then(|node_key| self.graph.get_node_attr(node_key))
     }
 
     pub fn set_node_value(
@@ -211,7 +194,6 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         }
         old_value
     }
-
 
     pub fn get_edge_value(
         &self,
@@ -235,7 +217,8 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         let dst_marker = dst_marker.into();
         let src_key = self.get_node_key(&src_marker)?;
         let dst_key = self.get_node_key(&dst_marker)?;
-        self.changed_edge_av.insert((src_key, dst_key), value.clone());
+        self.changed_edge_av
+            .insert((src_key, dst_key), value.clone());
         let old_value = self.graph.set_edge_attr((src_key, dst_key), value.clone());
         if old_value.is_some() {
             // we only changed it if it exists, by semantics of set_edge_attr
@@ -246,8 +229,11 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
 
     fn get_new_nodes_and_edges_from_desired_names(
         &self,
-        desired_node_output_names: &HashMap<NewNodeMarker, AbstractOutputNodeMarker>
-    ) -> (HashMap<AbstractOutputNodeMarker, NodeKey>, Vec<(NodeKey, NodeKey)>) {
+        desired_node_output_names: &HashMap<NewNodeMarker, AbstractOutputNodeMarker>,
+    ) -> (
+        HashMap<AbstractOutputNodeMarker, NodeKey>,
+        Vec<(NodeKey, NodeKey)>,
+    ) {
         let mut new_nodes = HashMap::new();
         for (marker, node_key) in &self.new_nodes_map {
             let Some(output_marker) = desired_node_output_names.get(&marker) else {
@@ -258,18 +244,23 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         let mut new_edges = Vec::new();
         // only include edges that belong to nodes that are in new_nodes and/or the existing graph
         for (src_key, dst_key) in &self.new_edges {
-            if new_nodes.values().any(|&n| n == *src_key) || new_nodes.values().any(|&n| n == *dst_key) {
+            if new_nodes.values().any(|&n| n == *src_key)
+                || new_nodes.values().any(|&n| n == *dst_key)
+            {
                 new_edges.push((*src_key, *dst_key));
             }
         }
         (new_nodes, new_edges)
     }
 
-    pub fn get_abstract_output<S: Semantics<NodeAbstract = G::NodeAttr, EdgeAbstract = G::EdgeAttr>>(
+    pub fn get_abstract_output<
+        S: Semantics<NodeAbstract = G::NodeAttr, EdgeAbstract = G::EdgeAttr>,
+    >(
         &self,
-        desired_node_output_names: HashMap<NewNodeMarker, AbstractOutputNodeMarker>
+        desired_node_output_names: HashMap<NewNodeMarker, AbstractOutputNodeMarker>,
     ) -> AbstractOperationOutput<S> {
-        let (new_nodes, new_edges) = self.get_new_nodes_and_edges_from_desired_names(&desired_node_output_names);
+        let (new_nodes, new_edges) =
+            self.get_new_nodes_and_edges_from_desired_names(&desired_node_output_names);
 
         // Only report changed av's for nodes and edges that are in the new_nodes and new_edges.
         let mut changed_abstract_values_nodes = HashMap::new();
@@ -280,7 +271,10 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         }
         let mut changed_abstract_edges = HashMap::new();
         for (edge_key, edge_av) in &self.changed_edge_av {
-            if new_edges.iter().any(|(src, dst)| *src == edge_key.0 && *dst == edge_key.1) {
+            if new_edges
+                .iter()
+                .any(|(src, dst)| *src == edge_key.0 && *dst == edge_key.1)
+            {
                 changed_abstract_edges.insert(*edge_key, edge_av.clone());
             }
         }
@@ -300,9 +294,10 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
 
     pub fn get_concrete_output(
         &self,
-        desired_node_output_names: HashMap<NewNodeMarker, AbstractOutputNodeMarker>
+        desired_node_output_names: HashMap<NewNodeMarker, AbstractOutputNodeMarker>,
     ) -> OperationOutput {
-        let (new_nodes, _new_edges) = self.get_new_nodes_and_edges_from_desired_names(&desired_node_output_names);
+        let (new_nodes, _new_edges) =
+            self.get_new_nodes_and_edges_from_desired_names(&desired_node_output_names);
 
         OperationOutput {
             new_nodes,

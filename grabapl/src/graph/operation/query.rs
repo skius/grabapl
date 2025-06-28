@@ -1,15 +1,20 @@
 use crate::graph::EdgeAttribute;
 use crate::graph::operation::OperationResult;
 use crate::graph::operation::user_defined::{AbstractOperationResultMarker, QueryInstructions};
-use crate::graph::pattern::{AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationParameter, ParameterSubstitution};
+use crate::graph::pattern::{
+    AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationParameter,
+    ParameterSubstitution,
+};
 use crate::graph::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, SemanticsClone};
-use crate::{interned_string_newtype, Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
+use crate::{
+    Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker, interned_string_newtype,
+};
 use derive_more::From;
 use derive_more::with_trait::Into;
+use internment::Intern;
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
 use std::collections::HashMap;
-use internment::Intern;
 
 pub struct AbstractQueryOutput<S: Semantics> {
     pub changes: Vec<AbstractQueryChange<S>>,
@@ -91,10 +96,7 @@ pub trait BuiltinQuery {
 
     // TODO: if we decide to actually support modification, we need to include an OperationOutput so that we can support new nodes and can keep track of
     //  changes of av's.
-    fn query(
-        &self,
-        g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>,
-    ) -> ConcreteQueryOutput;
+    fn query(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>) -> ConcreteQueryOutput;
 }
 
 pub struct ShapeQuery<S: Semantics> {
@@ -304,7 +306,8 @@ fn get_shape_query_substitution<S: SemanticsClone>(
                     Some((
                         query
                             .node_keys_to_shape_idents
-                            .get(&desired_shape_node_key)?.clone(),
+                            .get(&desired_shape_node_key)?
+                            .clone(),
                         dynamic_graph_node_key,
                     ))
                 })

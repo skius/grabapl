@@ -1,7 +1,12 @@
 use crate::graph::operation::query::{BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier};
-use crate::graph::operation::user_defined::{AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, AbstractUserDefinedOperationOutput, QueryInstructions, UserDefinedOperation};
+use crate::graph::operation::user_defined::{
+    AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker,
+    AbstractUserDefinedOperationOutput, QueryInstructions, UserDefinedOperation,
+};
 use crate::graph::operation::{BuiltinOperation, OperationError, get_substitution};
-use crate::graph::pattern::{AbstractOutputNodeMarker, GraphWithSubstitution, OperationParameter, ParameterSubstitution};
+use crate::graph::pattern::{
+    AbstractOutputNodeMarker, GraphWithSubstitution, OperationParameter, ParameterSubstitution,
+};
 use crate::graph::semantics::{AbstractGraph, AbstractMatcher, SemanticsClone};
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, OperationContext, OperationId, SubstMarker};
@@ -76,7 +81,7 @@ enum BuilderInstruction<S: SemanticsClone> {
     #[debug("AddOperation(???, args: {_1:?})")]
     AddOperation(BuilderOpLike<S>, Vec<AbstractNodeId>),
     #[debug("ReturnNode({_0:?}, {_1:?}, ???)")]
-    ReturnNode(AbstractNodeId, AbstractOutputNodeMarker, S::NodeAbstract)
+    ReturnNode(AbstractNodeId, AbstractOutputNodeMarker, S::NodeAbstract),
 }
 
 #[derive(Error, Debug, Clone)]
@@ -136,7 +141,8 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         if !self.instructions.is_empty() {
             self.instructions.pop();
         }
-        self.check_instructions().expect("internal error: a prefix slice of instructions should always be valid");
+        self.check_instructions()
+            .expect("internal error: a prefix slice of instructions should always be valid");
     }
 
     pub fn expect_parameter_node(
@@ -286,9 +292,8 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         if let AbstractNodeId::ParameterMarker(..) = &aid {
             return Err(OperationBuilderError::CannotReturnParameter(aid));
         }
-        self.instructions.push(
-            BuilderInstruction::ReturnNode(aid, output_marker, node),
-        );
+        self.instructions
+            .push(BuilderInstruction::ReturnNode(aid, output_marker, node));
         self.check_instructions_or_rollback()
     }
 
@@ -301,8 +306,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         // Here we would typically finalize the operation and return it.
         // For now, we just return Ok to indicate success.
 
-        let builder_result =
-            IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
+        let builder_result = IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
 
         let param = builder_result.operation_parameter;
         let instructions = builder_result.instructions;
@@ -310,7 +314,8 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         let mut interpreter =
             IntermediateInterpreter::new_for_self_op_id(self_op_id, param, self.op_ctx);
 
-        let user_def_op = interpreter.create_user_defined_operation(instructions, builder_result.return_nodes)?;
+        let user_def_op =
+            interpreter.create_user_defined_operation(instructions, builder_result.return_nodes)?;
 
         Ok(user_def_op)
     }
@@ -339,7 +344,10 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
             builder_result.operation_parameter,
             self.op_ctx,
         );
-        let _ = interpreter.create_user_defined_operation(builder_result.instructions, builder_result.return_nodes)?;
+        let _ = interpreter.create_user_defined_operation(
+            builder_result.instructions,
+            builder_result.return_nodes,
+        )?;
         Ok(())
     }
 }
@@ -357,15 +365,15 @@ impl<
     fn get_intermediate_state(
         &self,
     ) -> Result<(IntermediateState<S>, Vec<IntermediateStatePath>), OperationBuilderError> {
-        let builder_result =
-            IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
+        let builder_result = IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
         let mut interpreter = IntermediateInterpreter::new_for_self_op_id(
             0, // TODO: use a real operation ID here
             builder_result.operation_parameter,
             self.op_ctx,
         );
 
-        let (_, interp_instructions) = interpreter.interpret_instructions(builder_result.instructions)?;
+        let (_, interp_instructions) =
+            interpreter.interpret_instructions(builder_result.instructions)?;
         let path = builder_result.state_path;
         let mut path_iter = path.iter().peekable().cloned();
 
@@ -522,10 +530,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
     fn run(
         builder_instructions: &'a [BuilderInstruction<S>],
         op_ctx: &'a OperationContext<S>,
-    ) -> Result<
-        BuilderResult<S>,
-        OperationBuilderError,
-    > {
+    ) -> Result<BuilderResult<S>, OperationBuilderError> {
         /*
         General idea:
         Whenever we see start_query (or start_shape_query), we push a query state onto a stack.
@@ -664,7 +669,11 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
 
         let mut return_nodes = HashMap::new();
         // if we are outside all queries, check for ReturnNode instructions.
-        if !builder.path.iter().any(|i| matches!(i, IntermediateStatePath::StartQuery(..))) {
+        if !builder
+            .path
+            .iter()
+            .any(|i| matches!(i, IntermediateStatePath::StartQuery(..)))
+        {
             // we are outside all queries
             return_nodes = Self::collect_return_node_instructions(&mut iter)?;
             // TODO: validate that we have not encountered a Recurse instruction. In recursive queries we cannot statically return.
@@ -957,9 +966,15 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     let key = operation_parameter
                         .parameter_graph
                         .add_node(node_abstract.clone());
-                    operation_parameter.subst_to_node_keys.insert(marker.clone(), key);
-                    operation_parameter.node_keys_to_subst.insert(key, marker.clone());
-                    operation_parameter.explicit_input_nodes.push(marker.clone());
+                    operation_parameter
+                        .subst_to_node_keys
+                        .insert(marker.clone(), key);
+                    operation_parameter
+                        .node_keys_to_subst
+                        .insert(key, marker.clone());
+                    operation_parameter
+                        .explicit_input_nodes
+                        .push(marker.clone());
                 }
                 BuilderInstruction::ExpectContextNode(marker, node_abstract) => {
                     iter.next();
@@ -969,8 +984,12 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     let key = operation_parameter
                         .parameter_graph
                         .add_node(node_abstract.clone());
-                    operation_parameter.subst_to_node_keys.insert(marker.clone(), key);
-                    operation_parameter.node_keys_to_subst.insert(key, marker.clone());
+                    operation_parameter
+                        .subst_to_node_keys
+                        .insert(marker.clone(), key);
+                    operation_parameter
+                        .node_keys_to_subst
+                        .insert(key, marker.clone());
                 }
                 BuilderInstruction::ExpectParameterEdge(
                     source_marker,
@@ -981,11 +1000,15 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     let source_key = operation_parameter
                         .subst_to_node_keys
                         .get(source_marker)
-                        .ok_or(OperationBuilderError::NotFoundSubstMarker(source_marker.clone()))?;
+                        .ok_or(OperationBuilderError::NotFoundSubstMarker(
+                            source_marker.clone(),
+                        ))?;
                     let target_key = operation_parameter
                         .subst_to_node_keys
                         .get(target_marker)
-                        .ok_or(OperationBuilderError::NotFoundSubstMarker(target_marker.clone()))?;
+                        .ok_or(OperationBuilderError::NotFoundSubstMarker(
+                            target_marker.clone(),
+                        ))?;
                     operation_parameter.parameter_graph.add_edge(
                         *source_key,
                         *target_key,
@@ -1003,14 +1026,19 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
 
     fn collect_return_node_instructions(
         iter: &mut Peekable<Iter<BuilderInstruction<S>>>,
-    ) -> Result<HashMap<AbstractNodeId, (AbstractOutputNodeMarker, S::NodeAbstract)>, OperationBuilderError> {
+    ) -> Result<
+        HashMap<AbstractNodeId, (AbstractOutputNodeMarker, S::NodeAbstract)>,
+        OperationBuilderError,
+    > {
         let mut return_nodes = HashMap::new();
         while let Some(instruction) = iter.peek() {
             match instruction {
                 BuilderInstruction::ReturnNode(aid, output_marker, node) => {
                     iter.next();
                     if return_nodes.contains_key(aid) {
-                        return Err(OperationBuilderError::AlreadySelectedReturnNode(aid.clone()));
+                        return Err(OperationBuilderError::AlreadySelectedReturnNode(
+                            aid.clone(),
+                        ));
                     }
                     return_nodes.insert(aid.clone(), (output_marker.clone(), node.clone()));
                 }
@@ -1299,12 +1327,16 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 .node_av_of_aid(&aid)
                 .ok_or(OperationBuilderError::NotFoundReturnNode(aid.clone()))?;
             if !S::NodeMatcher::matches(inferred_av, &node_abstract) {
-                return Err(OperationBuilderError::InvalidReturnNodeType(
+                return Err(OperationBuilderError::InvalidReturnNodeType(aid));
+            }
+            if self
+                .current_state
+                .may_originate_from_shape_query
+                .contains(&aid)
+            {
+                return Err(OperationBuilderError::ReturnNodeMayOriginateFromShapeQuery(
                     aid,
                 ));
-            }
-            if self.current_state.may_originate_from_shape_query.contains(&aid) {
-                return Err(OperationBuilderError::ReturnNodeMayOriginateFromShapeQuery(aid));
             }
             output.new_nodes.insert(aid, (output_marker, node_abstract));
         }
@@ -1443,7 +1475,10 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         let (subst, arg) = self.get_current_substitution(&param, args)?;
 
         // apply the query to the current graph
-        query.apply_abstract(&mut GraphWithSubstitution::new(&mut self.current_state.graph, &subst));
+        query.apply_abstract(&mut GraphWithSubstitution::new(
+            &mut self.current_state.graph,
+            &subst,
+        ));
 
         // TODO: is this right? do we want to snapshot the state _after_ the query?
         //  I think so, because right now (weirdly enough) the query can modify. and the modifications
@@ -1524,7 +1559,8 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 // we already processed this
                 return Ok(());
             }
-            let subst_marker = SubstMarker::from((param.explicit_input_nodes.len() as u32).to_string());
+            let subst_marker =
+                SubstMarker::from((param.explicit_input_nodes.len() as u32).to_string());
             let key = self
                 .current_state
                 .node_keys_to_aid
@@ -1540,8 +1576,12 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 )
                 .clone();
             let param_key = param.parameter_graph.add_node(abstract_value);
-            param.subst_to_node_keys.insert(subst_marker.clone(), param_key);
-            param.node_keys_to_subst.insert(param_key, subst_marker.clone());
+            param
+                .subst_to_node_keys
+                .insert(subst_marker.clone(), param_key);
+            param
+                .node_keys_to_subst
+                .insert(param_key, subst_marker.clone());
             param.explicit_input_nodes.push(subst_marker.clone());
             abstract_args.push(aid.clone());
             arg_aid_to_param_subst.insert(aid.clone(), subst_marker.clone());
@@ -1641,11 +1681,14 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
 
                     // now update the state for the true branch.
                     let state_key = self.current_state.graph.add_node(av);
-                    let aid = AbstractNodeId::DynamicOutputMarker(gsq_op_marker.clone(), marker.clone());
+                    let aid =
+                        AbstractNodeId::DynamicOutputMarker(gsq_op_marker.clone(), marker.clone());
                     self.current_state
                         .node_keys_to_aid
                         .insert(state_key, aid.clone());
-                    self.current_state.may_originate_from_shape_query.insert(aid.clone());
+                    self.current_state
+                        .may_originate_from_shape_query
+                        .insert(aid.clone());
                 }
                 GraphShapeQueryInstruction::ExpectShapeEdge(src, target, av) => {
                     let src_key = aid_to_node_key_hack!(src.clone())?;

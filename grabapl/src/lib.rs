@@ -2,19 +2,8 @@ pub mod graph;
 pub mod pattern_match;
 pub mod util;
 
-use std::borrow::Cow;
 use crate::graph::*;
-use petgraph::algo::subgraph_isomorphisms_iter;
-use petgraph::dot::Dot;
-use petgraph::prelude::{DiGraphMap, GraphMap, StableDiGraph};
-use petgraph::visit::{IntoEdgesDirected, IntoNeighborsDirected, NodeRef};
-use petgraph::{Direction, dot};
-use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::iter;
 use derive_more::From;
-use internment::Intern;
 pub use graph::DotCollector;
 pub use graph::EdgeInsertionOrder;
 pub use graph::EdgeKey;
@@ -23,6 +12,17 @@ pub use graph::NodeKey;
 pub use graph::OperationContext;
 pub use graph::OperationId;
 pub use graph::semantics::Semantics;
+use internment::Intern;
+use petgraph::algo::subgraph_isomorphisms_iter;
+use petgraph::dot::Dot;
+use petgraph::prelude::{DiGraphMap, GraphMap, StableDiGraph};
+use petgraph::visit::{IntoEdgesDirected, IntoNeighborsDirected, NodeRef};
+use petgraph::{Direction, dot};
+use std::borrow::Cow;
+use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::iter;
 
 // TODO: should we instead have an 'AbstractAttribute' as well, and the pattern matcher works on that?
 // From every concrete graph you can get its abstract graph. That should be like the type.

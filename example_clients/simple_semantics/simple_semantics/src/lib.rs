@@ -1,11 +1,15 @@
 pub mod sample_user_defined_operations;
 
+use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
 use grabapl::graph::operation::query::{
     AbstractQueryChange, AbstractQueryOutput, BuiltinQuery as BuiltinQueryTrait,
     ConcreteQueryOutput, EdgeChange, NodeChange,
 };
 use grabapl::graph::operation::run_operation;
-use grabapl::graph::pattern::{GraphWithSubstitution, NewNodeMarker, OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution};
+use grabapl::graph::pattern::{
+    GraphWithSubstitution, NewNodeMarker, OperationArgument, OperationOutput, OperationParameter,
+    ParameterSubstitution,
+};
 use grabapl::graph::semantics::{
     AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, MatchJoiner,
     Semantics,
@@ -14,7 +18,6 @@ use grabapl::{DotCollector, EdgeInsertionOrder, OperationContext, SubstMarker, W
 use std::collections::HashMap;
 use std::convert::Into;
 use std::fmt::Debug;
-use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
 
 pub struct SimpleSemantics;
 
@@ -102,13 +105,19 @@ impl BuiltinQueryTrait for BuiltinQuery {
         let mut builder = OperationParameterBuilder::new();
         match self {
             BuiltinQuery::HasChild => {
-                builder.expect_explicit_input_node(Self::HAS_CHILD_INPUT, ()).unwrap();
+                builder
+                    .expect_explicit_input_node(Self::HAS_CHILD_INPUT, ())
+                    .unwrap();
             }
             BuiltinQuery::IsValueGt(_) => {
-                builder.expect_explicit_input_node(Self::IS_VALUE_GT_INPUT, ()).unwrap();
+                builder
+                    .expect_explicit_input_node(Self::IS_VALUE_GT_INPUT, ())
+                    .unwrap();
             }
             BuiltinQuery::IsValueEq(_) => {
-                builder.expect_explicit_input_node(Self::IS_VALUE_EQ_INPUT, ()).unwrap();
+                builder
+                    .expect_explicit_input_node(Self::IS_VALUE_EQ_INPUT, ())
+                    .unwrap();
             }
             BuiltinQuery::ValuesEqual => {
                 builder
@@ -162,10 +171,7 @@ impl BuiltinQueryTrait for BuiltinQuery {
         }
     }
 
-    fn query(
-        &self,
-        g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>
-    ) -> ConcreteQueryOutput {
+    fn query(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>) -> ConcreteQueryOutput {
         let mut taken = false;
         match self {
             BuiltinQuery::HasChild => {
@@ -174,12 +180,20 @@ impl BuiltinQueryTrait for BuiltinQuery {
                 )
             }
             BuiltinQuery::IsValueGt(val) => {
-                if *g.get_node_value(SubstMarker::from(Self::IS_VALUE_GT_INPUT)).unwrap() > *val {
+                if *g
+                    .get_node_value(SubstMarker::from(Self::IS_VALUE_GT_INPUT))
+                    .unwrap()
+                    > *val
+                {
                     taken = true;
                 }
             }
             BuiltinQuery::IsValueEq(val) => {
-                if *g.get_node_value(SubstMarker::from(Self::IS_VALUE_EQ_INPUT)).unwrap() == *val {
+                if *g
+                    .get_node_value(SubstMarker::from(Self::IS_VALUE_EQ_INPUT))
+                    .unwrap()
+                    == *val
+                {
                     taken = true;
                 }
             }
@@ -305,105 +319,105 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 // empty graph
             }
             BuiltinOperation::AppendChild => {
-                builder.expect_explicit_input_node(Self::APPEND_CHILD_INPUT, ()).unwrap();
+                builder
+                    .expect_explicit_input_node(Self::APPEND_CHILD_INPUT, ())
+                    .unwrap();
             }
             BuiltinOperation::IndexCycle => {
-                builder.expect_explicit_input_node(
-                    Self::INDEX_CYCLE_INPUT_A,
-                    (),
-                ).unwrap();
-                builder.expect_context_node(Self::INDEX_CYCLE_INPUT_B, ()).unwrap();
-                builder.expect_context_node(Self::INDEX_CYCLE_INPUT_C, ()).unwrap();
-                builder.expect_edge(
-                    Self::INDEX_CYCLE_INPUT_A,
-                    Self::INDEX_CYCLE_INPUT_B,
-                    EdgePattern::Wildcard,
-                ).unwrap();
-                builder.expect_edge(
-                    Self::INDEX_CYCLE_INPUT_B,
-                    Self::INDEX_CYCLE_INPUT_C,
-                    EdgePattern::Wildcard,
-                ).unwrap();
-                builder.expect_edge(
-                    Self::INDEX_CYCLE_INPUT_C,
-                    Self::INDEX_CYCLE_INPUT_A,
-                    EdgePattern::Exact("cycle".to_string()),
-                ).unwrap();
+                builder
+                    .expect_explicit_input_node(Self::INDEX_CYCLE_INPUT_A, ())
+                    .unwrap();
+                builder
+                    .expect_context_node(Self::INDEX_CYCLE_INPUT_B, ())
+                    .unwrap();
+                builder
+                    .expect_context_node(Self::INDEX_CYCLE_INPUT_C, ())
+                    .unwrap();
+                builder
+                    .expect_edge(
+                        Self::INDEX_CYCLE_INPUT_A,
+                        Self::INDEX_CYCLE_INPUT_B,
+                        EdgePattern::Wildcard,
+                    )
+                    .unwrap();
+                builder
+                    .expect_edge(
+                        Self::INDEX_CYCLE_INPUT_B,
+                        Self::INDEX_CYCLE_INPUT_C,
+                        EdgePattern::Wildcard,
+                    )
+                    .unwrap();
+                builder
+                    .expect_edge(
+                        Self::INDEX_CYCLE_INPUT_C,
+                        Self::INDEX_CYCLE_INPUT_A,
+                        EdgePattern::Exact("cycle".to_string()),
+                    )
+                    .unwrap();
             }
             BuiltinOperation::SetValue(_) => {
-                builder.expect_explicit_input_node(
-                    Self::SET_VALUE_INPUT,
-                    (),
-                ).unwrap();
+                builder
+                    .expect_explicit_input_node(Self::SET_VALUE_INPUT, ())
+                    .unwrap();
             }
             BuiltinOperation::AddEdge => {
-                builder.expect_explicit_input_node(
-                    Self::ADD_EDGE_INPUT_SRC,
-                    (),
-                ).unwrap();
-                builder.expect_explicit_input_node(
-                    Self::ADD_EDGE_INPUT_DST,
-                    (),
-                ).unwrap();
+                builder
+                    .expect_explicit_input_node(Self::ADD_EDGE_INPUT_SRC, ())
+                    .unwrap();
+                builder
+                    .expect_explicit_input_node(Self::ADD_EDGE_INPUT_DST, ())
+                    .unwrap();
             }
             BuiltinOperation::SetEdgeValue(_) => {
-                builder.expect_explicit_input_node(
-                    Self::SET_EDGE_VALUE_INPUT_SRC,
-                    (),
-                ).unwrap();
-                builder.expect_explicit_input_node(
-                    Self::SET_EDGE_VALUE_INPUT_DST,
-                    (),
-                ).unwrap();
-                builder.expect_edge(
-                    Self::SET_EDGE_VALUE_INPUT_SRC,
-                    Self::SET_EDGE_VALUE_INPUT_DST,
-                    EdgePattern::Wildcard,
-                ).unwrap();
+                builder
+                    .expect_explicit_input_node(Self::SET_EDGE_VALUE_INPUT_SRC, ())
+                    .unwrap();
+                builder
+                    .expect_explicit_input_node(Self::SET_EDGE_VALUE_INPUT_DST, ())
+                    .unwrap();
+                builder
+                    .expect_edge(
+                        Self::SET_EDGE_VALUE_INPUT_SRC,
+                        Self::SET_EDGE_VALUE_INPUT_DST,
+                        EdgePattern::Wildcard,
+                    )
+                    .unwrap();
             }
             BuiltinOperation::SetNodeValue(_) => {
-                builder.expect_explicit_input_node(
-                    Self::SET_NODE_VALUE_INPUT,
-                    (),
-                ).unwrap();
+                builder
+                    .expect_explicit_input_node(Self::SET_NODE_VALUE_INPUT, ())
+                    .unwrap();
             }
             BuiltinOperation::CopyNodeValueTo => {
-                builder.expect_explicit_input_node(
-                    Self::COPY_NODE_VALUE_TO_INPUT_SRC,
-                    (),
-                ).unwrap();
-                builder.expect_explicit_input_node(
-                    Self::COPY_NODE_VALUE_TO_INPUT_DST,
-                    (),
-                ).unwrap();
+                builder
+                    .expect_explicit_input_node(Self::COPY_NODE_VALUE_TO_INPUT_SRC, ())
+                    .unwrap();
+                builder
+                    .expect_explicit_input_node(Self::COPY_NODE_VALUE_TO_INPUT_DST, ())
+                    .unwrap();
             }
             BuiltinOperation::Decrement => {
-                builder.expect_explicit_input_node(
-                    Self::DECREMENT_INPUT,
-                    (),
-                ).unwrap();
+                builder
+                    .expect_explicit_input_node(Self::DECREMENT_INPUT, ())
+                    .unwrap();
             }
             BuiltinOperation::Increment => {
-                builder.expect_explicit_input_node(
-                    Self::INCREMENT_INPUT,
-                    (),
-                ).unwrap();
+                builder
+                    .expect_explicit_input_node(Self::INCREMENT_INPUT, ())
+                    .unwrap();
             }
             BuiltinOperation::DeleteNode => {
-                builder.expect_explicit_input_node(
-                    Self::DELETE_NODE_INPUT,
-                    (),
-                ).unwrap();
+                builder
+                    .expect_explicit_input_node(Self::DELETE_NODE_INPUT, ())
+                    .unwrap();
             }
             BuiltinOperation::SetSndToMaxOfFstSnd => {
-                builder.expect_explicit_input_node(
-                    Self::SET_SND_TO_MAX_OF_FST_SND_INPUT_FST,
-                    (),
-                ).unwrap();
-                builder.expect_explicit_input_node(
-                    Self::SET_SND_TO_MAX_OF_FST_SND_INPUT_SND,
-                    (),
-                ).unwrap();
+                builder
+                    .expect_explicit_input_node(Self::SET_SND_TO_MAX_OF_FST_SND_INPUT_FST, ())
+                    .unwrap();
+                builder
+                    .expect_explicit_input_node(Self::SET_SND_TO_MAX_OF_FST_SND_INPUT_SND, ())
+                    .unwrap();
             }
         }
         builder.build().unwrap()
@@ -443,11 +457,7 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
             BuiltinOperation::AddEdge => {
                 let src = SubstMarker::from(Self::ADD_EDGE_INPUT_SRC);
                 let dest = SubstMarker::from(Self::ADD_EDGE_INPUT_DST);
-                g.add_edge(
-                    src,
-                    dest,
-                    EdgePattern::Exact("".to_string()),
-                );
+                g.add_edge(src, dest, EdgePattern::Exact("".to_string()));
             }
             BuiltinOperation::SetEdgeValue(val) => {
                 let src = SubstMarker::from(Self::SET_EDGE_VALUE_INPUT_SRC);
@@ -480,10 +490,7 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
         g.get_concrete_output(new_nodes)
     }
 
-    fn apply(
-        &self,
-        g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>
-    ) -> OperationOutput {
+    fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>) -> OperationOutput {
         let mut new_nodes = HashMap::new();
         match self {
             BuiltinOperation::AddNode => {
@@ -516,17 +523,12 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
             BuiltinOperation::AddEdge => {
                 let src = SubstMarker::from(Self::ADD_EDGE_INPUT_SRC);
                 let dst = SubstMarker::from(Self::ADD_EDGE_INPUT_DST);
-                g.add_edge(
-                    src,
-                    dst,
-                    "".to_string(),
-                );
+                g.add_edge(src, dst, "".to_string());
             }
             BuiltinOperation::SetEdgeValue(val) => {
                 let src = SubstMarker::from(Self::SET_EDGE_VALUE_INPUT_SRC);
                 let dst = SubstMarker::from(Self::SET_EDGE_VALUE_INPUT_DST);
                 g.set_edge_value(src, dst, val.clone());
-
             }
             BuiltinOperation::SetNodeValue(val) => {
                 let a = SubstMarker::from(Self::SET_NODE_VALUE_INPUT);

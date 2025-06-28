@@ -1,9 +1,11 @@
-use grabapl::graph::operation::{run_from_concrete, BuiltinOperation};
 use grabapl::graph::operation::builder::{BuilderOpLike, OperationBuilder};
 use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
 use grabapl::graph::operation::query::{BuiltinQuery, ConcreteQueryOutput};
 use grabapl::graph::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
-use grabapl::graph::pattern::{GraphWithSubstitution, OperationOutput, OperationParameter, ParameterSubstitution};
+use grabapl::graph::operation::{BuiltinOperation, run_from_concrete};
+use grabapl::graph::pattern::{
+    GraphWithSubstitution, OperationOutput, OperationParameter, ParameterSubstitution,
+};
 use grabapl::graph::semantics::{
     AbstractGraph, AbstractJoin, AbstractMatcher, ConcreteGraph, ConcreteToAbstract,
 };
@@ -142,10 +144,7 @@ impl BuiltinOperation for TestOperation {
                     .expect_explicit_input_node("target", *op_typ)
                     .unwrap();
             }
-            TestOperation::AddNode {
-                node_type,
-                value,
-            } => {}
+            TestOperation::AddNode { node_type, value } => {}
             TestOperation::CopyValueFromTo => {
                 param_builder
                     .expect_explicit_input_node("source", NodeType::Object)
@@ -178,12 +177,10 @@ impl BuiltinOperation for TestOperation {
                 value,
             } => {
                 // Set the abstract value of the node to the specified type.
-                g.set_node_value(SubstMarker::from("target"), *target_typ).unwrap();
+                g.set_node_value(SubstMarker::from("target"), *target_typ)
+                    .unwrap();
             }
-            TestOperation::AddNode {
-                node_type,
-                value,
-            } => {
+            TestOperation::AddNode { node_type, value } => {
                 // Add a new node with the specified type and value.
                 g.add_node("new", node_type.clone());
                 new_node_names.insert("new".into(), "new".into());
@@ -191,7 +188,8 @@ impl BuiltinOperation for TestOperation {
             TestOperation::CopyValueFromTo => {
                 // Copy the value from one node to another.
                 let value = g.get_node_value(SubstMarker::from("source")).unwrap();
-                g.set_node_value(SubstMarker::from("destination"), value.clone()).unwrap();
+                g.set_node_value(SubstMarker::from("destination"), value.clone())
+                    .unwrap();
             }
             TestOperation::DeleteNode => {
                 // Delete the node.
@@ -201,10 +199,7 @@ impl BuiltinOperation for TestOperation {
         g.get_concrete_output(new_node_names)
     }
 
-    fn apply(
-        &self,
-        g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>,
-    ) -> OperationOutput {
+    fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>) -> OperationOutput {
         let mut new_node_names = HashMap::new();
         match self {
             TestOperation::NoOp => {
@@ -216,12 +211,10 @@ impl BuiltinOperation for TestOperation {
                 value,
             } => {
                 // Set the concrete value of the node to the specified value.
-                g.set_node_value(SubstMarker::from("target"), value.clone()).unwrap();
+                g.set_node_value(SubstMarker::from("target"), value.clone())
+                    .unwrap();
             }
-            TestOperation::AddNode {
-                node_type,
-                value,
-            } => {
+            TestOperation::AddNode { node_type, value } => {
                 // Add a new node with the specified type and value.
                 g.add_node("new", value.clone());
                 new_node_names.insert("new".into(), "new".into());
@@ -229,7 +222,8 @@ impl BuiltinOperation for TestOperation {
             TestOperation::CopyValueFromTo => {
                 // Copy the value from one node to another.
                 let value = g.get_node_value(SubstMarker::from("source")).unwrap();
-                g.set_node_value(SubstMarker::from("destination"), value.clone()).unwrap();
+                g.set_node_value(SubstMarker::from("destination"), value.clone())
+                    .unwrap();
             }
             TestOperation::DeleteNode => {
                 // Delete the node.
@@ -273,10 +267,7 @@ impl BuiltinQuery for TestQuery {
         // does nothing, not testing side-effect-ful queries here
     }
 
-    fn query(
-        &self,
-        g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>,
-    ) -> ConcreteQueryOutput {
+    fn query(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>) -> ConcreteQueryOutput {
         match self {
             TestQuery::ValuesEqual => {
                 let value1 = g.get_node_value(SubstMarker::from("a")).unwrap();
@@ -315,7 +306,9 @@ fn no_modifications_dont_change_abstract_value() {
     let op_ctx = OperationContext::<TestSemantics>::new();
     let mut builder = OperationBuilder::new(&op_ctx);
 
-    builder.expect_parameter_node("a", NodeType::Integer).unwrap();
+    builder
+        .expect_parameter_node("a", NodeType::Integer)
+        .unwrap();
     let a = AbstractNodeId::ParameterMarker("a".into());
     let state_before = builder.show_state().unwrap();
     builder
@@ -339,10 +332,15 @@ fn no_modifications_dont_change_abstract_value() {
 fn get_abstract_value_changing_operation() -> UserDefinedOperation<TestSemantics> {
     let op_ctx = OperationContext::<TestSemantics>::new();
     let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx);
-    builder.expect_parameter_node("p0", NodeType::Object).unwrap();
+    builder
+        .expect_parameter_node("p0", NodeType::Object)
+        .unwrap();
     let p0 = AbstractNodeId::ParameterMarker("p0".into());
     builder
-        .start_query(TestQuery::ValueEqualTo(NodeValue::Integer(0)), vec![p0.clone()])
+        .start_query(
+            TestQuery::ValueEqualTo(NodeValue::Integer(0)),
+            vec![p0.clone()],
+        )
         .unwrap();
     builder.enter_true_branch().unwrap();
     builder
@@ -373,16 +371,21 @@ fn get_abstract_value_changing_operation() -> UserDefinedOperation<TestSemantics
 fn get_abstract_value_changing_operation_no_branches() -> UserDefinedOperation<TestSemantics> {
     let op_ctx = OperationContext::<TestSemantics>::new();
     let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx);
-    builder.expect_parameter_node("p0", NodeType::Object).unwrap();
+    builder
+        .expect_parameter_node("p0", NodeType::Object)
+        .unwrap();
     let p0 = AbstractNodeId::param("p0");
     // Add an operation that changes the abstract value
     builder
-        .add_operation(BuilderOpLike::Builtin(TestOperation::SetTo {
-            op_typ: NodeType::Object,
-            // we *set* to the same type, which is not the same as a noop.
-            target_typ: NodeType::Object,
-            value: NodeValue::String("Changed".to_string()),
-        }), vec![p0])
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::SetTo {
+                op_typ: NodeType::Object,
+                // we *set* to the same type, which is not the same as a noop.
+                target_typ: NodeType::Object,
+                value: NodeValue::String("Changed".to_string()),
+            }),
+            vec![p0],
+        )
         .unwrap();
     builder.build(0).unwrap()
 }
@@ -393,7 +396,9 @@ fn modifications_change_abstract_value_even_if_same_internal_type_for_custom() {
     op_ctx.add_custom_operation(0, get_abstract_value_changing_operation());
     let mut builder = OperationBuilder::new(&op_ctx);
 
-    builder.expect_parameter_node("a", NodeType::Integer).unwrap();
+    builder
+        .expect_parameter_node("a", NodeType::Integer)
+        .unwrap();
     let a = AbstractNodeId::param("a");
     let state_before = builder.show_state().unwrap();
 
@@ -418,24 +423,28 @@ fn modifications_change_abstract_value_even_if_same_internal_type_for_custom() {
     );
 }
 
-
 #[test]
 fn modifications_change_abstract_value_even_if_same_internal_type_for_builtin() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();
     let mut builder = OperationBuilder::new(&op_ctx);
 
-    builder.expect_parameter_node("a", NodeType::Integer).unwrap();
+    builder
+        .expect_parameter_node("a", NodeType::Integer)
+        .unwrap();
     let a = AbstractNodeId::param("a");
     let state_before = builder.show_state().unwrap();
 
     // Add an operation that changes the abstract value
     builder
-        .add_operation(BuilderOpLike::Builtin(TestOperation::SetTo {
-            op_typ: NodeType::Object,
-            // we *set* to the same type, which is not the same as a noop.
-            target_typ: NodeType::Object,
-            value: NodeValue::String("Changed".to_string()),
-        }), vec![a.clone()])
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::SetTo {
+                op_typ: NodeType::Object,
+                // we *set* to the same type, which is not the same as a noop.
+                target_typ: NodeType::Object,
+                value: NodeValue::String("Changed".to_string()),
+            }),
+            vec![a.clone()],
+        )
         .unwrap();
 
     let state_after = builder.show_state().unwrap();
@@ -460,7 +469,9 @@ fn modifications_change_abstract_value_even_if_same_internal_type_for_custom_wit
     op_ctx.add_custom_operation(0, get_abstract_value_changing_operation_no_branches());
     let mut builder = OperationBuilder::new(&op_ctx);
 
-    builder.expect_parameter_node("a", NodeType::Integer).unwrap();
+    builder
+        .expect_parameter_node("a", NodeType::Integer)
+        .unwrap();
     let a = AbstractNodeId::param("a");
     let state_before = builder.show_state().unwrap();
 
@@ -488,11 +499,15 @@ fn modifications_change_abstract_value_even_if_same_internal_type_for_custom_wit
 fn get_custom_op_new_node_in_regular_query_branches() -> UserDefinedOperation<TestSemantics> {
     let op_ctx = OperationContext::<TestSemantics>::new();
     let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx);
-    builder.expect_parameter_node("p0", NodeType::Object).unwrap();
+    builder
+        .expect_parameter_node("p0", NodeType::Object)
+        .unwrap();
     let p0 = AbstractNodeId::param("p0");
 
     // Start a query that will create a new node in both branches
-    builder.start_query(TestQuery::ValueEqualTo(NodeValue::Integer(0)), vec![p0]).unwrap();
+    builder
+        .start_query(TestQuery::ValueEqualTo(NodeValue::Integer(0)), vec![p0])
+        .unwrap();
 
     // True branch
     builder.enter_true_branch().unwrap();
@@ -524,7 +539,9 @@ fn get_custom_op_new_node_in_regular_query_branches() -> UserDefinedOperation<Te
 
     // TODO: define the new node to be visible in the output
     let output_aid = AbstractNodeId::DynamicOutputMarker("new".into(), "new".into());
-    builder.return_node(output_aid, "output".into(), NodeType::Object).unwrap();
+    builder
+        .return_node(output_aid, "output".into(), NodeType::Object)
+        .unwrap();
 
     builder.build(0).unwrap()
 }
@@ -532,12 +549,16 @@ fn get_custom_op_new_node_in_regular_query_branches() -> UserDefinedOperation<Te
 fn get_custom_op_new_node_in_shape_query_branches() -> UserDefinedOperation<TestSemantics> {
     let op_ctx = OperationContext::<TestSemantics>::new();
     let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx);
-    builder.expect_parameter_node("p0", NodeType::Object).unwrap();
+    builder
+        .expect_parameter_node("p0", NodeType::Object)
+        .unwrap();
     let p0 = AbstractNodeId::param("p0");
 
     // Start a query that will create a new node in both branches
     builder.start_shape_query("new".into()).unwrap();
-    builder.expect_shape_node("new".into(), NodeType::String).unwrap();
+    builder
+        .expect_shape_node("new".into(), NodeType::String)
+        .unwrap();
 
     // True branch
     builder.enter_true_branch().unwrap();
@@ -560,7 +581,10 @@ fn get_custom_op_new_node_in_shape_query_branches() -> UserDefinedOperation<Test
 
     let output_aid = AbstractNodeId::DynamicOutputMarker("new".into(), "new".into());
     let res = builder.return_node(output_aid, "output".into(), NodeType::Object);
-    assert!(res.is_err(), "`output_aid` partially originates from a shape query, hence it may not be returned");
+    assert!(
+        res.is_err(),
+        "`output_aid` partially originates from a shape query, hence it may not be returned"
+    );
 
     builder.build(0).unwrap()
 }
@@ -570,12 +594,18 @@ fn new_node_from_both_branches_is_visible_for_regular_query() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();
     op_ctx.add_custom_operation(0, get_custom_op_new_node_in_regular_query_branches());
     let mut builder = OperationBuilder::new(&op_ctx);
-    builder.expect_parameter_node("p0", NodeType::Integer).unwrap();
+    builder
+        .expect_parameter_node("p0", NodeType::Integer)
+        .unwrap();
     let p0 = AbstractNodeId::param("p0");
     let state_before = builder.show_state().unwrap();
     // Add an operation that creates a new node in both branches
     builder
-        .add_named_operation("helper".into(), BuilderOpLike::FromOperationId(0), vec![p0.clone()])
+        .add_named_operation(
+            "helper".into(),
+            BuilderOpLike::FromOperationId(0),
+            vec![p0.clone()],
+        )
         .unwrap();
     let state_after = builder.show_state().unwrap();
     let num_before = state_before.graph.nodes().count();
@@ -589,7 +619,12 @@ fn new_node_from_both_branches_is_visible_for_regular_query() {
     let returned_node = AbstractNodeId::DynamicOutputMarker("helper".into(), "output".into());
 
     // test that I can actually use the returned node
-    builder.add_operation(BuilderOpLike::Builtin(TestOperation::CopyValueFromTo), vec![returned_node, p0.clone()]).unwrap();
+    builder
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::CopyValueFromTo),
+            vec![returned_node, p0.clone()],
+        )
+        .unwrap();
     let operation = builder.build(1).unwrap();
     op_ctx.add_custom_operation(1, operation);
 
@@ -610,21 +645,23 @@ fn new_node_from_both_branches_is_invisible_for_shape_query() {
     op_ctx.add_custom_operation(0, get_custom_op_new_node_in_shape_query_branches());
     let mut builder = OperationBuilder::new(&op_ctx);
     let input_marker = SubstMarker::from("input");
-    builder.expect_parameter_node(input_marker.clone(), NodeType::Integer).unwrap();
+    builder
+        .expect_parameter_node(input_marker.clone(), NodeType::Integer)
+        .unwrap();
     let input_aid = AbstractNodeId::ParameterMarker(input_marker.clone());
     let state_before = builder.show_state().unwrap();
     // Add an operation that creates a new node in both branches
     builder
-        .add_named_operation("helper".into(), BuilderOpLike::FromOperationId(0), vec![input_aid])
+        .add_named_operation(
+            "helper".into(),
+            BuilderOpLike::FromOperationId(0),
+            vec![input_aid],
+        )
         .unwrap();
     let state_after = builder.show_state().unwrap();
     let num_before = state_before.graph.nodes().count();
     let num_after = state_after.graph.nodes().count();
-    assert_eq!(
-        num_after,
-        num_before,
-        "Expected no new nodes to be visible"
-    );
+    assert_eq!(num_after, num_before, "Expected no new nodes to be visible");
 }
 
 #[test]
@@ -632,13 +669,19 @@ fn return_node_partially_from_shape_query_fails() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();
     let helper_op = {
         let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx);
-        builder.expect_parameter_node("p0", NodeType::Integer).unwrap();
+        builder
+            .expect_parameter_node("p0", NodeType::Integer)
+            .unwrap();
         let p0 = AbstractNodeId::param("p0");
         // Start a shape query to check if p0 has a child with edge 'child'
         builder.start_shape_query("child".into()).unwrap();
-        builder.expect_shape_node("new".into(), NodeType::String).unwrap();
+        builder
+            .expect_shape_node("new".into(), NodeType::String)
+            .unwrap();
         let child_aid = AbstractNodeId::dynamic_output("child", "new");
-        builder.expect_shape_edge(p0, child_aid.clone(), EdgeType::Exact("child".to_string())).unwrap();
+        builder
+            .expect_shape_edge(p0, child_aid.clone(), EdgeType::Exact("child".to_string()))
+            .unwrap();
         builder.enter_false_branch().unwrap();
         // if we don't have a child node, create one
         builder
@@ -655,23 +698,42 @@ fn return_node_partially_from_shape_query_fails() {
 
         // Return the child node
         let res = builder.return_node(child_aid, "child".into(), NodeType::String);
-        assert!(res.is_err(), "Expected returning a node partially originating from a shape query to fail");
+        assert!(
+            res.is_err(),
+            "Expected returning a node partially originating from a shape query to fail"
+        );
         builder.build(0).unwrap()
     };
     op_ctx.add_custom_operation(0, helper_op);
 
     // now see what happens if we try to run this in a builder
     let mut builder = OperationBuilder::new(&op_ctx);
-    builder.expect_parameter_node("p0", NodeType::Integer).unwrap();
+    builder
+        .expect_parameter_node("p0", NodeType::Integer)
+        .unwrap();
     let p0 = AbstractNodeId::param("p0");
     builder.expect_context_node("c0", NodeType::String).unwrap();
     let c0 = AbstractNodeId::param("c0");
-    builder.expect_parameter_edge("p0", "c0", EdgeType::Exact("child".to_string())).unwrap();
+    builder
+        .expect_parameter_edge("p0", "c0", EdgeType::Exact("child".to_string()))
+        .unwrap();
     let state_before = builder.show_state().unwrap();
-    builder.add_named_operation("helper".into(), BuilderOpLike::FromOperationId(0), vec![p0.clone()]).unwrap();
+    builder
+        .add_named_operation(
+            "helper".into(),
+            BuilderOpLike::FromOperationId(0),
+            vec![p0.clone()],
+        )
+        .unwrap();
     let state_after = builder.show_state().unwrap();
-    let aids_before = state_before.node_keys_to_aid.right_values().collect::<HashSet<_>>();
-    let aids_after = state_after.node_keys_to_aid.right_values().collect::<HashSet<_>>();
+    let aids_before = state_before
+        .node_keys_to_aid
+        .right_values()
+        .collect::<HashSet<_>>();
+    let aids_after = state_after
+        .node_keys_to_aid
+        .right_values()
+        .collect::<HashSet<_>>();
     assert_eq!(
         aids_before, aids_after,
         "Expected no new nodes to be created in the graph"
@@ -682,10 +744,20 @@ fn return_node_partially_from_shape_query_fails() {
 
         // for fun, see what happens when we delete the returned node and then try to use c0
         let returned_node = AbstractNodeId::DynamicOutputMarker("helper".into(), "child".into());
-        builder.add_operation(BuilderOpLike::Builtin(TestOperation::DeleteNode), vec![returned_node]).unwrap();
+        builder
+            .add_operation(
+                BuilderOpLike::Builtin(TestOperation::DeleteNode),
+                vec![returned_node],
+            )
+            .unwrap();
         // now use c0 to copy from c0 to p0
         // note: this is the operation that would crash (the concrete graph would not have the node) if we were allowed to return the node.
-        builder.add_operation(BuilderOpLike::Builtin(TestOperation::CopyValueFromTo), vec![c0, p0]).unwrap();
+        builder
+            .add_operation(
+                BuilderOpLike::Builtin(TestOperation::CopyValueFromTo),
+                vec![c0, p0],
+            )
+            .unwrap();
         let operation = builder.build(1).unwrap();
         op_ctx.add_custom_operation(1, operation);
 

@@ -372,10 +372,7 @@ mod ffi {
         }
 
         pub fn new_from_output(op_marker: &str, node_marker: &str) -> Box<AbstractNodeId> {
-            let aid = RustAbstractNodeId::dynamic_output(
-                op_marker,
-                node_marker,
-            );
+            let aid = RustAbstractNodeId::dynamic_output(op_marker, node_marker);
             Box::new(AbstractNodeId(aid))
         }
 

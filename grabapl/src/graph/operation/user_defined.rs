@@ -4,14 +4,19 @@ use crate::graph::operation::query::{
 use crate::graph::operation::{
     OperationError, OperationResult, run_builtin_operation, run_operation,
 };
-use crate::graph::pattern::{AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution};
+use crate::graph::pattern::{
+    AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationOutput,
+    OperationParameter, ParameterSubstitution,
+};
 use crate::graph::semantics::{AbstractGraph, ConcreteGraph, SemanticsClone};
-use crate::{interned_string_newtype, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
+use crate::{
+    NodeKey, OperationContext, OperationId, Semantics, SubstMarker, interned_string_newtype,
+};
 use derive_more::with_trait::From;
+use internment::Intern;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::str::FromStr;
-use internment::Intern;
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
@@ -23,7 +28,10 @@ pub enum AbstractOperationResultMarker {
     #[from(ignore)]
     Implicit(u64),
 }
-interned_string_newtype!(AbstractOperationResultMarker, AbstractOperationResultMarker::Custom);
+interned_string_newtype!(
+    AbstractOperationResultMarker,
+    AbstractOperationResultMarker::Custom
+);
 
 /// Identifies a node in the user defined operation view.
 #[derive(Clone, Copy, From, Debug, Eq, PartialEq, Hash)]
@@ -62,13 +70,12 @@ impl FromStr for AbstractNodeId {
             Ok(AbstractNodeId::param(stripped))
         } else if let Some(stripped) = s.strip_prefix("O(").and_then(|s| s.strip_suffix(')')) {
             let mut parts = stripped.split(',');
-            if let (Some(output_id), Some(output_marker), None) = (parts.next(), parts.next(), parts.next()) {
+            if let (Some(output_id), Some(output_marker), None) =
+                (parts.next(), parts.next(), parts.next())
+            {
                 let output_id = output_id.trim();
                 let output_marker = output_marker.trim();
-                Ok(AbstractNodeId::dynamic_output(
-                    output_id,
-                    output_marker,
-                ))
+                Ok(AbstractNodeId::dynamic_output(output_id, output_marker))
             } else {
                 Err(())
             }
@@ -317,27 +324,24 @@ fn run_instructions<S: SemanticsClone>(
                 let concrete_arg =
                     get_concrete_arg::<S>(args, &HashMap::new(), subst, previous_results)?;
                 let result = run_shape_query(g, query, &concrete_arg.selected_input_nodes)?;
-                let next_instr = if let Some(shape_idents_to_node_keys) =
-                    result.shape_idents_to_node_keys
-                {
-                    // apply the shape idents to node keys mapping
+                let next_instr =
+                    if let Some(shape_idents_to_node_keys) = result.shape_idents_to_node_keys {
+                        // apply the shape idents to node keys mapping
 
-                    let mut query_result_map = HashMap::new();
-                    for (ident, node_key) in shape_idents_to_node_keys {
-                        // TODO: add helper function, or add new variant to AbstractOutputNodeMarker, or just use that one for the shape query mapping and get rid of ShapeNodeIdentifier.
-                        let output_marker = AbstractOutputNodeMarker(
-                            ident.into(),
-                        );
-                        query_result_map.insert(output_marker, node_key);
-                    }
-                    if let Some(abstract_output_id) = abstract_output_id {
-                        previous_results.insert(abstract_output_id.clone(), query_result_map);
-                    }
+                        let mut query_result_map = HashMap::new();
+                        for (ident, node_key) in shape_idents_to_node_keys {
+                            // TODO: add helper function, or add new variant to AbstractOutputNodeMarker, or just use that one for the shape query mapping and get rid of ShapeNodeIdentifier.
+                            let output_marker = AbstractOutputNodeMarker(ident.into());
+                            query_result_map.insert(output_marker, node_key);
+                        }
+                        if let Some(abstract_output_id) = abstract_output_id {
+                            previous_results.insert(abstract_output_id.clone(), query_result_map);
+                        }
 
-                    &query_instr.taken
-                } else {
-                    &query_instr.not_taken
-                };
+                        &query_instr.taken
+                    } else {
+                        &query_instr.not_taken
+                    };
                 run_instructions(
                     g,
                     previous_results,

@@ -1,3 +1,4 @@
+use derive_more::From;
 use petgraph::Direction;
 use petgraph::algo::{general_subgraph_monomorphisms_iter, subgraph_isomorphisms_iter};
 use petgraph::dot::Dot;
@@ -7,7 +8,6 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::RandomState;
-use derive_more::From;
 
 pub mod dot;
 pub mod operation;
@@ -57,7 +57,19 @@ impl<EdgeAttr> EdgeAttribute<EdgeAttr> {
 
 type EdgeOrder = i32;
 
-#[derive(Hash, Eq, PartialEq, derive_more::Debug, Clone, Copy, PartialOrd, Ord, derive_more::Add, derive_more::AddAssign, From)]
+#[derive(
+    Hash,
+    Eq,
+    PartialEq,
+    derive_more::Debug,
+    Clone,
+    Copy,
+    PartialOrd,
+    Ord,
+    derive_more::Add,
+    derive_more::AddAssign,
+    From,
+)]
 #[debug("N({_0})")]
 pub struct NodeKey(pub u32);
 pub type EdgeKey = (NodeKey, NodeKey);
@@ -388,7 +400,11 @@ pub trait GraphTrait {
     fn get_node_attr(&self, node_key: NodeKey) -> Option<&Self::NodeAttr>;
     fn get_mut_node_attr(&mut self, node_key: NodeKey) -> Option<&mut Self::NodeAttr>;
     /// Sets the node attribute for the given node key that already exists in the graph.
-    fn set_node_attr(&mut self, node_key: NodeKey, node_attr: Self::NodeAttr) -> Option<Self::NodeAttr>;
+    fn set_node_attr(
+        &mut self,
+        node_key: NodeKey,
+        node_attr: Self::NodeAttr,
+    ) -> Option<Self::NodeAttr>;
     fn get_edge_attr(&self, edge_key: EdgeKey) -> Option<&Self::EdgeAttr>;
     fn get_mut_edge_attr(&mut self, edge_key: EdgeKey) -> Option<&mut Self::EdgeAttr>;
     /// Sets the edge attribute for the given edge key that already exists in the graph.
@@ -432,7 +448,11 @@ impl<NodeAttr, EdgeAttr> GraphTrait for Graph<NodeAttr, EdgeAttr> {
         self.get_mut_node_attr(node_key)
     }
 
-    fn set_node_attr(&mut self, node_key: NodeKey, node_attr: Self::NodeAttr) -> Option<Self::NodeAttr> {
+    fn set_node_attr(
+        &mut self,
+        node_key: NodeKey,
+        node_attr: Self::NodeAttr,
+    ) -> Option<Self::NodeAttr> {
         self.set_node_attr(node_key, node_attr)
     }
 
