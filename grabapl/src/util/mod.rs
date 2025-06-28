@@ -1,5 +1,7 @@
 pub mod bimap;
 
+// TODO: In general, consider if we really want a global interning pool for strings that is non-droppable (i.e., causes leaks).
+//  I think it's fine, because it's essentially just for variable names.
 #[macro_export]
 macro_rules! interned_string_newtype {
     ($ty_name:ident, $mk_fn:expr) => {
