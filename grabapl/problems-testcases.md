@@ -116,6 +116,7 @@ Caveats:
 2. This needs to happen _at the beginning_ of the operation, because if we're partially building an operation, and then
    recurse, we must already know the abstract values that will change.
    * This is bad user experience, but let's try it for now.
+   * We can make it slightly better: it just needs to happen *right after the first recursion*!
 
 
 Also, we need to tell the user why something doesn't work.
@@ -123,7 +124,7 @@ Also, we need to tell the user why something doesn't work.
 [//]: # (TODO: make this better user experience.)
 
 ### Examples
-See meeting notes gdoc.
+See meeting notes gdoc and excalidraw.
 
 
 
@@ -415,3 +416,23 @@ Any static changes must be inside some signature.
 * Want to write to a node? The fact that you're setting its abstract value must be specified.
 * Add, delete a node? Specify it.
 * Add, delete, or modify an edge? Specify it.
+
+This is bad for coupling. We have modularity in the sense that functions with the same signature can be used interchangeably, but
+the signatures are so detailed that this is unlikely to happen often.
+
+**Signature Subtyping**: To make this slightly more bearable, we should allow signature subtyping.
+That is, we need some function that checks whether a signature can be used in place of another signature.
+
+For example, for `s1` functions to be used wherever `s2` functions are expected:
+1. `s1` must define _at least_ the same set of output nodes as `s2`.
+   * The output nodes must have the same name.
+   * The output nodes must have the same edges.
+   * The abstract values of `s1`'s output nodes and edges must be subtypes of `s2`'s output nodes.
+2. The abstract value changes of `s1` must be subtypes of the abstract value changes of `s2`.
+   * If `s2` says "Parameter node `a` will be set to `Object`", then `s1` can say that `a` will be set to `Object` or `String` or `Number`.
+   * If `s2` says `String` however, then `s1` cannot say `Object` or `Number`, since that would be a supertype.
+3. There must be fewer deletions in `s1` than in `s2`.
+   * If `s2` deletes node `a`, then `s1` can delete `a` or not delete it.
+   * If `s2` deletes edge `b -> c`, then `s1` can delete that edge or not delete it.
+
+It should be possible, in the operation builder, to manually turn the inferred signature into a supertype of the inferred signature.
