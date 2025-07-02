@@ -15,6 +15,7 @@ use internment::Intern;
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
 use std::collections::HashMap;
+use crate::util::log;
 
 pub struct AbstractQueryOutput<S: Semantics> {
     pub changes: Vec<AbstractQueryChange<S>>,

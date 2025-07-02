@@ -12,11 +12,16 @@ petgraph = { path = "../playground/petgraph" }
 derive_more = { version = "2.0.1", features = ["from", "into", "debug", "add", "add_assign"]}
 thiserror = "2.0.12"
 internment = "0.8.6"
+log_crate = { version = "0.4", optional = true, package = "log" }
 
 [dev-dependencies]
 criterion = "0.5.1"
 proptest = "1.6.0"
 rand = "0.9.1"
+
+[features]
+default = ["log"]
+log = ["dep:log_crate"]
 
 [[bench]]
 name = "isomorphism_find_single_node"

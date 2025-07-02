@@ -2,6 +2,8 @@ pub mod graph;
 pub mod pattern_match;
 pub mod util;
 
+use util::log;
+
 use crate::graph::*;
 use derive_more::From;
 pub use graph::DotCollector;

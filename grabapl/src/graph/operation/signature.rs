@@ -142,8 +142,6 @@ impl<S: Semantics> OperationParameter<S> {
         &self,
         other: &OperationParameter<S>,
     ) -> bool {
-        // TODO: needs subgraph checks for context graph?
-
         // Situation: We expect to be calling an operation with a parameter of `other`.
         // Can we call it with `self`?
 

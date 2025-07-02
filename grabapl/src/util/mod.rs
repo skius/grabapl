@@ -21,3 +21,38 @@ macro_rules! interned_string_newtype {
         interned_string_newtype!($ty_name, $ty_name);
     };
 }
+pub mod log {
+    #[allow(unused)]
+    macro_rules! trace { ($($x:tt)*) => (
+        #[cfg(feature = "log")] {
+            log_crate::trace!($($x)*)
+        }
+    ) }
+    #[allow(unused)]
+    macro_rules! debug { ($($x:tt)*) => (
+        #[cfg(feature = "log")] {
+            log_crate::debug!($($x)*)
+        }
+    ) }
+    #[allow(unused)]
+    macro_rules! info { ($($x:tt)*) => (
+        #[cfg(feature = "log")] {
+            log_crate::info!($($x)*);
+        }
+    ) }
+    #[allow(unused)]
+    macro_rules! warn2 { ($($x:tt)*) => (
+        #[cfg(feature = "log")] {
+            log_crate::warn!($($x)*)
+        }
+    ) }
+    #[allow(unused)]
+    macro_rules! error { ($($x:tt)*) => (
+        #[cfg(feature = "log")] {
+            log_crate::error!($($x)*)
+        }
+    ) }
+
+    #[allow(unused)]
+    pub(crate) use {trace, debug, info, error, warn2 as warn};
+}
