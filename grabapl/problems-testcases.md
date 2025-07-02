@@ -431,8 +431,23 @@ For example, for `s1` functions to be used wherever `s2` functions are expected:
 2. The abstract value changes of `s1` must be subtypes of the abstract value changes of `s2`.
    * If `s2` says "Parameter node `a` will be set to `Object`", then `s1` can say that `a` will be set to `Object` or `String` or `Number`.
    * If `s2` says `String` however, then `s1` cannot say `Object` or `Number`, since that would be a supertype.
+   * Actually, quite importantly, it must be that all changes from `s1` are present in `s2`. I.e., `s1` cannot change more things than `s2`.
 3. There must be fewer deletions in `s1` than in `s2`.
    * If `s2` deletes node `a`, then `s1` can delete `a` or not delete it.
    * If `s2` deletes edge `b -> c`, then `s1` can delete that edge or not delete it.
 
 It should be possible, in the operation builder, to manually turn the inferred signature into a supertype of the inferred signature.
+
+### Edge changes problems
+
+Parameter: Nodes `a`, `b`.
+
+Operation adds an edge between `a` and `b` with type `String`.
+
+This will be part of the "new edges" set in the signature.
+
+Calling operation calls that operation with `a -Integer-> b`.
+
+All good - caller will notice that a new edge gets created, and hence will know that its existing edge must be updated.
+
+Note that this is only true because we don't allow multiple parallel edges.

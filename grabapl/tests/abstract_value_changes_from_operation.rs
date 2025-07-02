@@ -116,6 +116,12 @@ enum TestOperation {
         target_typ: NodeType,
         value: NodeValue,
     },
+    SetEdgeTo {
+        node_typ: NodeType,
+        param_typ: EdgeType,
+        target_typ: EdgeType,
+        value: String,
+    },
     AddNode {
         node_type: NodeType,
         value: NodeValue,
@@ -143,6 +149,25 @@ impl BuiltinOperation for TestOperation {
                 param_builder
                     .expect_explicit_input_node("target", *op_typ)
                     .unwrap();
+            }
+            TestOperation::SetEdgeTo {
+                node_typ,
+                param_typ: op_typ,
+                target_typ,
+                value,
+            } => {
+                param_builder
+                    .expect_explicit_input_node("src", *node_typ)
+                    .unwrap();
+                param_builder
+                    .expect_explicit_input_node("dst", *node_typ)
+                    .unwrap();
+                param_builder
+                    .expect_edge(
+                        SubstMarker::from("src"),
+                        SubstMarker::from("dst"),
+                        op_typ.clone(),
+                    ).unwrap();
             }
             TestOperation::AddNode { node_type, value } => {}
             TestOperation::CopyValueFromTo => {
@@ -180,6 +205,20 @@ impl BuiltinOperation for TestOperation {
                 g.set_node_value(SubstMarker::from("target"), *target_typ)
                     .unwrap();
             }
+            TestOperation::SetEdgeTo {
+                node_typ,
+                param_typ: op_typ,
+                target_typ,
+                value,
+            } => {
+                // Set the edge from source to destination with the specified type.
+                g.set_edge_value(
+                    SubstMarker::from("src"),
+                    SubstMarker::from("dst"),
+                    target_typ.clone(),
+                )
+                .unwrap();
+            }
             TestOperation::AddNode { node_type, value } => {
                 // Add a new node with the specified type and value.
                 g.add_node("new", node_type.clone());
@@ -213,6 +252,20 @@ impl BuiltinOperation for TestOperation {
                 // Set the concrete value of the node to the specified value.
                 g.set_node_value(SubstMarker::from("target"), value.clone())
                     .unwrap();
+            }
+            TestOperation::SetEdgeTo {
+                node_typ,
+                param_typ: op_typ,
+                target_typ,
+                value,
+            } => {
+                // Set the edge from source to destination with the specified value.
+                g.set_edge_value(
+                    SubstMarker::from("src"),
+                    SubstMarker::from("dst"),
+                    value.clone(),
+                )
+                .unwrap();
             }
             TestOperation::AddNode { node_type, value } => {
                 // Add a new node with the specified type and value.
@@ -770,3 +823,7 @@ fn return_node_partially_from_shape_query_fails() {
         run_from_concrete(&mut concrete_graph, &op_ctx, 1, &[p0_key]).unwrap();
     }
 }
+
+
+// Test that the full matrix of: [node types, edge types] x [set, delete] works as expected.
+// In particular, set and delete should propagate information about the new type into the caller operation's signature.
