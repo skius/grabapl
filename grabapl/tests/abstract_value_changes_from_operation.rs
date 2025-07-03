@@ -11,6 +11,7 @@ use grabapl::graph::semantics::{
 };
 use grabapl::{Graph, OperationContext, Semantics, SubstMarker};
 use std::collections::{HashMap, HashSet};
+use grabapl::graph::operation::signature::{AbstractSignatureEdgeId, AbstractSignatureNodeId};
 
 struct TestSemantics;
 
@@ -122,12 +123,19 @@ enum TestOperation {
         target_typ: EdgeType,
         value: String,
     },
+    AddEdge {
+        node_typ: NodeType,
+        param_typ: EdgeType,
+        target_typ: EdgeType,
+        value: String,
+    },
     AddNode {
         node_type: NodeType,
         value: NodeValue,
     },
     CopyValueFromTo,
     DeleteNode,
+    DeleteEdge,
 }
 
 impl BuiltinOperation for TestOperation {
@@ -169,6 +177,19 @@ impl BuiltinOperation for TestOperation {
                         op_typ.clone(),
                     ).unwrap();
             }
+            TestOperation::AddEdge {
+                node_typ,
+                param_typ: op_typ,
+                target_typ,
+                value,
+            } => {
+                param_builder
+                    .expect_explicit_input_node("src", *node_typ)
+                    .unwrap();
+                param_builder
+                    .expect_explicit_input_node("dst", *node_typ)
+                    .unwrap();
+            }
             TestOperation::AddNode { node_type, value } => {}
             TestOperation::CopyValueFromTo => {
                 param_builder
@@ -181,6 +202,21 @@ impl BuiltinOperation for TestOperation {
             TestOperation::DeleteNode => {
                 param_builder
                     .expect_explicit_input_node("target", NodeType::Object)
+                    .unwrap();
+            }
+            TestOperation::DeleteEdge => {
+                param_builder
+                    .expect_explicit_input_node("src", NodeType::Object)
+                    .unwrap();
+                param_builder
+                    .expect_explicit_input_node("dst", NodeType::Object)
+                    .unwrap();
+                param_builder
+                    .expect_edge(
+                        SubstMarker::from("src"),
+                        SubstMarker::from("dst"),
+                        EdgeType::Wildcard,
+                    )
                     .unwrap();
             }
         }
@@ -219,6 +255,19 @@ impl BuiltinOperation for TestOperation {
                 )
                 .unwrap();
             }
+            TestOperation::AddEdge {
+                node_typ,
+                param_typ: op_typ,
+                target_typ,
+                value,
+            } => {
+                // Add an edge from source to destination with the specified type.
+                g.add_edge(
+                    SubstMarker::from("src"),
+                    SubstMarker::from("dst"),
+                    target_typ.clone(),
+                );
+            }
             TestOperation::AddNode { node_type, value } => {
                 // Add a new node with the specified type and value.
                 g.add_node("new", node_type.clone());
@@ -233,6 +282,11 @@ impl BuiltinOperation for TestOperation {
             TestOperation::DeleteNode => {
                 // Delete the node.
                 g.delete_node(SubstMarker::from("target")).unwrap();
+            }
+            TestOperation::DeleteEdge => {
+                // Delete the edge from source to destination.
+                g.delete_edge(SubstMarker::from("src"), SubstMarker::from("dst"))
+                    .unwrap();
             }
         }
         g.get_concrete_output(new_node_names)
@@ -267,6 +321,19 @@ impl BuiltinOperation for TestOperation {
                 )
                 .unwrap();
             }
+            TestOperation::AddEdge {
+                node_typ,
+                param_typ: op_typ,
+                target_typ,
+                value,
+            } => {
+                // Add an edge from source to destination with the specified value.
+                g.add_edge(
+                    SubstMarker::from("src"),
+                    SubstMarker::from("dst"),
+                    value.clone(),
+                );
+            }
             TestOperation::AddNode { node_type, value } => {
                 // Add a new node with the specified type and value.
                 g.add_node("new", value.clone());
@@ -281,6 +348,11 @@ impl BuiltinOperation for TestOperation {
             TestOperation::DeleteNode => {
                 // Delete the node.
                 g.delete_node(SubstMarker::from("target")).unwrap();
+            }
+            TestOperation::DeleteEdge => {
+                // Delete the edge from source to destination.
+                g.delete_edge(SubstMarker::from("src"), SubstMarker::from("dst"))
+                    .unwrap();
             }
         }
         g.get_concrete_output(new_node_names)
@@ -825,5 +897,222 @@ fn return_node_partially_from_shape_query_fails() {
 }
 
 
-// Test that the full matrix of: [node types, edge types] x [set, delete] works as expected.
+// Test that the full matrix of: [node types, edge types] x [set, delete, new] works as expected.
 // In particular, set and delete should propagate information about the new type into the caller operation's signature.
+
+#[test]
+fn builder_infers_correct_signatures() {
+    let mut op_ctx = OperationContext::<TestSemantics>::new();
+    let mut builder = OperationBuilder::new(&op_ctx);
+    builder
+        .expect_parameter_node("p0", NodeType::Integer)
+        .unwrap();
+    builder
+        .expect_parameter_node("p1", NodeType::Integer)
+        .unwrap();
+    builder
+        .expect_parameter_node("p2", NodeType::Integer)
+        .unwrap();
+    builder.expect_context_node("c0", NodeType::Object).unwrap();
+    builder.expect_context_node("c1", NodeType::Object).unwrap();
+    builder.expect_parameter_edge("p0", "c0", EdgeType::Wildcard).unwrap();
+    builder.expect_parameter_edge("p2", "c1", EdgeType::Wildcard).unwrap();
+    builder.expect_parameter_edge("p0", "c1", EdgeType::Wildcard).unwrap();
+    // param: p0->c0, p1, p2->c1, p0->c1
+    // delete p1, delete c0 (which implies deletion of edge p0->c0), set p0, delete edge p2->c1, set c1, set p0->c1
+    // and create new node n0 to return, and new edge p0->c1 to return.
+    // new node n1 to not return, and new edge p0->n1 to not return.
+
+    let p0 = AbstractNodeId::ParameterMarker("p0".into());
+    let p1 = AbstractNodeId::ParameterMarker("p1".into());
+    let p2 = AbstractNodeId::ParameterMarker("p2".into());
+    let c0 = AbstractNodeId::ParameterMarker("c0".into());
+    let c1 = AbstractNodeId::ParameterMarker("c1".into());
+    let n0 = AbstractNodeId::DynamicOutputMarker("new".into(), "new".into());
+    let n1 = AbstractNodeId::DynamicOutputMarker("new1".into(), "new".into());
+
+    // delete p1
+    builder
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::DeleteNode),
+            vec![p1],
+        )
+        .unwrap();
+    // delete c0
+    builder
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::DeleteNode),
+            vec![c0],
+        )
+        .unwrap();
+    // set p0 to Integer (i.e., no change - this must still be visible!)
+    builder
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::SetTo {
+                op_typ: NodeType::Object,
+                target_typ: NodeType::Integer,
+                value: NodeValue::Integer(0),
+            }),
+            vec![p0],
+        )
+        .unwrap();
+    // delete edge p2->c1
+    builder
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::DeleteEdge),
+            vec![p2, c1],
+        )
+        .unwrap();
+    // set c1 to String (i.e., subtype of Object - this must still be visible!)
+    builder
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::SetTo {
+                op_typ: NodeType::Object,
+                target_typ: NodeType::String,
+                value: NodeValue::String("context".to_string()),
+            }),
+            vec![c1],
+        )
+        .unwrap();
+    // set edge p0->c1 to 'p0->c1' (i.e., subtype of Wildcard)
+    builder
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::SetEdgeTo {
+                node_typ: NodeType::Object,
+                param_typ: EdgeType::Wildcard,
+                target_typ: EdgeType::Exact("p0->c1".to_string()),
+                value: "p0->c1".to_string(),
+            }),
+            vec![p0, c1],
+        )
+        .unwrap();
+    // create new node n0
+    builder
+        .add_named_operation(
+            "new".into(),
+            BuilderOpLike::Builtin(TestOperation::AddNode {
+                node_type: NodeType::String,
+                value: NodeValue::String("new".to_string()),
+            }),
+            vec![],
+        )
+        .unwrap();
+    // create new edge p0->c1
+    builder
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::AddEdge {
+                node_typ: NodeType::Object,
+                param_typ: EdgeType::Wildcard,
+                target_typ: EdgeType::Exact("new_edge".to_string()),
+                value: "new_edge".to_string(),
+            }),
+            vec![p0, c1],
+        )
+        .unwrap();
+    // create new non-returned node n1
+    builder
+        .add_named_operation(
+            "new1".into(),
+            BuilderOpLike::Builtin(TestOperation::AddNode {
+                node_type: NodeType::Integer,
+                value: NodeValue::Integer(42),
+            }),
+            vec![],
+        )
+        .unwrap();
+    // create new non-returned edge p0->n1
+    builder
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::AddEdge {
+                node_typ: NodeType::Object,
+                param_typ: EdgeType::Wildcard,
+                target_typ: EdgeType::Exact("new_edge1".to_string()),
+                value: "new_edge1".to_string(),
+            }),
+            vec![p0, n1],
+        )
+        .unwrap();
+    // return n0
+    builder
+        .return_node(n0.clone(), "new".into(), NodeType::String)
+        .unwrap();
+    // return p0->c1 edge
+    builder
+        .return_edge(p0, c1, EdgeType::Exact("new_edge".to_string()))
+        .unwrap();
+    // try to return p0->n1 edge, which should fail because n1 is not returned
+    let res = builder
+        .return_edge(p0, n1, EdgeType::Exact("new_edge1".to_string()));
+    assert!(
+        res.is_err(),
+        "Expected returning edge p0->n1 to fail because n1 is not returned"
+    );
+    let operation = builder.build(0).unwrap();
+    // get signature
+    let signature = operation.signature();
+
+    // assert our desired changes
+    // number of explicit params
+    assert_eq!(signature.parameter.explicit_input_nodes.len(), 3, "Expected 3 explicit input nodes, p0, p1, p2");
+    // new nodes and edges
+    assert_eq!(&signature.output.new_nodes, &HashMap::from([("new".into(), NodeType::String)]), "Expected new node 'new' of type String");
+    assert_eq!(
+        &signature.output.new_edges,
+        &HashMap::from([(
+            (SubstMarker::from("p0").into(), SubstMarker::from("c1").into()),
+            EdgeType::Exact("new_edge".to_string()),
+        )]),
+        "Expected new edge from p0 to c1 of type 'new_edge'"
+    );
+    // deleted nodes and edges
+    assert_eq!(
+        &signature.output.deleted_nodes,
+        &HashSet::from([SubstMarker::from("p1").into(), SubstMarker::from("c0").into()]),
+        "Expected nodes p1 and c0 to be deleted"
+    );
+    assert_eq!(
+        &signature.output.deleted_edges,
+        &HashSet::from([
+            (
+                SubstMarker::from("p2").into(),
+                SubstMarker::from("c1").into()
+            ),
+            (
+                SubstMarker::from("p0").into(),
+                SubstMarker::from("c0").into()
+            )
+        ]),
+        "Expected edges p2->c1 and p0->c0 to be deleted"
+    );
+    // changed nodes and edges
+    assert_eq!(
+        &signature.output.changed_nodes,
+        &HashMap::from([
+            (SubstMarker::from("p0").into(), NodeType::Integer),
+            (SubstMarker::from("c1").into(), NodeType::String)
+        ]),
+        "Expected nodes p0 to be changed to Integer and c1 to String"
+    );
+    assert_eq!(
+        &signature.output.changed_edges,
+        &HashMap::from([(
+            (SubstMarker::from("p0").into(), SubstMarker::from("c1").into()),
+            EdgeType::Exact("p0->c1".to_string())
+        )]),
+        "Expected edge p0->c1 to be changed to 'new_edge'"
+    );
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+

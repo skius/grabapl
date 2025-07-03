@@ -6,6 +6,7 @@ use derive_more::From;
 use internment::Intern;
 use std::borrow::Cow;
 use std::collections::HashMap;
+use crate::util::log;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
 
 pub struct OperationParameter<S: Semantics> {
@@ -223,6 +224,8 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         if old_value.is_some() {
             // we only changed it if it exists, by semantics of set_edge_attr
             self.changed_edge_av.insert((src_key, dst_key), value);
+        } else {
+            log::warn!("Attempted to set edge value for non-existing edge from {:?} to {:?}.", src_key, dst_key);
         }
         old_value
     }

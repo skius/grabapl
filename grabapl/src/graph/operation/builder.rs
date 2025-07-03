@@ -82,6 +82,8 @@ enum BuilderInstruction<S: SemanticsClone> {
     AddOperation(BuilderOpLike<S>, Vec<AbstractNodeId>),
     #[debug("ReturnNode({_0:?}, {_1:?}, ???)")]
     ReturnNode(AbstractNodeId, AbstractOutputNodeMarker, S::NodeAbstract),
+    #[debug("ReturnEdge({_0:?}, {_1:?}, ???)")]
+    ReturnEdge(AbstractNodeId, AbstractNodeId, S::EdgeAbstract),
 }
 
 #[derive(Error, Debug, Clone)]
@@ -294,6 +296,28 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         }
         self.instructions
             .push(BuilderInstruction::ReturnNode(aid, output_marker, node));
+        self.check_instructions_or_rollback()
+    }
+
+    /// Indicate that an edge should be marked in the output with the given abstract value.
+    ///
+    /// Note that the edge must be a supertype of the edge's statically determined type.
+    /// Also, the edge must be visible in the end context of the operation, and must never have
+    /// been statically determined by a shape query.
+    ///
+    /// Further, new edges may only be returned if both endpoints of the edge are either parameter
+    /// nodes or new nodes also returned by the operation.
+    ///
+    /// These instructions must be the very last instructions in the operation builder.
+    pub fn return_edge(
+        &mut self,
+        src: AbstractNodeId,
+        dst: AbstractNodeId,
+        edge: S::EdgeAbstract,
+    ) -> Result<(), OperationBuilderError> {
+        // TODO: validate that the edge did not already exist in the param graph anyway.
+        self.instructions
+            .push(BuilderInstruction::ReturnEdge(src, dst, edge));
         self.check_instructions_or_rollback()
     }
 
@@ -1024,6 +1048,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
         Ok(operation_parameter)
     }
 
+    // TODO: also collect ReturnEdge
     fn collect_return_node_instructions(
         iter: &mut Peekable<Iter<BuilderInstruction<S>>>,
     ) -> Result<

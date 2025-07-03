@@ -1,12 +1,13 @@
 use std::collections::{HashMap, HashSet};
+use derive_more::From;
 use crate::graph::pattern::{AbstractOutputNodeMarker, OperationParameter};
 use crate::{Semantics, SubstMarker};
-use crate::graph::semantics::AbstractMatcher;
+use crate::graph::semantics::{AbstractMatcher, SemanticsClone};
 
 pub type AbstractSignatureEdgeId = (AbstractSignatureNodeId, AbstractSignatureNodeId);
 pub type ParameterEdgeId = (SubstMarker, SubstMarker);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, From)]
 pub enum AbstractSignatureNodeId {
     /// References a pre-existing node in the parameter graph.
     ExistingNode(SubstMarker),
@@ -38,7 +39,18 @@ pub struct OperationSignature<S: Semantics> {
     pub output: AbstractOutputChanges<S>,
 }
 
+impl<S: SemanticsClone> Clone for OperationSignature<S> {
+    fn clone(&self) -> Self {
+        OperationSignature {
+            name: self.name.clone(),
+            parameter: self.parameter.clone(),
+            output: self.output.clone(),
+        }
+    }
+}
+
 /// The changes to the graph that an operation will cause.
+#[derive(derive_more::Debug)]
 pub struct AbstractOutputChanges<S: Semantics> {
     /// New nodes that are guaranteed to be created with a value of the given type.
     pub new_nodes: HashMap<AbstractOutputNodeMarker, S::NodeAbstract>,
@@ -52,6 +64,19 @@ pub struct AbstractOutputChanges<S: Semantics> {
     pub deleted_nodes: HashSet<SubstMarker>,
     /// Pre-existing edges that may have been deleted by the operation.
     pub deleted_edges: HashSet<ParameterEdgeId>,
+}
+
+impl<S: SemanticsClone> Clone for AbstractOutputChanges<S> {
+    fn clone(&self) -> Self {
+        AbstractOutputChanges {
+            new_nodes: self.new_nodes.clone(),
+            new_edges: self.new_edges.clone(),
+            changed_nodes: self.changed_nodes.clone(),
+            changed_edges: self.changed_edges.clone(),
+            deleted_nodes: self.deleted_nodes.clone(),
+            deleted_edges: self.deleted_edges.clone(),
+        }
+    }
 }
 
 impl<S: Semantics> AbstractOutputChanges<S> {

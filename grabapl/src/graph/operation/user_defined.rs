@@ -17,6 +17,7 @@ use internment::Intern;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::str::FromStr;
+use crate::graph::operation::signature::OperationSignature;
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
@@ -256,6 +257,10 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
             // TODO: populate this
             removed_nodes: vec![],
         })
+    }
+    
+    pub fn signature(&self) -> OperationSignature<S> {
+        todo!()
     }
 }
 
