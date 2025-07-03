@@ -185,14 +185,14 @@ export class OperationBuilder {
         }
     }
 
-    startShapeQuery(queryName) {
+    startShapeQuery(opMarker) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
-        const queryNameSlice = diplomatRuntime.DiplomatBuf.str8(wasm, queryName);
+        const opMarkerSlice = diplomatRuntime.DiplomatBuf.str8(wasm, opMarker);
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
 
-        const result = wasm.OperationBuilder_start_shape_query(diplomatReceive.buffer, this.ffiValue, ...queryNameSlice.splat());
+        const result = wasm.OperationBuilder_start_shape_query(diplomatReceive.buffer, this.ffiValue, ...opMarkerSlice.splat());
 
         try {
             if (!diplomatReceive.resultFlag) {

@@ -207,6 +207,24 @@ const initCommands = () => {
                 op_builder.addOperation(name, op, args);
             }
         },
+        {
+            "name": "Recurse",
+            "inputs": ["Output Name", "Input1 + Input2 + ..."],
+            "invoke": (name, str_inputs) => {
+                // parse inputs
+                let input_list = str_inputs.split("+").map(input => input.trim());
+                // remove empty strings
+                input_list = input_list.filter(input => input !== "");
+                let args = AbstractArgList.create();
+                input_list.forEach(input => {
+                    let node_id = AbstractNodeId.newFromStr(input);
+                    args.push(node_id);
+                });
+                console.log(`recursing with inputs: ${input_list}`);
+                let op = BuilderOpLike.newRecurse();
+                op_builder.addOperation(name, op, args);
+            }
+        },
         // copy paste me
         {
             "name": "Sample",

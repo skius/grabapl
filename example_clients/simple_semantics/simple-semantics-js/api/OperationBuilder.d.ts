@@ -33,7 +33,7 @@ export class OperationBuilder {
 
     enterFalseBranch(): void;
 
-    startShapeQuery(queryName: string): void;
+    startShapeQuery(opMarker: string): void;
 
     endQuery(): void;
 
