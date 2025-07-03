@@ -9,7 +9,7 @@ use crate::graph::pattern::{
 };
 use crate::graph::semantics::{AbstractGraph, AbstractMatcher, SemanticsClone};
 use crate::util::bimap::BiMap;
-use crate::{Graph, NodeKey, OperationContext, OperationId, SubstMarker};
+use crate::{Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
 use petgraph::dot;
 use petgraph::dot::Dot;
 use petgraph::prelude::GraphMap;
@@ -20,6 +20,8 @@ use std::marker::PhantomData;
 use std::mem;
 use std::slice::Iter;
 use thiserror::Error;
+use crate::graph::operation::builder::BuilderInstruction::ExpectParameterEdge;
+use crate::graph::operation::signature::{AbstractSignatureNodeId, OperationSignature};
 /*
 General overview:
 
@@ -86,6 +88,18 @@ enum BuilderInstruction<S: SemanticsClone> {
     ReturnEdge(AbstractNodeId, AbstractNodeId, S::EdgeAbstract),
 }
 
+impl<S: SemanticsClone> BuilderInstruction<S> {
+    /// Returns true if this is an instruction that is valid to break out of a body of query/operation
+    /// instructions.
+    fn can_break_body(&self) -> bool {
+        use BuilderInstruction::*;
+        match self {
+            EnterTrueBranch | EnterFalseBranch | EndQuery | ReturnNode(..) | ReturnEdge(..) => true,
+            _ => false,
+        }
+    }
+}
+
 #[derive(Error, Debug, Clone)]
 pub enum OperationBuilderError {
     #[error("Expected a new unique subst marker, found repeat: {0:?}")]
@@ -112,6 +126,8 @@ pub enum OperationBuilderError {
     SuperfluousInstruction(String),
     #[error("Already selected to return node {0:?}")]
     AlreadySelectedReturnNode(AbstractNodeId),
+    #[error("Already selected to return edge {0:?}->{1:?}")]
+    AlreadySelectedReturnEdge(AbstractNodeId, AbstractNodeId),
     #[error("Could not find AID {0:?} for return node")]
     NotFoundReturnNode(AbstractNodeId),
     #[error("Invalid return node type for AID {0:?}, must be more generic")]
@@ -122,6 +138,16 @@ pub enum OperationBuilderError {
     ReturnNodeMayOriginateFromShapeQuery(AbstractNodeId),
     #[error("Cannot return a parameter node: {0:?}")]
     CannotReturnParameter(AbstractNodeId),
+    #[error("Could not find AID {0:?} for return edge source")]
+    NotFoundReturnEdgeSource(AbstractNodeId),
+    #[error("Could not find AID {0:?} for return edge target")]
+    NotFoundReturnEdgeTarget(AbstractNodeId),
+    #[error("Could not statically determine edge {0:?}->{1:?} to be available")]
+    NotFoundReturnEdge(AbstractNodeId, AbstractNodeId),
+    #[error("Invalid return edge type for AID {0:?}->{1:?}, must be more generic")]
+    InvalidReturnEdgeType(AbstractNodeId, AbstractNodeId),
+    #[error("Return edge {0:?}->{1:?} may have been created by a shape query, which is not allowed")]
+    ReturnEdgeMayOriginateFromShapeQuery(AbstractNodeId, AbstractNodeId),
 }
 
 pub struct OperationBuilder<'a, S: SemanticsClone> {
@@ -339,7 +365,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
             IntermediateInterpreter::new_for_self_op_id(self_op_id, param, self.op_ctx);
 
         let user_def_op =
-            interpreter.create_user_defined_operation(instructions, builder_result.return_nodes)?;
+            interpreter.create_user_defined_operation(instructions, builder_result.return_nodes, builder_result.return_edges)?;
 
         Ok(user_def_op)
     }
@@ -371,6 +397,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         let _ = interpreter.create_user_defined_operation(
             builder_result.instructions,
             builder_result.return_nodes,
+            builder_result.return_edges,
         )?;
         Ok(())
     }
@@ -545,6 +572,7 @@ struct BuilderResult<S: SemanticsClone> {
     )>,
     state_path: Vec<IntermediateStatePath>,
     return_nodes: HashMap<AbstractNodeId, (AbstractOutputNodeMarker, S::NodeAbstract)>,
+    return_edges: HashMap<(AbstractNodeId, AbstractNodeId), S::EdgeAbstract>,
 }
 
 // TODO: maybe this is not *intermediate* but actually the final state as well potentially?
@@ -692,6 +720,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
         let instructions = builder.build_many_instructions(&mut iter)?;
 
         let mut return_nodes = HashMap::new();
+        let mut return_edges = HashMap::new();
         // if we are outside all queries, check for ReturnNode instructions.
         if !builder
             .path
@@ -699,7 +728,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
             .any(|i| matches!(i, IntermediateStatePath::StartQuery(..)))
         {
             // we are outside all queries
-            return_nodes = Self::collect_return_node_instructions(&mut iter)?;
+            (return_nodes, return_edges) = Self::collect_return_instructions(&mut iter)?;
             // TODO: validate that we have not encountered a Recurse instruction. In recursive queries we cannot statically return.
         }
 
@@ -715,6 +744,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
             instructions,
             state_path: builder.path,
             return_nodes,
+            return_edges,
         })
     }
 
@@ -732,13 +762,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
 
         while let Some(instr) = iter.peek() {
             // break on control flow instructions and don't consume
-            if matches!(
-                instr,
-                BuilderInstruction::EndQuery
-                    | BuilderInstruction::EnterTrueBranch
-                    | BuilderInstruction::EnterFalseBranch
-                    | BuilderInstruction::ReturnNode(..)
-            ) {
+            if instr.can_break_body() {
                 break;
             }
             instructions.push(self.build_instruction(iter)?);
@@ -1049,13 +1073,17 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
     }
 
     // TODO: also collect ReturnEdge
-    fn collect_return_node_instructions(
+    fn collect_return_instructions(
         iter: &mut Peekable<Iter<BuilderInstruction<S>>>,
     ) -> Result<
-        HashMap<AbstractNodeId, (AbstractOutputNodeMarker, S::NodeAbstract)>,
+        (
+            HashMap<AbstractNodeId, (AbstractOutputNodeMarker, S::NodeAbstract)>,
+            HashMap<(AbstractNodeId, AbstractNodeId), S::EdgeAbstract>,
+        ),
         OperationBuilderError,
     > {
         let mut return_nodes = HashMap::new();
+        let mut return_edges = HashMap::new();
         while let Some(instruction) = iter.peek() {
             match instruction {
                 BuilderInstruction::ReturnNode(aid, output_marker, node) => {
@@ -1067,10 +1095,21 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     }
                     return_nodes.insert(aid.clone(), (output_marker.clone(), node.clone()));
                 }
+                BuilderInstruction::ReturnEdge(source, target, edge) => {
+                    iter.next();
+                    if return_edges.contains_key(&(source.clone(), target.clone())) {
+                        return Err(OperationBuilderError::AlreadySelectedReturnEdge(
+                            source.clone(),
+                            target.clone(),
+                        ));
+                    }
+                    return_edges.insert((source.clone(), target.clone()), edge.clone());
+                }
+
                 _ => break,
             }
         }
-        Ok(return_nodes)
+        Ok((return_nodes, return_edges))
     }
 
     fn remove_until_branch(&mut self, branch: bool) {
@@ -1169,7 +1208,8 @@ pub struct IntermediateState<S: SemanticsClone> {
     // TODO: Somehow remove AIDs from this set if they're completely overwritten by something non-shape-query.
     //  could be done by, whenever adding a new node, unconditionally removing the AID from this set as long as we're not in a shape query.
     //  since we have a different state at that point, it would get merged correctly (assuming we take the union).
-    pub may_originate_from_shape_query: HashSet<AbstractNodeId>,
+    pub node_may_originate_from_shape_query: HashSet<AbstractNodeId>,
+    pub edge_may_originate_from_shape_query: HashSet<(AbstractNodeId, AbstractNodeId)>,
     // TODO: keep track of may_deleted_nodes etc.
 
     // TODO: make query path
@@ -1183,7 +1223,8 @@ impl<S: SemanticsClone> Clone for IntermediateState<S> {
         IntermediateState {
             graph: self.graph.clone(),
             node_keys_to_aid: self.node_keys_to_aid.clone(),
-            may_originate_from_shape_query: self.may_originate_from_shape_query.clone(),
+            node_may_originate_from_shape_query: self.node_may_originate_from_shape_query.clone(),
+            edge_may_originate_from_shape_query: self.edge_may_originate_from_shape_query.clone(),
             query_path: self.query_path.clone(),
         }
     }
@@ -1311,7 +1352,8 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         let initial_state = IntermediateState {
             graph: initial_graph,
             node_keys_to_aid: initial_mapping,
-            may_originate_from_shape_query: HashSet::new(),
+            node_may_originate_from_shape_query: HashSet::new(),
+            edge_may_originate_from_shape_query: HashSet::new(),
             query_path: Vec::new(),
         };
 
@@ -1336,12 +1378,38 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             IntermediateInstruction<S>,
         )>,
         return_nodes: HashMap<AbstractNodeId, (AbstractOutputNodeMarker, S::NodeAbstract)>,
+        return_edges: HashMap<(AbstractNodeId, AbstractNodeId), S::EdgeAbstract>,
     ) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
         let (ud_instructions, _interp_instructions) =
             self.interpret_instructions(intermediate_instructions)?;
 
+        // self.current_state is now the final inferred state.
+
+        let (ud_output, signature) = self.determine_signature(
+            return_nodes,
+            return_edges,
+        )?;
+
+        Ok(UserDefinedOperation {
+            parameter: self.op_param.clone(),
+            instructions: ud_instructions,
+            output_changes: ud_output,
+            signature,
+        })
+    }
+
+    // Note: must be called after interpreting all instructions.
+    fn determine_signature(
+        &self,
+        return_nodes: HashMap<AbstractNodeId, (AbstractOutputNodeMarker, S::NodeAbstract)>,
+        return_edges: HashMap<(AbstractNodeId, AbstractNodeId), S::EdgeAbstract>,
+    ) -> Result<(AbstractUserDefinedOperationOutput<S>, OperationSignature<S>), OperationBuilderError> {
+        // this struct stores an instruction for user defined operations on *how* to return nodes.
+        let mut ud_output = AbstractUserDefinedOperationOutput::new();
+        // this stores in general *what* the operation is doing.
+        let mut signature = OperationSignature::empty_new("name", self.op_param.clone());
+
         // need to determine validity of return_nodes
-        let mut output = AbstractUserDefinedOperationOutput::new();
         for (aid, (output_marker, node_abstract)) in return_nodes {
             let Some(key) = self.current_state.node_keys_to_aid.get_right(&aid) else {
                 return Err(OperationBuilderError::NotFoundReturnNode(aid));
@@ -1356,21 +1424,130 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             }
             if self
                 .current_state
-                .may_originate_from_shape_query
+                .node_may_originate_from_shape_query
                 .contains(&aid)
             {
                 return Err(OperationBuilderError::ReturnNodeMayOriginateFromShapeQuery(
                     aid,
                 ));
             }
-            output.new_nodes.insert(aid, (output_marker, node_abstract));
+            ud_output.new_nodes.insert(aid, (output_marker, node_abstract.clone()));
+            // Add to signature
+            signature.output.new_nodes.insert(output_marker, node_abstract);
         }
 
-        Ok(UserDefinedOperation {
-            parameter: self.op_param.clone(),
-            instructions: ud_instructions,
-            output_changes: output,
-        })
+        let get_signature_id = |aid: &AbstractNodeId| {
+            match aid {
+                AbstractNodeId::ParameterMarker(s) => Ok(AbstractSignatureNodeId::ExistingNode(*s)),
+                AbstractNodeId::DynamicOutputMarker(_, _) => {
+                    // we must be returning this node
+                    let Some((output_marker, _)) = ud_output.new_nodes.get(aid) else {
+                        return Err(OperationBuilderError::NotFoundReturnNode(aid.clone()));
+                    };
+                    Ok(AbstractSignatureNodeId::NewNode(output_marker.clone()))
+                },
+            }
+        };
+
+        // need to determine validity of return_edges
+        for ((source_aid, target_aid), edge_abstract) in return_edges {
+            let Some(source_key) = self.current_state.node_keys_to_aid.get_right(&source_aid) else {
+                return Err(OperationBuilderError::NotFoundReturnEdgeSource(source_aid));
+            };
+            let Some(target_key) = self.current_state.node_keys_to_aid.get_right(&target_aid) else {
+                return Err(OperationBuilderError::NotFoundReturnEdgeTarget(target_aid));
+            };
+            let inferred_edge_av = self
+                .current_state
+                .edge_av_of_aid(&source_aid, &target_aid)
+                .ok_or(OperationBuilderError::NotFoundReturnEdge(
+                    source_aid.clone(),
+                    target_aid.clone(),
+                ))?;
+            if !S::EdgeMatcher::matches(inferred_edge_av, &edge_abstract) {
+                return Err(OperationBuilderError::InvalidReturnEdgeType(
+                    source_aid,
+                    target_aid,
+                ));
+            }
+            if self
+                .current_state
+                .edge_may_originate_from_shape_query
+                .contains(&(source_aid, target_aid))
+            {
+                return Err(OperationBuilderError::ReturnEdgeMayOriginateFromShapeQuery(
+                    source_aid,
+                    target_aid,
+                ));
+            }
+
+            // Add to signature
+            let source_sig_id = get_signature_id(&source_aid)?;
+            let target_sig_id = get_signature_id(&target_aid)?;
+            signature.output.new_edges.insert(
+                (source_sig_id, target_sig_id),
+                edge_abstract.clone(),
+            );
+        }
+
+        // deleted nodes and edges can be inferred from what's missing from the current state vs. op_param.
+
+        let initial_subst_nodes = self.op_param.node_keys_to_subst.values().cloned().collect::<HashSet<_>>();
+        let current_subst_nodes = self.current_state.node_keys_to_aid.right_values().filter_map(|aid| {
+            if let AbstractNodeId::ParameterMarker(subst) = aid {
+                Some(subst.clone())
+            } else {
+                None
+            }
+        }).collect::<HashSet<_>>();
+        
+        // deleted nodes are those that were in the initial substitution but not in the current state
+        let deleted_nodes: HashSet<_> = initial_subst_nodes
+            .difference(&current_subst_nodes)
+            .cloned()
+            .collect();
+        signature.output.deleted_nodes = deleted_nodes;
+        
+        let mut initial_edges = HashSet::new();
+        for (source, target, _) in self.op_param.parameter_graph.graph.all_edges() {
+            let Some(source_subst) = self.op_param.node_keys_to_subst.get(&source) else {
+                continue; // should not happen, but just in case
+            };
+            let Some(target_subst) = self.op_param.node_keys_to_subst.get(&target) else {
+                continue; // should not happen, but just in case
+            };
+            initial_edges.insert((*source_subst, *target_subst));
+        }
+        
+        let mut current_edges = HashSet::new();
+        for (source, target, _) in self.current_state.graph.graph.all_edges() {
+            let Some(source_aid) = self.current_state.node_keys_to_aid.get_left(&source) else {
+                continue; // should not happen, but just in case
+            };
+            let Some(target_aid) = self.current_state.node_keys_to_aid.get_left(&target) else {
+                continue; // should not happen, but just in case
+            };
+            if let (AbstractNodeId::ParameterMarker(source_subst), AbstractNodeId::ParameterMarker(target_subst)) =
+                (source_aid, target_aid)
+            {
+                current_edges.insert((source_subst.clone(), target_subst.clone()));
+            }
+        }
+        
+        // deleted edges are those that were in the initial substitution but not in the current state
+        let deleted_edges: HashSet<_> = initial_edges
+            .difference(&current_edges)
+            .cloned()
+            .collect();
+        signature.output.deleted_edges = deleted_edges;
+
+
+        // TODO: now we need to add deleted nodes and edges, as well as may_changed nodes and edges to the signature.
+        
+        // changed nodes and edges must be kept track of during the interpretation, including calls to child operations.
+        
+        
+        Ok((ud_output, signature))
     }
 
     fn interpret_instructions(
@@ -1712,7 +1889,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                         .node_keys_to_aid
                         .insert(state_key, aid.clone());
                     self.current_state
-                        .may_originate_from_shape_query
+                        .node_may_originate_from_shape_query
                         .insert(aid.clone());
                 }
                 GraphShapeQueryInstruction::ExpectShapeEdge(src, target, av) => {
@@ -1734,6 +1911,9 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                     self.current_state
                         .graph
                         .add_edge(state_src_key, state_target_key, av);
+                    self.current_state.edge_may_originate_from_shape_query.insert(
+                        (src.clone(), target.clone())
+                    );
                 }
             }
         }
@@ -1938,11 +2118,13 @@ fn merge_states<S: SemanticsClone>(
     state_false: &IntermediateState<S>,
 ) -> IntermediateState<S> {
     // TODO: handle `is_true_shape`.
+    //  ^ actually, we're doing that in interpret_graph_shape_query, so we don't need to do it here, I think.
 
     let mut new_state = IntermediateState {
         graph: Graph::new(),
         node_keys_to_aid: BiMap::new(),
-        may_originate_from_shape_query: HashSet::new(),
+        node_may_originate_from_shape_query: HashSet::new(),
+        edge_may_originate_from_shape_query: HashSet::new(),
         // TODO: should probably remove query_path from the state struct, and add it to a final returned StateWithQueryPath struct?
         query_path: Vec::new(),
     };
@@ -1952,15 +2134,6 @@ fn merge_states<S: SemanticsClone>(
     for aid in state_true.node_keys_to_aid.right_values() {
         if state_false.node_keys_to_aid.contains_right(aid) {
             common_aids.insert(aid.clone());
-        }
-    }
-
-    // if aid may come from a shape query in either branch, it may come from a shape query in the merged state.
-    for aid in &common_aids {
-        if state_true.may_originate_from_shape_query.contains(aid)
-            || state_false.may_originate_from_shape_query.contains(aid)
-        {
-            new_state.may_originate_from_shape_query.insert(aid.clone());
         }
     }
 
@@ -1994,6 +2167,12 @@ fn merge_states<S: SemanticsClone>(
         // Add the merged node to the new state.
         let new_key = new_state.graph.add_node(merged_av);
         new_state.node_keys_to_aid.insert(new_key, aid.clone());
+        // Keep track of the node originating from a shape query.
+        if state_true.node_may_originate_from_shape_query.contains(&aid)
+            || state_false.node_may_originate_from_shape_query.contains(&aid)
+        {
+            new_state.node_may_originate_from_shape_query.insert(aid);
+        }
     }
 
     // Now we merge the edges.
@@ -2039,6 +2218,13 @@ fn merge_states<S: SemanticsClone>(
                 new_state
                     .graph
                     .add_edge(*from_key_merged, *to_key_merged, merged_av);
+                // Keep track of the edge originating from a shape query.
+                let edge = (*from_aid, *to_aid);
+                if state_true.edge_may_originate_from_shape_query.contains(&edge)
+                    || state_false.edge_may_originate_from_shape_query.contains(&edge)
+                {
+                    new_state.edge_may_originate_from_shape_query.insert(edge);
+                }
             }
         }
 

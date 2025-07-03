@@ -185,6 +185,8 @@ impl<S: Semantics> AbstractUserDefinedOperationOutput<S> {
 // A 'custom'/user-defined operation
 pub struct UserDefinedOperation<S: Semantics> {
     pub parameter: OperationParameter<S>,
+    // cached signature. there is definitely some duplicated information here.
+    pub signature: OperationSignature<S>,
     // TODO: add preprocessing (checking) step to see if the instructions make sense and are well formed wrt which nodes they access statically.
     pub instructions: Vec<InstructionWithResultMarker<S>>,
     // TODO: need to define output changes.
@@ -198,8 +200,10 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
         parameter: OperationParameter<S>,
         instructions: Vec<InstructionWithResultMarker<S>>,
     ) -> Self {
+        let signature = OperationSignature::empty_new("some_name", parameter.clone());
         UserDefinedOperation {
             parameter,
+            signature,
             instructions,
             output_changes: AbstractUserDefinedOperationOutput::new(),
         }
@@ -258,9 +262,10 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
             removed_nodes: vec![],
         })
     }
-    
+
     pub fn signature(&self) -> OperationSignature<S> {
-        todo!()
+        // TODO: borrow
+        self.signature.clone()
     }
 }
 

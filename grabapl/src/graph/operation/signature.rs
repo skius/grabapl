@@ -49,6 +49,28 @@ impl<S: SemanticsClone> Clone for OperationSignature<S> {
     }
 }
 
+impl<S: Semantics> OperationSignature<S> {
+    // mostly an unsound hack to get things running for the time being
+    // TODO: fix/remove
+    pub fn empty_new(
+        name: impl Into<String>,
+        parameter: OperationParameter<S>,
+    ) -> Self {
+        OperationSignature {
+            name: name.into(),
+            parameter,
+            output: AbstractOutputChanges {
+                new_nodes: HashMap::new(),
+                new_edges: HashMap::new(),
+                changed_nodes: HashMap::new(),
+                changed_edges: HashMap::new(),
+                deleted_nodes: HashSet::new(),
+                deleted_edges: HashSet::new(),
+            },
+        }
+    }
+}
+
 /// The changes to the graph that an operation will cause.
 #[derive(derive_more::Debug)]
 pub struct AbstractOutputChanges<S: Semantics> {
