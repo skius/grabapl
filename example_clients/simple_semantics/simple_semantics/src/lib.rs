@@ -6,10 +6,7 @@ use grabapl::graph::operation::query::{
     ConcreteQueryOutput, EdgeChange, NodeChange,
 };
 use grabapl::graph::operation::run_operation;
-use grabapl::graph::pattern::{
-    GraphWithSubstitution, NewNodeMarker, OperationArgument, OperationOutput, OperationParameter,
-    ParameterSubstitution,
-};
+use grabapl::graph::pattern::{AbstractOperationOutput, GraphWithSubstitution, NewNodeMarker, OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution};
 use grabapl::graph::semantics::{
     AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, MatchJoiner,
     Semantics,
@@ -426,7 +423,7 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
     fn apply_abstract(
         &self,
         g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>,
-    ) -> OperationOutput {
+    ) -> AbstractOperationOutput<Self::S> {
         let mut new_nodes = HashMap::new();
         match self {
             BuiltinOperation::AddNode => {
@@ -487,7 +484,7 @@ impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
             }
         }
-        g.get_concrete_output(new_nodes)
+        g.get_abstract_output(new_nodes)
     }
 
     fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>) -> OperationOutput {

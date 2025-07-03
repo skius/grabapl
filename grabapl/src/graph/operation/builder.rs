@@ -4,9 +4,7 @@ use crate::graph::operation::user_defined::{
     AbstractUserDefinedOperationOutput, QueryInstructions, UserDefinedOperation,
 };
 use crate::graph::operation::{BuiltinOperation, OperationError, get_substitution};
-use crate::graph::pattern::{
-    AbstractOutputNodeMarker, GraphWithSubstitution, OperationParameter, ParameterSubstitution,
-};
+use crate::graph::pattern::{AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationParameter, ParameterSubstitution};
 use crate::graph::semantics::{AbstractGraph, AbstractMatcher, SemanticsClone};
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
@@ -1210,7 +1208,12 @@ pub struct IntermediateState<S: SemanticsClone> {
     //  since we have a different state at that point, it would get merged correctly (assuming we take the union).
     pub node_may_originate_from_shape_query: HashSet<AbstractNodeId>,
     pub edge_may_originate_from_shape_query: HashSet<(AbstractNodeId, AbstractNodeId)>,
-    // TODO: keep track of may_deleted_nodes etc.
+
+    /// The most generic abstract type that may be written to each node, if any.
+    pub node_may_be_written_to: HashMap<AbstractNodeId, S::NodeAbstract>,
+    /// The most generic abstract type that may be written to each edge, if any.
+    pub edge_may_be_written_to: HashMap<(AbstractNodeId, AbstractNodeId), S::EdgeAbstract>,
+
 
     // TODO: make query path
     pub query_path: Vec<QueryPath>,
@@ -1225,6 +1228,8 @@ impl<S: SemanticsClone> Clone for IntermediateState<S> {
             node_keys_to_aid: self.node_keys_to_aid.clone(),
             node_may_originate_from_shape_query: self.node_may_originate_from_shape_query.clone(),
             edge_may_originate_from_shape_query: self.edge_may_originate_from_shape_query.clone(),
+            node_may_be_written_to: self.node_may_be_written_to.clone(),
+            edge_may_be_written_to: self.edge_may_be_written_to.clone(),
             query_path: self.query_path.clone(),
         }
     }
@@ -1354,6 +1359,8 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             node_keys_to_aid: initial_mapping,
             node_may_originate_from_shape_query: HashSet::new(),
             edge_may_originate_from_shape_query: HashSet::new(),
+            node_may_be_written_to: HashMap::new(),
+            edge_may_be_written_to: HashMap::new(),
             query_path: Vec::new(),
         };
 
@@ -1436,7 +1443,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             signature.output.new_nodes.insert(output_marker, node_abstract);
         }
 
-        let get_signature_id = |aid: &AbstractNodeId| {
+        let get_param_or_output_sig_id = |aid: &AbstractNodeId| {
             match aid {
                 AbstractNodeId::ParameterMarker(s) => Ok(AbstractSignatureNodeId::ExistingNode(*s)),
                 AbstractNodeId::DynamicOutputMarker(_, _) => {
@@ -1482,8 +1489,8 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             }
 
             // Add to signature
-            let source_sig_id = get_signature_id(&source_aid)?;
-            let target_sig_id = get_signature_id(&target_aid)?;
+            let source_sig_id = get_param_or_output_sig_id(&source_aid)?;
+            let target_sig_id = get_param_or_output_sig_id(&target_aid)?;
             signature.output.new_edges.insert(
                 (source_sig_id, target_sig_id),
                 edge_abstract.clone(),
@@ -1500,14 +1507,14 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 None
             }
         }).collect::<HashSet<_>>();
-        
+
         // deleted nodes are those that were in the initial substitution but not in the current state
         let deleted_nodes: HashSet<_> = initial_subst_nodes
             .difference(&current_subst_nodes)
             .cloned()
             .collect();
         signature.output.deleted_nodes = deleted_nodes;
-        
+
         let mut initial_edges = HashSet::new();
         for (source, target, _) in self.op_param.parameter_graph.graph.all_edges() {
             let Some(source_subst) = self.op_param.node_keys_to_subst.get(&source) else {
@@ -1518,7 +1525,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             };
             initial_edges.insert((*source_subst, *target_subst));
         }
-        
+
         let mut current_edges = HashSet::new();
         for (source, target, _) in self.current_state.graph.graph.all_edges() {
             let Some(source_aid) = self.current_state.node_keys_to_aid.get_left(&source) else {
@@ -1533,7 +1540,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 current_edges.insert((source_subst.clone(), target_subst.clone()));
             }
         }
-        
+
         // deleted edges are those that were in the initial substitution but not in the current state
         let deleted_edges: HashSet<_> = initial_edges
             .difference(&current_edges)
@@ -1542,11 +1549,31 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         signature.output.deleted_edges = deleted_edges;
 
 
-        // TODO: now we need to add deleted nodes and edges, as well as may_changed nodes and edges to the signature.
-        
+
         // changed nodes and edges must be kept track of during the interpretation, including calls to child operations.
-        
-        
+
+        for (aid, node_abstract) in &self.current_state.node_may_be_written_to {
+            // we care about reporting only subst markers
+            let AbstractNodeId::ParameterMarker(subst) = aid else {
+                continue;
+            };
+            signature.output.changed_nodes.insert(*subst, node_abstract.clone());
+        }
+
+        for ((source_aid, target_aid), edge_abstract) in &self.current_state.edge_may_be_written_to {
+            // we care about reporting only subst markers
+            let AbstractNodeId::ParameterMarker(source_subst) = source_aid else {
+                continue;
+            };
+            let AbstractNodeId::ParameterMarker(target_subst) = target_aid else {
+                continue;
+            };
+            signature.output.changed_edges.insert(
+                (*source_subst, *target_subst),
+                edge_abstract.clone(),
+            );
+        }
+
         Ok((ud_output, signature))
     }
 
@@ -1611,17 +1638,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                     let mut gws = GraphWithSubstitution::new(&mut self.current_state.graph, &subst);
                     op.apply_abstract(&mut gws)
                 };
-                // go over new nodes
-                let marker =
-                    marker.unwrap_or_else(|| self.get_new_unnamed_abstract_operation_marker());
-                for (node_marker, node_key) in operation_output.new_nodes {
-                    let aid = AbstractNodeId::DynamicOutputMarker(marker.clone(), node_marker);
-                    self.current_state.node_keys_to_aid.insert(node_key, aid);
-                }
-                for node_key in operation_output.removed_nodes {
-                    // remove the node from the mapping
-                    self.current_state.node_keys_to_aid.remove_left(&node_key);
-                }
+                self.handle_abstract_output_changes(marker, operation_output)?;
 
                 Ok(UDInstruction::Builtin(op, abstract_arg))
             }
@@ -1638,18 +1655,11 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                     op.apply_abstract(self.op_ctx, &mut gws)
                 };
                 // go over new nodes
-                let marker =
-                    marker.unwrap_or_else(|| self.get_new_unnamed_abstract_operation_marker());
                 let operation_output = operation_output
                     .map_err(|e| OperationBuilderError::AbstractApplyOperationError(id, e))?;
-                for (node_marker, node_key) in operation_output.new_nodes {
-                    let aid = AbstractNodeId::DynamicOutputMarker(marker.clone(), node_marker);
-                    self.current_state.node_keys_to_aid.insert(node_key, aid);
-                }
-                for node_key in operation_output.removed_nodes {
-                    // remove the node from the mapping
-                    self.current_state.node_keys_to_aid.remove_left(&node_key);
-                }
+                
+                self.handle_abstract_output_changes(marker, operation_output)?;
+                
                 Ok(UDInstruction::Operation(id, abstract_arg))
             }
             IntermediateOpLike::Recurse(args) => {
@@ -1665,6 +1675,53 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 Ok(UDInstruction::Operation(self.self_op_id, abstract_arg))
             }
         }
+    }
+
+    fn handle_abstract_output_changes(
+        &mut self,
+        marker: Option<AbstractOperationResultMarker>,
+        operation_output: AbstractOperationOutput<S>,
+    ) -> Result<(), OperationBuilderError> {
+        // go over new nodes
+        let marker =
+            marker.unwrap_or_else(|| self.get_new_unnamed_abstract_operation_marker());
+        for (node_marker, node_key) in operation_output.new_nodes {
+            let aid = AbstractNodeId::DynamicOutputMarker(marker.clone(), node_marker);
+            // TODO: override the may_come_from_shape_query set here! remove the node - it's a non-shape-query node.
+            self.current_state.node_keys_to_aid.insert(node_key, aid);
+        }
+        for node_key in operation_output.removed_nodes {
+            // remove the node from the mapping
+            self.current_state.node_keys_to_aid.remove_left(&node_key);
+        }
+
+        // collect changes
+        for (key, node_abstract) in operation_output.changed_abstract_values_nodes {
+            let aid = self
+                .current_state
+                .node_keys_to_aid
+                .get_left(&key)
+                .expect("internal error: changed node not found in mapping");
+            self.current_state.node_may_be_written_to.insert(*aid, node_abstract);
+        }
+        for ((source, target), edge_abstract) in operation_output.changed_abstract_values_edges {
+            let source_aid = self
+                .current_state
+                .node_keys_to_aid
+                .get_left(&source)
+                .expect("internal error: changed edge source not found in mapping");
+            let target_aid = self
+                .current_state
+                .node_keys_to_aid
+                .get_left(&target)
+                .expect("internal error: changed edge target not found in mapping");
+            self.current_state.edge_may_be_written_to.insert(
+                (*source_aid, *target_aid),
+                edge_abstract,
+            );
+        }
+        
+        Ok(())
     }
 
     fn interpret_builtin_query(
@@ -2125,6 +2182,8 @@ fn merge_states<S: SemanticsClone>(
         node_keys_to_aid: BiMap::new(),
         node_may_originate_from_shape_query: HashSet::new(),
         edge_may_originate_from_shape_query: HashSet::new(),
+        node_may_be_written_to: HashMap::new(),
+        edge_may_be_written_to: HashMap::new(),
         // TODO: should probably remove query_path from the state struct, and add it to a final returned StateWithQueryPath struct?
         query_path: Vec::new(),
     };
@@ -2167,11 +2226,34 @@ fn merge_states<S: SemanticsClone>(
         // Add the merged node to the new state.
         let new_key = new_state.graph.add_node(merged_av);
         new_state.node_keys_to_aid.insert(new_key, aid.clone());
-        // Keep track of the node originating from a shape query.
+        // Keep track of the node originating from a shape query...
         if state_true.node_may_originate_from_shape_query.contains(&aid)
             || state_false.node_may_originate_from_shape_query.contains(&aid)
         {
             new_state.node_may_originate_from_shape_query.insert(aid);
+        }
+        // ... as well as the written types.
+        // We take the join-union of the written types from both states.
+        let written_av_true = state_true
+            .node_may_be_written_to
+            .get(&aid)
+            .cloned();
+        let written_av_false = state_false
+            .node_may_be_written_to
+            .get(&aid)
+            .cloned();
+        let merged_written_av = match (written_av_true, written_av_false) {
+            (Some(av_true), Some(av_false)) => {
+                // Note: we need this to be some, since we've already inserted the node in the new graph.
+                // for more detail, see the comment in the edges section below.
+                Some(S::join_nodes(&av_true, &av_false).expect("client semantics error: expected to be able to merge written node attributes"))
+            }
+            (Some(av_true), None) => Some(av_true),
+            (None, Some(av_false)) => Some(av_false),
+            (None, None) => None,
+        };
+        if let Some(merged_av) = merged_written_av {
+            new_state.node_may_be_written_to.insert(aid, merged_av);
         }
     }
 
@@ -2208,24 +2290,51 @@ fn merge_states<S: SemanticsClone>(
         };
 
         // Check if the edge exists in the false state.
-        if let Some(av_false) = state_false
+        let Some(av_false) = state_false
             .graph
-            .get_edge_attr((*from_key_false, *to_key_false))
+            .get_edge_attr((*from_key_false, *to_key_false)) else {
+            // If the edge does not exist in the false state, we skip it.
+            continue;
+        };
+        let Some(merged_av) = S::join_edges(av_true, av_false) else {
+            // If we cannot merge the edges, we skip this edge.
+            continue;
+        };
+        // Add the merged edge to the new state.
+        new_state
+            .graph
+            .add_edge(*from_key_merged, *to_key_merged, merged_av);
+        // Keep track of the edge originating from a shape query.
+        let edge = (from_aid.clone(), to_aid.clone());
+        if state_true.edge_may_originate_from_shape_query.contains(&edge)
+            || state_false.edge_may_originate_from_shape_query.contains(&edge)
         {
-            // Try to merge the edges.
-            if let Some(merged_av) = S::join_edges(av_true, av_false) {
-                // If we can merge the edges, add the merged edge to the new state.
-                new_state
-                    .graph
-                    .add_edge(*from_key_merged, *to_key_merged, merged_av);
-                // Keep track of the edge originating from a shape query.
-                let edge = (*from_aid, *to_aid);
-                if state_true.edge_may_originate_from_shape_query.contains(&edge)
-                    || state_false.edge_may_originate_from_shape_query.contains(&edge)
-                {
-                    new_state.edge_may_originate_from_shape_query.insert(edge);
-                }
+            new_state.edge_may_originate_from_shape_query.insert(edge);
+        }
+
+        let written_av_true = state_true
+            .edge_may_be_written_to
+            .get(&(from_aid.clone(), to_aid.clone()))
+            .cloned();
+        let written_av_false = state_false
+            .edge_may_be_written_to
+            .get(&(from_aid.clone(), to_aid.clone()))
+            .cloned();
+        let merged_written_av = match (written_av_true, written_av_false) {
+            (Some(av_true), Some(av_false)) => {
+                // Note: this must be Some, because we have the edge in our merged graph for a fact.
+                // If we were to ignore it *just for edge_may_be_written_to* if the written values could not be merged,
+                // we'd unsoundly skip returning information about potential changes to the edge.
+                Some(S::join_edges(&av_true, &av_false).expect("client semantics error: expected to be able to merge written edge attributes"))
             }
+            (Some(av_true), None) => Some(av_true),
+            (None, Some(av_false)) => Some(av_false),
+            (None, None) => None,
+        };
+        if let Some(merged_av) = merged_written_av {
+            new_state
+                .edge_may_be_written_to
+                .insert((from_aid.clone(), to_aid.clone()), merged_av);
         }
 
         // TODO: edge orders need to be handled here.

@@ -4,10 +4,7 @@ use crate::graph::operation::query::{
 use crate::graph::operation::{
     OperationError, OperationResult, run_builtin_operation, run_operation,
 };
-use crate::graph::pattern::{
-    AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationOutput,
-    OperationParameter, ParameterSubstitution,
-};
+use crate::graph::pattern::{AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, NodeMarker, OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution};
 use crate::graph::semantics::{AbstractGraph, ConcreteGraph, SemanticsClone};
 use crate::{
     NodeKey, OperationContext, OperationId, Semantics, SubstMarker, interned_string_newtype,
@@ -17,7 +14,8 @@ use internment::Intern;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::str::FromStr;
-use crate::graph::operation::signature::OperationSignature;
+use crate::graph::operation::signature::{AbstractSignatureNodeId, OperationSignature};
+use crate::util::bimap::BiMap;
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
@@ -213,18 +211,62 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
         &self,
         op_ctx: &OperationContext<S>,
         g: &mut GraphWithSubstitution<AbstractGraph<S>>,
-    ) -> OperationResult<OperationOutput> {
-        let mut output_names = HashMap::new();
+    ) -> OperationResult<AbstractOperationOutput<S>> {
+        let mut output_names = BiMap::new();
 
-        // TODO: Implement apply_abstract for UserDefinedOperation
-
+        // handle new nodes
         for (aid, (name, av)) in &self.output_changes.new_nodes {
             let nnm = g.new_node_marker();
             g.add_node(nnm.clone(), av.clone());
             output_names.insert(nnm, name.clone());
         }
-
-        Ok(g.get_concrete_output(output_names))
+        
+        let sig_id_to_node_marker = |sig_id: AbstractSignatureNodeId| {
+            match sig_id {
+                AbstractSignatureNodeId::ExistingNode(subst) => {NodeMarker::Subst(subst)},
+                AbstractSignatureNodeId::NewNode(name) => {
+                    // find in output_names
+                    let nnm = output_names.get_right(&name)
+                        .expect("internal error: signature node not found in output names");
+                    NodeMarker::New(*nnm)
+                }
+            }
+        };
+        
+        // handle new edges
+        for ((src, dst), av) in &self.signature.output.new_edges {
+            let src_marker = sig_id_to_node_marker(*src);
+            let dst_marker = sig_id_to_node_marker(*dst);
+            g.add_edge(src_marker, dst_marker, av.clone());
+        }
+        
+        // handle changed nodes
+        for (subst, av) in &self.signature.output.changed_nodes {
+            let node_marker = NodeMarker::Subst(*subst);
+            g.set_node_value(node_marker, av.clone()).unwrap();
+        }
+        // handle changed edges
+        for ((src, dst), av) in &self.signature.output.changed_edges {
+            let src_marker = NodeMarker::Subst(*src);
+            let dst_marker = NodeMarker::Subst(*dst);
+            g.set_edge_value(src_marker, dst_marker, av.clone()).unwrap();
+        }
+        
+        // handle removed nodes
+        for subst in &self.signature.output.deleted_nodes {
+            let node_marker = NodeMarker::Subst(*subst);
+            g.delete_node(node_marker);
+        }
+        // handle removed edges
+        for (src, dst) in &self.signature.output.deleted_edges {
+            let src_marker = NodeMarker::Subst(*src);
+            let dst_marker = NodeMarker::Subst(*dst);
+            g.delete_edge(src_marker, dst_marker);
+        }
+        
+        
+        let (output_names, _) = output_names.into_inner();
+        Ok(g.get_abstract_output(output_names))
     }
 
     pub(crate) fn apply(

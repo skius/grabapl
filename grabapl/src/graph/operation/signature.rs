@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use derive_more::From;
-use crate::graph::pattern::{AbstractOutputNodeMarker, OperationParameter};
+use crate::graph::pattern::{AbstractOutputNodeMarker, NewNodeMarker, OperationParameter};
 use crate::{Semantics, SubstMarker};
 use crate::graph::semantics::{AbstractMatcher, SemanticsClone};
 

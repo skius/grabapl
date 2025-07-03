@@ -6,10 +6,7 @@ pub mod signature;
 
 use crate::graph::EdgeAttribute;
 use crate::graph::operation::user_defined::{AbstractOperationResultMarker, UserDefinedOperation};
-use crate::graph::pattern::{
-    AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationOutput,
-    OperationParameter, ParameterSubstitution,
-};
+use crate::graph::pattern::{AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution};
 use crate::graph::semantics::{
     AbstractGraph, AbstractMatcher, ConcreteGraph, ConcreteToAbstract, Semantics, SemanticsClone,
 };
@@ -39,7 +36,7 @@ pub trait BuiltinOperation: Debug {
     fn apply_abstract(
         &self,
         g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>,
-    ) -> OperationOutput;
+    ) -> AbstractOperationOutput<Self::S>;
 
     // TODO: OperationOutput returned here should only represent Abstract changes. Basically the guaranteed new nodes so that other ops can refer to it.
     //  Maybe we could have something be returned in apply_abstract (just a Vec<SubstMarker>?) to indicate _which_ nodes are guaranteed to be added, and apply then returns a map with those substmarkers as keys?
@@ -103,7 +100,7 @@ impl<'a, S: SemanticsClone> Operation<'a, S> {
         &self,
         op_ctx: &OperationContext<S>,
         g: &mut GraphWithSubstitution<AbstractGraph<S>>,
-    ) -> OperationResult<OperationOutput> {
+    ) -> OperationResult<AbstractOperationOutput<S>> {
         match self {
             Operation::Builtin(op) => Ok(op.apply_abstract(g)),
             Operation::Custom(op) => op.apply_abstract(op_ctx, g),

@@ -5,7 +5,7 @@ use crate::{Graph, NodeKey, Semantics, SubstMarker, WithSubstMarker, interned_st
 use derive_more::From;
 use internment::Intern;
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use crate::util::log;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
 
@@ -265,20 +265,28 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         let (new_nodes, new_edges) =
             self.get_new_nodes_and_edges_from_desired_names(&desired_node_output_names);
 
-        // Only report changed av's for nodes and edges that are in the new_nodes and new_edges.
+        // Only report changed av's for nodes and edges that are params
+        // TODO: make sure the changed_av_nodes/edges skip deleted nodes/edges.
+        let existing_nodes: HashSet<NodeKey> = self
+            .subst
+            .mapping
+            .values()
+            .cloned()
+            .collect();
+        let mut existing_edges = HashSet::new();
+        for (src, dst, _) in self.graph.edges() {
+            existing_edges.insert((src, dst));
+        }
         let mut changed_abstract_values_nodes = HashMap::new();
         for (node_key, node_av) in &self.changed_node_av {
-            if new_nodes.values().any(|&n| n == *node_key) {
+            if existing_nodes.contains(node_key) {
                 changed_abstract_values_nodes.insert(*node_key, node_av.clone());
             }
         }
         let mut changed_abstract_edges = HashMap::new();
-        for (edge_key, edge_av) in &self.changed_edge_av {
-            if new_edges
-                .iter()
-                .any(|(src, dst)| *src == edge_key.0 && *dst == edge_key.1)
-            {
-                changed_abstract_edges.insert(*edge_key, edge_av.clone());
+        for (&(src, dst), edge_av) in &self.changed_edge_av {
+            if existing_edges.contains(&(src, dst)) {
+                changed_abstract_edges.insert((src, dst), edge_av.clone());
             }
         }
 
@@ -291,7 +299,7 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
             removed_edges: self.removed_edges.clone(),
             removed_nodes: self.removed_nodes.clone(),
             changed_abstract_values_nodes,
-            changed_abstract_edges,
+            changed_abstract_values_edges: changed_abstract_edges,
         }
     }
 
@@ -388,7 +396,7 @@ pub struct AbstractOperationOutput<S: Semantics> {
     //  without needing to simulate it every time we want to abstractly apply it.
     /// These maps contain any abstract values that are set (not necessarily changed) during the operation execution.
     pub changed_abstract_values_nodes: HashMap<NodeKey, S::NodeAbstract>,
-    pub changed_abstract_edges: HashMap<(NodeKey, NodeKey), S::EdgeAbstract>,
+    pub changed_abstract_values_edges: HashMap<(NodeKey, NodeKey), S::EdgeAbstract>,
 }
 // TODO(severe): since this is basically an AID output, we must make sure that during *concrete* execution,
 //  we don't accidentally overwrite the mapping from AID to NodeKey from some existing operation.

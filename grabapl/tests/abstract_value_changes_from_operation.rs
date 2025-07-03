@@ -3,9 +3,7 @@ use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
 use grabapl::graph::operation::query::{BuiltinQuery, ConcreteQueryOutput};
 use grabapl::graph::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
 use grabapl::graph::operation::{BuiltinOperation, run_from_concrete};
-use grabapl::graph::pattern::{
-    GraphWithSubstitution, OperationOutput, OperationParameter, ParameterSubstitution,
-};
+use grabapl::graph::pattern::{AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter, ParameterSubstitution};
 use grabapl::graph::semantics::{
     AbstractGraph, AbstractJoin, AbstractMatcher, ConcreteGraph, ConcreteToAbstract,
 };
@@ -226,7 +224,7 @@ impl BuiltinOperation for TestOperation {
     fn apply_abstract(
         &self,
         g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>,
-    ) -> OperationOutput {
+    ) -> AbstractOperationOutput<Self::S> {
         let mut new_node_names = HashMap::new();
         match self {
             TestOperation::NoOp => {
@@ -289,7 +287,7 @@ impl BuiltinOperation for TestOperation {
                     .unwrap();
             }
         }
-        g.get_concrete_output(new_node_names)
+        g.get_abstract_output(new_node_names)
     }
 
     fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>) -> OperationOutput {
