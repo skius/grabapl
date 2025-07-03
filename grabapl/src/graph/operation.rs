@@ -106,6 +106,8 @@ impl<'a, S: SemanticsClone> Operation<'a, S> {
             Operation::Custom(op) => op.apply_abstract(op_ctx, g),
         }
     }
+
+    // TODO: support getting the signature from also a builtin operation?
 }
 
 // TODO: Builtin operations should be a trait that follows some generic pattern of mutating the graph
