@@ -1151,86 +1151,149 @@ fn builder_infers_correct_signatures() {
 //  * shape queries not being allowed to match already-matched nodes
 //  * recursion abstract changes
 
-#[test_log::test]
-fn recursion_signature_is_sound() {
-    // if we recurse and do changes, those are correctly communicated to caller operations via the signature.
+macro_rules! recursion_signature_is_sound {
+    (before) => {
+        // when we change the abstract value of the node _before_ the recursive call
+        recursion_signature_is_sound!(true, false, false, NodeType::Integer, NodeType::Integer);
+    };
+    (after) => {
+        // when we change the abstract value of the node _after_ the recursive call
+        recursion_signature_is_sound!(false, true, false, NodeType::Integer, NodeType::Integer);
+    };
+    ($fst:literal, $snd:literal, $set_last_to_string:literal, $p0_typ:expr, $c0_typ:expr) => {
+        let op_ctx = OperationContext::<TestSemantics>::new();
+        let mut builder = OperationBuilder::new(&op_ctx);
+        // the operation we're designing takes p0->c0, the start of a linked list, and sets all nodes (except the last node) to Integer.
+        // it does the "except the last node" check by first seeing if there is a child, and only then recursing.
+        builder
+            .expect_parameter_node("p0", NodeType::Object)
+            .unwrap();
+        builder.expect_context_node("c0", NodeType::Object).unwrap();
+        builder
+            .expect_parameter_edge("p0", "c0", EdgeType::Wildcard)
+            .unwrap();
+        let p0 = AbstractNodeId::ParameterMarker("p0".into());
+        let c0 = AbstractNodeId::ParameterMarker("c0".into());
+        if $fst {
+            builder
+                .add_operation(
+                    BuilderOpLike::Builtin(TestOperation::SetTo {
+                        op_typ: NodeType::Object,
+                        target_typ: NodeType::Integer,
+                        value: NodeValue::Integer(0),
+                    }),
+                    vec![p0],
+                )
+                .unwrap();
+        }
+        builder.start_shape_query("q").unwrap();
+        builder
+            .expect_shape_node("child".into(), NodeType::Object)
+            .unwrap();
+        let child_aid = AbstractNodeId::dynamic_output("q", "child");
+        builder
+            .expect_shape_edge(c0.clone(), child_aid.clone(), EdgeType::Wildcard)
+            .unwrap();
+        builder.enter_true_branch().unwrap();
+        // if we have a child, recurse
+        builder
+            .add_named_operation(
+                "recurse".into(),
+                BuilderOpLike::Recurse,
+                vec![c0], // only need to select c0: child_aid should be matched by context.
+            )
+            .unwrap();
+        if $set_last_to_string {
+            builder.enter_false_branch().unwrap();
+            // if we don't have a child, set the last node to String
+            builder
+                .add_operation(
+                    BuilderOpLike::Builtin(TestOperation::SetTo {
+                        op_typ: NodeType::Object,
+                        target_typ: NodeType::String,
+                        value: NodeValue::String("Last".to_string()),
+                    }),
+                    vec![c0.clone()],
+                )
+                .unwrap();
+        }
+        builder.end_query().unwrap();
+        if $snd {
+            builder
+                .add_operation(
+                    BuilderOpLike::Builtin(TestOperation::SetTo {
+                        op_typ: NodeType::Object,
+                        target_typ: NodeType::Integer,
+                        value: NodeValue::Integer(0),
+                    }),
+                    vec![p0],
+                )
+                .unwrap();
+        }
 
-    let mut op_ctx = OperationContext::<TestSemantics>::new();
-    let mut builder = OperationBuilder::new(&op_ctx);
-    // the operation we're designing takes p0->c0, the start of a linked list, and sets all nodes (except the last node) to Integer.
-    // it does the "except the last node" check by first seeing if there is a child, and only then recursing.
-    builder
-        .expect_parameter_node("p0", NodeType::Object)
-        .unwrap();
-    builder.expect_context_node("c0", NodeType::Object).unwrap();
-    builder
-        .expect_parameter_edge("p0", "c0", EdgeType::Wildcard)
-        .unwrap();
-    let p0 = AbstractNodeId::ParameterMarker("p0".into());
-    let c0 = AbstractNodeId::ParameterMarker("c0".into());
-    builder
-        .add_operation(
-            BuilderOpLike::Builtin(TestOperation::SetTo {
-                op_typ: NodeType::Object,
-                target_typ: NodeType::Integer,
-                value: NodeValue::Integer(0),
-            }),
-            vec![p0],
-        )
-        .unwrap();
-    builder.start_shape_query("q").unwrap();
-    builder
-        .expect_shape_node("child".into(), NodeType::Object)
-        .unwrap();
-    let child_aid = AbstractNodeId::dynamic_output("q", "child");
-    builder
-        .expect_shape_edge(c0.clone(), child_aid.clone(), EdgeType::Wildcard)
-        .unwrap();
-    builder.enter_true_branch().unwrap();
-    // if we have a child, recurse
-    builder
-        .add_named_operation(
-            "recurse".into(),
-            BuilderOpLike::Recurse,
-            vec![c0], // only need to select c0: child_aid should be matched by context.
-        )
-        .unwrap();
-    builder.end_query().unwrap();
-
-    let operation = builder.build(0).unwrap();
-    let signature = operation.signature();
-    // assert that the signature is correct
-    assert_eq!(
-        signature.output.deleted_nodes,
-        HashSet::new(),
-        "Expected no nodes to be deleted"
-    );
-    assert_eq!(
-        signature.output.deleted_edges,
-        HashSet::new(),
-        "Expected no edges to be deleted"
-    );
-    assert_eq!(
-        signature.output.changed_nodes,
-        HashMap::from([
-            (SubstMarker::from("p0").into(), NodeType::Integer),
-            (SubstMarker::from("c0").into(), NodeType::Integer), // Note: c0 also changed due to the recursive call.
-        ]),
-        "Expected both p0 and c0 to change"
-    );
-    assert_eq!(
-        signature.output.changed_edges,
-        HashMap::new(),
-        "Expected no edges to be changed"
-    );
-    assert_eq!(
-        signature.output.new_nodes,
-        HashMap::new(),
-        "Expected no new nodes to be created"
-    );
-    assert_eq!(
-        signature.output.new_edges,
-        HashMap::new(),
-        "Expected no new edges to be created"
-    );
+        let operation = builder.build(0).unwrap();
+        let signature = operation.signature();
+        // assert that the signature is correct
+        assert_eq!(
+            signature.output.deleted_nodes,
+            HashSet::new(),
+            "Expected no nodes to be deleted"
+        );
+        assert_eq!(
+            signature.output.deleted_edges,
+            HashSet::new(),
+            "Expected no edges to be deleted"
+        );
+        assert_eq!(
+            signature.output.changed_nodes,
+            HashMap::from([
+                (SubstMarker::from("p0").into(), $p0_typ),
+                (SubstMarker::from("c0").into(), $c0_typ), // Note: c0 also changed due to the recursive call.
+            ]),
+            "Expected both p0 and c0 to change"
+        );
+        assert_eq!(
+            signature.output.changed_edges,
+            HashMap::new(),
+            "Expected no edges to be changed"
+        );
+        assert_eq!(
+            signature.output.new_nodes,
+            HashMap::new(),
+            "Expected no new nodes to be created"
+        );
+        assert_eq!(
+            signature.output.new_edges,
+            HashMap::new(),
+            "Expected no new edges to be created"
+        );
+    };
 }
+
+#[test_log::test]
+fn recursion_signature_is_sound_when_changed_before() {
+    // if we do changes and then recurse, those are correctly communicated to caller operations via the signature.
+    recursion_signature_is_sound!(before);
+}
+
+#[test_log::test]
+fn recursion_signature_is_sound_when_changed_after() {
+    // if we recurse and then do changes, those are correctly communicated to caller operations via the signature.
+    recursion_signature_is_sound!(after);
+    // Note: this test passes because we recalculate the signature at the very end, *and then use it for calculating the recurse call's effects*!
+}
+
+#[test_log::test]
+fn recursion_signature_is_sound_when_changed_before_and_last_node_set_to_string() {
+    // since c0 may or may not be the last node, the system has no choice but to infer a common supertype.
+    recursion_signature_is_sound!(true, false, true, NodeType::Integer, NodeType::Object);
+}
+
+#[test_log::test]
+fn recursion_signature_is_sound_when_changed_after_and_last_node_set_to_string() {
+    // since c0 may or may not be the last node, the system has no choice but to infer a common supertype.
+    recursion_signature_is_sound!(false, true, true, NodeType::Integer, NodeType::Object);
+}
+
+
+// TODO: add test for recursion that matches differently based on future changes. See the excalidraws.

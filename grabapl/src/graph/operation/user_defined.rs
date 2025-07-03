@@ -197,6 +197,17 @@ pub struct UserDefinedOperation<S: Semantics> {
 // TODO: use a private runner struct that keeps all the necessary mappings on self for easier methods.
 
 impl<S: SemanticsClone> UserDefinedOperation<S> {
+    pub fn new_noop() -> Self {
+        let parameter = OperationParameter::new_empty();
+        let signature = OperationSignature::empty_new("noop", parameter.clone());
+        UserDefinedOperation {
+            parameter,
+            signature,
+            instructions: Vec::new(),
+            output_changes: AbstractUserDefinedOperationOutput::new(),
+        }
+    }
+    
     pub fn new(
         parameter: OperationParameter<S>,
         instructions: Vec<InstructionWithResultMarker<S>>,

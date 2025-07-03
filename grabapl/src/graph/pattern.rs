@@ -33,6 +33,17 @@ impl<S: SemanticsClone> Clone for OperationParameter<S> {
     }
 }
 
+impl<S: Semantics> OperationParameter<S> {
+    pub fn new_empty() -> Self {
+        OperationParameter {
+            explicit_input_nodes: Vec::new(),
+            parameter_graph: AbstractGraph::<S>::new(),
+            subst_to_node_keys: HashMap::new(),
+            node_keys_to_subst: HashMap::new(),
+        }
+    }
+}
+
 /// The result of trying to bind an abstract graph to a parameter graph.
 // Note: this is a mapping from OperationParameter substmarkers to the dynamic/argument graph node keys.
 #[derive(Debug)]

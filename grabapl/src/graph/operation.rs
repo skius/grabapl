@@ -165,7 +165,7 @@ args: {selected_inputs:?}"
             let param_node_key = param
                 .subst_to_node_keys
                 .get(param_marker)
-                .expect("Invalid parameter marker");
+                .expect("internal error: invalid parameter marker");
             (*param_node_key, *argument_node_key)
         })
         .collect::<HashMap<_, _>>();

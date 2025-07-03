@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use crate::graph::operation::builder::BuilderInstruction::ExpectParameterEdge;
 use crate::graph::operation::query::{BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier};
 use crate::graph::operation::signature::{AbstractSignatureNodeId, OperationSignature};
@@ -156,6 +157,8 @@ pub enum OperationBuilderError {
 pub struct OperationBuilder<'a, S: SemanticsClone> {
     op_ctx: &'a OperationContext<S>,
     instructions: Vec<BuilderInstruction<S>>,
+    // hack for recursion
+    previous_user_defined_operation: RefCell<UserDefinedOperation<S>>,
 }
 
 // TODO: all message adding, validate all args by building temp graph
@@ -164,6 +167,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         Self {
             instructions: Vec::new(),
             op_ctx,
+            previous_user_defined_operation: RefCell::new(UserDefinedOperation::new_noop()),
         }
     }
 
@@ -363,9 +367,10 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
 
         let param = builder_result.operation_parameter;
         let instructions = builder_result.instructions;
-
+        let prev_user_ref =
+            self.previous_user_defined_operation.borrow();
         let mut interpreter =
-            IntermediateInterpreter::new_for_self_op_id(self_op_id, param, self.op_ctx);
+            IntermediateInterpreter::new_for_self_op_id(self_op_id, param, self.op_ctx, &prev_user_ref);
 
         let user_def_op = interpreter.create_user_defined_operation(
             instructions,
@@ -395,16 +400,22 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         // TODO: how do we pass builder_result.return_nodes to the interpreter?
         //  maybe have a check_validity function?
         //  Or we could just call create_user_defined_operation directly here and check its result.
-        let mut interpreter = IntermediateInterpreter::new_for_self_op_id(
-            0, // Unused. TODO: make prettier...
-            builder_result.operation_parameter,
-            self.op_ctx,
-        );
-        let _ = interpreter.create_user_defined_operation(
-            builder_result.instructions,
-            builder_result.return_nodes,
-            builder_result.return_edges,
-        )?;
+
+        let partial_user_def_op = {
+            let prev_user_ref = self.previous_user_defined_operation.borrow();
+            let mut interpreter = IntermediateInterpreter::new_for_self_op_id(
+                0, // Unused. TODO: make prettier...
+                builder_result.operation_parameter,
+                self.op_ctx,
+                &prev_user_ref,
+            );
+            interpreter.create_user_defined_operation(
+                builder_result.instructions,
+                builder_result.return_nodes,
+                builder_result.return_edges,
+            )?
+        };
+        *self.previous_user_defined_operation.borrow_mut() = partial_user_def_op;
         Ok(())
     }
 }
@@ -423,10 +434,13 @@ impl<
         &self,
     ) -> Result<(IntermediateState<S>, Vec<IntermediateStatePath>), OperationBuilderError> {
         let builder_result = IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
+        let prev_user_ref =
+            self.previous_user_defined_operation.borrow();
         let mut interpreter = IntermediateInterpreter::new_for_self_op_id(
             0, // TODO: use a real operation ID here
             builder_result.operation_parameter,
             self.op_ctx,
+            &prev_user_ref,
         );
 
         let (_, interp_instructions) =
@@ -1335,6 +1349,8 @@ struct IntermediateInterpreter<'a, S: SemanticsClone> {
     op_param: OperationParameter<S>,
     initial_state: IntermediateState<S>,
     current_state: IntermediateState<S>,
+    /// Primarily used for hacking abstract changes due to recursive calls.
+    partial_self_user_defined_op: &'a UserDefinedOperation<S>,
     /// A counter to generate unique operation result markers.
     counter: u64,
 }
@@ -1351,6 +1367,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         self_op_id: OperationId,
         op_param: OperationParameter<S>,
         op_ctx: &'a OperationContext<S>,
+        partial_self_user_defined_op: &'a UserDefinedOperation<S>,
     ) -> Self {
         let initial_graph = op_param.parameter_graph.clone();
 
@@ -1379,6 +1396,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             op_param,
             initial_state,
             current_state,
+            partial_self_user_defined_op,
             counter: 0,
         };
 
@@ -1693,6 +1711,27 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 // apply the operation to the current graph
                 // TODO: apply op
                 // this should probably use some pre-defined (at the beginning) abstract changes to the graph.
+
+                // Hack: pretend the partial user defined operation is the full operation.
+                // TODO: remove this hack. Make it so only explicit changes via ExpectRecursionChange... instructions are allowed.
+                //  (note: it's also unsound for now, since changes _after_ the recursion call are ignored.)
+
+                let operation_output = {
+                    let mut gws = GraphWithSubstitution::new(
+                        &mut self.current_state.graph,
+                        &subst,
+                    );
+                    self.partial_self_user_defined_op
+                        .apply_abstract(self.op_ctx, &mut gws)
+                };
+                let operation_output = operation_output
+                    .map_err(|e| OperationBuilderError::AbstractApplyOperationError(
+                        self.self_op_id,
+                        e,
+                    ))?;
+                self.handle_abstract_output_changes(marker, operation_output)?;
+
+
                 Ok(UDInstruction::Operation(self.self_op_id, abstract_arg))
             }
         }
