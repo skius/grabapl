@@ -17,7 +17,7 @@ use crate::util::log;
 use crate::{DotCollector, Graph, NodeKey, SubstMarker};
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use thiserror::Error;
@@ -256,7 +256,7 @@ fn run_custom_operation<S: SemanticsClone>(
     // let abstract_g = S::concrete_to_abstract(&g);
     // let subst = get_substitution(&abstract_g, param, &selected_inputs)?;
 
-    let output = op.apply(op_ctx, g, &arg.subst)?;
+    let output = op.apply(op_ctx, g, &arg)?;
 
     Ok(output)
 }
@@ -287,6 +287,7 @@ pub fn run_from_concrete<S: SemanticsClone>(
     let arg = OperationArgument {
         subst,
         selected_input_nodes: selected_inputs.into(),
+        hidden_nodes: HashSet::new(),
     };
 
     run_operation(g, op_ctx, op, arg)

@@ -11,7 +11,7 @@ use grabapl::graph::pattern::{
 use grabapl::graph::semantics::{
     AbstractGraph, AbstractJoin, AbstractMatcher, ConcreteGraph, ConcreteToAbstract,
 };
-use grabapl::{Graph, OperationContext, Semantics, SubstMarker};
+use grabapl::{Graph, OperationContext, OperationId, Semantics, SubstMarker};
 use log_crate::info;
 use std::collections::{HashMap, HashSet};
 
@@ -1297,3 +1297,155 @@ fn recursion_signature_is_sound_when_changed_after_and_last_node_set_to_string()
 
 
 // TODO: add test for recursion that matches differently based on future changes. See the excalidraws.
+
+#[test_log::test]
+fn shape_query_doesnt_match_nodes_for_which_handles_exist() {
+    // TODO: make this more lenient. See problems-testcases.md to support eg read-only shape queries.
+
+    // If an outer operation already has a handle to a specific concrete node (checked dynamically),
+    // then a shape query cannot match that node.
+
+    fn get_shape_query_modifying_operation(op_id: OperationId) -> UserDefinedOperation<TestSemantics> {
+        let op_ctx = OperationContext::<TestSemantics>::new();
+        let mut builder = OperationBuilder::new(&op_ctx);
+        builder
+            .expect_parameter_node("p0", NodeType::Object)
+            .unwrap();
+        let p0 = AbstractNodeId::param("p0");
+        // start a shape query for a child.
+        builder.start_shape_query("q").unwrap();
+        builder
+            .expect_shape_node("child".into(), NodeType::Object)
+            .unwrap();
+        let child_aid = AbstractNodeId::dynamic_output("q", "child");
+        builder
+            .expect_shape_edge(p0.clone(), child_aid.clone(), EdgeType::Wildcard)
+            .unwrap();
+        builder.enter_true_branch().unwrap();
+        // if we have a child, set it to "I'm a string"
+        // TODO: once we support read-only shape queries, add a second test that replaces this SetTo with a CopyTo, and then assert that it is matched.
+        builder
+            .add_operation(
+                BuilderOpLike::Builtin(TestOperation::SetTo {
+                    op_typ: NodeType::Object,
+                    target_typ: NodeType::String,
+                    value: NodeValue::String("I'm a string".to_string()),
+                }),
+                vec![child_aid],
+            )
+            .unwrap();
+        builder.enter_false_branch().unwrap();
+        // if we don't, set p0 to "no child"
+        builder
+            .add_operation(
+                BuilderOpLike::Builtin(TestOperation::SetTo {
+                    op_typ: NodeType::Object,
+                    target_typ: NodeType::String,
+                    value: NodeValue::String("no child".to_string()),
+                }),
+                vec![p0],
+            )
+            .unwrap();
+
+        builder.build(op_id).unwrap()
+    }
+
+    let mut op_ctx = OperationContext::<TestSemantics>::new();
+    op_ctx.add_custom_operation(0, get_shape_query_modifying_operation(0));
+    let mut builder = OperationBuilder::new(&op_ctx);
+    builder
+        .expect_parameter_node("p0", NodeType::Object)
+        .unwrap();
+    builder.expect_context_node("c0", NodeType::Integer).unwrap();
+    let p0 = AbstractNodeId::param("p0");
+    let c0 = AbstractNodeId::param("c0");
+    // call op 0
+    builder
+        .add_operation(
+            BuilderOpLike::FromOperationId(0),
+            vec![p0],
+        )
+        .unwrap();
+    let state = builder.show_state().unwrap();
+    // c0 should still be Integer, since the operation does not know about the inner operation's shape query.
+    let c0_key = state.node_keys_to_aid.get_right(&c0).unwrap();
+    assert_eq!(
+        state.graph.get_node_attr(*c0_key).unwrap(),
+        &NodeType::Integer,
+        "Expected c0 to remain unchanged, since the operation does not know about the inner operation's shape query"
+    );
+
+    let op = builder.build(1).unwrap();
+    op_ctx.add_custom_operation(1, op);
+
+    // now run the operation with a concrete graph
+    {
+        // in the concrete:
+        // check that no child leads to the node being set to "no child"
+        let mut g_no_child = TestSemantics::new_concrete_graph();
+        let p0_key = g_no_child.add_node(NodeValue::Integer(42));
+        run_from_concrete(&mut g_no_child, &op_ctx, 0, &[p0_key]).unwrap();
+        let p0_value = g_no_child.get_node_attr(p0_key).unwrap();
+        assert_eq!(
+            p0_value,
+            &NodeValue::String("no child".to_string()),
+            "Expected p0 to be set to 'no child' when no child exists"
+        );
+    }
+    {
+        // in the concrete:
+        // check that a node with a child leads to the child being set to "I'm a string"
+        let mut g_with_child = TestSemantics::new_concrete_graph();
+        let p0_key = g_with_child.add_node(NodeValue::Integer(42));
+        let c0_key = g_with_child.add_node(NodeValue::Integer(43));
+        g_with_child.add_edge(p0_key, c0_key, "child".to_string());
+        run_from_concrete(&mut g_with_child, &op_ctx, 0, &[p0_key]).unwrap();
+        let p0_value = g_with_child.get_node_attr(p0_key).unwrap();
+        let c0_value = g_with_child.get_node_attr(c0_key).unwrap();
+        assert_eq!(
+            p0_value,
+            &NodeValue::Integer(42),
+            "Expected p0 to remain unchanged when a child exists"
+        );
+        assert_eq!(
+            c0_value,
+            &NodeValue::String("I'm a string".to_string()),
+            "Expected child to be set to 'I'm a string' when it exists"
+        );
+    }
+    {
+        // in the abstract, i.e., with the outer operation active and having a handle to the child node:
+        let mut g = TestSemantics::new_concrete_graph();
+        let p0_key = g.add_node(NodeValue::Integer(42));
+        let c0_key = g.add_node(NodeValue::Integer(43));
+        g.add_edge(p0_key, c0_key, "child".to_string());
+        run_from_concrete(&mut g, &op_ctx, 1, &[p0_key]).unwrap();
+        let p0_value = g.get_node_attr(p0_key).unwrap();
+        let c0_value = g.get_node_attr(c0_key).unwrap();
+        // despite p0 having a child, the shape query should not match it.
+        // otherwise, the abstract information from the outer operation is unsound.
+        assert_eq!(
+            p0_value,
+            &NodeValue::String("no child".to_string()),
+            "Expected p0 to be set to 'no child' when the shape query does not match the child node, even if one exists"
+        );
+        assert_eq!(
+            c0_value,
+            &NodeValue::Integer(43),
+            "Expected child to remain unchanged since it is not matched, even though it exists",
+        );
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+

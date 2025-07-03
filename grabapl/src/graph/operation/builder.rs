@@ -540,12 +540,14 @@ use super::user_defined::Instruction as UDInstruction;
 #[derive(derive_more::Debug)]
 enum IntermediateInstruction<S: SemanticsClone> {
     OpLike(IntermediateOpLike<S>),
-    #[debug("GraphShapeQuery({_0:#?}, {_1:#?}, {_2:#?})")]
-    GraphShapeQuery(
-        AbstractOperationResultMarker,
-        Vec<GraphShapeQueryInstruction<S>>,
-        IntermediateQueryInstructions<S>,
-    ),
+    // #[debug("GraphShapeQuery({marker:#?}, {graph_instructions:#?}, {query_instructions:#?})")]
+    GraphShapeQuery {
+        /// Is the query finished and should we check it for connectedness?
+        is_finished: bool,
+        marker: AbstractOperationResultMarker,
+        graph_instructions: Vec<GraphShapeQueryInstruction<S>>,
+        query_instructions: IntermediateQueryInstructions<S>,
+    },
     #[debug("BuiltinQuery(???, {_1:#?}, {_2:#?})")]
     BuiltinQuery(
         S::BuiltinQuery,
@@ -847,16 +849,17 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                         "{op_marker:?}"
                     ))));
                 // Start a new shape query state
-                let (gsq_instructions, branch_instructions) =
+                let (is_finished, gsq_instructions, branch_instructions) =
                     self.build_shape_query(iter, op_marker.clone())?;
                 // Ok((Some(*op_marker), UDInstruction::ShapeQuery()))
                 Ok((
                     Some(op_marker.clone()), // NOTE: this marker is needed as well for the _concrete_ execution
-                    IntermediateInstruction::GraphShapeQuery(
-                        op_marker.clone(),
-                        gsq_instructions,
-                        branch_instructions,
-                    ),
+                    IntermediateInstruction::GraphShapeQuery {
+                        is_finished,
+                        marker: op_marker.clone(),
+                        graph_instructions: gsq_instructions,
+                        query_instructions: branch_instructions,
+                    },
                 ))
             }
             _ => Err(OperationBuilderError::ExpectedOperationOrQuery),
@@ -869,6 +872,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
         operation_marker: AbstractOperationResultMarker,
     ) -> Result<
         (
+            bool,
             Vec<GraphShapeQueryInstruction<S>>,
             IntermediateQueryInstructions<S>,
         ),
@@ -893,6 +897,9 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
         let mut true_branch_instructions = None;
         let mut false_branch_instructions = None;
 
+        // did the user finish the query and should we check that it's finished?
+        let mut did_query_finish = false;
+
         while let Some(instruction) = iter.peek() {
             match instruction {
                 BuilderInstruction::EnterTrueBranch => {
@@ -904,6 +911,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     self.remove_until_branch(false);
                     self.path.push(IntermediateStatePath::EnterTrue);
                     true_branch_instructions = Some(self.build_many_instructions(iter)?);
+                    did_query_finish = true;
                 }
                 BuilderInstruction::EnterFalseBranch => {
                     iter.next();
@@ -914,12 +922,14 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     self.remove_until_branch(true);
                     self.path.push(IntermediateStatePath::EnterFalse);
                     false_branch_instructions = Some(self.build_many_instructions(iter)?);
+                    did_query_finish = true;
                 }
                 BuilderInstruction::EndQuery => {
                     iter.next();
                     // we are ending the query, so we remove the current query state from the path
                     self.remove_until_query_start();
                     self.path.push(IntermediateStatePath::SkipQuery);
+                    did_query_finish = true;
                     break;
                 }
                 BuilderInstruction::ExpectShapeNode(marker, abstract_value) => {
@@ -957,6 +967,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
         }
 
         Ok((
+            did_query_finish,
             gsq_instructions,
             IntermediateQueryInstructions {
                 true_branch: true_branch_instructions.unwrap_or_default(),
@@ -1654,11 +1665,12 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
             IntermediateInstruction::BuiltinQuery(query, args, query_instructions) => {
                 self.interpret_builtin_query(query, args, query_instructions)
             }
-            IntermediateInstruction::GraphShapeQuery(
-                op_marker,
-                gsq_instructions,
+            IntermediateInstruction::GraphShapeQuery {
+                is_finished,
+                marker,
+                graph_instructions,
                 query_instructions,
-            ) => self.interpret_graph_shape_query(op_marker, gsq_instructions, query_instructions),
+            } => self.interpret_graph_shape_query(is_finished, marker, graph_instructions, query_instructions),
         }
     }
 
@@ -1849,6 +1861,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
 
     fn interpret_graph_shape_query(
         &mut self,
+        is_finished: bool,
         gsq_op_marker: AbstractOperationResultMarker,
         gsq_instructions: Vec<GraphShapeQueryInstruction<S>>,
         query_instructions: IntermediateQueryInstructions<S>,
@@ -2046,6 +2059,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
 
         // TODO: need to validate GSQ somewhere.
         //  Most importantly, that there are no free floating shape nodes.
+        // TODO: do this with under the is_finished flag.
 
         let mut initial_true_branch_state = self.current_state.clone();
 

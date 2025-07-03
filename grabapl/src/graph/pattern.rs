@@ -55,6 +55,26 @@ impl ParameterSubstitution {
     pub fn new(mapping: HashMap<SubstMarker, NodeKey>) -> Self {
         ParameterSubstitution { mapping }
     }
+    
+    pub fn infer_explicit_for_param(
+        selected_nodes: &[NodeKey],
+        param: &OperationParameter<impl Semantics>,
+    ) -> OperationResult<Self> {
+        if param.explicit_input_nodes.len() != selected_nodes.len() {
+            return Err(OperationError::InvalidOperationArgumentCount {
+                expected: param.explicit_input_nodes.len(),
+                actual: selected_nodes.len(),
+            });
+        }
+
+        let mapping = param
+            .explicit_input_nodes
+            .iter()
+            .zip(selected_nodes.iter())
+            .map(|(subst_marker, node_key)| (subst_marker.clone(), *node_key))
+            .collect();
+        Ok(ParameterSubstitution { mapping })
+    }
 }
 
 #[derive(Debug, Clone, Copy, From, Hash, Eq, PartialEq)]
@@ -335,32 +355,24 @@ pub struct OperationArgument<'a> {
     /// We know this substitution statically already, since we define our parameter substitutions statically.
     /// So we can store it in this struct.
     pub subst: ParameterSubstitution,
+    /// Nodes for which an operation already has an in-scope handle.
+    /// These nodes may not be matched in shape queries, as they could modify values and break the operation's
+    /// abstract guarantees, since changes are not visible to outer operations.
+    pub hidden_nodes: HashSet<NodeKey>,
 }
 
-impl<'a> OperationArgument<'a> {
-    pub fn infer_explicit_for_param(
-        selected_nodes: &'a [NodeKey],
-        param: &OperationParameter<impl Semantics>,
-    ) -> OperationResult<Self> {
-        if param.explicit_input_nodes.len() != selected_nodes.len() {
-            return Err(OperationError::InvalidOperationArgumentCount {
-                expected: param.explicit_input_nodes.len(),
-                actual: selected_nodes.len(),
-            });
-        }
-
-        let subst = param
-            .explicit_input_nodes
-            .iter()
-            .zip(selected_nodes.iter())
-            .map(|(subst_marker, node_key)| (subst_marker.clone(), *node_key))
-            .collect();
-        Ok(OperationArgument {
-            selected_input_nodes: selected_nodes.into(),
-            subst: ParameterSubstitution::new(subst),
-        })
-    }
-}
+// impl<'a> OperationArgument<'a> {
+//     pub fn infer_explicit_for_param(
+//         selected_nodes: &'a [NodeKey],
+//         param: &OperationParameter<impl Semantics>,
+//     ) -> OperationResult<Self> {
+//         let subst = ParameterSubstitution::infer_explicit_for_param(selected_nodes, param)?;
+//         Ok(OperationArgument {
+//             selected_input_nodes: selected_nodes.into(),
+//             subst,
+//         })
+//     }
+// }
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
 pub struct AbstractOutputNodeMarker(pub Intern<String>);

@@ -16,9 +16,10 @@ use crate::{
 };
 use derive_more::with_trait::From;
 use internment::Intern;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::str::FromStr;
+use crate::util::log;
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
@@ -207,7 +208,7 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
             output_changes: AbstractUserDefinedOperationOutput::new(),
         }
     }
-    
+
     pub fn new(
         parameter: OperationParameter<S>,
         instructions: Vec<InstructionWithResultMarker<S>>,
@@ -288,8 +289,9 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
         &self,
         op_ctx: &OperationContext<S>,
         g: &mut ConcreteGraph<S>,
-        subst: &ParameterSubstitution,
+        arg: &OperationArgument,
     ) -> OperationResult<OperationOutput> {
+        let subst = &arg.subst;
         let mut our_output_map: HashMap<AbstractOutputNodeMarker, NodeKey> = HashMap::new();
 
         let mut previous_results: HashMap<
@@ -304,6 +306,7 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
             op_ctx,
             &self.instructions,
             subst,
+            &arg.hidden_nodes,
         )?;
 
         for (aid, (name, _)) in &self.output_changes.new_nodes {
@@ -336,6 +339,7 @@ fn run_instructions<S: SemanticsClone>(
     op_ctx: &OperationContext<S>,
     instructions: &[InstructionWithResultMarker<S>],
     subst: &ParameterSubstitution,
+    outer_hidden_nodes: &HashSet<NodeKey>,
 ) -> OperationResult<()> {
     for (abstract_output_id, instruction) in instructions {
         match instruction {
@@ -345,7 +349,9 @@ fn run_instructions<S: SemanticsClone>(
                     &arg.subst_to_aid,
                     subst,
                     previous_results,
+                    outer_hidden_nodes,
                 )?;
+                log::trace!("Resulting concrete arg: {concrete_arg:#?}");
                 // TODO: make fallible
                 // TODO: How do we support mutually recursive user defined operations?
                 //  - I think just specifying the ID directly? this will mainly be a problem for the OperationBuilder
@@ -369,6 +375,7 @@ fn run_instructions<S: SemanticsClone>(
                     &arg.subst_to_aid,
                     subst,
                     previous_results,
+                    outer_hidden_nodes,
                 )?;
                 let result = run_builtin_query::<S>(g, query, concrete_arg)?;
                 let next_instr = if result.taken {
@@ -384,13 +391,15 @@ fn run_instructions<S: SemanticsClone>(
                     op_ctx,
                     next_instr,
                     subst,
+                    outer_hidden_nodes,
                 )?
             }
             Instruction::ShapeQuery(query, args, query_instr) => {
                 // ShapeQueries dont have context mappings, so we can just pass an empty hashmap.
+                // TODO: ^ rethink the above, it's a bit of an ungly hack. Why not have it take an AbstractOperationArgument as well?
                 let concrete_arg =
-                    get_concrete_arg::<S>(args, &HashMap::new(), subst, previous_results)?;
-                let result = run_shape_query(g, query, &concrete_arg.selected_input_nodes)?;
+                    get_concrete_arg::<S>(args, &HashMap::new(), subst, previous_results, outer_hidden_nodes)?;
+                let result = run_shape_query(g, query, &concrete_arg.selected_input_nodes, &concrete_arg.hidden_nodes)?;
                 let next_instr =
                     if let Some(shape_idents_to_node_keys) = result.shape_idents_to_node_keys {
                         // apply the shape idents to node keys mapping
@@ -416,6 +425,7 @@ fn run_instructions<S: SemanticsClone>(
                     op_ctx,
                     next_instr,
                     subst,
+                    outer_hidden_nodes,
                 )?;
             }
         }
@@ -428,32 +438,40 @@ fn run_instructions<S: SemanticsClone>(
 fn get_concrete_arg<S: Semantics>(
     explicit_args: &[AbstractNodeId],
     context_mapping: &HashMap<SubstMarker, AbstractNodeId>,
-    subst: &ParameterSubstitution,
+    our_subst: &ParameterSubstitution,
     previous_results: &HashMap<
         AbstractOperationResultMarker,
         HashMap<AbstractOutputNodeMarker, NodeKey>,
     >,
+    outer_hidden_nodes: &HashSet<NodeKey>,
 ) -> OperationResult<OperationArgument<'static>> {
+    log::trace!("Getting concrete arg for subst: {our_subst:#?}, explicit_args: {explicit_args:#?}, context_mapping: {context_mapping:#?}, previous_results: {previous_results:#?}, outer_hidden_nodes: {outer_hidden_nodes:#?}");
     let selected_keys: Vec<NodeKey> = explicit_args
         .iter()
-        .map(|arg| aid_to_node_key(arg.clone(), subst, previous_results))
+        .map(|arg| aid_to_node_key(arg.clone(), our_subst, previous_results))
         .collect::<OperationResult<_>>()?;
 
-    let subst = ParameterSubstitution::new(
+    let new_subst = ParameterSubstitution::new(
         context_mapping
             .iter()
             .map(|(subst_marker, abstract_node_id)| {
                 Ok((
                     subst_marker.clone(),
-                    aid_to_node_key(abstract_node_id.clone(), subst, previous_results)?,
+                    aid_to_node_key(abstract_node_id.clone(), our_subst, previous_results)?,
                 ))
             })
             .collect::<OperationResult<_>>()?,
     );
 
+    let mut hidden_nodes: HashSet<_> = our_subst.mapping.values().copied().chain(
+        previous_results.values().flat_map(|map| map.values()).copied()
+    ).collect();
+    hidden_nodes.extend(outer_hidden_nodes);
+
     Ok(OperationArgument {
         selected_input_nodes: selected_keys.into(),
-        subst,
+        subst: new_subst,
+        hidden_nodes,
     })
 }
 

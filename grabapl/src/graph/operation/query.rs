@@ -15,7 +15,7 @@ use derive_more::with_trait::Into;
 use internment::Intern;
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub struct AbstractQueryOutput<S: Semantics> {
     pub changes: Vec<AbstractQueryChange<S>>,
@@ -201,6 +201,7 @@ pub(crate) fn run_shape_query<S: SemanticsClone>(
     g: &mut ConcreteGraph<S>,
     query: &GraphShapeQuery<S>,
     selected_inputs: &[NodeKey],
+    hidden_nodes: &HashSet<NodeKey>,
 ) -> OperationResult<ConcreteShapeQueryResult> {
     let abstract_graph = S::concrete_to_abstract(g);
     // assert that the abstract graph matches the parameter. this is not the dynamic check yet, this is just asserting
@@ -209,7 +210,7 @@ pub(crate) fn run_shape_query<S: SemanticsClone>(
     // let subst = get_substitution(&abstract_graph, &query.parameter, &selected_inputs)?;
 
     let subst =
-        OperationArgument::infer_explicit_for_param(selected_inputs, &query.parameter)?.subst;
+        ParameterSubstitution::infer_explicit_for_param(selected_inputs, &query.parameter)?;
 
     // Check if the concrete graph matches the expected shape
     // needs to satisfy conditions 1-3 and a-c from above TODO
@@ -232,7 +233,7 @@ pub(crate) fn run_shape_query<S: SemanticsClone>(
 
     // TODO: implement edge order?
 
-    get_shape_query_substitution(query, &abstract_graph, &subst)
+    get_shape_query_substitution(query, &abstract_graph, &subst, hidden_nodes)
 
     // TODO: after calling this, the abstract graph needs to somehow know that it can be changed for changed values!
 }
@@ -241,7 +242,9 @@ fn get_shape_query_substitution<S: SemanticsClone>(
     query: &GraphShapeQuery<S>,
     dynamic_graph: &AbstractGraph<S>,
     subst: &ParameterSubstitution,
+    hidden_nodes: &HashSet<NodeKey>,
 ) -> OperationResult<ConcreteShapeQueryResult> {
+    log::trace!("Running shape query with hidden nodes {:?}", hidden_nodes);
     let desired_shape = &query.expected_graph;
 
     let desired_shape_ref = &desired_shape.graph;
@@ -264,6 +267,14 @@ fn get_shape_query_substitution<S: SemanticsClone>(
             enforced_desired_to_dynamic.get(desired_shape_node_key)
         {
             return expected_dynamic_node_key == dynamic_graph_node_key;
+        }
+        // we let the enforced mapping take precedence, but now we ignore all hidden nodes
+        if hidden_nodes.contains(dynamic_graph_node_key) {
+            log::info!(
+                "Skipping hidden node {:?} in dynamic graph for shape query",
+                dynamic_graph_node_key
+            );
+            return false;
         }
 
         let desired_shape_attr = desired_shape
