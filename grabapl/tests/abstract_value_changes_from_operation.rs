@@ -902,22 +902,26 @@ fn return_node_partially_from_shape_query_fails() {
 
 #[test]
 fn builder_infers_correct_signatures() {
+    let param_instructions = |builder: &mut OperationBuilder<TestSemantics>| {
+        builder
+            .expect_parameter_node("p0", NodeType::Integer)
+            .unwrap();
+        builder
+            .expect_parameter_node("p1", NodeType::Integer)
+            .unwrap();
+        builder
+            .expect_parameter_node("p2", NodeType::Integer)
+            .unwrap();
+        builder.expect_context_node("c0", NodeType::Object).unwrap();
+        builder.expect_context_node("c1", NodeType::Object).unwrap();
+        builder.expect_parameter_edge("p0", "c0", EdgeType::Wildcard).unwrap();
+        builder.expect_parameter_edge("p2", "c1", EdgeType::Wildcard).unwrap();
+        builder.expect_parameter_edge("p0", "c1", EdgeType::Wildcard).unwrap();
+    };
+
     let mut op_ctx = OperationContext::<TestSemantics>::new();
     let mut builder = OperationBuilder::new(&op_ctx);
-    builder
-        .expect_parameter_node("p0", NodeType::Integer)
-        .unwrap();
-    builder
-        .expect_parameter_node("p1", NodeType::Integer)
-        .unwrap();
-    builder
-        .expect_parameter_node("p2", NodeType::Integer)
-        .unwrap();
-    builder.expect_context_node("c0", NodeType::Object).unwrap();
-    builder.expect_context_node("c1", NodeType::Object).unwrap();
-    builder.expect_parameter_edge("p0", "c0", EdgeType::Wildcard).unwrap();
-    builder.expect_parameter_edge("p2", "c1", EdgeType::Wildcard).unwrap();
-    builder.expect_parameter_edge("p0", "c1", EdgeType::Wildcard).unwrap();
+    param_instructions(&mut builder);
     // param: p0->c0, p1, p2->c1, p0->c1
     // delete p1, delete c0 (which implies deletion of edge p0->c0), set p0, delete edge p2->c1, set c1, set p0->c1
     // and create new node n0 to return, and new edge p0->c1 to return.
@@ -1064,44 +1068,65 @@ fn builder_infers_correct_signatures() {
         )]),
         "Expected new edge from p0 to c1 of type 'new_edge'"
     );
-    // deleted nodes and edges
-    assert_eq!(
-        &signature.output.deleted_nodes,
-        &HashSet::from([SubstMarker::from("p1").into(), SubstMarker::from("c0").into()]),
-        "Expected nodes p1 and c0 to be deleted"
-    );
-    assert_eq!(
-        &signature.output.deleted_edges,
-        &HashSet::from([
-            (
-                SubstMarker::from("p2").into(),
-                SubstMarker::from("c1").into()
-            ),
-            (
-                SubstMarker::from("p0").into(),
-                SubstMarker::from("c0").into()
-            )
-        ]),
-        "Expected edges p2->c1 and p0->c0 to be deleted"
-    );
-    // changed nodes and edges
-    assert_eq!(
-        &signature.output.changed_nodes,
-        &HashMap::from([
-            (SubstMarker::from("p0").into(), NodeType::Integer),
-            (SubstMarker::from("c1").into(), NodeType::String)
-        ]),
-        "Expected nodes p0 to be changed to Integer and c1 to String"
-    );
-    assert_eq!(
-        &signature.output.changed_edges,
-        &HashMap::from([(
-            (SubstMarker::from("p0").into(), SubstMarker::from("c1").into()),
-            EdgeType::Exact("p0->c1".to_string())
-        )]),
-        "Expected edge p0->c1 to be changed to 'new_edge'"
-    );
+    macro_rules! assert_deleted_and_changed_nodes_and_edges {
+        ($signature:expr) => {
+            // deleted nodes and edges
+            assert_eq!(
+                &$signature.output.deleted_nodes,
+                &HashSet::from([SubstMarker::from("p1").into(), SubstMarker::from("c0").into()]),
+                "Expected nodes p1 and c0 to be deleted"
+            );
+            assert_eq!(
+                &$signature.output.deleted_edges,
+                &HashSet::from([
+                    (
+                        SubstMarker::from("p2").into(),
+                        SubstMarker::from("c1").into()
+                    ),
+                    (
+                        SubstMarker::from("p0").into(),
+                        SubstMarker::from("c0").into()
+                    )
+                ]),
+                "Expected edges p2->c1 and p0->c0 to be deleted"
+            );
+            // changed nodes and edges
+            assert_eq!(
+                &$signature.output.changed_nodes,
+                &HashMap::from([
+                    (SubstMarker::from("p0").into(), NodeType::Integer),
+                    (SubstMarker::from("c1").into(), NodeType::String)
+                ]),
+                "Expected nodes p0 to be changed to Integer and c1 to String"
+            );
+            assert_eq!(
+                &$signature.output.changed_edges,
+                &HashMap::from([(
+                    (SubstMarker::from("p0").into(), SubstMarker::from("c1").into()),
+                    EdgeType::Exact("p0->c1".to_string())
+                )]),
+                "Expected edge p0->c1 to be changed to 'new_edge'"
+            );
+        };
+    }
+    assert_deleted_and_changed_nodes_and_edges!(signature);
 
+
+
+    // Now ensure the same changes (minus the newly added nodes and edges) are propagated to another operation
+    // that calls this operation.
+
+    op_ctx.add_custom_operation(0, operation);
+    let mut builder = OperationBuilder::new(&op_ctx);
+    // same parameter graph so we can call the other operation
+    param_instructions(&mut builder);
+
+    // now call the other operation
+    builder.add_operation(BuilderOpLike::FromOperationId(0), vec![p0, p1, p2]).unwrap();
+    let operation = builder.build(1).unwrap();
+    let signature = operation.signature();
+    // assert changes and deletions
+    assert_deleted_and_changed_nodes_and_edges!(signature);
 }
 
 
