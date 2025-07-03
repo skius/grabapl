@@ -17,6 +17,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use thiserror::Error;
+use crate::util::log;
 
 // TODO: We might want to be able to supply additional data to builtin operations. For example, a Set Value operation should be 'generic' over its value without
 //  needing to store a separate operation in the OpCtx for every value...
@@ -137,6 +138,16 @@ pub fn get_substitution<S: Semantics>(
         });
     }
 
+    let return_arg_does_not_match_error_with_dbg_info = || {
+        let shape_dbg_arg = g.shape_dot();
+        let shape_dbg_param = param.parameter_graph.shape_dot();
+        log::info!("Failed to find substitution between parameter and argument graph:
+shape of argument graph:\n{shape_dbg_arg},
+shape of parameter graph:\n{shape_dbg_param},
+args: {selected_inputs:?}");
+        SubstitutionError::ArgumentDoesNotMatchParameter
+    };
+
     // TODO: this won't work if the user selects the same node multiple times. We cannot have a subgraph where two nodes of the subgraph actually match to just a single one in the input graph.
     //  A fix might be to split the isomorphism finding to per-explicitly-selected node?
 
@@ -175,7 +186,7 @@ pub fn get_substitution<S: Semantics>(
 
     // TODO: error could indicate that this is not due to edge orderedness, but just general shape.
     let isos = general_subgraph_monomorphisms_iter(&param_ref, &arg_ref, &mut nm, &mut em)
-        .ok_or(SubstitutionError::ArgumentDoesNotMatchParameter)?;
+        .ok_or_else(return_arg_does_not_match_error_with_dbg_info)?;
 
     isos.filter_map(|iso| {
         // TODO: handle edge orderedness
@@ -197,7 +208,7 @@ pub fn get_substitution<S: Semantics>(
     })
     .next()
     .map(ParameterSubstitution::new)
-    .ok_or(SubstitutionError::ArgumentDoesNotMatchParameter)
+    .ok_or_else(return_arg_does_not_match_error_with_dbg_info)
 }
 
 pub fn run_operation<S: SemanticsClone>(

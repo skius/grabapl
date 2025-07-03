@@ -81,7 +81,7 @@ fn insert_bst_builder_test(
                 show(&op_builder);
                 {
                     // If it is, we need to go to the right subtree, if it exists
-                    op_builder.start_shape_query("right_query".into()).unwrap();
+                    op_builder.start_shape_query("right_query").unwrap();
                     show(&op_builder);
                     // now expect what we want
                     // "child" is the node we will refer to in the "if" case. it doubles as both the identifier for the

@@ -239,11 +239,11 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
     //  How to specify which shape node? ==> the shape node markers should be unique per path
     pub fn start_shape_query(
         &mut self,
-        op_marker: AbstractOperationResultMarker,
+        op_marker: impl Into<AbstractOperationResultMarker>,
     ) -> Result<(), OperationBuilderError> {
         // todo!()
         self.instructions
-            .push(BuilderInstruction::StartShapeQuery(op_marker));
+            .push(BuilderInstruction::StartShapeQuery(op_marker.into()));
         self.check_instructions_or_rollback()
     }
 

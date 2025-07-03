@@ -9,6 +9,7 @@ use grabapl::graph::semantics::{
 };
 use grabapl::{Graph, OperationContext, Semantics, SubstMarker};
 use std::collections::{HashMap, HashSet};
+use log_crate::info;
 use grabapl::graph::operation::signature::{AbstractSignatureEdgeId, AbstractSignatureNodeId};
 
 struct TestSemantics;
@@ -678,7 +679,7 @@ fn get_custom_op_new_node_in_shape_query_branches() -> UserDefinedOperation<Test
     let p0 = AbstractNodeId::param("p0");
 
     // Start a query that will create a new node in both branches
-    builder.start_shape_query("new".into()).unwrap();
+    builder.start_shape_query("new").unwrap();
     builder
         .expect_shape_node("new".into(), NodeType::String)
         .unwrap();
@@ -797,7 +798,7 @@ fn return_node_partially_from_shape_query_fails() {
             .unwrap();
         let p0 = AbstractNodeId::param("p0");
         // Start a shape query to check if p0 has a child with edge 'child'
-        builder.start_shape_query("child".into()).unwrap();
+        builder.start_shape_query("child").unwrap();
         builder
             .expect_shape_node("new".into(), NodeType::String)
             .unwrap();
@@ -1127,9 +1128,73 @@ fn builder_infers_correct_signatures() {
     assert_deleted_and_changed_nodes_and_edges!(signature);
 }
 
+// TODO: add tests for:
+//  * shape queries not being allowed to match already-matched nodes
+//  * recursion abstract changes
 
 
+#[test_log::test]
+fn recursion_signature_is_sound() {
+    // if we recurse and do changes, those are correctly communicated to caller operations via the signature.
 
+    let mut op_ctx = OperationContext::<TestSemantics>::new();
+    let mut builder = OperationBuilder::new(&op_ctx);
+    // the operation we're designing takes p0->c0, the start of a linked list, and sets all nodes (except the last node) to Integer.
+    // it does the "except the last node" check by first seeing if there is a child, and only then recursing.
+    builder.expect_parameter_node("p0", NodeType::Object).unwrap();
+    builder.expect_context_node("c0", NodeType::Object).unwrap();
+    builder.expect_parameter_edge("p0", "c0", EdgeType::Wildcard).unwrap();
+    let p0 = AbstractNodeId::ParameterMarker("p0".into());
+    let c0 = AbstractNodeId::ParameterMarker("c0".into());
+    builder.add_operation(BuilderOpLike::Builtin(TestOperation::SetTo {
+        op_typ: NodeType::Object,
+        target_typ: NodeType::Integer,
+        value: NodeValue::Integer(0),
+    }), vec![p0]).unwrap();
+    builder.start_shape_query("q").unwrap();
+    builder.expect_shape_node("child".into(), NodeType::Object).unwrap();
+    let child_aid = AbstractNodeId::dynamic_output("q", "child");
+    builder.expect_shape_edge(c0.clone(), child_aid.clone(), EdgeType::Wildcard).unwrap();
+    builder.enter_true_branch().unwrap();
+    // if we have a child, recurse
+    builder
+        .add_named_operation(
+            "recurse".into(),
+            BuilderOpLike::Recurse,
+            vec![c0], // only need to select c0: child_aid should be matched by context.
+        )
+        .unwrap();
+    builder.end_query().unwrap();
+
+    let operation = builder.build(0).unwrap();
+    let signature = operation.signature();
+    // assert that the signature is correct
+    assert_eq!(signature.output.deleted_nodes, HashSet::new(), "Expected no nodes to be deleted");
+    assert_eq!(signature.output.deleted_edges, HashSet::new(), "Expected no edges to be deleted");
+    assert_eq!(
+        signature.output.changed_nodes,
+        HashMap::from([
+            (SubstMarker::from("p0").into(), NodeType::Integer),
+            (SubstMarker::from("c0").into(), NodeType::Integer), // Note: c0 also changed due to the recursive call.
+        ]),
+        "Expected both p0 and c0 to change"
+    );
+    assert_eq!(
+        signature.output.changed_edges,
+        HashMap::new(),
+        "Expected no edges to be changed"
+    );
+    assert_eq!(
+        signature.output.new_nodes,
+        HashMap::new(),
+        "Expected no new nodes to be created"
+    );
+    assert_eq!(
+        signature.output.new_edges,
+        HashMap::new(),
+        "Expected no new edges to be created"
+    );
+}
 
 
 

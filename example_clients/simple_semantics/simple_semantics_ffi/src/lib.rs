@@ -195,11 +195,10 @@ mod ffi {
 
         pub fn start_shape_query(
             &mut self,
-            query_name: &str,
+            op_marker: &str,
         ) -> Result<(), Box<OperationBuilderError>> {
-            let marker = query_name.into();
             self.0
-                .start_shape_query(marker)
+                .start_shape_query(op_marker)
                 .map_err(|e| Box::new(OperationBuilderError(e)))
         }
 
