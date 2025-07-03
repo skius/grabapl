@@ -1,16 +1,19 @@
 use grabapl::graph::operation::builder::{BuilderOpLike, OperationBuilder};
 use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
 use grabapl::graph::operation::query::{BuiltinQuery, ConcreteQueryOutput};
+use grabapl::graph::operation::signature::{AbstractSignatureEdgeId, AbstractSignatureNodeId};
 use grabapl::graph::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
 use grabapl::graph::operation::{BuiltinOperation, run_from_concrete};
-use grabapl::graph::pattern::{AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter, ParameterSubstitution};
+use grabapl::graph::pattern::{
+    AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter,
+    ParameterSubstitution,
+};
 use grabapl::graph::semantics::{
     AbstractGraph, AbstractJoin, AbstractMatcher, ConcreteGraph, ConcreteToAbstract,
 };
 use grabapl::{Graph, OperationContext, Semantics, SubstMarker};
-use std::collections::{HashMap, HashSet};
 use log_crate::info;
-use grabapl::graph::operation::signature::{AbstractSignatureEdgeId, AbstractSignatureNodeId};
+use std::collections::{HashMap, HashSet};
 
 struct TestSemantics;
 
@@ -174,7 +177,8 @@ impl BuiltinOperation for TestOperation {
                         SubstMarker::from("src"),
                         SubstMarker::from("dst"),
                         op_typ.clone(),
-                    ).unwrap();
+                    )
+                    .unwrap();
             }
             TestOperation::AddEdge {
                 node_typ,
@@ -895,7 +899,6 @@ fn return_node_partially_from_shape_query_fails() {
     }
 }
 
-
 // Test that the full matrix of: [node types, edge types] x [set, delete, new] works as expected.
 // In particular, set and delete should propagate information about the new type into the caller operation's signature.
 
@@ -913,9 +916,15 @@ fn builder_infers_correct_signatures() {
             .unwrap();
         builder.expect_context_node("c0", NodeType::Object).unwrap();
         builder.expect_context_node("c1", NodeType::Object).unwrap();
-        builder.expect_parameter_edge("p0", "c0", EdgeType::Wildcard).unwrap();
-        builder.expect_parameter_edge("p2", "c1", EdgeType::Wildcard).unwrap();
-        builder.expect_parameter_edge("p0", "c1", EdgeType::Wildcard).unwrap();
+        builder
+            .expect_parameter_edge("p0", "c0", EdgeType::Wildcard)
+            .unwrap();
+        builder
+            .expect_parameter_edge("p2", "c1", EdgeType::Wildcard)
+            .unwrap();
+        builder
+            .expect_parameter_edge("p0", "c1", EdgeType::Wildcard)
+            .unwrap();
     };
 
     let mut op_ctx = OperationContext::<TestSemantics>::new();
@@ -936,17 +945,11 @@ fn builder_infers_correct_signatures() {
 
     // delete p1
     builder
-        .add_operation(
-            BuilderOpLike::Builtin(TestOperation::DeleteNode),
-            vec![p1],
-        )
+        .add_operation(BuilderOpLike::Builtin(TestOperation::DeleteNode), vec![p1])
         .unwrap();
     // delete c0
     builder
-        .add_operation(
-            BuilderOpLike::Builtin(TestOperation::DeleteNode),
-            vec![c0],
-        )
+        .add_operation(BuilderOpLike::Builtin(TestOperation::DeleteNode), vec![c0])
         .unwrap();
     // set p0 to Integer (i.e., no change - this must still be visible!)
     builder
@@ -1044,8 +1047,7 @@ fn builder_infers_correct_signatures() {
         .return_edge(p0, c1, EdgeType::Exact("new_edge".to_string()))
         .unwrap();
     // try to return p0->n1 edge, which should fail because n1 is not returned
-    let res = builder
-        .return_edge(p0, n1, EdgeType::Exact("new_edge1".to_string()));
+    let res = builder.return_edge(p0, n1, EdgeType::Exact("new_edge1".to_string()));
     assert!(
         res.is_err(),
         "Expected returning edge p0->n1 to fail because n1 is not returned"
@@ -1056,13 +1058,24 @@ fn builder_infers_correct_signatures() {
 
     // assert our desired changes
     // number of explicit params
-    assert_eq!(signature.parameter.explicit_input_nodes.len(), 3, "Expected 3 explicit input nodes, p0, p1, p2");
+    assert_eq!(
+        signature.parameter.explicit_input_nodes.len(),
+        3,
+        "Expected 3 explicit input nodes, p0, p1, p2"
+    );
     // new nodes and edges
-    assert_eq!(&signature.output.new_nodes, &HashMap::from([("new".into(), NodeType::String)]), "Expected new node 'new' of type String");
+    assert_eq!(
+        &signature.output.new_nodes,
+        &HashMap::from([("new".into(), NodeType::String)]),
+        "Expected new node 'new' of type String"
+    );
     assert_eq!(
         &signature.output.new_edges,
         &HashMap::from([(
-            (SubstMarker::from("p0").into(), SubstMarker::from("c1").into()),
+            (
+                SubstMarker::from("p0").into(),
+                SubstMarker::from("c1").into()
+            ),
             EdgeType::Exact("new_edge".to_string()),
         )]),
         "Expected new edge from p0 to c1 of type 'new_edge'"
@@ -1072,7 +1085,10 @@ fn builder_infers_correct_signatures() {
             // deleted nodes and edges
             assert_eq!(
                 &$signature.output.deleted_nodes,
-                &HashSet::from([SubstMarker::from("p1").into(), SubstMarker::from("c0").into()]),
+                &HashSet::from([
+                    SubstMarker::from("p1").into(),
+                    SubstMarker::from("c0").into()
+                ]),
                 "Expected nodes p1 and c0 to be deleted"
             );
             assert_eq!(
@@ -1101,7 +1117,10 @@ fn builder_infers_correct_signatures() {
             assert_eq!(
                 &$signature.output.changed_edges,
                 &HashMap::from([(
-                    (SubstMarker::from("p0").into(), SubstMarker::from("c1").into()),
+                    (
+                        SubstMarker::from("p0").into(),
+                        SubstMarker::from("c1").into()
+                    ),
                     EdgeType::Exact("p0->c1".to_string())
                 )]),
                 "Expected edge p0->c1 to be changed to 'new_edge'"
@@ -1109,8 +1128,6 @@ fn builder_infers_correct_signatures() {
         };
     }
     assert_deleted_and_changed_nodes_and_edges!(signature);
-
-
 
     // Now ensure the same changes (minus the newly added nodes and edges) are propagated to another operation
     // that calls this operation.
@@ -1121,7 +1138,9 @@ fn builder_infers_correct_signatures() {
     param_instructions(&mut builder);
 
     // now call the other operation
-    builder.add_operation(BuilderOpLike::FromOperationId(0), vec![p0, p1, p2]).unwrap();
+    builder
+        .add_operation(BuilderOpLike::FromOperationId(0), vec![p0, p1, p2])
+        .unwrap();
     let operation = builder.build(1).unwrap();
     let signature = operation.signature();
     // assert changes and deletions
@@ -1132,7 +1151,6 @@ fn builder_infers_correct_signatures() {
 //  * shape queries not being allowed to match already-matched nodes
 //  * recursion abstract changes
 
-
 #[test_log::test]
 fn recursion_signature_is_sound() {
     // if we recurse and do changes, those are correctly communicated to caller operations via the signature.
@@ -1141,20 +1159,33 @@ fn recursion_signature_is_sound() {
     let mut builder = OperationBuilder::new(&op_ctx);
     // the operation we're designing takes p0->c0, the start of a linked list, and sets all nodes (except the last node) to Integer.
     // it does the "except the last node" check by first seeing if there is a child, and only then recursing.
-    builder.expect_parameter_node("p0", NodeType::Object).unwrap();
+    builder
+        .expect_parameter_node("p0", NodeType::Object)
+        .unwrap();
     builder.expect_context_node("c0", NodeType::Object).unwrap();
-    builder.expect_parameter_edge("p0", "c0", EdgeType::Wildcard).unwrap();
+    builder
+        .expect_parameter_edge("p0", "c0", EdgeType::Wildcard)
+        .unwrap();
     let p0 = AbstractNodeId::ParameterMarker("p0".into());
     let c0 = AbstractNodeId::ParameterMarker("c0".into());
-    builder.add_operation(BuilderOpLike::Builtin(TestOperation::SetTo {
-        op_typ: NodeType::Object,
-        target_typ: NodeType::Integer,
-        value: NodeValue::Integer(0),
-    }), vec![p0]).unwrap();
+    builder
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::SetTo {
+                op_typ: NodeType::Object,
+                target_typ: NodeType::Integer,
+                value: NodeValue::Integer(0),
+            }),
+            vec![p0],
+        )
+        .unwrap();
     builder.start_shape_query("q").unwrap();
-    builder.expect_shape_node("child".into(), NodeType::Object).unwrap();
+    builder
+        .expect_shape_node("child".into(), NodeType::Object)
+        .unwrap();
     let child_aid = AbstractNodeId::dynamic_output("q", "child");
-    builder.expect_shape_edge(c0.clone(), child_aid.clone(), EdgeType::Wildcard).unwrap();
+    builder
+        .expect_shape_edge(c0.clone(), child_aid.clone(), EdgeType::Wildcard)
+        .unwrap();
     builder.enter_true_branch().unwrap();
     // if we have a child, recurse
     builder
@@ -1169,8 +1200,16 @@ fn recursion_signature_is_sound() {
     let operation = builder.build(0).unwrap();
     let signature = operation.signature();
     // assert that the signature is correct
-    assert_eq!(signature.output.deleted_nodes, HashSet::new(), "Expected no nodes to be deleted");
-    assert_eq!(signature.output.deleted_edges, HashSet::new(), "Expected no edges to be deleted");
+    assert_eq!(
+        signature.output.deleted_nodes,
+        HashSet::new(),
+        "Expected no nodes to be deleted"
+    );
+    assert_eq!(
+        signature.output.deleted_edges,
+        HashSet::new(),
+        "Expected no edges to be deleted"
+    );
     assert_eq!(
         signature.output.changed_nodes,
         HashMap::from([
@@ -1195,12 +1234,3 @@ fn recursion_signature_is_sound() {
         "Expected no new edges to be created"
     );
 }
-
-
-
-
-
-
-
-
-

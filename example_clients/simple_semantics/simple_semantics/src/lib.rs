@@ -6,7 +6,10 @@ use grabapl::graph::operation::query::{
     ConcreteQueryOutput, EdgeChange, NodeChange,
 };
 use grabapl::graph::operation::run_operation;
-use grabapl::graph::pattern::{AbstractOperationOutput, GraphWithSubstitution, NewNodeMarker, OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution};
+use grabapl::graph::pattern::{
+    AbstractOperationOutput, GraphWithSubstitution, NewNodeMarker, OperationArgument,
+    OperationOutput, OperationParameter, ParameterSubstitution,
+};
 use grabapl::graph::semantics::{
     AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, MatchJoiner,
     Semantics,

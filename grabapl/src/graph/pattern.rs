@@ -1,12 +1,12 @@
 use crate::graph::GraphTrait;
 use crate::graph::operation::{OperationError, OperationResult};
 use crate::graph::semantics::{AbstractGraph, SemanticsClone};
+use crate::util::log;
 use crate::{Graph, NodeKey, Semantics, SubstMarker, WithSubstMarker, interned_string_newtype};
 use derive_more::From;
 use internment::Intern;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-use crate::util::log;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
 
 pub struct OperationParameter<S: Semantics> {
@@ -225,7 +225,11 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
             // we only changed it if it exists, by semantics of set_edge_attr
             self.changed_edge_av.insert((src_key, dst_key), value);
         } else {
-            log::warn!("Attempted to set edge value for non-existing edge from {:?} to {:?}.", src_key, dst_key);
+            log::warn!(
+                "Attempted to set edge value for non-existing edge from {:?} to {:?}.",
+                src_key,
+                dst_key
+            );
         }
         old_value
     }
@@ -267,12 +271,7 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
 
         // Only report changed av's for nodes and edges that are params
         // TODO: make sure the changed_av_nodes/edges skip deleted nodes/edges.
-        let existing_nodes: HashSet<NodeKey> = self
-            .subst
-            .mapping
-            .values()
-            .cloned()
-            .collect();
+        let existing_nodes: HashSet<NodeKey> = self.subst.mapping.values().cloned().collect();
         let mut existing_edges = HashSet::new();
         for (src, dst, _) in self.graph.edges() {
             existing_edges.insert((src, dst));

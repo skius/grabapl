@@ -1,11 +1,16 @@
 use crate::graph::operation::query::{
     BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier, run_builtin_query, run_shape_query,
 };
+use crate::graph::operation::signature::{AbstractSignatureNodeId, OperationSignature};
 use crate::graph::operation::{
     OperationError, OperationResult, run_builtin_operation, run_operation,
 };
-use crate::graph::pattern::{AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, NodeMarker, OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution};
+use crate::graph::pattern::{
+    AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, NodeMarker,
+    OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution,
+};
 use crate::graph::semantics::{AbstractGraph, ConcreteGraph, SemanticsClone};
+use crate::util::bimap::BiMap;
 use crate::{
     NodeKey, OperationContext, OperationId, Semantics, SubstMarker, interned_string_newtype,
 };
@@ -14,8 +19,6 @@ use internment::Intern;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::str::FromStr;
-use crate::graph::operation::signature::{AbstractSignatureNodeId, OperationSignature};
-use crate::util::bimap::BiMap;
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
@@ -220,26 +223,27 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
             g.add_node(nnm.clone(), av.clone());
             output_names.insert(nnm, name.clone());
         }
-        
+
         let sig_id_to_node_marker = |sig_id: AbstractSignatureNodeId| {
             match sig_id {
-                AbstractSignatureNodeId::ExistingNode(subst) => {NodeMarker::Subst(subst)},
+                AbstractSignatureNodeId::ExistingNode(subst) => NodeMarker::Subst(subst),
                 AbstractSignatureNodeId::NewNode(name) => {
                     // find in output_names
-                    let nnm = output_names.get_right(&name)
+                    let nnm = output_names
+                        .get_right(&name)
                         .expect("internal error: signature node not found in output names");
                     NodeMarker::New(*nnm)
                 }
             }
         };
-        
+
         // handle new edges
         for ((src, dst), av) in &self.signature.output.new_edges {
             let src_marker = sig_id_to_node_marker(*src);
             let dst_marker = sig_id_to_node_marker(*dst);
             g.add_edge(src_marker, dst_marker, av.clone());
         }
-        
+
         // handle changed nodes
         for (subst, av) in &self.signature.output.changed_nodes {
             let node_marker = NodeMarker::Subst(*subst);
@@ -249,9 +253,10 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
         for ((src, dst), av) in &self.signature.output.changed_edges {
             let src_marker = NodeMarker::Subst(*src);
             let dst_marker = NodeMarker::Subst(*dst);
-            g.set_edge_value(src_marker, dst_marker, av.clone()).unwrap();
+            g.set_edge_value(src_marker, dst_marker, av.clone())
+                .unwrap();
         }
-        
+
         // handle removed nodes
         for subst in &self.signature.output.deleted_nodes {
             let node_marker = NodeMarker::Subst(*subst);
@@ -263,8 +268,7 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
             let dst_marker = NodeMarker::Subst(*dst);
             g.delete_edge(src_marker, dst_marker);
         }
-        
-        
+
         let (output_names, _) = output_names.into_inner();
         Ok(g.get_abstract_output(output_names))
     }

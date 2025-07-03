@@ -6,6 +6,7 @@ use crate::graph::pattern::{
     ParameterSubstitution,
 };
 use crate::graph::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, SemanticsClone};
+use crate::util::log;
 use crate::{
     Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker, interned_string_newtype,
 };
@@ -15,7 +16,6 @@ use internment::Intern;
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
 use std::collections::HashMap;
-use crate::util::log;
 
 pub struct AbstractQueryOutput<S: Semantics> {
     pub changes: Vec<AbstractQueryChange<S>>,

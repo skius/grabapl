@@ -413,7 +413,7 @@ pub trait GraphTrait {
         edge_key: EdgeKey,
         edge_attr: Self::EdgeAttr,
     ) -> Option<Self::EdgeAttr>;
-    
+
     fn edges(&self) -> impl Iterator<Item = (NodeKey, NodeKey, &Self::EdgeAttr)>;
 }
 
@@ -473,7 +473,7 @@ impl<NodeAttr, EdgeAttr> GraphTrait for Graph<NodeAttr, EdgeAttr> {
     ) -> Option<Self::EdgeAttr> {
         self.set_edge_attr(edge_key, edge_attr)
     }
-    
+
     fn edges(&self) -> impl Iterator<Item = (NodeKey, NodeKey, &Self::EdgeAttr)> {
         self.graph
             .all_edges()

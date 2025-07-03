@@ -1,15 +1,19 @@
 pub mod builder;
 pub mod parameterbuilder;
 pub mod query;
-pub mod user_defined;
 pub mod signature;
+pub mod user_defined;
 
 use crate::graph::EdgeAttribute;
 use crate::graph::operation::user_defined::{AbstractOperationResultMarker, UserDefinedOperation};
-use crate::graph::pattern::{AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution};
+use crate::graph::pattern::{
+    AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument,
+    OperationOutput, OperationParameter, ParameterSubstitution,
+};
 use crate::graph::semantics::{
     AbstractGraph, AbstractMatcher, ConcreteGraph, ConcreteToAbstract, Semantics, SemanticsClone,
 };
+use crate::util::log;
 use crate::{DotCollector, Graph, NodeKey, SubstMarker};
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
@@ -17,7 +21,6 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use thiserror::Error;
-use crate::util::log;
 
 // TODO: We might want to be able to supply additional data to builtin operations. For example, a Set Value operation should be 'generic' over its value without
 //  needing to store a separate operation in the OpCtx for every value...
@@ -141,10 +144,12 @@ pub fn get_substitution<S: Semantics>(
     let return_arg_does_not_match_error_with_dbg_info = || {
         let shape_dbg_arg = g.shape_dot();
         let shape_dbg_param = param.parameter_graph.shape_dot();
-        log::info!("Failed to find substitution between parameter and argument graph:
+        log::info!(
+            "Failed to find substitution between parameter and argument graph:
 shape of argument graph:\n{shape_dbg_arg},
 shape of parameter graph:\n{shape_dbg_param},
-args: {selected_inputs:?}");
+args: {selected_inputs:?}"
+        );
         SubstitutionError::ArgumentDoesNotMatchParameter
     };
 

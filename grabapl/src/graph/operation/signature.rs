@@ -1,8 +1,8 @@
-use std::collections::{HashMap, HashSet};
-use derive_more::From;
 use crate::graph::pattern::{AbstractOutputNodeMarker, NewNodeMarker, OperationParameter};
-use crate::{Semantics, SubstMarker};
 use crate::graph::semantics::{AbstractMatcher, SemanticsClone};
+use crate::{Semantics, SubstMarker};
+use derive_more::From;
+use std::collections::{HashMap, HashSet};
 
 pub type AbstractSignatureEdgeId = (AbstractSignatureNodeId, AbstractSignatureNodeId);
 pub type ParameterEdgeId = (SubstMarker, SubstMarker);
@@ -52,10 +52,7 @@ impl<S: SemanticsClone> Clone for OperationSignature<S> {
 impl<S: Semantics> OperationSignature<S> {
     // mostly an unsound hack to get things running for the time being
     // TODO: fix/remove
-    pub fn empty_new(
-        name: impl Into<String>,
-        parameter: OperationParameter<S>,
-    ) -> Self {
+    pub fn empty_new(name: impl Into<String>, parameter: OperationParameter<S>) -> Self {
         OperationSignature {
             name: name.into(),
             parameter,
@@ -185,10 +182,7 @@ impl<S: Semantics> AbstractOutputChanges<S> {
 impl<S: Semantics> OperationParameter<S> {
     /// Returns `true` if `self` can be used *as a parameter* wherever `other` is expected, i.e., `self <: other`.
     /// Note that this is a parameter, so it is contravariant when looked at as part of a function type.
-    pub fn is_subtype_of(
-        &self,
-        other: &OperationParameter<S>,
-    ) -> bool {
+    pub fn is_subtype_of(&self, other: &OperationParameter<S>) -> bool {
         // Situation: We expect to be calling an operation with a parameter of `other`.
         // Can we call it with `self`?
 
@@ -198,12 +192,29 @@ impl<S: Semantics> OperationParameter<S> {
         if self.explicit_input_nodes.len() != other.explicit_input_nodes.len() {
             return false;
         }
-        for (self_subst, other_subst) in self.explicit_input_nodes.iter().zip(other.explicit_input_nodes.iter()) {
-            let self_key = self.subst_to_node_keys.get(self_subst).expect("internal error: missing subst marker in self");
-            let other_key = other.subst_to_node_keys.get(other_subst).expect("internal error: missing subst marker in other");
-            let self_type = self.parameter_graph.get_node_attr(*self_key).expect("internal error: missing node attribute in self");
-            let other_type = other.parameter_graph.get_node_attr(*other_key).expect("internal error: missing node attribute in other");
-            if !S::NodeMatcher::matches(other_type, self_type) { // NB: must have other <: self, not the opposite way!
+        for (self_subst, other_subst) in self
+            .explicit_input_nodes
+            .iter()
+            .zip(other.explicit_input_nodes.iter())
+        {
+            let self_key = self
+                .subst_to_node_keys
+                .get(self_subst)
+                .expect("internal error: missing subst marker in self");
+            let other_key = other
+                .subst_to_node_keys
+                .get(other_subst)
+                .expect("internal error: missing subst marker in other");
+            let self_type = self
+                .parameter_graph
+                .get_node_attr(*self_key)
+                .expect("internal error: missing node attribute in self");
+            let other_type = other
+                .parameter_graph
+                .get_node_attr(*other_key)
+                .expect("internal error: missing node attribute in other");
+            if !S::NodeMatcher::matches(other_type, self_type) {
+                // NB: must have other <: self, not the opposite way!
                 // Self's type is not a supertype of other's type.
                 // Any caller working with the assumption of `other` could pass `self` a value that is not compatible with what it expects.
                 return false;

@@ -54,5 +54,5 @@ pub mod log {
     ) }
 
     #[allow(unused)]
-    pub(crate) use {trace, debug, info, error, warn2 as warn};
+    pub(crate) use {debug, error, info, trace, warn2 as warn};
 }
