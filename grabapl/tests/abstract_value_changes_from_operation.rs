@@ -1437,7 +1437,8 @@ fn shape_query_doesnt_match_nodes_for_which_handles_exist() {
     }
 }
 
-
+// TODO: add "forget node" instruction that can be used to make sure that shape queries can match and modify
+//  the forgotten nodes.
 
 
 

@@ -84,7 +84,7 @@ So, if we were doing any "connectedness-analysis", we'd have to say they were "p
 
 If we don't do a connectedness-analysis, is it a problem to have both graphs?
 
-**TODO**: revisit after revisiting the connectedness semantics design 
+**TODO**: revisit after revisiting the  connectedness semantics design 
 
 
 ### Output node names
@@ -410,6 +410,10 @@ Can we combine the two options?
 
 Note: What we're saying here is it's more important that an outer operation does not get its abstract graph dynamically invalidated,
 but instead may see some operations not being called if a shape query cannot match due to existing handles.
+
+**Regarding forgetting**: Forgotten nodes need to be kept track of during the builder,
+because they are distinctly not *deleted* nodes. In the concrete, forgotten nodes
+need to be removed from the hidden_nodes set _of the self operation_ (but not any outer hidden_nodes set).
 
 ## Thoughts about abstract graph changes in terms of function signatures
 Any static changes must be inside some signature.
