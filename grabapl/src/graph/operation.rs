@@ -174,8 +174,10 @@ args: {selected_inputs:?}"
     let param_ref = &param.parameter_graph.graph;
 
     let mut nm = |param_node: &NodeKey, arg_node: &NodeKey| {
-        if let Some(expected_arg_node) = enforced_param_to_arg_node_key_mapping.get(param_node) {
-            return expected_arg_node == arg_node;
+        if let Some(expected_arg_node) = enforced_param_to_arg_node_key_mapping.get(param_node)
+            && expected_arg_node != arg_node {
+            // early-exit if the node is in the enforced mapping, but does not match the argument node.
+            return false;
         }
         let param_attr = param.parameter_graph.get_node_attr(*param_node).unwrap();
         let arg_attr = g.get_node_attr(*arg_node).unwrap();
