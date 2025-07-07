@@ -13,6 +13,7 @@ derive_more = { version = "2.0.1", features = ["from", "into", "debug", "add", "
 thiserror = "2.0.12"
 internment = "0.8.6"
 log_crate = { version = "0.4", optional = true, package = "log" }
+error-stack = "0.5.0"
 
 [dev-dependencies]
 criterion = "0.5.1"

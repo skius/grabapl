@@ -27,6 +27,7 @@ mod ffi {
     use simple_semantics::{BuiltinOperation, BuiltinQuery as RustBuiltinQuery, SimpleSemantics};
     use std::fmt::Write;
     use std::str::FromStr;
+    use error_stack::Report;
 
     use super::{RustEdgeAbstract, RustEdgeConcrete, RustNodeAbstract, RustNodeConcrete};
     use ::grabapl::graph::operation::user_defined::AbstractNodeId as RustAbstractNodeId;
@@ -394,12 +395,13 @@ mod ffi {
     }
 
     #[diplomat::opaque]
-    pub struct OperationBuilderError(RustOperationBuilderError);
+    pub struct OperationBuilderError(Report<RustOperationBuilderError>);
 
     impl OperationBuilderError {
         #[diplomat::attr(auto, stringifier)]
-        pub fn message(&self, dw: &mut DiplomatWrite) {
-            write!(dw, "{}", self.0).unwrap();
+        pub fn message(&mut self, dw: &mut DiplomatWrite) {
+            Report::set_color_mode(error_stack::fmt::ColorMode::None);
+            write!(dw, "{:?}", self.0).unwrap();
         }
     }
 

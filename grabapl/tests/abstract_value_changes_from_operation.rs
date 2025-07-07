@@ -1,4 +1,4 @@
-use grabapl::graph::operation::builder::{BuilderOpLike, OperationBuilder};
+use grabapl::graph::operation::builder::{BuilderOpLike, OperationBuilder, OperationBuilderError};
 use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
 use grabapl::graph::operation::query::{BuiltinQuery, ConcreteQueryOutput};
 use grabapl::graph::operation::signature::{AbstractSignatureEdgeId, AbstractSignatureNodeId};
@@ -14,6 +14,8 @@ use grabapl::graph::semantics::{
 use grabapl::{Graph, OperationContext, OperationId, Semantics, SubstMarker};
 use log_crate::info;
 use std::collections::{HashMap, HashSet};
+use error_stack::FrameKind;
+
 mod util;
 use util::semantics::*;
 
@@ -926,7 +928,19 @@ fn recursion_breaks_when_modification_changes_after_use() {
         .unwrap();
     // ^ this is invalid.
     let res = builder.build(0);
+    if let Err(ref e) = res {
+        if e.contains::<OperationBuilderError>() {
+            println!("contains OperationBuilderError");
+        }
+        for f in e.frames() {
+            if let FrameKind::Context(c) = f.kind() {
+                println!("Context frame: {:?}", c);
+            }
+            println!("Error frame: {:?}", f);
+        }
+    };
     res.unwrap();
+    // ^ but we only crash here. Since we don't recompute the entire function with the added operation until then.
 }
 
 #[test_log::test]

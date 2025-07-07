@@ -23,6 +23,7 @@ use std::iter::Peekable;
 use std::marker::PhantomData;
 use std::mem;
 use std::slice::Iter;
+use error_stack::{Report, ResultExt, Result, bail, report};
 use thiserror::Error;
 /*
 General overview:
@@ -122,6 +123,8 @@ pub enum OperationBuilderError {
     NotFoundOperationId(OperationId),
     #[error("Could not apply operation due to mismatched arguments: {0}")]
     SubstitutionError(#[from] crate::graph::operation::SubstitutionError),
+    #[error("Could not apply operation due to mismatched arguments")]
+    SubstitutionErrorNew,
     #[error("Could not abstractly apply operation {0} due to: {1}")]
     AbstractApplyOperationError(OperationId, OperationError),
     #[error("Superfluous instruction {0}")]
@@ -307,7 +310,8 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
         // todo!()
         self.instructions
             .push(BuilderInstruction::AddOperation(op, args));
-        self.check_instructions_or_rollback()
+        self.check_instructions_or_rollback()?;
+        Ok(())
     }
 
     /// Indicate that a node should be marked in the output with the given abstract value.
@@ -325,7 +329,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
     ) -> Result<(), OperationBuilderError> {
         // dont support returning parameter nodes
         if let AbstractNodeId::ParameterMarker(..) = &aid {
-            return Err(OperationBuilderError::CannotReturnParameter(aid));
+            bail!(OperationBuilderError::CannotReturnParameter(aid));
         }
         self.instructions
             .push(BuilderInstruction::ReturnNode(aid, output_marker, node));
@@ -756,7 +760,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
 
         // assert our iter is empty
         if let Some(next_instruction) = iter.peek() {
-            return Err(OperationBuilderError::SuperfluousInstruction(format!(
+            bail!(OperationBuilderError::SuperfluousInstruction(format!(
                 "{next_instruction:?}"
             )));
         }
@@ -862,7 +866,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     },
                 ))
             }
-            _ => Err(OperationBuilderError::ExpectedOperationOrQuery),
+            _ => bail!(OperationBuilderError::ExpectedOperationOrQuery),
         }
     }
 
@@ -905,7 +909,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                 BuilderInstruction::EnterTrueBranch => {
                     iter.next();
                     if true_branch_instructions.is_some() {
-                        return Err(OperationBuilderError::AlreadyVisitedBranch(true));
+                        bail!(OperationBuilderError::AlreadyVisitedBranch(true));
                     }
                     // we are entering a true branch, so we remove the false branch from the path
                     self.remove_until_branch(false);
@@ -916,7 +920,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                 BuilderInstruction::EnterFalseBranch => {
                     iter.next();
                     if false_branch_instructions.is_some() {
-                        return Err(OperationBuilderError::AlreadyVisitedBranch(false));
+                        bail!(OperationBuilderError::AlreadyVisitedBranch(false));
                     }
                     // we are entering a false branch, so we remove the true branch from the path
                     self.remove_until_branch(true);
@@ -961,7 +965,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     ));
                 }
                 _ => {
-                    return Err(OperationBuilderError::InvalidInQuery);
+                    bail!(OperationBuilderError::InvalidInQuery);
                 }
             }
         }
@@ -988,7 +992,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                 BuilderInstruction::EnterTrueBranch => {
                     iter.next();
                     if true_branch_instructions.is_some() {
-                        return Err(OperationBuilderError::AlreadyVisitedBranch(true));
+                        bail!(OperationBuilderError::AlreadyVisitedBranch(true));
                     }
                     // we are entering a true branch, so we remove the false branch from the path
                     self.remove_until_branch(false);
@@ -998,7 +1002,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                 BuilderInstruction::EnterFalseBranch => {
                     iter.next();
                     if false_branch_instructions.is_some() {
-                        return Err(OperationBuilderError::AlreadyVisitedBranch(false));
+                        bail!(OperationBuilderError::AlreadyVisitedBranch(false));
                     }
                     // we are entering a false branch, so we remove the true branch from the path
                     self.remove_until_branch(true);
@@ -1013,7 +1017,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     break;
                 }
                 _ => {
-                    return Err(OperationBuilderError::InvalidInQuery);
+                    bail!(OperationBuilderError::InvalidInQuery);
                 }
             }
         }
@@ -1040,7 +1044,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                 BuilderInstruction::ExpectParameterNode(marker, node_abstract) => {
                     iter.next();
                     if operation_parameter.subst_to_node_keys.contains_key(marker) {
-                        return Err(OperationBuilderError::ReusedSubstMarker(marker.clone()));
+                        bail!(OperationBuilderError::ReusedSubstMarker(marker.clone()));
                     }
                     let key = operation_parameter
                         .parameter_graph
@@ -1058,7 +1062,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                 BuilderInstruction::ExpectContextNode(marker, node_abstract) => {
                     iter.next();
                     if operation_parameter.subst_to_node_keys.contains_key(marker) {
-                        return Err(OperationBuilderError::ReusedSubstMarker(marker.clone()));
+                        bail!(OperationBuilderError::ReusedSubstMarker(marker.clone()));
                     }
                     let key = operation_parameter
                         .parameter_graph
@@ -1120,7 +1124,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                 BuilderInstruction::ReturnNode(aid, output_marker, node) => {
                     iter.next();
                     if return_nodes.contains_key(aid) {
-                        return Err(OperationBuilderError::AlreadySelectedReturnNode(
+                        bail!(OperationBuilderError::AlreadySelectedReturnNode(
                             aid.clone(),
                         ));
                     }
@@ -1129,7 +1133,7 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                 BuilderInstruction::ReturnEdge(source, target, edge) => {
                     iter.next();
                     if return_edges.contains_key(&(source.clone(), target.clone())) {
-                        return Err(OperationBuilderError::AlreadySelectedReturnEdge(
+                        bail!(OperationBuilderError::AlreadySelectedReturnEdge(
                             source.clone(),
                             target.clone(),
                         ));
@@ -1453,7 +1457,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         // need to determine validity of return_nodes
         for (aid, (output_marker, node_abstract)) in return_nodes {
             let Some(key) = self.current_state.node_keys_to_aid.get_right(&aid) else {
-                return Err(OperationBuilderError::NotFoundReturnNode(aid));
+                bail!(OperationBuilderError::NotFoundReturnNode(aid));
             };
             // make sure type we're deciding to return is a valid supertype
             let inferred_av = self
@@ -1461,14 +1465,14 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 .node_av_of_aid(&aid)
                 .ok_or(OperationBuilderError::NotFoundReturnNode(aid.clone()))?;
             if !S::NodeMatcher::matches(inferred_av, &node_abstract) {
-                return Err(OperationBuilderError::InvalidReturnNodeType(aid));
+                bail!(OperationBuilderError::InvalidReturnNodeType(aid));
             }
             if self
                 .current_state
                 .node_may_originate_from_shape_query
                 .contains(&aid)
             {
-                return Err(OperationBuilderError::ReturnNodeMayOriginateFromShapeQuery(
+                bail!(OperationBuilderError::ReturnNodeMayOriginateFromShapeQuery(
                     aid,
                 ));
             }
@@ -1488,7 +1492,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 AbstractNodeId::DynamicOutputMarker(_, _) => {
                     // we must be returning this node
                     let Some((output_marker, _)) = ud_output.new_nodes.get(aid) else {
-                        return Err(OperationBuilderError::NotFoundReturnNode(aid.clone()));
+                        bail!(OperationBuilderError::NotFoundReturnNode(aid.clone()));
                     };
                     Ok(AbstractSignatureNodeId::NewNode(output_marker.clone()))
                 }
@@ -1499,11 +1503,11 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         for ((source_aid, target_aid), edge_abstract) in return_edges {
             let Some(source_key) = self.current_state.node_keys_to_aid.get_right(&source_aid)
             else {
-                return Err(OperationBuilderError::NotFoundReturnEdgeSource(source_aid));
+                bail!(OperationBuilderError::NotFoundReturnEdgeSource(source_aid));
             };
             let Some(target_key) = self.current_state.node_keys_to_aid.get_right(&target_aid)
             else {
-                return Err(OperationBuilderError::NotFoundReturnEdgeTarget(target_aid));
+                bail!(OperationBuilderError::NotFoundReturnEdgeTarget(target_aid));
             };
             let inferred_edge_av = self
                 .current_state
@@ -1513,7 +1517,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                     target_aid.clone(),
                 ))?;
             if !S::EdgeMatcher::matches(inferred_edge_av, &edge_abstract) {
-                return Err(OperationBuilderError::InvalidReturnEdgeType(
+                bail!(OperationBuilderError::InvalidReturnEdgeType(
                     source_aid, target_aid,
                 ));
             }
@@ -1522,7 +1526,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 .edge_may_originate_from_shape_query
                 .contains(&(source_aid, target_aid))
             {
-                return Err(OperationBuilderError::ReturnEdgeMayOriginateFromShapeQuery(
+                bail!(OperationBuilderError::ReturnEdgeMayOriginateFromShapeQuery(
                     source_aid, target_aid,
                 ));
             }
@@ -1659,7 +1663,8 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
     ) -> Result<(UDInstruction<S>, InterpretedInstruction<S>), OperationBuilderError> {
         match instruction {
             IntermediateInstruction::OpLike(oplike) => Ok((
-                self.interpret_op_like(marker, oplike)?,
+                self.interpret_op_like(marker, oplike)
+                    .attach_printable_lazy(|| format!("Failed OpLike"))?,
                 InterpretedInstruction::OpLike,
             )),
             IntermediateInstruction::BuiltinQuery(query, args, query_instructions) => {
@@ -1682,7 +1687,10 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         match oplike {
             IntermediateOpLike::Builtin(op, args) => {
                 let param = op.parameter();
-                let (subst, abstract_arg) = self.get_current_substitution(&param, args)?;
+                let (subst, abstract_arg) = self.get_current_substitution(&param, args)
+                    .attach_printable_lazy(|| {
+                        format!("Failed to get current substitution for builtin operation: {op:?}")
+                    })?;
 
                 // now apply op and store result
                 let operation_output = {
@@ -2109,10 +2117,11 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                     .node_keys_to_aid
                     .get_right(aid)
                     .cloned()
-                    .ok_or(OperationBuilderError::NotFoundAid(aid.clone()))
+                    .ok_or(report!(OperationBuilderError::NotFoundAid(aid.clone())))
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let subst = get_substitution(&self.current_state.graph, &param, &selected_inputs)?;
+        let subst = get_substitution(&self.current_state.graph, &param, &selected_inputs)
+            .change_context(OperationBuilderError::SubstitutionErrorNew)?;
         let subst_to_aid = subst.mapping.iter().map(|(subst, key)| {
             let aid = self.current_state.node_keys_to_aid.get_left(&key).cloned()
                 .expect("node key should be in mapping, because all node keys from the abstract graph should be in the mapping. internal error");

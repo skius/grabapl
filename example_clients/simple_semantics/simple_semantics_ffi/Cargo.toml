@@ -14,3 +14,4 @@ diplomat-runtime = { version = "0.12.0", features = ["log"] }
 log = "0.4"
 grabapl = { path = "../../../grabapl" }
 simple_semantics = { path = "../simple_semantics" }
+error-stack = "0.5.0"
