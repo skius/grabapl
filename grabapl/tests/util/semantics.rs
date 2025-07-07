@@ -100,6 +100,22 @@ pub enum NodeValue {
     Integer(i32),
 }
 
+impl NodeValue {
+    pub fn must_string(&self) -> &str {
+        match self {
+            NodeValue::String(s) => s,
+            NodeValue::Integer(_) => panic!("type unsoundness: expected a string node value, found integer"),
+        }
+    }
+    
+    pub fn must_integer(&self) -> i32 {
+        match self {
+            NodeValue::String(_) => panic!("type unsoundness: expected an integer node value, found string"),
+            NodeValue::Integer(i) => *i,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EdgeType {
     Wildcard,
@@ -131,8 +147,10 @@ pub enum TestOperation {
         value: NodeValue,
     },
     CopyValueFromTo,
+    SwapValues,
     DeleteNode,
     DeleteEdge,
+    AddInteger(i32),
 }
 
 impl BuiltinOperation for TestOperation {
@@ -197,6 +215,14 @@ impl BuiltinOperation for TestOperation {
                     .expect_explicit_input_node("destination", NodeType::Object)
                     .unwrap();
             }
+            TestOperation::SwapValues => {
+                param_builder
+                    .expect_explicit_input_node("source", NodeType::Object)
+                    .unwrap();
+                param_builder
+                    .expect_explicit_input_node("destination", NodeType::Object)
+                    .unwrap();
+            }
             TestOperation::DeleteNode => {
                 param_builder
                     .expect_explicit_input_node("target", NodeType::Object)
@@ -215,6 +241,11 @@ impl BuiltinOperation for TestOperation {
                         SubstMarker::from("dst"),
                         EdgeType::Wildcard,
                     )
+                    .unwrap();
+            }
+            TestOperation::AddInteger(i) => {
+                param_builder
+                    .expect_explicit_input_node("target", NodeType::Integer)
                     .unwrap();
             }
         }
@@ -277,6 +308,23 @@ impl BuiltinOperation for TestOperation {
                 g.set_node_value(SubstMarker::from("destination"), value.clone())
                     .unwrap();
             }
+            TestOperation::SwapValues => {
+                // Swap the values of two nodes.
+                let value1 = g.get_node_value(SubstMarker::from("source")).unwrap();
+                let value2 = g.get_node_value(SubstMarker::from("destination")).unwrap();
+                let v1 = value1.clone();
+                let v2 = value2.clone();
+                g.set_node_value(SubstMarker::from("source"), v2)
+                    .unwrap();
+                g.set_node_value(SubstMarker::from("destination"), v1)
+                    .unwrap();
+                // TODO: talk about above problem in user defined op.
+                //  Specifically: We take two objects as input, and swap them. Nothing guarantees that the most precise
+                //  types of the two nodes are the same, hence the valid inferred signature (if this were an user defined op) would be
+                //  that both nodes end up as type Object. However, because this is builtin, it can actually in a sense
+                //  "look at" the real, most precise values of the nodes, and just say that it swaps those.
+                //  If we didn't have this, we'd need monomorphized swapvaluesInt etc operations, or support for generics.
+            }
             TestOperation::DeleteNode => {
                 // Delete the node.
                 g.delete_node(SubstMarker::from("target")).unwrap();
@@ -285,6 +333,9 @@ impl BuiltinOperation for TestOperation {
                 // Delete the edge from source to destination.
                 g.delete_edge(SubstMarker::from("src"), SubstMarker::from("dst"))
                     .unwrap();
+            }
+            TestOperation::AddInteger(i) => {
+                // no abstract changes
             }
         }
         g.get_abstract_output(new_node_names)
@@ -343,6 +394,17 @@ impl BuiltinOperation for TestOperation {
                 g.set_node_value(SubstMarker::from("destination"), value.clone())
                     .unwrap();
             }
+            TestOperation::SwapValues => {
+                // Swap the values of two nodes.
+                let value1 = g.get_node_value(SubstMarker::from("source")).unwrap();
+                let value2 = g.get_node_value(SubstMarker::from("destination")).unwrap();
+                let v1 = value1.clone();
+                let v2 = value2.clone();
+                g.set_node_value(SubstMarker::from("source"), v2)
+                    .unwrap();
+                g.set_node_value(SubstMarker::from("destination"), v1)
+                    .unwrap();
+            }
             TestOperation::DeleteNode => {
                 // Delete the node.
                 g.delete_node(SubstMarker::from("target")).unwrap();
@@ -350,6 +412,15 @@ impl BuiltinOperation for TestOperation {
             TestOperation::DeleteEdge => {
                 // Delete the edge from source to destination.
                 g.delete_edge(SubstMarker::from("src"), SubstMarker::from("dst"))
+                    .unwrap();
+            }
+            TestOperation::AddInteger(i) => {
+                // Add an integer to the node.
+                let NodeValue::Integer(old_value) = g.get_node_value(SubstMarker::from("target")).unwrap() else {
+                    panic!("expected an integer node value for AddInteger operation - type unsoundness");
+                };
+                let value = NodeValue::Integer(*i + *old_value);
+                g.set_node_value(SubstMarker::from("target"), value)
                     .unwrap();
             }
         }
@@ -361,6 +432,7 @@ impl BuiltinOperation for TestOperation {
 pub enum TestQuery {
     ValuesEqual,
     ValueEqualTo(NodeValue),
+    CmpFstSnd(std::cmp::Ordering),
 }
 
 impl BuiltinQuery for TestQuery {
@@ -380,6 +452,14 @@ impl BuiltinQuery for TestQuery {
             TestQuery::ValueEqualTo(_) => {
                 param_builder
                     .expect_explicit_input_node("a", NodeType::Object)
+                    .unwrap();
+            }
+            TestQuery::CmpFstSnd(_) => {
+                param_builder
+                    .expect_explicit_input_node("a", NodeType::Object)
+                    .unwrap();
+                param_builder
+                    .expect_explicit_input_node("b", NodeType::Object)
                     .unwrap();
             }
         }
@@ -403,6 +483,19 @@ impl BuiltinQuery for TestQuery {
                 let node_value = g.get_node_value(SubstMarker::from("a")).unwrap();
                 ConcreteQueryOutput {
                     taken: node_value == value,
+                }
+            }
+            TestQuery::CmpFstSnd(ordering) => {
+                let value1 = g.get_node_value(SubstMarker::from("a")).unwrap();
+                let value2 = g.get_node_value(SubstMarker::from("b")).unwrap();
+                let cmp_result = match (value1, value2) {
+                    (NodeValue::Integer(a), NodeValue::Integer(b)) => a.cmp(&b),
+                    _ => {
+                        panic!("type unsoundness: expected integers for comparison");
+                    }
+                };
+                ConcreteQueryOutput {
+                    taken: cmp_result == *ordering,
                 }
             }
         }

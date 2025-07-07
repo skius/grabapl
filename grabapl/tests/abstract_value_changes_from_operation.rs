@@ -382,6 +382,9 @@ fn new_node_from_both_branches_is_invisible_for_shape_query() {
     assert_eq!(num_after, num_before, "Expected no new nodes to be visible");
 }
 
+// TODO: Add test for the "additive changes in the shape query true branch" header from problems-testcases.md
+//  i.e., _new_ nodes and _new_ edges, not just matched, pre-existing nodes in the true branch.
+
 #[test]
 fn return_node_partially_from_shape_query_fails() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();
