@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use crate::graph::operation::builder::BuilderInstruction::ExpectParameterEdge;
 use crate::graph::operation::query::{BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier};
 use crate::graph::operation::signature::{AbstractSignatureNodeId, OperationSignature};
@@ -14,16 +13,17 @@ use crate::graph::pattern::{
 use crate::graph::semantics::{AbstractGraph, AbstractMatcher, SemanticsClone};
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
+use error_stack::{Report, Result, ResultExt, bail, report};
 use petgraph::dot;
 use petgraph::dot::Dot;
 use petgraph::prelude::GraphMap;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Display};
 use std::iter::Peekable;
 use std::marker::PhantomData;
 use std::mem;
 use std::slice::Iter;
-use error_stack::{Report, ResultExt, Result, bail, report};
 use thiserror::Error;
 /*
 General overview:
@@ -371,10 +371,13 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
 
         let param = builder_result.operation_parameter;
         let instructions = builder_result.instructions;
-        let prev_user_ref =
-            self.previous_user_defined_operation.borrow();
-        let mut interpreter =
-            IntermediateInterpreter::new_for_self_op_id(self_op_id, param, self.op_ctx, &prev_user_ref);
+        let prev_user_ref = self.previous_user_defined_operation.borrow();
+        let mut interpreter = IntermediateInterpreter::new_for_self_op_id(
+            self_op_id,
+            param,
+            self.op_ctx,
+            &prev_user_ref,
+        );
 
         let user_def_op = interpreter.create_user_defined_operation(
             instructions,
@@ -438,8 +441,7 @@ impl<
         &self,
     ) -> Result<(IntermediateState<S>, Vec<IntermediateStatePath>), OperationBuilderError> {
         let builder_result = IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
-        let prev_user_ref =
-            self.previous_user_defined_operation.borrow();
+        let prev_user_ref = self.previous_user_defined_operation.borrow();
         let mut interpreter = IntermediateInterpreter::new_for_self_op_id(
             0, // TODO: use a real operation ID here
             builder_result.operation_parameter,
@@ -1675,7 +1677,12 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 marker,
                 graph_instructions,
                 query_instructions,
-            } => self.interpret_graph_shape_query(is_finished, marker, graph_instructions, query_instructions),
+            } => self.interpret_graph_shape_query(
+                is_finished,
+                marker,
+                graph_instructions,
+                query_instructions,
+            ),
         }
     }
 
@@ -1687,7 +1694,8 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
         match oplike {
             IntermediateOpLike::Builtin(op, args) => {
                 let param = op.parameter();
-                let (subst, abstract_arg) = self.get_current_substitution(&param, args)
+                let (subst, abstract_arg) = self
+                    .get_current_substitution(&param, args)
                     .attach_printable_lazy(|| {
                         format!("Failed to get current substitution for builtin operation: {op:?}")
                     })?;
@@ -1737,20 +1745,14 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 //  (note: it's also unsound for now, since changes _after_ the recursion call are ignored.)
 
                 let operation_output = {
-                    let mut gws = GraphWithSubstitution::new(
-                        &mut self.current_state.graph,
-                        &subst,
-                    );
+                    let mut gws = GraphWithSubstitution::new(&mut self.current_state.graph, &subst);
                     self.partial_self_user_defined_op
                         .apply_abstract(self.op_ctx, &mut gws)
                 };
-                let operation_output = operation_output
-                    .map_err(|e| OperationBuilderError::AbstractApplyOperationError(
-                        self.self_op_id,
-                        e,
-                    ))?;
+                let operation_output = operation_output.map_err(|e| {
+                    OperationBuilderError::AbstractApplyOperationError(self.self_op_id, e)
+                })?;
                 self.handle_abstract_output_changes(marker, operation_output)?;
-
 
                 Ok(UDInstruction::Operation(self.self_op_id, abstract_arg))
             }

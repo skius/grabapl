@@ -1,3 +1,4 @@
+use error_stack::FrameKind;
 use grabapl::graph::operation::builder::{BuilderOpLike, OperationBuilder, OperationBuilderError};
 use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
 use grabapl::graph::operation::query::{BuiltinQuery, ConcreteQueryOutput};
@@ -14,7 +15,6 @@ use grabapl::graph::semantics::{
 use grabapl::{Graph, OperationContext, OperationId, Semantics, SubstMarker};
 use log_crate::info;
 use std::collections::{HashMap, HashSet};
-use error_stack::FrameKind;
 
 mod util;
 use util::semantics::*;
@@ -885,7 +885,6 @@ fn recursion_signature_is_sound_when_changed_after_and_last_node_set_to_string()
     recursion_signature_is_sound!(false, true, true, NodeType::Integer, NodeType::Object);
 }
 
-
 // TODO: add test for recursion that matches differently based on future changes. See the excalidraws.
 
 #[test_log::test]
@@ -899,10 +898,7 @@ fn recursion_breaks_when_modification_changes_after_use() {
     let p0 = AbstractNodeId::param("p0");
     // recurse on p0
     builder
-        .add_operation(
-            BuilderOpLike::Recurse,
-            vec![p0],
-        )
+        .add_operation(BuilderOpLike::Recurse, vec![p0])
         .unwrap();
     // expect it to be an integer
     builder
@@ -950,7 +946,9 @@ fn shape_query_doesnt_match_nodes_for_which_handles_exist() {
     // If an outer operation already has a handle to a specific concrete node (checked dynamically),
     // then a shape query cannot match that node.
 
-    fn get_shape_query_modifying_operation(op_id: OperationId) -> UserDefinedOperation<TestSemantics> {
+    fn get_shape_query_modifying_operation(
+        op_id: OperationId,
+    ) -> UserDefinedOperation<TestSemantics> {
         let op_ctx = OperationContext::<TestSemantics>::new();
         let mut builder = OperationBuilder::new(&op_ctx);
         builder
@@ -1001,15 +999,14 @@ fn shape_query_doesnt_match_nodes_for_which_handles_exist() {
     builder
         .expect_parameter_node("p0", NodeType::Object)
         .unwrap();
-    builder.expect_context_node("c0", NodeType::Integer).unwrap();
+    builder
+        .expect_context_node("c0", NodeType::Integer)
+        .unwrap();
     let p0 = AbstractNodeId::param("p0");
     let c0 = AbstractNodeId::param("c0");
     // call op 0
     builder
-        .add_operation(
-            BuilderOpLike::FromOperationId(0),
-            vec![p0],
-        )
+        .add_operation(BuilderOpLike::FromOperationId(0), vec![p0])
         .unwrap();
     let state = builder.show_state().unwrap();
     // c0 should still be Integer, since the operation does not know about the inner operation's shape query.
@@ -1084,14 +1081,3 @@ fn shape_query_doesnt_match_nodes_for_which_handles_exist() {
 
 // TODO: add "forget node" instruction that can be used to make sure that shape queries can match and modify
 //  the forgotten nodes.
-
-
-
-
-
-
-
-
-
-
-

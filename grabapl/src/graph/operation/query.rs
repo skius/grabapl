@@ -209,8 +209,7 @@ pub(crate) fn run_shape_query<S: SemanticsClone>(
     // ^ since we have an invariant that graphshapequeries dont have context graphs, the returned substitution should just always be the explicit node mapping.
     // let subst = get_substitution(&abstract_graph, &query.parameter, &selected_inputs)?;
 
-    let subst =
-        ParameterSubstitution::infer_explicit_for_param(selected_inputs, &query.parameter)?;
+    let subst = ParameterSubstitution::infer_explicit_for_param(selected_inputs, &query.parameter)?;
 
     // Check if the concrete graph matches the expected shape
     // needs to satisfy conditions 1-3 and a-c from above TODO

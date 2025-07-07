@@ -24,10 +24,10 @@ mod ffi {
     };
     use ::grabapl::graph::semantics::AbstractGraph as RustAbstractGraph;
     use ::grabapl::graph::semantics::ConcreteGraph as RustConcreteGraph;
+    use error_stack::Report;
     use simple_semantics::{BuiltinOperation, BuiltinQuery as RustBuiltinQuery, SimpleSemantics};
     use std::fmt::Write;
     use std::str::FromStr;
-    use error_stack::Report;
 
     use super::{RustEdgeAbstract, RustEdgeConcrete, RustNodeAbstract, RustNodeConcrete};
     use ::grabapl::graph::operation::user_defined::AbstractNodeId as RustAbstractNodeId;

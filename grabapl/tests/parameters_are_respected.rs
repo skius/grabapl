@@ -1,16 +1,20 @@
 mod util;
 
+use grabapl::OperationContext;
 use grabapl::graph::operation::builder::{BuilderOpLike, OperationBuilder};
 use grabapl::graph::operation::user_defined::AbstractNodeId;
-use grabapl::OperationContext;
 use util::semantics::*;
 
 #[test_log::test]
 fn types_must_be_subtypes() {
     let op_ctx = OperationContext::<TestSemantics>::new();
     let mut builder = OperationBuilder::new(&op_ctx);
-    builder.expect_parameter_node("p0", NodeType::Object).unwrap();
-    builder.expect_parameter_node("p1", NodeType::Integer).unwrap();
+    builder
+        .expect_parameter_node("p0", NodeType::Object)
+        .unwrap();
+    builder
+        .expect_parameter_node("p1", NodeType::Integer)
+        .unwrap();
     let p0 = AbstractNodeId::param("p0");
     let p1 = AbstractNodeId::param("p1");
     // p0 cannot be used as String, nor as Integer
@@ -22,7 +26,10 @@ fn types_must_be_subtypes() {
         }),
         vec![p0],
     );
-    assert!(res.is_err(), "Expected error when using Object argument as String");
+    assert!(
+        res.is_err(),
+        "Expected error when using Object argument as String"
+    );
     let res = builder.add_operation(
         BuilderOpLike::Builtin(TestOperation::SetTo {
             op_typ: NodeType::Integer,
@@ -31,5 +38,8 @@ fn types_must_be_subtypes() {
         }),
         vec![p1],
     );
-    assert!(res.is_err(), "Expected error when using Object argument as Integer");
+    assert!(
+        res.is_err(),
+        "Expected error when using Object argument as Integer"
+    );
 }

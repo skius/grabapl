@@ -55,7 +55,7 @@ impl ParameterSubstitution {
     pub fn new(mapping: HashMap<SubstMarker, NodeKey>) -> Self {
         ParameterSubstitution { mapping }
     }
-    
+
     pub fn infer_explicit_for_param(
         selected_nodes: &[NodeKey],
         param: &OperationParameter<impl Semantics>,

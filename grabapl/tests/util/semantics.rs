@@ -1,10 +1,14 @@
-use std::collections::HashMap;
 use grabapl::graph::operation::BuiltinOperation;
 use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
 use grabapl::graph::operation::query::{BuiltinQuery, ConcreteQueryOutput};
-use grabapl::graph::pattern::{AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter};
-use grabapl::graph::semantics::{AbstractGraph, AbstractJoin, AbstractMatcher, ConcreteGraph, ConcreteToAbstract};
+use grabapl::graph::pattern::{
+    AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter,
+};
+use grabapl::graph::semantics::{
+    AbstractGraph, AbstractJoin, AbstractMatcher, ConcreteGraph, ConcreteToAbstract,
+};
 use grabapl::{Semantics, SubstMarker};
+use std::collections::HashMap;
 
 pub struct TestSemantics;
 
@@ -247,7 +251,7 @@ impl BuiltinOperation for TestOperation {
                     SubstMarker::from("dst"),
                     target_typ.clone(),
                 )
-                    .unwrap();
+                .unwrap();
             }
             TestOperation::AddEdge {
                 node_typ,
@@ -313,7 +317,7 @@ impl BuiltinOperation for TestOperation {
                     SubstMarker::from("dst"),
                     value.clone(),
                 )
-                    .unwrap();
+                .unwrap();
             }
             TestOperation::AddEdge {
                 node_typ,

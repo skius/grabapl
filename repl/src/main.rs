@@ -16,25 +16,19 @@ enum Command {
 }
 
 fn command<'a>() -> impl Parser<'a, &'a str, Command, extra::Err<Rich<'a, char>>> {
-    choice([
-        just("expect_parameter_node")
-            .ignore_then(
-                whitespace().at_least(1)
-                    .ignore_then(
-                        ident()
-                            .map(SubstMarker::from),
-                    )
-                    .then_ignore(whitespace().at_least(1))
-                    .then(
-                        choice((
-                            just("object").to(NodeType::Object),
-                            just("string").to(NodeType::String),
-                            just("integer").to(NodeType::Integer),
-                        )),
-                    )
-            )
-            .map(|(s, t)| Command::ExpectParameterNode(s, t)),
-    ])
+    choice([just("expect_parameter_node")
+        .ignore_then(
+            whitespace()
+                .at_least(1)
+                .ignore_then(ident().map(SubstMarker::from))
+                .then_ignore(whitespace().at_least(1))
+                .then(choice((
+                    just("object").to(NodeType::Object),
+                    just("string").to(NodeType::String),
+                    just("integer").to(NodeType::Integer),
+                ))),
+        )
+        .map(|(s, t)| Command::ExpectParameterNode(s, t))])
 }
 
 fn main() {

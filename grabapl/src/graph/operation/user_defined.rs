@@ -11,6 +11,7 @@ use crate::graph::pattern::{
 };
 use crate::graph::semantics::{AbstractGraph, ConcreteGraph, SemanticsClone};
 use crate::util::bimap::BiMap;
+use crate::util::log;
 use crate::{
     NodeKey, OperationContext, OperationId, Semantics, SubstMarker, interned_string_newtype,
 };
@@ -19,7 +20,6 @@ use internment::Intern;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::str::FromStr;
-use crate::util::log;
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
@@ -397,9 +397,19 @@ fn run_instructions<S: SemanticsClone>(
             Instruction::ShapeQuery(query, args, query_instr) => {
                 // ShapeQueries dont have context mappings, so we can just pass an empty hashmap.
                 // TODO: ^ rethink the above, it's a bit of an ungly hack. Why not have it take an AbstractOperationArgument as well?
-                let concrete_arg =
-                    get_concrete_arg::<S>(args, &HashMap::new(), subst, previous_results, outer_hidden_nodes)?;
-                let result = run_shape_query(g, query, &concrete_arg.selected_input_nodes, &concrete_arg.hidden_nodes)?;
+                let concrete_arg = get_concrete_arg::<S>(
+                    args,
+                    &HashMap::new(),
+                    subst,
+                    previous_results,
+                    outer_hidden_nodes,
+                )?;
+                let result = run_shape_query(
+                    g,
+                    query,
+                    &concrete_arg.selected_input_nodes,
+                    &concrete_arg.hidden_nodes,
+                )?;
                 let next_instr =
                     if let Some(shape_idents_to_node_keys) = result.shape_idents_to_node_keys {
                         // apply the shape idents to node keys mapping
@@ -445,7 +455,9 @@ fn get_concrete_arg<S: Semantics>(
     >,
     outer_hidden_nodes: &HashSet<NodeKey>,
 ) -> OperationResult<OperationArgument<'static>> {
-    log::trace!("Getting concrete arg for subst: {our_subst:#?}, explicit_args: {explicit_args:#?}, context_mapping: {context_mapping:#?}, previous_results: {previous_results:#?}, outer_hidden_nodes: {outer_hidden_nodes:#?}");
+    log::trace!(
+        "Getting concrete arg for subst: {our_subst:#?}, explicit_args: {explicit_args:#?}, context_mapping: {context_mapping:#?}, previous_results: {previous_results:#?}, outer_hidden_nodes: {outer_hidden_nodes:#?}"
+    );
     let selected_keys: Vec<NodeKey> = explicit_args
         .iter()
         .map(|arg| aid_to_node_key(arg.clone(), our_subst, previous_results))
@@ -463,9 +475,17 @@ fn get_concrete_arg<S: Semantics>(
             .collect::<OperationResult<_>>()?,
     );
 
-    let mut hidden_nodes: HashSet<_> = our_subst.mapping.values().copied().chain(
-        previous_results.values().flat_map(|map| map.values()).copied()
-    ).collect();
+    let mut hidden_nodes: HashSet<_> = our_subst
+        .mapping
+        .values()
+        .copied()
+        .chain(
+            previous_results
+                .values()
+                .flat_map(|map| map.values())
+                .copied(),
+        )
+        .collect();
     hidden_nodes.extend(outer_hidden_nodes);
 
     Ok(OperationArgument {

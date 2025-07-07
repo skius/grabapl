@@ -175,7 +175,8 @@ args: {selected_inputs:?}"
 
     let mut nm = |param_node: &NodeKey, arg_node: &NodeKey| {
         if let Some(expected_arg_node) = enforced_param_to_arg_node_key_mapping.get(param_node)
-            && expected_arg_node != arg_node {
+            && expected_arg_node != arg_node
+        {
             // early-exit if the node is in the enforced mapping, but does not match the argument node.
             return false;
         }
