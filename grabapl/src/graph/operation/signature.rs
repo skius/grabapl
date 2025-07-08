@@ -80,6 +80,11 @@ pub struct AbstractOutputChanges<S: Semantics> {
     pub maybe_changed_nodes: HashMap<SubstMarker, S::NodeAbstract>,
     /// Pre-existing edges that may have been modified to be of the given type.
     pub maybe_changed_edges: HashMap<ParameterEdgeId, S::EdgeAbstract>,
+    // TODO: think about also having "must_changed_nodes" and "must_changed_edges" here,
+    //  which would be useful for:
+    //  1. More precise states, since the builder would not have to join the must-written value with the old value - it knows that the old value is not needed!
+    //  2. More coherence, since builtin operation currently act this way when executed directly inside an operation.
+    //     i.e., they do not join the old value with the new value, but rather overwrite it, since they know for a fact what happens.
     /// Pre-existing nodes that may have been deleted by the operation.
     pub maybe_deleted_nodes: HashSet<SubstMarker>,
     /// Pre-existing edges that may have been deleted by the operation.
