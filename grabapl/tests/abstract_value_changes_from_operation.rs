@@ -15,6 +15,7 @@ use grabapl::graph::semantics::{
 use grabapl::{Graph, OperationContext, OperationId, Semantics, SubstMarker};
 use log_crate::info;
 use std::collections::{HashMap, HashSet};
+use grabapl::graph::operation::builtin::LibBuiltinOperation;
 
 mod util;
 use util::semantics::*;
@@ -677,7 +678,7 @@ fn builder_infers_correct_signatures() {
         ($signature:expr) => {
             // deleted nodes and edges
             assert_eq!(
-                &$signature.output.deleted_nodes,
+                &$signature.output.maybe_deleted_nodes,
                 &HashSet::from([
                     SubstMarker::from("p1").into(),
                     SubstMarker::from("c0").into()
@@ -685,7 +686,7 @@ fn builder_infers_correct_signatures() {
                 "Expected nodes p1 and c0 to be deleted"
             );
             assert_eq!(
-                &$signature.output.deleted_edges,
+                &$signature.output.maybe_deleted_edges,
                 &HashSet::from([
                     (
                         SubstMarker::from("p2").into(),
@@ -700,7 +701,7 @@ fn builder_infers_correct_signatures() {
             );
             // changed nodes and edges
             assert_eq!(
-                &$signature.output.changed_nodes,
+                &$signature.output.maybe_changed_nodes,
                 &HashMap::from([
                     (SubstMarker::from("p0").into(), NodeType::Integer),
                     (SubstMarker::from("c1").into(), NodeType::String)
@@ -708,7 +709,7 @@ fn builder_infers_correct_signatures() {
                 "Expected nodes p0 to be changed to Integer and c1 to String"
             );
             assert_eq!(
-                &$signature.output.changed_edges,
+                &$signature.output.maybe_changed_edges,
                 &HashMap::from([(
                     (
                         SubstMarker::from("p0").into(),
@@ -828,17 +829,17 @@ macro_rules! recursion_signature_is_sound {
         let signature = operation.signature();
         // assert that the signature is correct
         assert_eq!(
-            signature.output.deleted_nodes,
+            signature.output.maybe_deleted_nodes,
             HashSet::new(),
             "Expected no nodes to be deleted"
         );
         assert_eq!(
-            signature.output.deleted_edges,
+            signature.output.maybe_deleted_edges,
             HashSet::new(),
             "Expected no edges to be deleted"
         );
         assert_eq!(
-            signature.output.changed_nodes,
+            signature.output.maybe_changed_nodes,
             HashMap::from([
                 (SubstMarker::from("p0").into(), $p0_typ),
                 (SubstMarker::from("c0").into(), $c0_typ), // Note: c0 also changed due to the recursive call.
@@ -846,7 +847,7 @@ macro_rules! recursion_signature_is_sound {
             "Expected both p0 and c0 to change"
         );
         assert_eq!(
-            signature.output.changed_edges,
+            signature.output.maybe_changed_edges,
             HashMap::new(),
             "Expected no edges to be changed"
         );
@@ -1074,3 +1075,90 @@ fn shape_query_doesnt_match_nodes_for_which_handles_exist() {
 
 // TODO: add "forget node" instruction that can be used to make sure that shape queries can match and modify
 //  the forgotten nodes.
+
+#[test_log::test]
+fn may_writes_remember_previous_abstract_value() {
+    // The semantics of our abstract output changes for the "changed_*" cases is that those are writes that *may have happened*.
+    // Importantly, they may not have happened too.
+    // So, we cannot *overwrite* the current abstract value with the result of a write that only *may* have happened, we need to consider the case that no write happened.
+    // The builder itself must also be aware of this and not overapproximate to the point of uselessness.
+
+    // TODO: the builder awareness should come from te Signature::apply_abstract doing the necessary updates, probably
+    //  a builtin op can directly modify the abstract graph and hence knows the ground truth.
+
+    let mut op_ctx = OperationContext::<TestSemantics>::new();
+
+    let op = {
+        let mut builder = OperationBuilder::new(&op_ctx);
+        // an operation that takes a p0: Object and changes it to a String.
+        // TODO: we could loosen the constraints and make it so that a known, unconditional change, even in a user defined op, leads to unconditional changes in the caller.
+        //  but at the moment, any changes in UDOs are considered "may" changes.
+        builder
+            .expect_parameter_node("p0", NodeType::Object)
+            .unwrap();
+        let p0 = AbstractNodeId::param("p0");
+        // note: query only necessary to actually break type safety in the concrete.
+        builder.start_query(TestQuery::ValueEqualTo(NodeValue::Integer(3)), vec![p0]).unwrap();
+        builder.enter_true_branch().unwrap();
+        builder
+            .add_operation(
+                BuilderOpLike::LibBuiltin(LibBuiltinOperation::SetNode {
+                    param: NodeType::Object,
+                    value: NodeValue::String("Changed".to_string()),
+                }),
+                vec![p0.clone()],
+            )
+            .unwrap();
+        builder.build(0).unwrap()
+    };
+    op_ctx.add_custom_operation(0, op);
+
+    let mut builder = OperationBuilder::new(&op_ctx);
+    builder
+        .expect_parameter_node("p0", NodeType::Object)
+        .unwrap();
+    let p0 = AbstractNodeId::param("p0");
+    // a builtin op that changes p0 to Integer should unconditionally change the abstract value of p0 to Integer.
+    builder.add_operation(BuilderOpLike::LibBuiltin(LibBuiltinOperation::SetNode {
+        param: NodeType::Object,
+        value: NodeValue::Integer(42),
+    }), vec![p0]).unwrap();
+    let state = builder.show_state().unwrap();
+    let typ = state.node_av_of_aid(&p0).unwrap();
+    assert_eq!(
+        typ,
+        &NodeType::Integer,
+        "Expected p0 to be Integer after unconditional, builtin SetNode"
+    );
+
+    // a custom op that conditionally (i.e., *may*) changes p0 to String should change the abstract value of p0 to the join of its previous value (Integer) and String, so Object.
+    builder
+        .add_operation(BuilderOpLike::FromOperationId(0), vec![p0])
+        .unwrap();
+    let state = builder.show_state().unwrap();
+    let typ = state.node_av_of_aid(&p0).unwrap();
+    assert_eq!(
+        typ,
+        &NodeType::Object,
+        "Expected p0 to be Object after conditional, user-defined SetNode"
+    );
+
+    let op = builder.build(1).unwrap();
+    op_ctx.add_custom_operation(1, op);
+
+    // See here for broken type safety:
+    if true {
+    // if false {
+        let mut g = TestSemantics::new_concrete_graph();
+        let p0_key = g.add_node(NodeValue::Integer(0));
+        // this won't hit the inner operation's set to string operation, so it would remain integer.
+        run_from_concrete(&mut g, &op_ctx, 1, &[p0_key]).unwrap();
+        let p0_value = g.get_node_attr(p0_key).unwrap();
+        assert_eq!(
+            p0_value,
+            &NodeValue::Integer(42),
+            "Expected p0 to remain Integer after running the operation, since the inner operation's set to String was not hit"
+        );
+    }
+
+}

@@ -1,6 +1,6 @@
 use crate::SubstMarker;
 use crate::graph::pattern::{AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, NewNodeMarker, NodeMarker, OperationParameter};
-use crate::graph::semantics::{AbstractGraph, AbstractMatcher, Semantics};
+use crate::graph::semantics::{AbstractGraph, AbstractJoin, AbstractMatcher, Semantics};
 use derive_more::From;
 use std::collections::{HashMap, HashSet};
 use crate::util::bimap::BiMap;
@@ -60,10 +60,10 @@ impl<S: Semantics> OperationSignature<S> {
             output: AbstractOutputChanges {
                 new_nodes: HashMap::new(),
                 new_edges: HashMap::new(),
-                changed_nodes: HashMap::new(),
-                changed_edges: HashMap::new(),
-                deleted_nodes: HashSet::new(),
-                deleted_edges: HashSet::new(),
+                maybe_changed_nodes: HashMap::new(),
+                maybe_changed_edges: HashMap::new(),
+                maybe_deleted_nodes: HashSet::new(),
+                maybe_deleted_edges: HashSet::new(),
             },
         }
     }
@@ -77,13 +77,13 @@ pub struct AbstractOutputChanges<S: Semantics> {
     /// New edges that are guaranteed to be created with a value of the given type.
     pub new_edges: HashMap<AbstractSignatureEdgeId, S::EdgeAbstract>,
     /// Pre-existing nodes that may have been modified to be of the given type.
-    pub changed_nodes: HashMap<SubstMarker, S::NodeAbstract>,
+    pub maybe_changed_nodes: HashMap<SubstMarker, S::NodeAbstract>,
     /// Pre-existing edges that may have been modified to be of the given type.
-    pub changed_edges: HashMap<ParameterEdgeId, S::EdgeAbstract>,
+    pub maybe_changed_edges: HashMap<ParameterEdgeId, S::EdgeAbstract>,
     /// Pre-existing nodes that may have been deleted by the operation.
-    pub deleted_nodes: HashSet<SubstMarker>,
+    pub maybe_deleted_nodes: HashSet<SubstMarker>,
     /// Pre-existing edges that may have been deleted by the operation.
-    pub deleted_edges: HashSet<ParameterEdgeId>,
+    pub maybe_deleted_edges: HashSet<ParameterEdgeId>,
 }
 
 impl<S: Semantics> Clone for AbstractOutputChanges<S> {
@@ -91,10 +91,10 @@ impl<S: Semantics> Clone for AbstractOutputChanges<S> {
         AbstractOutputChanges {
             new_nodes: self.new_nodes.clone(),
             new_edges: self.new_edges.clone(),
-            changed_nodes: self.changed_nodes.clone(),
-            changed_edges: self.changed_edges.clone(),
-            deleted_nodes: self.deleted_nodes.clone(),
-            deleted_edges: self.deleted_edges.clone(),
+            maybe_changed_nodes: self.maybe_changed_nodes.clone(),
+            maybe_changed_edges: self.maybe_changed_edges.clone(),
+            maybe_deleted_nodes: self.maybe_deleted_nodes.clone(),
+            maybe_deleted_edges: self.maybe_deleted_edges.clone(),
         }
     }
 }
@@ -133,8 +133,8 @@ impl<S: Semantics> AbstractOutputChanges<S> {
 
         // All changed nodes and edges from `self` must be present in `other`, with a supertype of their
         // counterpart in `self`.
-        for (marker, self_type) in &self.changed_nodes {
-            if let Some(other_type) = other.changed_nodes.get(marker) {
+        for (marker, self_type) in &self.maybe_changed_nodes {
+            if let Some(other_type) = other.maybe_changed_nodes.get(marker) {
                 if !S::NodeMatcher::matches(self_type, other_type) {
                     // Changed node is not a subtype of the one in `other`.
                     // Any caller working with the assumption of `other` would assume an incorrect type.
@@ -146,8 +146,8 @@ impl<S: Semantics> AbstractOutputChanges<S> {
                 return false;
             }
         }
-        for (edge_id, self_type) in &self.changed_edges {
-            if let Some(other_type) = other.changed_edges.get(edge_id) {
+        for (edge_id, self_type) in &self.maybe_changed_edges {
+            if let Some(other_type) = other.maybe_changed_edges.get(edge_id) {
                 if !S::EdgeMatcher::matches(self_type, other_type) {
                     // Changed edge is not a subtype of the one in `other`.
                     // Any caller working with the assumption of `other` would assume an incorrect type.
@@ -161,15 +161,15 @@ impl<S: Semantics> AbstractOutputChanges<S> {
         }
 
         // All deleted nodes and edges from `self` must be present in `other`.
-        for marker in &self.deleted_nodes {
-            if !other.deleted_nodes.contains(marker) {
+        for marker in &self.maybe_deleted_nodes {
+            if !other.maybe_deleted_nodes.contains(marker) {
                 // `self` would delete a node that `other` expects to be present.
                 // Any caller working with the assumption of `other` would assume this node exists and crash.
                 return false;
             }
         }
-        for edge_id in &self.deleted_edges {
-            if !other.deleted_edges.contains(edge_id) {
+        for edge_id in &self.maybe_deleted_edges {
+            if !other.maybe_deleted_edges.contains(edge_id) {
                 // `self` would delete an edge that `other` expects to be present.
                 // Any caller working with the assumption of `other` would assume this edge exists and crash.
                 return false;
@@ -178,7 +178,7 @@ impl<S: Semantics> AbstractOutputChanges<S> {
 
         true
     }
-    
+
     pub fn apply_abstract(&self, g: &mut GraphWithSubstitution<AbstractGraph<S>>) -> AbstractOperationOutput<S> {
         let mut output_names = BiMap::new();
 
@@ -209,26 +209,38 @@ impl<S: Semantics> AbstractOutputChanges<S> {
             g.add_edge(src_marker, dst_marker, av.clone());
         }
 
+        // Important for the maybe-changed values:
+        // Since they're only maybe-changed, it could be that they're not changed.
+        // In other words, we need to indicate that the join of the old value and the new value is the most precise abstract value to give.
+        // TODO: do this
+
         // handle changed nodes
-        for (subst, av) in &self.changed_nodes {
+        for (subst, av) in &self.maybe_changed_nodes {
             let node_marker = NodeMarker::Subst(*subst);
-            g.set_node_value(node_marker, av.clone()).unwrap();
+            let curr_av = g.get_node_value(node_marker).unwrap();
+            // Join the current value with the new value.
+            let av = S::NodeJoin::join(curr_av, av).expect("Join failed. TODO: should we just require that the join is always possible?");
+            g.set_node_value(node_marker, av).unwrap();
         }
         // handle changed edges
-        for ((src, dst), av) in &self.changed_edges {
+        for ((src, dst), av) in &self.maybe_changed_edges {
             let src_marker = NodeMarker::Subst(*src);
             let dst_marker = NodeMarker::Subst(*dst);
-            g.set_edge_value(src_marker, dst_marker, av.clone())
+            let curr_av = g.get_edge_value(src_marker, dst_marker).unwrap();
+            // Join the current value with the new value.
+            let av = S::EdgeJoin::join(curr_av, av)
+                .expect("Join failed. TODO: should we just require that the join is always possible?");
+            g.set_edge_value(src_marker, dst_marker, av)
                 .unwrap();
         }
 
         // handle removed nodes
-        for subst in &self.deleted_nodes {
+        for subst in &self.maybe_deleted_nodes {
             let node_marker = NodeMarker::Subst(*subst);
             g.delete_node(node_marker);
         }
         // handle removed edges
-        for (src, dst) in &self.deleted_edges {
+        for (src, dst) in &self.maybe_deleted_edges {
             let src_marker = NodeMarker::Subst(*src);
             let dst_marker = NodeMarker::Subst(*dst);
             g.delete_edge(src_marker, dst_marker);

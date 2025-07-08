@@ -259,6 +259,8 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
 
     // TODO: get rid of AbstractOperationResultMarker requirement. Either completely or make it optional and autogenerate one.
     //  How to specify which shape node? ==> the shape node markers should be unique per path
+    // TODO: Shape queries cannot shape-test for abstract values of existing nodes yet!
+    // TODO: Also add test for existing edges between existing nodes.
     pub fn start_shape_query(
         &mut self,
         op_marker: impl Into<AbstractOperationResultMarker>,
@@ -1582,7 +1584,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             .difference(&current_subst_nodes)
             .cloned()
             .collect();
-        signature.output.deleted_nodes = deleted_nodes;
+        signature.output.maybe_deleted_nodes = deleted_nodes;
 
         let mut initial_edges = HashSet::new();
         for (source, target, _) in self.op_param.parameter_graph.graph.all_edges() {
@@ -1614,7 +1616,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
 
         // deleted edges are those that were in the initial substitution but not in the current state
         let deleted_edges: HashSet<_> = initial_edges.difference(&current_edges).cloned().collect();
-        signature.output.deleted_edges = deleted_edges;
+        signature.output.maybe_deleted_edges = deleted_edges;
 
         // changed nodes and edges must be kept track of during the interpretation, including calls to child operations.
 
@@ -1625,7 +1627,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             };
             signature
                 .output
-                .changed_nodes
+                .maybe_changed_nodes
                 .insert(*subst, node_abstract.clone());
         }
 
@@ -1640,7 +1642,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             };
             signature
                 .output
-                .changed_edges
+                .maybe_changed_edges
                 .insert((*source_subst, *target_subst), edge_abstract.clone());
         }
 
@@ -2383,6 +2385,7 @@ fn merge_states<S: Semantics>(
             (None, Some(av_false)) => Some(av_false),
             (None, None) => None,
         };
+        // TODO: above might be unsound. see "may_writes_remember_previous_abstract_value" test
         if let Some(merged_av) = merged_written_av {
             new_state.node_may_be_written_to.insert(aid, merged_av);
         }
