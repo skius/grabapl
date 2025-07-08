@@ -1,6 +1,6 @@
 use crate::graph::GraphTrait;
 use crate::graph::operation::{OperationError, OperationResult};
-use crate::graph::semantics::{AbstractGraph};
+use crate::graph::semantics::AbstractGraph;
 use crate::util::log;
 use crate::{Graph, NodeKey, Semantics, SubstMarker, WithSubstMarker, interned_string_newtype};
 use derive_more::From;

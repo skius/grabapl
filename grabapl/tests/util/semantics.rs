@@ -104,13 +104,17 @@ impl NodeValue {
     pub fn must_string(&self) -> &str {
         match self {
             NodeValue::String(s) => s,
-            NodeValue::Integer(_) => panic!("type unsoundness: expected a string node value, found integer"),
+            NodeValue::Integer(_) => {
+                panic!("type unsoundness: expected a string node value, found integer")
+            }
         }
     }
-    
+
     pub fn must_integer(&self) -> i32 {
         match self {
-            NodeValue::String(_) => panic!("type unsoundness: expected an integer node value, found string"),
+            NodeValue::String(_) => {
+                panic!("type unsoundness: expected an integer node value, found string")
+            }
             NodeValue::Integer(i) => *i,
         }
     }
@@ -314,8 +318,7 @@ impl BuiltinOperation for TestOperation {
                 let value2 = g.get_node_value(SubstMarker::from("destination")).unwrap();
                 let v1 = value1.clone();
                 let v2 = value2.clone();
-                g.set_node_value(SubstMarker::from("source"), v2)
-                    .unwrap();
+                g.set_node_value(SubstMarker::from("source"), v2).unwrap();
                 g.set_node_value(SubstMarker::from("destination"), v1)
                     .unwrap();
                 // TODO: talk about above problem in user defined op.
@@ -400,8 +403,7 @@ impl BuiltinOperation for TestOperation {
                 let value2 = g.get_node_value(SubstMarker::from("destination")).unwrap();
                 let v1 = value1.clone();
                 let v2 = value2.clone();
-                g.set_node_value(SubstMarker::from("source"), v2)
-                    .unwrap();
+                g.set_node_value(SubstMarker::from("source"), v2).unwrap();
                 g.set_node_value(SubstMarker::from("destination"), v1)
                     .unwrap();
             }
@@ -416,8 +418,12 @@ impl BuiltinOperation for TestOperation {
             }
             TestOperation::AddInteger(i) => {
                 // Add an integer to the node.
-                let NodeValue::Integer(old_value) = g.get_node_value(SubstMarker::from("target")).unwrap() else {
-                    panic!("expected an integer node value for AddInteger operation - type unsoundness");
+                let NodeValue::Integer(old_value) =
+                    g.get_node_value(SubstMarker::from("target")).unwrap()
+                else {
+                    panic!(
+                        "expected an integer node value for AddInteger operation - type unsoundness"
+                    );
                 };
                 let value = NodeValue::Integer(*i + *old_value);
                 g.set_node_value(SubstMarker::from("target"), value)

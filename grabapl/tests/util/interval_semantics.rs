@@ -28,7 +28,10 @@ pub mod interval {
         }
 
         pub fn new_singleton(value: i32) -> Self {
-            Interval { start: value, end: value }
+            Interval {
+                start: value,
+                end: value,
+            }
         }
 
         pub fn new(start: i32, end: i32) -> Self {
@@ -88,9 +91,7 @@ impl AbstractJoin for NodeJoiner {
     type Abstract = NodeType;
 
     fn join(a: &Self::Abstract, b: &Self::Abstract) -> Option<Self::Abstract> {
-        Some(NodeType(
-            a.0.union(&b.0),
-        ))
+        Some(NodeType(a.0.union(&b.0)))
     }
 }
 
@@ -190,9 +191,7 @@ impl BuiltinOperation for TestOperation {
                     .expect_explicit_input_node("target", *op_typ)
                     .unwrap();
             }
-            TestOperation::AddEdge {
-                node_typ,
-            } => {
+            TestOperation::AddEdge { node_typ } => {
                 param_builder
                     .expect_explicit_input_node("src", *node_typ)
                     .unwrap();
@@ -230,11 +229,7 @@ impl BuiltinOperation for TestOperation {
                     .expect_explicit_input_node("dst", NodeType::any())
                     .unwrap();
                 param_builder
-                    .expect_edge(
-                        SubstMarker::from("src"),
-                        SubstMarker::from("dst"),
-                        EdgeType,
-                    )
+                    .expect_edge(SubstMarker::from("src"), SubstMarker::from("dst"), EdgeType)
                     .unwrap();
             }
             TestOperation::AddInteger(i) => {
@@ -265,15 +260,9 @@ impl BuiltinOperation for TestOperation {
                 g.set_node_value(SubstMarker::from("target"), *target_typ)
                     .unwrap();
             }
-            TestOperation::AddEdge {
-                node_typ,
-            } => {
+            TestOperation::AddEdge { node_typ } => {
                 // Add an edge from source to destination with the specified type.
-                g.add_edge(
-                    SubstMarker::from("src"),
-                    SubstMarker::from("dst"),
-                    EdgeType,
-                );
+                g.add_edge(SubstMarker::from("src"), SubstMarker::from("dst"), EdgeType);
             }
             TestOperation::AddNode { node_type, value } => {
                 // Add a new node with the specified type and value.
@@ -292,8 +281,7 @@ impl BuiltinOperation for TestOperation {
                 let value2 = g.get_node_value(SubstMarker::from("destination")).unwrap();
                 let v1 = value1.clone();
                 let v2 = value2.clone();
-                g.set_node_value(SubstMarker::from("source"), v2)
-                    .unwrap();
+                g.set_node_value(SubstMarker::from("source"), v2).unwrap();
                 g.set_node_value(SubstMarker::from("destination"), v1)
                     .unwrap();
                 // TODO: talk about above problem in user defined op.
@@ -314,7 +302,8 @@ impl BuiltinOperation for TestOperation {
             }
             TestOperation::AddInteger(i) => {
                 // Add an integer to the node.
-                let &NodeType(old_interval) = g.get_node_value(SubstMarker::from("target")).unwrap();
+                let &NodeType(old_interval) =
+                    g.get_node_value(SubstMarker::from("target")).unwrap();
                 let new_type = NodeType(interval::Interval::new(
                     old_interval.start + *i,
                     old_interval.end + *i,
@@ -341,9 +330,7 @@ impl BuiltinOperation for TestOperation {
                 g.set_node_value(SubstMarker::from("target"), value.clone())
                     .unwrap();
             }
-            TestOperation::AddEdge {
-                node_typ,
-            } => {
+            TestOperation::AddEdge { node_typ } => {
                 // Add an edge from source to destination with the specified value.
                 g.add_edge(
                     SubstMarker::from("src"),
@@ -368,8 +355,7 @@ impl BuiltinOperation for TestOperation {
                 let value2 = g.get_node_value(SubstMarker::from("destination")).unwrap();
                 let v1 = value1.clone();
                 let v2 = value2.clone();
-                g.set_node_value(SubstMarker::from("source"), v2)
-                    .unwrap();
+                g.set_node_value(SubstMarker::from("source"), v2).unwrap();
                 g.set_node_value(SubstMarker::from("destination"), v1)
                     .unwrap();
             }

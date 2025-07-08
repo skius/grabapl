@@ -1,7 +1,11 @@
 use crate::graph::operation::builder::BuilderInstruction::ExpectParameterEdge;
+use crate::graph::operation::builtin::LibBuiltinOperation;
 use crate::graph::operation::query::{BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier};
 use crate::graph::operation::signature::{AbstractSignatureNodeId, OperationSignature};
-use crate::graph::operation::user_defined::{AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, AbstractUserDefinedOperationOutput, OpLikeInstruction, QueryInstructions, UserDefinedOperation};
+use crate::graph::operation::user_defined::{
+    AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker,
+    AbstractUserDefinedOperationOutput, OpLikeInstruction, QueryInstructions, UserDefinedOperation,
+};
 use crate::graph::operation::{BuiltinOperation, OperationError, get_substitution};
 use crate::graph::pattern::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationParameter,
@@ -22,7 +26,6 @@ use std::marker::PhantomData;
 use std::mem;
 use std::slice::Iter;
 use thiserror::Error;
-use crate::graph::operation::builtin::LibBuiltinOperation;
 /*
 General overview:
 
@@ -1698,16 +1701,26 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             IntermediateOpLike::Builtin(op, args) => {
                 let abstract_arg = self
                     .interpret_builtin_like_op(marker, &op, args)
-                    .attach_printable_lazy(|| format!("Failed to interpret builtin operation: {op:?}"))?;
+                    .attach_printable_lazy(|| {
+                        format!("Failed to interpret builtin operation: {op:?}")
+                    })?;
 
-                Ok(UDInstruction::OpLike(OpLikeInstruction::Builtin(op), abstract_arg))
+                Ok(UDInstruction::OpLike(
+                    OpLikeInstruction::Builtin(op),
+                    abstract_arg,
+                ))
             }
             IntermediateOpLike::LibBuiltin(op, args) => {
                 let abstract_arg = self
                     .interpret_builtin_like_op(marker, &op, args)
-                    .attach_printable_lazy(|| format!("Failed to interpret lib builtin operation: {op:?}"))?;
+                    .attach_printable_lazy(|| {
+                        format!("Failed to interpret lib builtin operation: {op:?}")
+                    })?;
 
-                Ok(UDInstruction::OpLike(OpLikeInstruction::LibBuiltin(op), abstract_arg))
+                Ok(UDInstruction::OpLike(
+                    OpLikeInstruction::LibBuiltin(op),
+                    abstract_arg,
+                ))
             }
             IntermediateOpLike::Operation(id, args) => {
                 let op = self
@@ -1727,7 +1740,10 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
 
                 self.handle_abstract_output_changes(marker, operation_output)?;
 
-                Ok(UDInstruction::OpLike(OpLikeInstruction::Operation(id), abstract_arg))
+                Ok(UDInstruction::OpLike(
+                    OpLikeInstruction::Operation(id),
+                    abstract_arg,
+                ))
             }
             IntermediateOpLike::Recurse(args) => {
                 // TODO: recursion is actually tricky. because at this point we have not finished interpreting the current operation yet.
@@ -1754,11 +1770,14 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                 })?;
                 self.handle_abstract_output_changes(marker, operation_output)?;
 
-                Ok(UDInstruction::OpLike(OpLikeInstruction::Operation(self.self_op_id), abstract_arg))
+                Ok(UDInstruction::OpLike(
+                    OpLikeInstruction::Operation(self.self_op_id),
+                    abstract_arg,
+                ))
             }
         }
     }
-    
+
     fn interpret_builtin_like_op<B: BuiltinOperation<S = S>>(
         &mut self,
         marker: Option<AbstractOperationResultMarker>,

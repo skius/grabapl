@@ -171,7 +171,7 @@ pub trait Semantics {
 // pub trait Semantics:
 //     Semantics<NodeConcrete: Clone, NodeAbstract: Clone, EdgeConcrete: Clone, EdgeAbstract: Clone>
 // {
-//     
+//
 // }
 // impl<S: Semantics> Semantics for S
 // where

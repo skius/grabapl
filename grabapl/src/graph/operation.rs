@@ -1,11 +1,12 @@
 pub mod builder;
+mod builtin;
 pub mod parameterbuilder;
 pub mod query;
 pub mod signature;
 pub mod user_defined;
-mod builtin;
 
 use crate::graph::EdgeAttribute;
+use crate::graph::operation::builtin::LibBuiltinOperation;
 use crate::graph::operation::user_defined::{AbstractOperationResultMarker, UserDefinedOperation};
 use crate::graph::pattern::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument,
@@ -22,7 +23,6 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use thiserror::Error;
-use crate::graph::operation::builtin::LibBuiltinOperation;
 
 // TODO: We might want to be able to supply additional data to builtin operations. For example, a Set Value operation should be 'generic' over its value without
 //  needing to store a separate operation in the OpCtx for every value...
@@ -76,7 +76,7 @@ impl<S: Semantics> OperationContext<S> {
     pub fn add_builtin_operation(&mut self, id: OperationId, op: S::BuiltinOperation) {
         self.builtins.insert(id, op);
     }
-    
+
     pub fn add_lib_builtin_operation(&mut self, id: OperationId, op: LibBuiltinOperation<S>) {
         self.libbuiltins.insert(id, op);
     }

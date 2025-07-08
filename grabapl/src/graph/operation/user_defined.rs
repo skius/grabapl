@@ -1,8 +1,12 @@
+use crate::graph::operation::builtin::LibBuiltinOperation;
 use crate::graph::operation::query::{
     BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier, run_builtin_query, run_shape_query,
 };
 use crate::graph::operation::signature::{AbstractSignatureNodeId, OperationSignature};
-use crate::graph::operation::{OperationError, OperationResult, run_builtin_operation, run_operation, run_lib_builtin_operation};
+use crate::graph::operation::{
+    OperationError, OperationResult, run_builtin_operation, run_lib_builtin_operation,
+    run_operation,
+};
 use crate::graph::pattern::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, NodeMarker,
     OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution,
@@ -18,7 +22,6 @@ use internment::Intern;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::str::FromStr;
-use crate::graph::operation::builtin::LibBuiltinOperation;
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
@@ -367,7 +370,9 @@ fn run_instructions<S: Semantics>(
                     OpLikeInstruction::Operation(op_id) => {
                         run_operation::<S>(g, op_ctx, *op_id, concrete_arg)?
                     }
-                    OpLikeInstruction::Builtin(op) => run_builtin_operation::<S>(g, op, concrete_arg)?,
+                    OpLikeInstruction::Builtin(op) => {
+                        run_builtin_operation::<S>(g, op, concrete_arg)?
+                    }
                     OpLikeInstruction::LibBuiltin(op) => {
                         run_lib_builtin_operation(g, op, concrete_arg)?
                     }

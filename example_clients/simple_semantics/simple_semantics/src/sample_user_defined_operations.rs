@@ -1,7 +1,10 @@
 use crate::{BuiltinOperation, BuiltinQuery, EdgePattern, SimpleSemantics};
 use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
 use grabapl::graph::operation::query::GraphShapeQuery;
-use grabapl::graph::operation::user_defined::{AbstractNodeId, AbstractOperationArgument, Instruction, OpLikeInstruction, QueryInstructions, UserDefinedOperation};
+use grabapl::graph::operation::user_defined::{
+    AbstractNodeId, AbstractOperationArgument, Instruction, OpLikeInstruction, QueryInstructions,
+    UserDefinedOperation,
+};
 use grabapl::graph::pattern::{OperationArgument, OperationParameter};
 use grabapl::{OperationContext, OperationId};
 use std::collections::HashMap;
@@ -97,25 +100,26 @@ pub fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemanti
 
     instructions.push((
         None,
-        Instruction::OpLike(OpLikeInstruction::Builtin(
-            BuiltinOperation::IndexCycle,
-        ),AbstractOperationArgument {
-            selected_input_nodes: vec![fourth_id],
-            // TODO: double check this hashmap. I think it's right but ...
-            subst_to_aid: HashMap::from([
-                (0.to_string().into(), fourth_id),
-                (
-                    1.to_string().into(),
-                    AbstractNodeId::DynamicOutputMarker("third_child".into(), "child".into()),
-                ),
-                (
-                    2.to_string().into(),
-                    AbstractNodeId::DynamicOutputMarker("second_child".into(), "child".into()),
-                ),
-                // (1, AbstractNodeId::DynamicOutputMarker("first_child".into(), "child".into())),
-                // (4, AbstractNodeId::DynamicOutputMarker("fourth_child".into(), "child".into())),
-            ]),
-        }),
+        Instruction::OpLike(
+            OpLikeInstruction::Builtin(BuiltinOperation::IndexCycle),
+            AbstractOperationArgument {
+                selected_input_nodes: vec![fourth_id],
+                // TODO: double check this hashmap. I think it's right but ...
+                subst_to_aid: HashMap::from([
+                    (0.to_string().into(), fourth_id),
+                    (
+                        1.to_string().into(),
+                        AbstractNodeId::DynamicOutputMarker("third_child".into(), "child".into()),
+                    ),
+                    (
+                        2.to_string().into(),
+                        AbstractNodeId::DynamicOutputMarker("second_child".into(), "child".into()),
+                    ),
+                    // (1, AbstractNodeId::DynamicOutputMarker("first_child".into(), "child".into())),
+                    // (4, AbstractNodeId::DynamicOutputMarker("fourth_child".into(), "child".into())),
+                ]),
+            },
+        ),
     ));
 
     UserDefinedOperation::new(param, instructions)

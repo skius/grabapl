@@ -7,9 +7,7 @@ use crate::graph::pattern::{
 };
 use crate::graph::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics};
 use crate::util::log;
-use crate::{
-    Graph, NodeKey, OperationContext, OperationId, SubstMarker, interned_string_newtype,
-};
+use crate::{Graph, NodeKey, OperationContext, OperationId, SubstMarker, interned_string_newtype};
 use derive_more::From;
 use derive_more::with_trait::Into;
 use internment::Intern;
