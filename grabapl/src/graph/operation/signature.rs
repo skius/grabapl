@@ -1,8 +1,9 @@
 use crate::SubstMarker;
-use crate::graph::pattern::{AbstractOutputNodeMarker, NewNodeMarker, OperationParameter};
-use crate::graph::semantics::{AbstractMatcher, Semantics};
+use crate::graph::pattern::{AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, NewNodeMarker, NodeMarker, OperationParameter};
+use crate::graph::semantics::{AbstractGraph, AbstractMatcher, Semantics};
 use derive_more::From;
 use std::collections::{HashMap, HashSet};
+use crate::util::bimap::BiMap;
 
 pub type AbstractSignatureEdgeId = (AbstractSignatureNodeId, AbstractSignatureNodeId);
 pub type ParameterEdgeId = (SubstMarker, SubstMarker);
@@ -176,6 +177,65 @@ impl<S: Semantics> AbstractOutputChanges<S> {
         }
 
         true
+    }
+    
+    pub fn apply_abstract(&self, g: &mut GraphWithSubstitution<AbstractGraph<S>>) -> AbstractOperationOutput<S> {
+        let mut output_names = BiMap::new();
+
+        // handle new nodes
+        for (name, av) in &self.new_nodes {
+            let nnm = g.new_node_marker();
+            g.add_node(nnm.clone(), av.clone());
+            output_names.insert(nnm, name.clone());
+        }
+
+        let sig_id_to_node_marker = |sig_id: AbstractSignatureNodeId| {
+            match sig_id {
+                AbstractSignatureNodeId::ExistingNode(subst) => NodeMarker::Subst(subst),
+                AbstractSignatureNodeId::NewNode(name) => {
+                    // find in output_names
+                    let nnm = output_names
+                        .get_right(&name)
+                        .expect("internal error: signature node not found in output names");
+                    NodeMarker::New(*nnm)
+                }
+            }
+        };
+
+        // handle new edges
+        for ((src, dst), av) in &self.new_edges {
+            let src_marker = sig_id_to_node_marker(*src);
+            let dst_marker = sig_id_to_node_marker(*dst);
+            g.add_edge(src_marker, dst_marker, av.clone());
+        }
+
+        // handle changed nodes
+        for (subst, av) in &self.changed_nodes {
+            let node_marker = NodeMarker::Subst(*subst);
+            g.set_node_value(node_marker, av.clone()).unwrap();
+        }
+        // handle changed edges
+        for ((src, dst), av) in &self.changed_edges {
+            let src_marker = NodeMarker::Subst(*src);
+            let dst_marker = NodeMarker::Subst(*dst);
+            g.set_edge_value(src_marker, dst_marker, av.clone())
+                .unwrap();
+        }
+
+        // handle removed nodes
+        for subst in &self.deleted_nodes {
+            let node_marker = NodeMarker::Subst(*subst);
+            g.delete_node(node_marker);
+        }
+        // handle removed edges
+        for (src, dst) in &self.deleted_edges {
+            let src_marker = NodeMarker::Subst(*src);
+            let dst_marker = NodeMarker::Subst(*dst);
+            g.delete_edge(src_marker, dst_marker);
+        }
+
+        let (output_names, _) = output_names.into_inner();
+        g.get_abstract_output(output_names)
     }
 }
 

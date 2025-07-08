@@ -38,6 +38,10 @@ interned_string_newtype!(
     AbstractOperationResultMarker::Custom
 );
 
+// #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
+// pub struct NamedMarker(Intern<String>);
+// interned_string_newtype!(NamedMarker);
+
 /// Identifies a node in the user defined operation view.
 #[derive(Clone, Copy, From, Debug, Eq, PartialEq, Hash)]
 pub enum AbstractNodeId {
@@ -45,6 +49,8 @@ pub enum AbstractNodeId {
     ParameterMarker(SubstMarker),
     /// A node that was created as a result of another operation.
     DynamicOutputMarker(AbstractOperationResultMarker, AbstractOutputNodeMarker),
+    // /// A node that was given an explicit name
+    // Named(NamedMarker),
 }
 
 impl AbstractNodeId {
@@ -237,62 +243,7 @@ impl<S: Semantics> UserDefinedOperation<S> {
         op_ctx: &OperationContext<S>,
         g: &mut GraphWithSubstitution<AbstractGraph<S>>,
     ) -> OperationResult<AbstractOperationOutput<S>> {
-        let mut output_names = BiMap::new();
-
-        // handle new nodes
-        for (aid, (name, av)) in &self.output_changes.new_nodes {
-            let nnm = g.new_node_marker();
-            g.add_node(nnm.clone(), av.clone());
-            output_names.insert(nnm, name.clone());
-        }
-
-        let sig_id_to_node_marker = |sig_id: AbstractSignatureNodeId| {
-            match sig_id {
-                AbstractSignatureNodeId::ExistingNode(subst) => NodeMarker::Subst(subst),
-                AbstractSignatureNodeId::NewNode(name) => {
-                    // find in output_names
-                    let nnm = output_names
-                        .get_right(&name)
-                        .expect("internal error: signature node not found in output names");
-                    NodeMarker::New(*nnm)
-                }
-            }
-        };
-
-        // handle new edges
-        for ((src, dst), av) in &self.signature.output.new_edges {
-            let src_marker = sig_id_to_node_marker(*src);
-            let dst_marker = sig_id_to_node_marker(*dst);
-            g.add_edge(src_marker, dst_marker, av.clone());
-        }
-
-        // handle changed nodes
-        for (subst, av) in &self.signature.output.changed_nodes {
-            let node_marker = NodeMarker::Subst(*subst);
-            g.set_node_value(node_marker, av.clone()).unwrap();
-        }
-        // handle changed edges
-        for ((src, dst), av) in &self.signature.output.changed_edges {
-            let src_marker = NodeMarker::Subst(*src);
-            let dst_marker = NodeMarker::Subst(*dst);
-            g.set_edge_value(src_marker, dst_marker, av.clone())
-                .unwrap();
-        }
-
-        // handle removed nodes
-        for subst in &self.signature.output.deleted_nodes {
-            let node_marker = NodeMarker::Subst(*subst);
-            g.delete_node(node_marker);
-        }
-        // handle removed edges
-        for (src, dst) in &self.signature.output.deleted_edges {
-            let src_marker = NodeMarker::Subst(*src);
-            let dst_marker = NodeMarker::Subst(*dst);
-            g.delete_edge(src_marker, dst_marker);
-        }
-
-        let (output_names, _) = output_names.into_inner();
-        Ok(g.get_abstract_output(output_names))
+        Ok(self.signature.output.apply_abstract(g))
     }
 
     pub(crate) fn apply(
