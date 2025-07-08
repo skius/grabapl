@@ -36,7 +36,7 @@ fn types_must_be_subtypes() {
             target_typ: NodeType::Integer,
             value: NodeValue::Integer(42),
         }),
-        vec![p1],
+        vec![p0],
     );
     assert!(
         res.is_err(),

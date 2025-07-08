@@ -3,6 +3,7 @@ pub mod parameterbuilder;
 pub mod query;
 pub mod signature;
 pub mod user_defined;
+mod builtin;
 
 use crate::graph::EdgeAttribute;
 use crate::graph::operation::user_defined::{AbstractOperationResultMarker, UserDefinedOperation};
