@@ -675,7 +675,7 @@ fn builder_infers_correct_signatures() {
         "Expected new edge from p0 to c1 of type 'new_edge'"
     );
     macro_rules! assert_deleted_and_changed_nodes_and_edges {
-        ($signature:expr) => {
+        ($signature:expr, $expected_maybe_changed_nodes:expr) => {
             // deleted nodes and edges
             assert_eq!(
                 &$signature.output.maybe_deleted_nodes,
@@ -702,10 +702,7 @@ fn builder_infers_correct_signatures() {
             // changed nodes and edges
             assert_eq!(
                 &$signature.output.maybe_changed_nodes,
-                &HashMap::from([
-                    (SubstMarker::from("p0").into(), NodeType::Integer),
-                    (SubstMarker::from("c1").into(), NodeType::String)
-                ]),
+                &$expected_maybe_changed_nodes,
                 "Expected nodes p0 to be changed to Integer and c1 to String"
             );
             assert_eq!(
@@ -721,7 +718,10 @@ fn builder_infers_correct_signatures() {
             );
         };
     }
-    assert_deleted_and_changed_nodes_and_edges!(signature);
+    assert_deleted_and_changed_nodes_and_edges!(signature, HashMap::from([
+        (SubstMarker::from("p0").into(), NodeType::Integer),
+        (SubstMarker::from("c1").into(), NodeType::String)
+    ]));
 
     // Now ensure the same changes (minus the newly added nodes and edges) are propagated to another operation
     // that calls this operation.
@@ -738,7 +738,11 @@ fn builder_infers_correct_signatures() {
     let operation = builder.build(1).unwrap();
     let signature = operation.signature();
     // assert changes and deletions
-    assert_deleted_and_changed_nodes_and_edges!(signature);
+    // note that the expected node changes are different for c1, since 
+    assert_deleted_and_changed_nodes_and_edges!(signature, HashMap::from([
+            (SubstMarker::from("p0").into(), NodeType::Integer),
+            (SubstMarker::from("c1").into(), NodeType::String)
+    ]));
 }
 
 // TODO: add tests for:
@@ -1093,6 +1097,7 @@ fn may_writes_remember_previous_abstract_value() {
         // an operation that takes a p0: Object and changes it to a String.
         // TODO: we could loosen the constraints and make it so that a known, unconditional change, even in a user defined op, leads to unconditional changes in the caller.
         //  but at the moment, any changes in UDOs are considered "may" changes.
+        // in other words, the query below is actually not necessary.
         builder
             .expect_parameter_node("p0", NodeType::Object)
             .unwrap();
@@ -1109,6 +1114,15 @@ fn may_writes_remember_previous_abstract_value() {
                 vec![p0.clone()],
             )
             .unwrap();
+        builder.end_query().unwrap();
+        let state = builder.show_state().unwrap();
+        // note that we still expect p0 to be object, it's just that we tell our caller that it may have changed to String.
+        let typ = state.node_av_of_aid(&p0).unwrap();
+        assert_eq!(
+            typ,
+            &NodeType::Object,
+            "Expected p0 to remain Object after conditional change to String"
+        );
         builder.build(0).unwrap()
     };
     op_ctx.add_custom_operation(0, op);
@@ -1160,5 +1174,21 @@ fn may_writes_remember_previous_abstract_value() {
             "Expected p0 to remain Integer after running the operation, since the inner operation's set to String was not hit"
         );
     }
+
+
+    // furthermore, just because a operation _may_ change a node, it doesn't unnecessarily make the caller's av less precise.
+    let mut builder = OperationBuilder::new(&op_ctx);
+    builder
+        .expect_parameter_node("p0", NodeType::String)
+        .unwrap();
+    // we expect a String
+    builder.add_operation(BuilderOpLike::FromOperationId(0), vec![p0]).unwrap();
+    let state = builder.show_state().unwrap();
+    let typ = state.node_av_of_aid(&p0).unwrap();
+    assert_eq!(
+        typ,
+        &NodeType::String,
+        "Expected p0 to remain String after running the operation, since the inner operation let us now it may at most write a string."
+    );
 
 }

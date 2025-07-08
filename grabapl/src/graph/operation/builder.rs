@@ -1829,6 +1829,9 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         }
 
         // collect changes
+        // TODO: What is a good idea regarding changes abstract values?
+        //  I think it's a good idea to just propagate what we know for a fact _could_ be written (but in its most precise form).
+        //  If instead we said "merge it with the current value", then we make it potentially join with the parameter.
         for (key, node_abstract) in operation_output.changed_abstract_values_nodes {
             let aid = self
                 .get_current_aid_from_key(key)

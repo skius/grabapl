@@ -7,6 +7,7 @@ use derive_more::From;
 use internment::Intern;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
+use std::marker::PhantomData;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
 
 pub struct OperationParameter<S: Semantics> {
@@ -227,6 +228,29 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         old_value
     }
 
+    /// Use this method to apply another operation's maybe-changes to the graph.
+    /// This will update the current view of the node's AV to be sound, i.e., the join of the current AV and the maybe-written AV,
+    /// but will remember that it was only the maybe-written AV that was _actually_ maybe written.
+    pub fn maybe_set_node_value(
+        &mut self,
+        marker: impl Into<NodeMarker>,
+        maybe_written_av: G::NodeAttr,
+        join: impl Fn(&G::NodeAttr, &G::NodeAttr) -> Option<G::NodeAttr>,
+    ) -> Option<G::NodeAttr> {
+        let marker = marker.into();
+        let node_key = self.get_node_key(&marker)?;
+        if let Some(old_av) = self.graph.get_node_attr(node_key) {
+            // only remember that we maybe wrote "maybe_written_av".
+            self.changed_node_av.insert(node_key, maybe_written_av.clone());
+            // Merge the current AV with the new value.
+            let merged_av = join(old_av, &maybe_written_av).expect("must be able to join. TODO: think about if this requirement makes sense");
+            // merged_av is the new value we want to set.
+            self.graph.set_node_attr(node_key, merged_av)
+        } else {
+            None
+        }
+    }
+
     pub fn get_edge_value(
         &self,
         src_marker: impl Into<NodeMarker>,
@@ -263,6 +287,34 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
             );
         }
         old_value
+    }
+    
+    pub fn maybe_set_edge_value(
+        &mut self,
+        src_marker: impl Into<NodeMarker>,
+        dst_marker: impl Into<NodeMarker>,
+        maybe_written_av: G::EdgeAttr,
+        join: impl Fn(&G::EdgeAttr, &G::EdgeAttr) -> Option<G::EdgeAttr>,
+    ) -> Option<G::EdgeAttr> {
+        let src_marker = src_marker.into();
+        let dst_marker = dst_marker.into();
+        let src_key = self.get_node_key(&src_marker)?;
+        let dst_key = self.get_node_key(&dst_marker)?;
+        if let Some(old_av) = self.graph.get_edge_attr((src_key, dst_key)) {
+            // only remember that we maybe wrote "maybe_writte_av".
+            self.changed_edge_av.insert((src_key, dst_key), maybe_written_av.clone());
+            // Merge the current AV with the new value.
+            let merged_av = join(old_av, &maybe_written_av).expect("must be able to join. TODO: think about if this requirement makes sense");
+            // merged_av is the new value we want to set.
+            self.graph.set_edge_attr((src_key, dst_key), merged_av)
+        } else {
+            log::warn!(
+                "Attempted to set edge value for non-existing edge from {:?} to {:?}.",
+                src_key,
+                dst_key
+            );
+            None
+        }
     }
 
     fn get_new_nodes_and_edges_from_desired_names(

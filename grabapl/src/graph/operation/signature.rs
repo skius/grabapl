@@ -212,25 +212,17 @@ impl<S: Semantics> AbstractOutputChanges<S> {
         // Important for the maybe-changed values:
         // Since they're only maybe-changed, it could be that they're not changed.
         // In other words, we need to indicate that the join of the old value and the new value is the most precise abstract value to give.
-        // TODO: do this
 
         // handle changed nodes
         for (subst, av) in &self.maybe_changed_nodes {
             let node_marker = NodeMarker::Subst(*subst);
-            let curr_av = g.get_node_value(node_marker).unwrap();
-            // Join the current value with the new value.
-            let av = S::NodeJoin::join(curr_av, av).expect("Join failed. TODO: should we just require that the join is always possible?");
-            g.set_node_value(node_marker, av).unwrap();
+            g.maybe_set_node_value(node_marker, av.clone(), S::NodeJoin::join).unwrap();
         }
         // handle changed edges
         for ((src, dst), av) in &self.maybe_changed_edges {
             let src_marker = NodeMarker::Subst(*src);
             let dst_marker = NodeMarker::Subst(*dst);
-            let curr_av = g.get_edge_value(src_marker, dst_marker).unwrap();
-            // Join the current value with the new value.
-            let av = S::EdgeJoin::join(curr_av, av)
-                .expect("Join failed. TODO: should we just require that the join is always possible?");
-            g.set_edge_value(src_marker, dst_marker, av)
+            g.maybe_set_edge_value(src_marker, dst_marker, av.clone(), S::EdgeJoin::join)
                 .unwrap();
         }
 
