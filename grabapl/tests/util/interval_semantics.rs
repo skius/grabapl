@@ -142,7 +142,7 @@ impl NodeType {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NodeValue(i32);
+pub struct NodeValue(pub i32);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct EdgeType;

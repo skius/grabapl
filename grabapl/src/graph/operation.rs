@@ -1,5 +1,5 @@
 pub mod builder;
-mod builtin;
+pub mod builtin;
 pub mod parameterbuilder;
 pub mod query;
 pub mod signature;
