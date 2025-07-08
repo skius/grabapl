@@ -1,6 +1,6 @@
 use crate::graph::GraphTrait;
 use crate::graph::operation::{OperationError, OperationResult};
-use crate::graph::semantics::{AbstractGraph, SemanticsClone};
+use crate::graph::semantics::{AbstractGraph};
 use crate::util::log;
 use crate::{Graph, NodeKey, Semantics, SubstMarker, WithSubstMarker, interned_string_newtype};
 use derive_more::From;
@@ -22,7 +22,7 @@ pub struct OperationParameter<S: Semantics> {
     pub node_keys_to_subst: HashMap<NodeKey, SubstMarker>,
 }
 
-impl<S: SemanticsClone> Clone for OperationParameter<S> {
+impl<S: Semantics> Clone for OperationParameter<S> {
     fn clone(&self) -> Self {
         OperationParameter {
             explicit_input_nodes: self.explicit_input_nodes.clone(),

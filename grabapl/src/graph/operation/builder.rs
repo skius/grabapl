@@ -1,16 +1,13 @@
 use crate::graph::operation::builder::BuilderInstruction::ExpectParameterEdge;
 use crate::graph::operation::query::{BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier};
 use crate::graph::operation::signature::{AbstractSignatureNodeId, OperationSignature};
-use crate::graph::operation::user_defined::{
-    AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker,
-    AbstractUserDefinedOperationOutput, QueryInstructions, UserDefinedOperation,
-};
+use crate::graph::operation::user_defined::{AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, AbstractUserDefinedOperationOutput, OpLikeInstruction, QueryInstructions, UserDefinedOperation};
 use crate::graph::operation::{BuiltinOperation, OperationError, get_substitution};
 use crate::graph::pattern::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationParameter,
     ParameterSubstitution,
 };
-use crate::graph::semantics::{AbstractGraph, AbstractMatcher, SemanticsClone};
+use crate::graph::semantics::{AbstractGraph, AbstractMatcher};
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
 use error_stack::{Report, Result, ResultExt, bail, report};
@@ -25,6 +22,7 @@ use std::marker::PhantomData;
 use std::mem;
 use std::slice::Iter;
 use thiserror::Error;
+use crate::graph::operation::builtin::LibBuiltinOperation;
 /*
 General overview:
 
@@ -44,8 +42,9 @@ This is the same routine that can provide state feedback to the user like:
 The intermediate state returns a graph and a hashmap from nodes and edges to additional metadata, like their abstract node id.
 */
 
-pub enum BuilderOpLike<S: SemanticsClone> {
+pub enum BuilderOpLike<S: Semantics> {
     Builtin(S::BuiltinOperation),
+    LibBuiltin(LibBuiltinOperation<S>),
     FromOperationId(OperationId),
     Recurse,
 }
@@ -53,7 +52,7 @@ pub enum BuilderOpLike<S: SemanticsClone> {
 // TODO: perhaps this should include a "GiveNodeExplicitName" instruction that gives a node a name of a single string?
 //  this would need to be a variant of AbstractNodeId.
 #[derive(derive_more::Debug)]
-enum BuilderInstruction<S: SemanticsClone> {
+enum BuilderInstruction<S: Semantics> {
     #[debug("ExpectParameterNode({_0:?}, ???)")]
     ExpectParameterNode(SubstMarker, S::NodeAbstract),
     #[debug("ExpectContextNode({_0:?}, ???)")]
@@ -91,7 +90,7 @@ enum BuilderInstruction<S: SemanticsClone> {
     ReturnEdge(AbstractNodeId, AbstractNodeId, S::EdgeAbstract),
 }
 
-impl<S: SemanticsClone> BuilderInstruction<S> {
+impl<S: Semantics> BuilderInstruction<S> {
     /// Returns true if this is an instruction that is valid to break out of a body of query/operation
     /// instructions.
     fn can_break_body(&self) -> bool {
@@ -157,7 +156,7 @@ pub enum OperationBuilderError {
     ReturnEdgeMayOriginateFromShapeQuery(AbstractNodeId, AbstractNodeId),
 }
 
-pub struct OperationBuilder<'a, S: SemanticsClone> {
+pub struct OperationBuilder<'a, S: Semantics> {
     op_ctx: &'a OperationContext<S>,
     instructions: Vec<BuilderInstruction<S>>,
     // hack for recursion
@@ -165,7 +164,7 @@ pub struct OperationBuilder<'a, S: SemanticsClone> {
 }
 
 // TODO: all message adding, validate all args by building temp graph
-impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBuilder<'a, S> {
+impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBuilder<'a, S> {
     pub fn new(op_ctx: &'a OperationContext<S>) -> Self {
         Self {
             instructions: Vec::new(),
@@ -429,7 +428,7 @@ impl<'a, S: SemanticsClone<BuiltinQuery: Clone, BuiltinOperation: Clone>> Operat
 
 impl<
     'a,
-    S: SemanticsClone<
+    S: Semantics<
             NodeAbstract: Debug,
             EdgeAbstract: Debug,
             BuiltinOperation: Clone,
@@ -536,7 +535,7 @@ impl<
     }
 }
 
-struct IntermediateStateBuilder<'a, S: SemanticsClone> {
+struct IntermediateStateBuilder<'a, S: Semantics> {
     path: Vec<IntermediateStatePath>,
     _phantom_data: PhantomData<&'a S>,
 }
@@ -544,7 +543,7 @@ struct IntermediateStateBuilder<'a, S: SemanticsClone> {
 use super::user_defined::Instruction as UDInstruction;
 
 #[derive(derive_more::Debug)]
-enum IntermediateInstruction<S: SemanticsClone> {
+enum IntermediateInstruction<S: Semantics> {
     OpLike(IntermediateOpLike<S>),
     // #[debug("GraphShapeQuery({marker:#?}, {graph_instructions:#?}, {query_instructions:#?})")]
     GraphShapeQuery {
@@ -563,15 +562,16 @@ enum IntermediateInstruction<S: SemanticsClone> {
 }
 
 #[derive(derive_more::Debug)]
-enum IntermediateOpLike<S: SemanticsClone> {
+enum IntermediateOpLike<S: Semantics> {
     #[debug("Builtin(???, {_1:#?})")]
     Builtin(S::BuiltinOperation, Vec<AbstractNodeId>),
+    LibBuiltin(LibBuiltinOperation<S>, Vec<AbstractNodeId>),
     Operation(OperationId, Vec<AbstractNodeId>),
     Recurse(Vec<AbstractNodeId>),
 }
 
 #[derive(derive_more::Debug)]
-struct IntermediateQueryInstructions<S: SemanticsClone> {
+struct IntermediateQueryInstructions<S: Semantics> {
     #[debug("[{}]", true_branch.iter().map(|(opt, inst)| format!("({opt:#?}, {:#?})", inst)).collect::<Vec<_>>().join(", "))]
     true_branch: Vec<(
         Option<AbstractOperationResultMarker>,
@@ -585,14 +585,14 @@ struct IntermediateQueryInstructions<S: SemanticsClone> {
 }
 
 #[derive(derive_more::Debug)]
-enum GraphShapeQueryInstruction<S: SemanticsClone> {
+enum GraphShapeQueryInstruction<S: Semantics> {
     #[debug("ExpectShapeNode({_0:#?})")]
     ExpectShapeNode(AbstractOutputNodeMarker, S::NodeAbstract),
     #[debug("ExpectShapeEdge({_0:#?}, {_1:#?})")]
     ExpectShapeEdge(AbstractNodeId, AbstractNodeId, S::EdgeAbstract),
 }
 
-struct BuilderResult<S: SemanticsClone> {
+struct BuilderResult<S: Semantics> {
     operation_parameter: OperationParameter<S>,
     instructions: Vec<(
         Option<AbstractOperationResultMarker>,
@@ -604,7 +604,7 @@ struct BuilderResult<S: SemanticsClone> {
 }
 
 // TODO: maybe this is not *intermediate* but actually the final state as well potentially?
-impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
+impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
     IntermediateStateBuilder<'a, S>
 {
     fn run(
@@ -825,6 +825,9 @@ impl<'a, S: SemanticsClone<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                 let oplike = match oplike {
                     BuilderOpLike::Builtin(builtin_op) => {
                         IntermediateOpLike::Builtin(builtin_op.clone(), args.clone())
+                    }
+                    BuilderOpLike::LibBuiltin(lib_builtin_op) => {
+                        IntermediateOpLike::LibBuiltin(lib_builtin_op.clone(), args.clone())
                     }
                     BuilderOpLike::FromOperationId(op_id) => {
                         IntermediateOpLike::Operation(op_id.clone(), args.clone())
@@ -1239,7 +1242,7 @@ pub enum QueryPath {
 //  - If we are inside a query, which branches have we not entered yet?
 //  - Are we making a shape/non-shape query?
 
-pub struct IntermediateState<S: SemanticsClone> {
+pub struct IntermediateState<S: Semantics> {
     pub graph: AbstractGraph<S>,
     pub node_keys_to_aid: BiMap<NodeKey, AbstractNodeId>,
     // TODO: Somehow remove AIDs from this set if they're completely overwritten by something non-shape-query.
@@ -1259,7 +1262,7 @@ pub struct IntermediateState<S: SemanticsClone> {
 
 // TODO: unfortunately, we cannot derive Clone, since it implies a `S: Clone` bound.
 //  - in theory, we could add that bound, since a Semantics as a value does not really store much. So clone should be fine.
-impl<S: SemanticsClone> Clone for IntermediateState<S> {
+impl<S: Semantics> Clone for IntermediateState<S> {
     fn clone(&self) -> Self {
         IntermediateState {
             graph: self.graph.clone(),
@@ -1273,7 +1276,7 @@ impl<S: SemanticsClone> Clone for IntermediateState<S> {
     }
 }
 
-impl<S: SemanticsClone> IntermediateState<S> {
+impl<S: Semantics> IntermediateState<S> {
     pub fn node_av_of_aid(&self, aid: &AbstractNodeId) -> Option<&S::NodeAbstract> {
         let node_key = self.node_keys_to_aid.get_right(aid)?;
         self.graph.get_node_attr(*node_key)
@@ -1290,7 +1293,7 @@ impl<S: SemanticsClone> IntermediateState<S> {
     }
 }
 
-impl<S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S> {
+impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S> {
     pub fn dot_with_aid(&self) -> String {
         struct PrettyAid<'a>(&'a AbstractNodeId);
 
@@ -1343,24 +1346,24 @@ impl<S: SemanticsClone<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateSt
     }
 }
 
-enum InterpretedInstruction<S: SemanticsClone> {
+enum InterpretedInstruction<S: Semantics> {
     OpLike,
     Query(InterpretedQueryInstructions<S>),
 }
 
-struct InterpretedQueryInstructions<S: SemanticsClone> {
+struct InterpretedQueryInstructions<S: Semantics> {
     initial_state_true_branch: IntermediateState<S>,
     initial_state_false_branch: IntermediateState<S>,
     true_branch: InterpretedInstructions<S>,
     false_branch: InterpretedInstructions<S>,
 }
 
-struct InterpretedInstructionWithState<S: SemanticsClone> {
+struct InterpretedInstructionWithState<S: Semantics> {
     instruction: InterpretedInstruction<S>,
     state_after: IntermediateState<S>,
 }
 
-struct IntermediateInterpreter<'a, S: SemanticsClone> {
+struct IntermediateInterpreter<'a, S: Semantics> {
     self_op_id: OperationId,
     op_ctx: &'a OperationContext<S>,
     op_param: OperationParameter<S>,
@@ -1379,7 +1382,7 @@ type InterpretedInstructions<S> = Vec<(
     InterpretedInstructionWithState<S>,
 )>;
 
-impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
+impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
     fn new_for_self_op_id(
         self_op_id: OperationId,
         op_param: OperationParameter<S>,
@@ -1693,21 +1696,18 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
     ) -> Result<UDInstruction<S>, OperationBuilderError> {
         match oplike {
             IntermediateOpLike::Builtin(op, args) => {
-                let param = op.parameter();
-                let (subst, abstract_arg) = self
-                    .get_current_substitution(&param, args)
-                    .attach_printable_lazy(|| {
-                        format!("Failed to get current substitution for builtin operation: {op:?}")
-                    })?;
+                let abstract_arg = self
+                    .interpret_builtin_like_op(marker, &op, args)
+                    .attach_printable_lazy(|| format!("Failed to interpret builtin operation: {op:?}"))?;
 
-                // now apply op and store result
-                let operation_output = {
-                    let mut gws = GraphWithSubstitution::new(&mut self.current_state.graph, &subst);
-                    op.apply_abstract(&mut gws)
-                };
-                self.handle_abstract_output_changes(marker, operation_output)?;
+                Ok(UDInstruction::OpLike(OpLikeInstruction::Builtin(op), abstract_arg))
+            }
+            IntermediateOpLike::LibBuiltin(op, args) => {
+                let abstract_arg = self
+                    .interpret_builtin_like_op(marker, &op, args)
+                    .attach_printable_lazy(|| format!("Failed to interpret lib builtin operation: {op:?}"))?;
 
-                Ok(UDInstruction::Builtin(op, abstract_arg))
+                Ok(UDInstruction::OpLike(OpLikeInstruction::LibBuiltin(op), abstract_arg))
             }
             IntermediateOpLike::Operation(id, args) => {
                 let op = self
@@ -1727,7 +1727,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
 
                 self.handle_abstract_output_changes(marker, operation_output)?;
 
-                Ok(UDInstruction::Operation(id, abstract_arg))
+                Ok(UDInstruction::OpLike(OpLikeInstruction::Operation(id), abstract_arg))
             }
             IntermediateOpLike::Recurse(args) => {
                 // TODO: recursion is actually tricky. because at this point we have not finished interpreting the current operation yet.
@@ -1754,9 +1754,32 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
                 })?;
                 self.handle_abstract_output_changes(marker, operation_output)?;
 
-                Ok(UDInstruction::Operation(self.self_op_id, abstract_arg))
+                Ok(UDInstruction::OpLike(OpLikeInstruction::Operation(self.self_op_id), abstract_arg))
             }
         }
+    }
+    
+    fn interpret_builtin_like_op<B: BuiltinOperation<S = S>>(
+        &mut self,
+        marker: Option<AbstractOperationResultMarker>,
+        op: &B,
+        args: Vec<AbstractNodeId>,
+    ) -> Result<AbstractOperationArgument, OperationBuilderError> {
+        let param = op.parameter();
+        let (subst, abstract_arg) = self
+            .get_current_substitution(&param, args)
+            .attach_printable_lazy(|| {
+                format!("Failed to get current substitution for builtin operation: {op:?}")
+            })?;
+
+        // now apply op and store result
+        let operation_output = {
+            let mut gws = GraphWithSubstitution::new(&mut self.current_state.graph, &subst);
+            op.apply_abstract(&mut gws)
+        };
+        self.handle_abstract_output_changes(marker, operation_output)?;
+
+        Ok(abstract_arg)
     }
 
     fn handle_abstract_output_changes(
@@ -2145,7 +2168,7 @@ impl<'a, S: SemanticsClone> IntermediateInterpreter<'a, S> {
     }
 }
 
-fn get_state_for_path<S: SemanticsClone>(
+fn get_state_for_path<S: Semantics>(
     initial_state: &IntermediateState<S>,
     interpreted_instructions: &InterpretedInstructions<S>,
     path: &mut impl Iterator<Item = IntermediateStatePath>,
@@ -2215,7 +2238,7 @@ fn get_state_for_path<S: SemanticsClone>(
     Some(current_state.clone())
 }
 
-fn get_query_path_for_path<S: SemanticsClone>(
+fn get_query_path_for_path<S: Semantics>(
     path: &mut impl Iterator<Item = IntermediateStatePath>,
 ) -> Vec<QueryPath> {
     let mut query_path = Vec::new();
@@ -2254,7 +2277,7 @@ fn get_query_path_for_path<S: SemanticsClone>(
 /// therefore is not present in the resulting state. Same for `O(c3)` from the false branch.
 /// Also note how the node that exists in both branches, `O(c1)`, is present in the resulting state with the
 /// least common supertype of the two branches, which is `Object` in this case.
-fn merge_states<S: SemanticsClone>(
+fn merge_states<S: Semantics>(
     is_true_shape: bool,
     state_true: &IntermediateState<S>,
     state_false: &IntermediateState<S>,

@@ -1,37 +1,61 @@
 use std::collections::HashMap;
 use crate::graph::operation::parameterbuilder::OperationParameterBuilder;
 use crate::graph::pattern::{AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter};
-use crate::graph::semantics::{AbstractGraph, ConcreteGraph, ConcreteToAbstract, SemanticsClone};
+use crate::graph::semantics::{AbstractGraph, ConcreteGraph, ConcreteToAbstract};
 use crate::{Semantics, SubstMarker};
+use crate::graph::operation::BuiltinOperation;
 
 /// Operations that are available for every semantics.
+#[derive(derive_more::Debug)]
 pub enum LibBuiltinOperation<S: Semantics> {
+    #[debug("AddNode")]
     AddNode {
         value: S::NodeConcrete,
     },
+    #[debug("AddEdge")]
     AddEdge {
         node_param: S::NodeAbstract,
         value: S::EdgeConcrete,
     },
+    #[debug("RemoveNode")]
     RemoveNode {
         param: S::NodeAbstract,
     },
+    #[debug("RemoveEdge")]
     RemoveEdge {
         node_param: S::NodeAbstract,
         edge_param: S::EdgeAbstract,
     },
+    #[debug("SetNode")]
     SetNode {
         param: S::NodeAbstract,
         value: S::NodeConcrete,
     },
 }
 
-impl<S: SemanticsClone> LibBuiltinOperation<S> {
+// TODO: could potentially make this prettier.
+//  Problem is derive(Clone) does not work since it requires S: Clone.
+//  We could factor out all the Node/Edge Abstract/Concrete assoc types into a separate trait, and then
+//  support making that clone.
+//  Or we just require Semantics: Clone.
+impl<S: Semantics> Clone for LibBuiltinOperation<S> {
+    fn clone(&self) -> Self {
+        match self {
+            LibBuiltinOperation::AddNode { value } => LibBuiltinOperation::AddNode { value: value.clone() },
+            LibBuiltinOperation::AddEdge { node_param, value } => LibBuiltinOperation::AddEdge { node_param: node_param.clone(), value: value.clone() },
+            LibBuiltinOperation::RemoveNode { param } => LibBuiltinOperation::RemoveNode { param: param.clone() },
+            LibBuiltinOperation::RemoveEdge { node_param, edge_param } => LibBuiltinOperation::RemoveEdge { node_param: node_param.clone(), edge_param: edge_param.clone() },
+            LibBuiltinOperation::SetNode { param, value } => LibBuiltinOperation::SetNode { param: param.clone(), value: value.clone() },
+        }
+    }
+}
+
+impl<S: Semantics> LibBuiltinOperation<S> {
     pub fn parameter(&self) -> OperationParameter<S> {
         let mut param_builder = OperationParameterBuilder::new();
         match self {
             LibBuiltinOperation::AddNode { value } => {
-                
+
             }
             LibBuiltinOperation::AddEdge { node_param, value } => {
                 param_builder.expect_explicit_input_node("src", node_param.clone()).unwrap();
@@ -51,7 +75,7 @@ impl<S: SemanticsClone> LibBuiltinOperation<S> {
         }
         param_builder.build().unwrap()
     }
-    
+
     pub fn apply_abstract(&self, g: &mut GraphWithSubstitution<AbstractGraph<S>>) -> AbstractOperationOutput<S> {
         let mut new_node_names = HashMap::new();
         match self {
@@ -96,5 +120,21 @@ impl<S: SemanticsClone> LibBuiltinOperation<S> {
             }
         }
         g.get_concrete_output(new_node_names)
+    }
+}
+
+impl<S: Semantics> BuiltinOperation for LibBuiltinOperation<S> {
+    type S = S;
+
+    fn parameter(&self) -> OperationParameter<S> {
+        self.parameter()
+    }
+
+    fn apply_abstract(&self, g: &mut GraphWithSubstitution<AbstractGraph<S>>) -> AbstractOperationOutput<S> {
+        self.apply_abstract(g)
+    }
+
+    fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<S>>) -> OperationOutput {
+        self.apply(g)
     }
 }

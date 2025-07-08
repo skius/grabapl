@@ -2,14 +2,12 @@ use crate::graph::operation::query::{
     BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier, run_builtin_query, run_shape_query,
 };
 use crate::graph::operation::signature::{AbstractSignatureNodeId, OperationSignature};
-use crate::graph::operation::{
-    OperationError, OperationResult, run_builtin_operation, run_operation,
-};
+use crate::graph::operation::{OperationError, OperationResult, run_builtin_operation, run_operation, run_lib_builtin_operation};
 use crate::graph::pattern::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, NodeMarker,
     OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution,
 };
-use crate::graph::semantics::{AbstractGraph, ConcreteGraph, SemanticsClone};
+use crate::graph::semantics::{AbstractGraph, ConcreteGraph};
 use crate::util::bimap::BiMap;
 use crate::util::log;
 use crate::{
@@ -20,6 +18,7 @@ use internment::Intern;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::str::FromStr;
+use crate::graph::operation::builtin::LibBuiltinOperation;
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
@@ -134,13 +133,21 @@ impl AbstractOperationArgument {
 }
 
 #[derive(derive_more::Debug)]
+pub enum OpLikeInstruction<S: Semantics> {
+    #[debug("Builtin(???)")]
+    Builtin(S::BuiltinOperation),
+    #[debug("LibBuiltin({_0:?})")]
+    LibBuiltin(LibBuiltinOperation<S>),
+    #[debug("Operation({_0:#?})")]
+    Operation(OperationId),
+}
+
+#[derive(derive_more::Debug)]
 pub enum Instruction<S: Semantics> {
-    // TODO: Split out into Instruction::OperationLike (which includes both Builtin and Operation)
+    // TODO: Split out into Instruction::OperationLike (which includes both Builtin and Operation) (done)
     //  and Instruction::QueryLike (which includes BuiltinQuery and potential future custom queries).
-    #[debug("Builtin(???, {_1:#?})")]
-    Builtin(S::BuiltinOperation, AbstractOperationArgument),
-    #[debug("Operation({_0:#?}, {_1:#?})")]
-    Operation(OperationId, AbstractOperationArgument),
+    #[debug("OpLike({_0:#?}, {_1:#?})")]
+    OpLike(OpLikeInstruction<S>, AbstractOperationArgument),
     #[debug("BuiltinQuery(???, {_1:#?}, {_2:#?})")]
     BuiltinQuery(
         S::BuiltinQuery,
@@ -197,7 +204,7 @@ pub struct UserDefinedOperation<S: Semantics> {
 
 // TODO: use a private runner struct that keeps all the necessary mappings on self for easier methods.
 
-impl<S: SemanticsClone> UserDefinedOperation<S> {
+impl<S: Semantics> UserDefinedOperation<S> {
     pub fn new_noop() -> Self {
         let parameter = OperationParameter::new_empty();
         let signature = OperationSignature::empty_new("noop", parameter.clone());
@@ -329,7 +336,7 @@ impl<S: SemanticsClone> UserDefinedOperation<S> {
     }
 }
 
-fn run_instructions<S: SemanticsClone>(
+fn run_instructions<S: Semantics>(
     g: &mut ConcreteGraph<S>,
     previous_results: &mut HashMap<
         AbstractOperationResultMarker,
@@ -343,7 +350,7 @@ fn run_instructions<S: SemanticsClone>(
 ) -> OperationResult<()> {
     for (abstract_output_id, instruction) in instructions {
         match instruction {
-            oplike @ (Instruction::Operation(_, arg) | Instruction::Builtin(_, arg)) => {
+            Instruction::OpLike(oplike, arg) => {
                 let concrete_arg = get_concrete_arg::<S>(
                     &arg.selected_input_nodes,
                     &arg.subst_to_aid,
@@ -357,12 +364,13 @@ fn run_instructions<S: SemanticsClone>(
                 //  - I think just specifying the ID directly? this will mainly be a problem for the OperationBuilder
                 //  - we need some ExecutionContext that potentially stores information like fuel (to avoid infinite loops and timing out)
                 let output = match oplike {
-                    Instruction::Operation(op_id, _) => {
+                    OpLikeInstruction::Operation(op_id) => {
                         run_operation::<S>(g, op_ctx, *op_id, concrete_arg)?
                     }
-                    Instruction::Builtin(op, _) => run_builtin_operation::<S>(g, op, concrete_arg)?,
-                    // does not match the outer match arm
-                    Instruction::BuiltinQuery(..) | Instruction::ShapeQuery(..) => unreachable!(),
+                    OpLikeInstruction::Builtin(op) => run_builtin_operation::<S>(g, op, concrete_arg)?,
+                    OpLikeInstruction::LibBuiltin(op) => {
+                        run_lib_builtin_operation(g, op, concrete_arg)?
+                    }
                 };
                 if let Some(abstract_output_id) = abstract_output_id {
                     previous_results.insert(abstract_output_id.clone(), output.new_nodes);

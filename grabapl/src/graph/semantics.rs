@@ -90,16 +90,16 @@ pub trait AbstractJoin {
 pub trait Semantics {
     /// A data graph's nodes contain values of this type.
     /// PL analogy: values.
-    type NodeConcrete;
+    type NodeConcrete: Clone;
     /// An operation can define patterns for nodes using this type.
     /// PL analogy: types.
-    type NodeAbstract;
+    type NodeAbstract: Clone;
     /// A data graph's edges contain values of this type.
     /// PL analogy: values.
-    type EdgeConcrete;
+    type EdgeConcrete: Clone;
     /// An operation can define patterns for edges using this type.
     /// PL analogy: types.
-    type EdgeAbstract;
+    type EdgeAbstract: Clone;
     /// The specific matching process for nodes.
     type NodeMatcher: AbstractMatcher<Abstract = Self::NodeAbstract>;
     /// The specific matching process for edges.
@@ -137,12 +137,7 @@ pub trait Semantics {
     fn join_nodes(a: &Self::NodeAbstract, b: &Self::NodeAbstract) -> Option<Self::NodeAbstract> {
         Self::NodeJoin::join(a, b)
     }
-}
 
-// TODO: do we need this? it's just easier to use this than spell it out
-pub trait SemanticsClone:
-    Semantics<NodeConcrete: Clone, NodeAbstract: Clone, EdgeConcrete: Clone, EdgeAbstract: Clone>
-{
     // TODO: Assert that the node keys are the same
     fn concrete_to_abstract(c: &ConcreteGraph<Self>) -> AbstractGraph<Self> {
         let mut abstract_graph = Graph::new();
@@ -171,14 +166,21 @@ pub trait SemanticsClone:
         abstract_graph
     }
 }
-impl<S: Semantics> SemanticsClone for S
-where
-    S::NodeConcrete: Clone,
-    S::EdgeConcrete: Clone,
-    S::NodeAbstract: Clone,
-    S::EdgeAbstract: Clone,
-{
-}
+
+// TODO: do we need this? it's just easier to use this than spell it out
+// pub trait Semantics:
+//     Semantics<NodeConcrete: Clone, NodeAbstract: Clone, EdgeConcrete: Clone, EdgeAbstract: Clone>
+// {
+//     
+// }
+// impl<S: Semantics> Semantics for S
+// where
+//     S::NodeConcrete: Clone,
+//     S::EdgeConcrete: Clone,
+//     S::NodeAbstract: Clone,
+//     S::EdgeAbstract: Clone,
+// {
+// }
 
 pub type ConcreteGraph<S: Semantics> =
     Graph<<S as Semantics>::NodeConcrete, <S as Semantics>::EdgeConcrete>;

@@ -5,10 +5,10 @@ use crate::graph::pattern::{
     AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationParameter,
     ParameterSubstitution,
 };
-use crate::graph::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, SemanticsClone};
+use crate::graph::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics};
 use crate::util::log;
 use crate::{
-    Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker, interned_string_newtype,
+    Graph, NodeKey, OperationContext, OperationId, SubstMarker, interned_string_newtype,
 };
 use derive_more::From;
 use derive_more::with_trait::Into;
@@ -181,7 +181,7 @@ pub struct ConcreteShapeQueryResult {
     pub shape_idents_to_node_keys: Option<HashMap<ShapeNodeIdentifier, NodeKey>>,
 }
 
-pub(crate) fn run_builtin_query<S: SemanticsClone>(
+pub(crate) fn run_builtin_query<S: Semantics>(
     g: &mut ConcreteGraph<S>,
     query: &S::BuiltinQuery,
     arg: OperationArgument,
@@ -197,7 +197,7 @@ pub(crate) fn run_builtin_query<S: SemanticsClone>(
 // TODO: We could make the graph shape query have match arms in the form of a list of (match_arm_name, expected_graph) list that get checked in sequence
 // and the QueryInstructions would contain a hashmap from match_arm_name to the list of instructions to take assuming that match arm is taken.
 
-pub(crate) fn run_shape_query<S: SemanticsClone>(
+pub(crate) fn run_shape_query<S: Semantics>(
     g: &mut ConcreteGraph<S>,
     query: &GraphShapeQuery<S>,
     selected_inputs: &[NodeKey],
@@ -237,7 +237,7 @@ pub(crate) fn run_shape_query<S: SemanticsClone>(
     // TODO: after calling this, the abstract graph needs to somehow know that it can be changed for changed values!
 }
 
-fn get_shape_query_substitution<S: SemanticsClone>(
+fn get_shape_query_substitution<S: Semantics>(
     query: &GraphShapeQuery<S>,
     dynamic_graph: &AbstractGraph<S>,
     subst: &ParameterSubstitution,

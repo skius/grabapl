@@ -1,6 +1,6 @@
 use crate::graph::pattern::{AbstractOutputNodeMarker, NewNodeMarker, OperationParameter};
-use crate::graph::semantics::{AbstractMatcher, SemanticsClone};
-use crate::{Semantics, SubstMarker};
+use crate::graph::semantics::{AbstractMatcher, Semantics};
+use crate::{SubstMarker};
 use derive_more::From;
 use std::collections::{HashMap, HashSet};
 
@@ -39,7 +39,7 @@ pub struct OperationSignature<S: Semantics> {
     pub output: AbstractOutputChanges<S>,
 }
 
-impl<S: SemanticsClone> Clone for OperationSignature<S> {
+impl<S: Semantics> Clone for OperationSignature<S> {
     fn clone(&self) -> Self {
         OperationSignature {
             name: self.name.clone(),
@@ -85,7 +85,7 @@ pub struct AbstractOutputChanges<S: Semantics> {
     pub deleted_edges: HashSet<ParameterEdgeId>,
 }
 
-impl<S: SemanticsClone> Clone for AbstractOutputChanges<S> {
+impl<S: Semantics> Clone for AbstractOutputChanges<S> {
     fn clone(&self) -> Self {
         AbstractOutputChanges {
             new_nodes: self.new_nodes.clone(),

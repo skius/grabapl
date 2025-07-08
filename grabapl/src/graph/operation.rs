@@ -12,7 +12,7 @@ use crate::graph::pattern::{
     OperationOutput, OperationParameter, ParameterSubstitution,
 };
 use crate::graph::semantics::{
-    AbstractGraph, AbstractMatcher, ConcreteGraph, ConcreteToAbstract, Semantics, SemanticsClone,
+    AbstractGraph, AbstractMatcher, ConcreteGraph, ConcreteToAbstract, Semantics,
 };
 use crate::util::log;
 use crate::{DotCollector, Graph, NodeKey, SubstMarker};
@@ -22,6 +22,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use thiserror::Error;
+use crate::graph::operation::builtin::LibBuiltinOperation;
 
 // TODO: We might want to be able to supply additional data to builtin operations. For example, a Set Value operation should be 'generic' over its value without
 //  needing to store a separate operation in the OpCtx for every value...
@@ -51,6 +52,7 @@ pub trait BuiltinOperation: Debug {
 /// Contains available operations
 pub struct OperationContext<S: Semantics> {
     builtins: HashMap<OperationId, S::BuiltinOperation>,
+    libbuiltins: HashMap<OperationId, LibBuiltinOperation<S>>,
     custom: HashMap<OperationId, UserDefinedOperation<S>>,
 }
 
@@ -58,6 +60,7 @@ impl<S: Semantics> OperationContext<S> {
     pub fn new() -> Self {
         OperationContext {
             builtins: HashMap::new(),
+            libbuiltins: HashMap::new(),
             custom: HashMap::new(),
         }
     }
@@ -65,6 +68,7 @@ impl<S: Semantics> OperationContext<S> {
     pub fn from_builtins(builtins: HashMap<OperationId, S::BuiltinOperation>) -> Self {
         OperationContext {
             builtins,
+            libbuiltins: HashMap::new(),
             custom: HashMap::new(),
         }
     }
@@ -72,12 +76,19 @@ impl<S: Semantics> OperationContext<S> {
     pub fn add_builtin_operation(&mut self, id: OperationId, op: S::BuiltinOperation) {
         self.builtins.insert(id, op);
     }
+    
+    pub fn add_lib_builtin_operation(&mut self, id: OperationId, op: LibBuiltinOperation<S>) {
+        self.libbuiltins.insert(id, op);
+    }
 
     pub fn add_custom_operation(&mut self, id: OperationId, op: UserDefinedOperation<S>) {
         self.custom.insert(id, op);
     }
 
     pub fn get(&self, id: OperationId) -> Option<Operation<S>> {
+        if let Some(lib_builtin) = self.libbuiltins.get(&id) {
+            return Some(Operation::LibBuiltin(lib_builtin));
+        }
         if let Some(builtin) = self.builtins.get(&id) {
             return Some(Operation::Builtin(builtin));
         }
@@ -90,13 +101,15 @@ impl<S: Semantics> OperationContext<S> {
 
 pub enum Operation<'a, S: Semantics> {
     Builtin(&'a S::BuiltinOperation),
+    LibBuiltin(&'a LibBuiltinOperation<S>),
     Custom(&'a UserDefinedOperation<S>),
 }
 
-impl<'a, S: SemanticsClone> Operation<'a, S> {
+impl<'a, S: Semantics> Operation<'a, S> {
     pub fn parameter(&self) -> OperationParameter<S> {
         match self {
             Operation::Builtin(op) => op.parameter(),
+            Operation::LibBuiltin(op) => op.parameter(),
             Operation::Custom(op) => op.parameter.clone(),
         }
     }
@@ -108,6 +121,7 @@ impl<'a, S: SemanticsClone> Operation<'a, S> {
     ) -> OperationResult<AbstractOperationOutput<S>> {
         match self {
             Operation::Builtin(op) => Ok(op.apply_abstract(g)),
+            Operation::LibBuiltin(op) => Ok(op.apply_abstract(g)),
             Operation::Custom(op) => op.apply_abstract(op_ctx, g),
         }
     }
@@ -220,19 +234,32 @@ args: {selected_inputs:?}"
     .ok_or_else(return_arg_does_not_match_error_with_dbg_info)
 }
 
-pub fn run_operation<S: SemanticsClone>(
+pub fn run_operation<S: Semantics>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
     op_ctx: &OperationContext<S>,
     op: OperationId,
     arg: OperationArgument,
 ) -> OperationResult<OperationOutput> {
     match op_ctx.get(op).expect("Invalid operation ID") {
+        Operation::LibBuiltin(lib_builtin) => run_lib_builtin_operation::<S>(g, lib_builtin, arg),
         Operation::Builtin(builtin) => run_builtin_operation::<S>(g, builtin, arg),
         Operation::Custom(custom) => run_custom_operation::<S>(g, op_ctx, custom, arg),
     }
 }
 
-fn run_builtin_operation<S: SemanticsClone>(
+fn run_lib_builtin_operation<S: Semantics>(
+    g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
+    op: &LibBuiltinOperation<S>,
+    arg: OperationArgument,
+) -> OperationResult<OperationOutput> {
+    // TODO: we probably dont need to pass the OperationArgument down. Might just cause confusion.
+    let mut gws = GraphWithSubstitution::new(g, &arg.subst);
+    let output = op.apply(&mut gws);
+
+    Ok(output)
+}
+
+fn run_builtin_operation<S: Semantics>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
     op: &S::BuiltinOperation,
     arg: OperationArgument,
@@ -249,7 +276,7 @@ fn run_builtin_operation<S: SemanticsClone>(
     Ok(output)
 }
 
-fn run_custom_operation<S: SemanticsClone>(
+fn run_custom_operation<S: Semantics>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
     op_ctx: &OperationContext<S>,
     op: &UserDefinedOperation<S>,
@@ -265,7 +292,7 @@ fn run_custom_operation<S: SemanticsClone>(
     Ok(output)
 }
 
-pub fn run_from_concrete<S: SemanticsClone>(
+pub fn run_from_concrete<S: Semantics>(
     g: &mut ConcreteGraph<S>,
     op_ctx: &OperationContext<S>,
     op: OperationId,
@@ -278,6 +305,10 @@ pub fn run_from_concrete<S: SemanticsClone>(
         .get(op)
         .ok_or(OperationError::InvalidOperationId(op))?
     {
+        Operation::LibBuiltin(lib_builtin) => {
+            let param = lib_builtin.parameter();
+            get_substitution(&abstract_g, &param, selected_inputs)?
+        }
         Operation::Builtin(builtin) => {
             let param = builtin.parameter();
             get_substitution(&abstract_g, &param, selected_inputs)?
