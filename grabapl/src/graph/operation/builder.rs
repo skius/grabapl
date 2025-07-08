@@ -157,6 +157,14 @@ pub enum OperationBuilderError {
         "Return edge {0:?}->{1:?} may have been created by a shape query, which is not allowed"
     )]
     ReturnEdgeMayOriginateFromShapeQuery(AbstractNodeId, AbstractNodeId),
+    #[error("internal error: {0}")]
+    InternalError(&'static str),
+    #[error("Explicitly selected input AID not found")]
+    SelectedInputsNotFoundAid,
+    #[error("Shape edge target node not found")]
+    ShapeEdgeTargetNotFound,
+    #[error("Shape edge source node not found")]
+    ShapeEdgeSourceNotFound,
 }
 
 pub struct OperationBuilder<'a, S: Semantics> {
@@ -1821,28 +1829,22 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         // collect changes
         for (key, node_abstract) in operation_output.changed_abstract_values_nodes {
             let aid = self
-                .current_state
-                .node_keys_to_aid
-                .get_left(&key)
+                .get_current_aid_from_key(key)
                 .expect("internal error: changed node not found in mapping");
             self.current_state
                 .node_may_be_written_to
-                .insert(*aid, node_abstract);
+                .insert(aid, node_abstract);
         }
         for ((source, target), edge_abstract) in operation_output.changed_abstract_values_edges {
             let source_aid = self
-                .current_state
-                .node_keys_to_aid
-                .get_left(&source)
+                .get_current_aid_from_key(source)
                 .expect("internal error: changed edge source not found in mapping");
             let target_aid = self
-                .current_state
-                .node_keys_to_aid
-                .get_left(&target)
+                .get_current_aid_from_key(target)
                 .expect("internal error: changed edge target not found in mapping");
             self.current_state
                 .edge_may_be_written_to
-                .insert((*source_aid, *target_aid), edge_abstract);
+                .insert((source_aid, target_aid), edge_abstract);
         }
 
         Ok(())
@@ -1945,12 +1947,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             }
             let subst_marker =
                 SubstMarker::from((param.explicit_input_nodes.len() as u32).to_string());
-            let key = self
-                .current_state
-                .node_keys_to_aid
-                .get_right(&aid)
-                .cloned()
-                .ok_or(OperationBuilderError::NotFoundAid(aid.clone()))?;
+            let key = self.get_current_key_from_aid(aid)?;
             let abstract_value = self
                 .current_state
                 .graph
@@ -1998,6 +1995,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                 }
                 GraphShapeQueryInstruction::ExpectShapeEdge(src, target, _) => {
                     // we need both src and target to be in the initial graph, assuming they dont come from `gsq_op_marker`
+                    // TODO: really we need to collect the entire connected components associated with src and target here?
                     collect_non_shape_ident(src)?;
                     collect_non_shape_ident(target)?;
                 }
@@ -2080,16 +2078,12 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                     expected_graph.add_edge(src_key, target_key, av.clone());
 
                     // now update the state for the true branch.
-                    let state_src_key = *self
-                        .current_state
-                        .node_keys_to_aid
-                        .get_right(&src)
-                        .ok_or(OperationBuilderError::NotFoundAid(src))?;
-                    let state_target_key = *self
-                        .current_state
-                        .node_keys_to_aid
-                        .get_right(&target)
-                        .ok_or(OperationBuilderError::NotFoundAid(target.clone()))?;
+                    let state_src_key = self
+                        .get_current_key_from_aid(src)
+                        .change_context(OperationBuilderError::ShapeEdgeSourceNotFound)?;
+                    let state_target_key = self
+                        .get_current_key_from_aid(target)
+                        .change_context(OperationBuilderError::ShapeEdgeTargetNotFound)?;
                     self.current_state
                         .graph
                         .add_edge(state_src_key, state_target_key, av);
@@ -2157,18 +2151,16 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         let selected_inputs = args
             .iter()
             .map(|aid| {
-                self.current_state
-                    .node_keys_to_aid
-                    .get_right(aid)
-                    .cloned()
-                    .ok_or(report!(OperationBuilderError::NotFoundAid(aid.clone())))
+                self.get_current_key_from_aid(*aid)
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .change_context(OperationBuilderError::SelectedInputsNotFoundAid)?;
         let subst = get_substitution(&self.current_state.graph, &param, &selected_inputs)
             .change_context(OperationBuilderError::SubstitutionErrorNew)?;
         let subst_to_aid = subst.mapping.iter().map(|(subst, key)| {
-            let aid = self.current_state.node_keys_to_aid.get_left(&key).cloned()
-                .expect("node key should be in mapping, because all node keys from the abstract graph should be in the mapping. internal error");
+            let aid = self.get_current_aid_from_key(*key)
+                .change_context(OperationBuilderError::InternalError("node key should be in mapping, because all node keys from the abstract graph should be in the mapping"))
+                .unwrap();
             (subst.clone(), aid)
         }).collect();
 
@@ -2184,6 +2176,18 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         let val = self.counter;
         self.counter += 1;
         AbstractOperationResultMarker::Implicit(val)
+    }
+
+    fn get_current_key_from_aid(&self, aid: AbstractNodeId) -> Result<NodeKey, OperationBuilderError> {
+        self.current_state.node_keys_to_aid.get_right(&aid)
+            .copied()
+            .ok_or(report!(OperationBuilderError::NotFoundAid(aid.clone())))
+    }
+
+    fn get_current_aid_from_key(&self, key: NodeKey) -> Result<AbstractNodeId, OperationBuilderError> {
+        self.current_state.node_keys_to_aid.get_left(&key)
+            .cloned()
+            .ok_or(report!(OperationBuilderError::InternalError("could not find node key")))
     }
 }
 
