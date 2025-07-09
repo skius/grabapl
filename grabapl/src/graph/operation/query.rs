@@ -241,7 +241,7 @@ fn get_shape_query_substitution<S: Semantics>(
     subst: &ParameterSubstitution,
     hidden_nodes: &HashSet<NodeKey>,
 ) -> OperationResult<ConcreteShapeQueryResult> {
-    log::trace!("Running shape query with hidden nodes {:?}", hidden_nodes);
+    log::trace!("Running shape query with hidden nodes {:?} and parameter substitution {:?}", hidden_nodes, subst);
     let desired_shape = &query.expected_graph;
 
     let desired_shape_ref = &desired_shape.graph;

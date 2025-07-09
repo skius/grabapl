@@ -738,7 +738,7 @@ fn builder_infers_correct_signatures() {
     let operation = builder.build(1).unwrap();
     let signature = operation.signature();
     // assert changes and deletions
-    // note that the expected node changes are different for c1, since 
+    // note that the expected node changes are different for c1, since
     assert_deleted_and_changed_nodes_and_edges!(signature, HashMap::from([
             (SubstMarker::from("p0").into(), NodeType::Integer),
             (SubstMarker::from("c1").into(), NodeType::String)
@@ -1191,4 +1191,68 @@ fn may_writes_remember_previous_abstract_value() {
         "Expected p0 to remain String after running the operation, since the inner operation let us now it may at most write a string."
     );
 
+}
+
+
+// Test that shape queries have the entire connected component as context - i.e., they cannot match anything that already exists in the abstract graph.
+#[test_log::test]
+fn shape_query_cannot_match_existing_nodes() {
+    let mut op_ctx = OperationContext::<TestSemantics>::new();
+    let mut builder = OperationBuilder::new(&op_ctx);
+    // we expect a p0: Object -child-> p1: Object
+    builder
+        .expect_parameter_node("p0", NodeType::Object)
+        .unwrap();
+    builder
+        .expect_parameter_node("p1", NodeType::Object)
+        .unwrap();
+    let p0 = AbstractNodeId::param("p0");
+    let p1 = AbstractNodeId::param("p1");
+    builder.expect_parameter_edge("p0", "p1", EdgeType::Exact("child".into()))
+        .unwrap();
+    // start a shape query for a child.
+    builder.start_shape_query("q").unwrap();
+    builder
+        .expect_shape_node("child".into(), NodeType::Object)
+        .unwrap();
+    let child_aid = AbstractNodeId::dynamic_output("q", "child");
+    builder
+        .expect_shape_edge(p0, child_aid, EdgeType::Exact("child".into()))
+        .unwrap();
+    builder.enter_true_branch().unwrap();
+    // now delete child
+    builder
+        .add_operation(
+            BuilderOpLike::LibBuiltin(LibBuiltinOperation::RemoveNode {
+                param: NodeType::Object,
+            }),
+            vec![child_aid],
+        )
+        .unwrap();
+    builder.end_query().unwrap();
+    // we expect that p1 was not matched, hence it must still exist
+    let state = builder.show_state().unwrap();
+    let p1_av = state.node_av_of_aid(&p1);
+    assert_eq!(
+        p1_av,
+        Some(&NodeType::Object),
+        "Expected p1 to remain Object after running the shape query, since it was not matched"
+    );
+    // finish
+    let op = builder.build(0).unwrap();
+    op_ctx.add_custom_operation(0, op);
+
+    // run on concrete graph.
+    let mut g = TestSemantics::new_concrete_graph();
+    let p0_key = g.add_node(NodeValue::Integer(0));
+    let p1_key = g.add_node(NodeValue::Integer(1));
+    g.add_edge(p0_key, p1_key, "child".into());
+
+    run_from_concrete(&mut g, &op_ctx, 0, &[p0_key, p1_key]).unwrap();
+    // assert that p1 still exists
+    assert_eq!(
+        g.get_node_attr(p1_key),
+        Some(&NodeValue::Integer(1)),
+        "Expected p1 to remain a node in the graph",
+    );
 }
