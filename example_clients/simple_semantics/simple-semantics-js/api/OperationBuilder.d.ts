@@ -43,6 +43,8 @@ export class OperationBuilder {
 
     addOperation(name: string | null, instruction: BuilderOpLike, args: AbstractArgList): void;
 
+    renameNode(aid: AbstractNodeId, newName: string): void;
+
     show(): IntermediateState;
 
     finalize(opId: number): UserDefinedOperation;

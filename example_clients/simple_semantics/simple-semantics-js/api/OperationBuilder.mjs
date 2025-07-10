@@ -289,6 +289,29 @@ export class OperationBuilder {
         }
     }
 
+    renameNode(aid, newName) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const newNameSlice = diplomatRuntime.DiplomatBuf.str8(wasm, newName);
+        const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
+
+
+        const result = wasm.OperationBuilder_rename_node(diplomatReceive.buffer, this.ffiValue, aid.ffiValue, ...newNameSlice.splat());
+
+        try {
+            if (!diplomatReceive.resultFlag) {
+                const cause = new OperationBuilderError(diplomatRuntime.internalConstructor, diplomatRuntime.ptrRead(wasm, diplomatReceive.buffer), []);
+                throw new globalThis.Error('OperationBuilderError: ' + cause.toString(), { cause });
+            }
+        }
+
+        finally {
+            functionCleanupArena.free();
+
+            diplomatReceive.free();
+        }
+    }
+
     show() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 

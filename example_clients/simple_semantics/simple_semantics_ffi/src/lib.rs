@@ -255,6 +255,16 @@ mod ffi {
             }
         }
 
+        pub fn rename_node(
+            &mut self,
+            aid: &AbstractNodeId,
+            new_name: &str,
+        ) -> Result<(), Box<OperationBuilderError>> {
+            self.0
+                .rename_node(aid.0.clone(), new_name)
+                .map_err(|e| Box::new(OperationBuilderError(e)))
+        }
+
         pub fn show(&self) -> Result<Box<IntermediateState>, Box<OperationBuilderError>> {
             self.0
                 .show_state()

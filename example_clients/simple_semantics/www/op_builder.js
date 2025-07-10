@@ -154,6 +154,14 @@ const initCommands = () => {
             }
         },
         {
+            "name": "Rename Node",
+            "inputs": ["Old AID", "New Name"],
+            "invoke": (old_aid_str, new_name) => {
+                let old_aid = AbstractNodeId.newFromStr(old_aid_str);
+                op_builder.renameNode(old_aid, new_name);
+            }
+        },
+        {
             "name": "Add Node",
             "inputs": ["Operation Name"],
             "invoke": (op_marker) => {
