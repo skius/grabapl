@@ -78,9 +78,10 @@ impl FromStr for AbstractNodeId {
 
     // TODO: add tests for this
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        // Parse the two options into the enum variants:
+        // Parse into enum variants:
         //  1. "P(<marker:string>)" for ParameterMarker
         //  2. "O(<output_id:string>, <output_marker:string>)" for DynamicOutputMarker
+        //  3. "N(<name:string>)" for Named
         // Note the inner strings may not contain (, ), or commas to make it easier for us.
         if let Some(stripped) = s.strip_prefix("P(").and_then(|s| s.strip_suffix(')')) {
             Ok(AbstractNodeId::param(stripped))
@@ -95,6 +96,9 @@ impl FromStr for AbstractNodeId {
             } else {
                 Err(())
             }
+        } else if let Some(stripped) = s.strip_prefix("N(").and_then(|s| s.strip_suffix(')')) {
+            let name = stripped.trim();
+            Ok(AbstractNodeId::named(name))
         } else {
             Err(())
         }
