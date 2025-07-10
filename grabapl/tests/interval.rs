@@ -27,9 +27,15 @@ fn example() {
     assert_eq!(resulting_type, &NodeType::new(5, 15));
 
     // test adding a new node
-    builder.add_named_operation("new".into(), BuilderOpLike::LibBuiltin(LibBuiltinOperation::AddNode {
-        value: NodeValue(2),
-    }), vec![]).unwrap();
+    builder
+        .add_named_operation(
+            "new".into(),
+            BuilderOpLike::LibBuiltin(LibBuiltinOperation::AddNode {
+                value: NodeValue(2),
+            }),
+            vec![],
+        )
+        .unwrap();
     let new_node = AbstractNodeId::dynamic_output("new", "new");
 
     let state = builder.show_state().unwrap();

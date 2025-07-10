@@ -2136,7 +2136,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
 
         let ud_instruction = UDInstruction::ShapeQuery(
             gsq,
-            AbstractOperationArgument{
+            AbstractOperationArgument {
                 selected_input_nodes: abstract_args,
                 subst_to_aid: arg_aid_to_param_subst.into_right_map(),
             },
@@ -2163,9 +2163,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
     ) -> Result<(ParameterSubstitution, AbstractOperationArgument), OperationBuilderError> {
         let selected_inputs = args
             .iter()
-            .map(|aid| {
-                self.get_current_key_from_aid(*aid)
-            })
+            .map(|aid| self.get_current_key_from_aid(*aid))
             .collect::<Result<Vec<_>, _>>()
             .change_context(OperationBuilderError::SelectedInputsNotFoundAid)?;
         let subst = get_substitution(&self.current_state.graph, &param, &selected_inputs)
@@ -2191,16 +2189,28 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         AbstractOperationResultMarker::Implicit(val)
     }
 
-    fn get_current_key_from_aid(&self, aid: AbstractNodeId) -> Result<NodeKey, OperationBuilderError> {
-        self.current_state.node_keys_to_aid.get_right(&aid)
+    fn get_current_key_from_aid(
+        &self,
+        aid: AbstractNodeId,
+    ) -> Result<NodeKey, OperationBuilderError> {
+        self.current_state
+            .node_keys_to_aid
+            .get_right(&aid)
             .copied()
             .ok_or(report!(OperationBuilderError::NotFoundAid(aid.clone())))
     }
 
-    fn get_current_aid_from_key(&self, key: NodeKey) -> Result<AbstractNodeId, OperationBuilderError> {
-        self.current_state.node_keys_to_aid.get_left(&key)
+    fn get_current_aid_from_key(
+        &self,
+        key: NodeKey,
+    ) -> Result<AbstractNodeId, OperationBuilderError> {
+        self.current_state
+            .node_keys_to_aid
+            .get_left(&key)
             .cloned()
-            .ok_or(report!(OperationBuilderError::InternalError("could not find node key")))
+            .ok_or(report!(OperationBuilderError::InternalError(
+                "could not find node key"
+            )))
     }
 }
 

@@ -1,5 +1,6 @@
 use error_stack::FrameKind;
 use grabapl::graph::operation::builder::{BuilderOpLike, OperationBuilder, OperationBuilderError};
+use grabapl::graph::operation::builtin::LibBuiltinOperation;
 use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
 use grabapl::graph::operation::query::{BuiltinQuery, ConcreteQueryOutput};
 use grabapl::graph::operation::signature::{AbstractSignatureEdgeId, AbstractSignatureNodeId};
@@ -15,7 +16,6 @@ use grabapl::graph::semantics::{
 use grabapl::{Graph, OperationContext, OperationId, Semantics, SubstMarker};
 use log_crate::info;
 use std::collections::{HashMap, HashSet};
-use grabapl::graph::operation::builtin::LibBuiltinOperation;
 
 mod util;
 use util::semantics::*;
@@ -700,8 +700,7 @@ fn builder_infers_correct_signatures() {
             );
             // changed nodes and edges
             assert_eq!(
-                &$signature.output.maybe_changed_nodes,
-                &$expected_maybe_changed_nodes,
+                &$signature.output.maybe_changed_nodes, &$expected_maybe_changed_nodes,
                 "Expected nodes p0 to be changed to Integer and c1 to String"
             );
             assert_eq!(
@@ -717,10 +716,13 @@ fn builder_infers_correct_signatures() {
             );
         };
     }
-    assert_deleted_and_changed_nodes_and_edges!(signature, HashMap::from([
-        (SubstMarker::from("p0").into(), NodeType::Integer),
-        (SubstMarker::from("c1").into(), NodeType::String)
-    ]));
+    assert_deleted_and_changed_nodes_and_edges!(
+        signature,
+        HashMap::from([
+            (SubstMarker::from("p0").into(), NodeType::Integer),
+            (SubstMarker::from("c1").into(), NodeType::String)
+        ])
+    );
 
     // Now ensure the same changes (minus the newly added nodes and edges) are propagated to another operation
     // that calls this operation.
@@ -738,10 +740,13 @@ fn builder_infers_correct_signatures() {
     let signature = operation.signature();
     // assert changes and deletions
     // note that the expected node changes are different for c1, since
-    assert_deleted_and_changed_nodes_and_edges!(signature, HashMap::from([
+    assert_deleted_and_changed_nodes_and_edges!(
+        signature,
+        HashMap::from([
             (SubstMarker::from("p0").into(), NodeType::Integer),
             (SubstMarker::from("c1").into(), NodeType::String)
-    ]));
+        ])
+    );
 }
 
 // TODO: add tests for:
@@ -1102,7 +1107,9 @@ fn may_writes_remember_previous_abstract_value() {
             .unwrap();
         let p0 = AbstractNodeId::param("p0");
         // note: query only necessary to actually break type safety in the concrete.
-        builder.start_query(TestQuery::ValueEqualTo(NodeValue::Integer(3)), vec![p0]).unwrap();
+        builder
+            .start_query(TestQuery::ValueEqualTo(NodeValue::Integer(3)), vec![p0])
+            .unwrap();
         builder.enter_true_branch().unwrap();
         builder
             .add_operation(
@@ -1132,10 +1139,15 @@ fn may_writes_remember_previous_abstract_value() {
         .unwrap();
     let p0 = AbstractNodeId::param("p0");
     // a builtin op that changes p0 to Integer should unconditionally change the abstract value of p0 to Integer.
-    builder.add_operation(BuilderOpLike::LibBuiltin(LibBuiltinOperation::SetNode {
-        param: NodeType::Object,
-        value: NodeValue::Integer(42),
-    }), vec![p0]).unwrap();
+    builder
+        .add_operation(
+            BuilderOpLike::LibBuiltin(LibBuiltinOperation::SetNode {
+                param: NodeType::Object,
+                value: NodeValue::Integer(42),
+            }),
+            vec![p0],
+        )
+        .unwrap();
     let state = builder.show_state().unwrap();
     let typ = state.node_av_of_aid(&p0).unwrap();
     assert_eq!(
@@ -1161,7 +1173,7 @@ fn may_writes_remember_previous_abstract_value() {
 
     // See here for broken type safety:
     if true {
-    // if false {
+        // if false {
         let mut g = TestSemantics::new_concrete_graph();
         let p0_key = g.add_node(NodeValue::Integer(0));
         // this won't hit the inner operation's set to string operation, so it would remain integer.
@@ -1174,14 +1186,15 @@ fn may_writes_remember_previous_abstract_value() {
         );
     }
 
-
     // furthermore, just because a operation _may_ change a node, it doesn't unnecessarily make the caller's av less precise.
     let mut builder = OperationBuilder::new(&op_ctx);
     builder
         .expect_parameter_node("p0", NodeType::String)
         .unwrap();
     // we expect a String
-    builder.add_operation(BuilderOpLike::FromOperationId(0), vec![p0]).unwrap();
+    builder
+        .add_operation(BuilderOpLike::FromOperationId(0), vec![p0])
+        .unwrap();
     let state = builder.show_state().unwrap();
     let typ = state.node_av_of_aid(&p0).unwrap();
     assert_eq!(
@@ -1189,9 +1202,7 @@ fn may_writes_remember_previous_abstract_value() {
         &NodeType::String,
         "Expected p0 to remain String after running the operation, since the inner operation let us now it may at most write a string."
     );
-
 }
-
 
 // Test that shape queries have the entire connected component as context - i.e., they cannot match anything that already exists in the abstract graph.
 #[test_log::test]
@@ -1207,7 +1218,8 @@ fn shape_query_cannot_match_existing_nodes() {
         .unwrap();
     let p0 = AbstractNodeId::param("p0");
     let p1 = AbstractNodeId::param("p1");
-    builder.expect_parameter_edge("p0", "p1", EdgeType::Exact("child".into()))
+    builder
+        .expect_parameter_edge("p0", "p1", EdgeType::Exact("child".into()))
         .unwrap();
     // start a shape query for a child.
     builder.start_shape_query("q").unwrap();

@@ -241,9 +241,11 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         let node_key = self.get_node_key(&marker)?;
         if let Some(old_av) = self.graph.get_node_attr(node_key) {
             // only remember that we maybe wrote "maybe_written_av".
-            self.changed_node_av.insert(node_key, maybe_written_av.clone());
+            self.changed_node_av
+                .insert(node_key, maybe_written_av.clone());
             // Merge the current AV with the new value.
-            let merged_av = join(old_av, &maybe_written_av).expect("must be able to join. TODO: think about if this requirement makes sense");
+            let merged_av = join(old_av, &maybe_written_av)
+                .expect("must be able to join. TODO: think about if this requirement makes sense");
             // merged_av is the new value we want to set.
             self.graph.set_node_attr(node_key, merged_av)
         } else {
@@ -288,7 +290,7 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         }
         old_value
     }
-    
+
     pub fn maybe_set_edge_value(
         &mut self,
         src_marker: impl Into<NodeMarker>,
@@ -302,9 +304,11 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         let dst_key = self.get_node_key(&dst_marker)?;
         if let Some(old_av) = self.graph.get_edge_attr((src_key, dst_key)) {
             // only remember that we maybe wrote "maybe_writte_av".
-            self.changed_edge_av.insert((src_key, dst_key), maybe_written_av.clone());
+            self.changed_edge_av
+                .insert((src_key, dst_key), maybe_written_av.clone());
             // Merge the current AV with the new value.
-            let merged_av = join(old_av, &maybe_written_av).expect("must be able to join. TODO: think about if this requirement makes sense");
+            let merged_av = join(old_av, &maybe_written_av)
+                .expect("must be able to join. TODO: think about if this requirement makes sense");
             // merged_av is the new value we want to set.
             self.graph.set_edge_attr((src_key, dst_key), merged_av)
         } else {

@@ -1,9 +1,12 @@
 use crate::SubstMarker;
-use crate::graph::pattern::{AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, NewNodeMarker, NodeMarker, OperationParameter};
+use crate::graph::pattern::{
+    AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, NewNodeMarker,
+    NodeMarker, OperationParameter,
+};
 use crate::graph::semantics::{AbstractGraph, AbstractJoin, AbstractMatcher, Semantics};
+use crate::util::bimap::BiMap;
 use derive_more::From;
 use std::collections::{HashMap, HashSet};
-use crate::util::bimap::BiMap;
 
 pub type AbstractSignatureEdgeId = (AbstractSignatureNodeId, AbstractSignatureNodeId);
 pub type ParameterEdgeId = (SubstMarker, SubstMarker);
@@ -184,7 +187,10 @@ impl<S: Semantics> AbstractOutputChanges<S> {
         true
     }
 
-    pub fn apply_abstract(&self, g: &mut GraphWithSubstitution<AbstractGraph<S>>) -> AbstractOperationOutput<S> {
+    pub fn apply_abstract(
+        &self,
+        g: &mut GraphWithSubstitution<AbstractGraph<S>>,
+    ) -> AbstractOperationOutput<S> {
         let mut output_names = BiMap::new();
 
         // handle new nodes
@@ -221,7 +227,8 @@ impl<S: Semantics> AbstractOutputChanges<S> {
         // handle changed nodes
         for (subst, av) in &self.maybe_changed_nodes {
             let node_marker = NodeMarker::Subst(*subst);
-            g.maybe_set_node_value(node_marker, av.clone(), S::NodeJoin::join).unwrap();
+            g.maybe_set_node_value(node_marker, av.clone(), S::NodeJoin::join)
+                .unwrap();
         }
         // handle changed edges
         for ((src, dst), av) in &self.maybe_changed_edges {

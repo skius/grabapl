@@ -259,7 +259,8 @@ pub fn get_count_list_len_user_defined_operation(
         Some("next_child_query".into()),
         Instruction::ShapeQuery(
             shape_query,
-            AbstractOperationArgument {  selected_input_nodes: vec![input_node],
+            AbstractOperationArgument {
+                selected_input_nodes: vec![input_node],
                 subst_to_aid: HashMap::from([("input".into(), input_node)]),
             },
             QueryInstructions {
@@ -536,8 +537,12 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                     )]),
                                                 }
                                             },
-                                            AbstractOperationArgument {  selected_input_nodes: vec![root_node],
-                                                subst_to_aid: HashMap::from([("input".into(), root_node)]),
+                                            AbstractOperationArgument {
+                                                selected_input_nodes: vec![root_node],
+                                                subst_to_aid: HashMap::from([(
+                                                    "input".into(),
+                                                    root_node,
+                                                )]),
                                             },
                                             QueryInstructions {
                                                 taken: vec![
@@ -649,8 +654,12 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                     )]),
                                                 }
                                             },
-                                            AbstractOperationArgument {  selected_input_nodes: vec![root_node],
-                                                subst_to_aid: HashMap::from([("input".into(), root_node)]),
+                                            AbstractOperationArgument {
+                                                selected_input_nodes: vec![root_node],
+                                                subst_to_aid: HashMap::from([(
+                                                    "input".into(),
+                                                    root_node,
+                                                )]),
                                             },
                                             QueryInstructions {
                                                 taken: vec![
@@ -811,7 +820,8 @@ pub fn get_node_heights_user_defined_operation(
         Some("left_child_query".into()),
         Instruction::ShapeQuery(
             left_child_query,
-            AbstractOperationArgument {  selected_input_nodes: vec![root_node],
+            AbstractOperationArgument {
+                selected_input_nodes: vec![root_node],
                 subst_to_aid: HashMap::from([("input".into(), root_node)]),
             },
             QueryInstructions {
@@ -841,7 +851,8 @@ pub fn get_node_heights_user_defined_operation(
         Some("right_child_query".into()),
         Instruction::ShapeQuery(
             right_child_query,
-            AbstractOperationArgument {  selected_input_nodes: vec![root_node],
+            AbstractOperationArgument {
+                selected_input_nodes: vec![root_node],
                 subst_to_aid: HashMap::from([("input".into(), root_node)]),
             },
             QueryInstructions {

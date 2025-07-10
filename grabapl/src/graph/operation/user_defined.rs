@@ -260,13 +260,14 @@ impl<S: Semantics> UserDefinedOperation<S> {
         arg: &OperationArgument,
     ) -> OperationResult<OperationOutput> {
         let mut runner = Runner::new(op_ctx, g, arg);
-        runner.run(
-            &self.instructions,
-        )?;
+        runner.run(&self.instructions)?;
 
-        let our_output_map = self.output_changes.new_nodes.iter().map(|(aid, (name, _))| {
-            Ok((*name, runner.aid_to_node_key(*aid)?))
-        }).collect::<OperationResult<_>>()?;
+        let our_output_map = self
+            .output_changes
+            .new_nodes
+            .iter()
+            .map(|(aid, (name, _))| Ok((*name, runner.aid_to_node_key(*aid)?)))
+            .collect::<OperationResult<_>>()?;
 
         // TODO: How to define a good output here?
         //  probably should be part of the UserDefinedOperation struct. AbstractNodeId should be used, and then we get the actual node key based on what's happening.
@@ -328,10 +329,7 @@ impl<'a, S: Semantics> Runner<'a, S> {
                         }
                     };
                     if let Some(abstract_output_id) = abstract_output_id {
-                        self.extend_abstract_mapping(
-                            abstract_output_id.clone(),
-                            output.new_nodes,
-                        );
+                        self.extend_abstract_mapping(abstract_output_id.clone(), output.new_nodes);
                         // TODO: also handle output.removed_nodes.
                     }
                 }
@@ -377,9 +375,7 @@ impl<'a, S: Semantics> Runner<'a, S> {
                         } else {
                             &query_instr.not_taken
                         };
-                    self.run(
-                        next_instr,
-                    )?;
+                    self.run(next_instr)?;
                 }
             }
         }
@@ -392,24 +388,30 @@ impl<'a, S: Semantics> Runner<'a, S> {
         output_map: HashMap<AbstractOutputNodeMarker, NodeKey>,
     ) {
         for (marker, node_key) in output_map {
-            self.abstract_to_concrete
-                .insert(AbstractNodeId::DynamicOutputMarker(abstract_output_id, marker), node_key);
+            self.abstract_to_concrete.insert(
+                AbstractNodeId::DynamicOutputMarker(abstract_output_id, marker),
+                node_key,
+            );
         }
     }
 
-    fn aid_to_node_key(
-        &self,
-        aid: AbstractNodeId,
-    ) -> OperationResult<NodeKey> {
+    fn aid_to_node_key(&self, aid: AbstractNodeId) -> OperationResult<NodeKey> {
         // Get a param aid from our argument's substitution, and the rest from the map.
         match aid {
-            AbstractNodeId::ParameterMarker(subst_marker) => {
-                self.arg.subst.mapping.get(&subst_marker).copied()
-                    .ok_or(OperationError::UnknownParameterMarker(subst_marker))
-            }
+            AbstractNodeId::ParameterMarker(subst_marker) => self
+                .arg
+                .subst
+                .mapping
+                .get(&subst_marker)
+                .copied()
+                .ok_or(OperationError::UnknownParameterMarker(subst_marker)),
             AbstractNodeId::DynamicOutputMarker(output_id, output_marker) => {
-                let key = self.abstract_to_concrete
-                    .get(&AbstractNodeId::DynamicOutputMarker(output_id, output_marker))
+                let key = self
+                    .abstract_to_concrete
+                    .get(&AbstractNodeId::DynamicOutputMarker(
+                        output_id,
+                        output_marker,
+                    ))
                     .copied()
                     .ok_or(OperationError::UnknownOutputNodeMarker(output_marker))?;
                 Ok(key)
@@ -425,10 +427,11 @@ impl<'a, S: Semantics> Runner<'a, S> {
     ) -> OperationResult<OperationArgument<'static>> {
         log::trace!(
             "Getting concrete arg of abstract arg: {arg:#?} previous_results: {:#?}, our operation's argument: {:#?}",
-                &self.abstract_to_concrete,
-                &self.arg,
+            &self.abstract_to_concrete,
+            &self.arg,
         );
-        let selected_keys: Vec<NodeKey> = arg.selected_input_nodes
+        let selected_keys: Vec<NodeKey> = arg
+            .selected_input_nodes
             .iter()
             .map(|arg| self.aid_to_node_key(*arg))
             .collect::<OperationResult<_>>()?;
@@ -445,15 +448,13 @@ impl<'a, S: Semantics> Runner<'a, S> {
                 .collect::<OperationResult<_>>()?,
         );
 
-        let hidden_nodes: HashSet<_> = self.arg.subst
+        let hidden_nodes: HashSet<_> = self
+            .arg
+            .subst
             .mapping
             .values()
             .copied()
-            .chain(
-                self.abstract_to_concrete
-                    .values()
-                    .copied(),
-            )
+            .chain(self.abstract_to_concrete.values().copied())
             .chain(self.arg.hidden_nodes.iter().copied())
             .collect();
 
