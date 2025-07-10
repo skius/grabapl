@@ -117,6 +117,13 @@ impl AbstractOperationArgument {
         }
     }
 
+    pub fn new_for_shape_query(explicit_nodes: Vec<AbstractNodeId>) -> Self {
+        AbstractOperationArgument {
+            selected_input_nodes: explicit_nodes,
+            subst_to_aid: HashMap::new(),
+        }
+    }
+
     pub fn infer_explicit_for_param(
         selected_nodes: Vec<AbstractNodeId>,
         param: &OperationParameter<impl Semantics>,
@@ -252,28 +259,14 @@ impl<S: Semantics> UserDefinedOperation<S> {
         g: &mut ConcreteGraph<S>,
         arg: &OperationArgument,
     ) -> OperationResult<OperationOutput> {
-        let subst = &arg.subst;
-        let mut our_output_map: HashMap<AbstractOutputNodeMarker, NodeKey> = HashMap::new();
-
-        let mut previous_results: HashMap<
-            AbstractOperationResultMarker,
-            HashMap<AbstractOutputNodeMarker, NodeKey>,
-        > = HashMap::new();
-
-        run_instructions(
-            g,
-            &mut previous_results,
-            &mut our_output_map,
-            op_ctx,
+        let mut runner = Runner::new(op_ctx, g, arg);
+        runner.run(
             &self.instructions,
-            subst,
-            &arg.hidden_nodes,
         )?;
 
-        for (aid, (name, _)) in &self.output_changes.new_nodes {
-            let node_key = aid_to_node_key(aid.clone(), subst, &previous_results)?;
-            our_output_map.insert(name.clone(), node_key);
-        }
+        let our_output_map = self.output_changes.new_nodes.iter().map(|(aid, (name, _))| {
+            Ok((*name, runner.aid_to_node_key(*aid)?))
+        }).collect::<OperationResult<_>>()?;
 
         // TODO: How to define a good output here?
         //  probably should be part of the UserDefinedOperation struct. AbstractNodeId should be used, and then we get the actual node key based on what's happening.
@@ -290,198 +283,185 @@ impl<S: Semantics> UserDefinedOperation<S> {
     }
 }
 
-fn run_instructions<S: Semantics>(
-    g: &mut ConcreteGraph<S>,
-    previous_results: &mut HashMap<
-        AbstractOperationResultMarker,
-        HashMap<AbstractOutputNodeMarker, NodeKey>,
-    >,
-    our_output_map: &mut HashMap<AbstractOutputNodeMarker, NodeKey>,
-    op_ctx: &OperationContext<S>,
-    instructions: &[InstructionWithResultMarker<S>],
-    subst: &ParameterSubstitution,
-    outer_hidden_nodes: &HashSet<NodeKey>,
-) -> OperationResult<()> {
-    for (abstract_output_id, instruction) in instructions {
-        match instruction {
-            Instruction::OpLike(oplike, arg) => {
-                let concrete_arg = get_concrete_arg::<S>(
-                    &arg.selected_input_nodes,
-                    &arg.subst_to_aid,
-                    subst,
-                    previous_results,
-                    outer_hidden_nodes,
-                )?;
-                log::trace!("Resulting concrete arg: {concrete_arg:#?}");
-                // TODO: make fallible
-                // TODO: How do we support mutually recursive user defined operations?
-                //  - I think just specifying the ID directly? this will mainly be a problem for the OperationBuilder
-                //  - we need some ExecutionContext that potentially stores information like fuel (to avoid infinite loops and timing out)
-                let output = match oplike {
-                    OpLikeInstruction::Operation(op_id) => {
-                        run_operation::<S>(g, op_ctx, *op_id, concrete_arg)?
+/// Runs a user defined operation.
+struct Runner<'a, S: Semantics> {
+    op_ctx: &'a OperationContext<S>,
+    g: &'a mut ConcreteGraph<S>,
+    /// The argument with which our operation was called.
+    arg: &'a OperationArgument<'a>,
+    // Note: should not store AID::Parameter nodes, those are in `arg` already.
+    abstract_to_concrete: HashMap<AbstractNodeId, NodeKey>,
+}
+
+impl<'a, S: Semantics> Runner<'a, S> {
+    pub fn new(
+        op_ctx: &'a OperationContext<S>,
+        g: &'a mut ConcreteGraph<S>,
+        arg: &'a OperationArgument<'a>,
+    ) -> Self {
+        Runner {
+            op_ctx,
+            g,
+            arg,
+            abstract_to_concrete: HashMap::new(),
+        }
+    }
+
+    fn run(&mut self, instructions: &[InstructionWithResultMarker<S>]) -> OperationResult<()> {
+        for (abstract_output_id, instruction) in instructions {
+            match instruction {
+                Instruction::OpLike(oplike, arg) => {
+                    let concrete_arg = self.abstract_to_concrete_arg(arg)?;
+                    log::trace!("Resulting concrete arg: {concrete_arg:#?}");
+                    // TODO: How do we support *mutually* recursive user defined operations?
+                    //  - I think just specifying the ID directly? this will mainly be a problem for the OperationBuilder
+                    // TODO: we need some ExecutionContext that potentially stores information like fuel (to avoid infinite loops and timing out)
+                    let output = match oplike {
+                        OpLikeInstruction::Operation(op_id) => {
+                            run_operation::<S>(self.g, self.op_ctx, *op_id, concrete_arg)?
+                        }
+                        OpLikeInstruction::Builtin(op) => {
+                            run_builtin_operation::<S>(self.g, op, concrete_arg)?
+                        }
+                        OpLikeInstruction::LibBuiltin(op) => {
+                            run_lib_builtin_operation(self.g, op, concrete_arg)?
+                        }
+                    };
+                    if let Some(abstract_output_id) = abstract_output_id {
+                        self.extend_abstract_mapping(
+                            abstract_output_id.clone(),
+                            output.new_nodes,
+                        );
+                        // TODO: also handle output.removed_nodes.
                     }
-                    OpLikeInstruction::Builtin(op) => {
-                        run_builtin_operation::<S>(g, op, concrete_arg)?
-                    }
-                    OpLikeInstruction::LibBuiltin(op) => {
-                        run_lib_builtin_operation(g, op, concrete_arg)?
-                    }
-                };
-                if let Some(abstract_output_id) = abstract_output_id {
-                    previous_results.insert(abstract_output_id.clone(), output.new_nodes);
-                    // TODO: also handle output.removed_nodes.
                 }
-            }
-            Instruction::BuiltinQuery(query, arg, query_instr) => {
-                let concrete_arg = get_concrete_arg::<S>(
-                    &arg.selected_input_nodes,
-                    &arg.subst_to_aid,
-                    subst,
-                    previous_results,
-                    outer_hidden_nodes,
-                )?;
-                let result = run_builtin_query::<S>(g, query, concrete_arg)?;
-                let next_instr = if result.taken {
-                    &query_instr.taken
-                } else {
-                    &query_instr.not_taken
-                };
-                // TODO: don't use function stack (ie, dont recurse), instead use explicit stack
-                run_instructions(
-                    g,
-                    previous_results,
-                    our_output_map,
-                    op_ctx,
-                    next_instr,
-                    subst,
-                    outer_hidden_nodes,
-                )?
-            }
-            Instruction::ShapeQuery(query, args, query_instr) => {
-                // ShapeQueries dont have context mappings, so we can just pass an empty hashmap.
-                // TODO: ^ rethink the above, it's a bit of an ungly hack. Why not have it take an AbstractOperationArgument as well?
-                let concrete_arg = get_concrete_arg::<S>(
-                    args,
-                    &HashMap::new(),
-                    subst,
-                    previous_results,
-                    outer_hidden_nodes,
-                )?;
-                let result = run_shape_query(
-                    g,
-                    query,
-                    &concrete_arg.selected_input_nodes,
-                    &concrete_arg.hidden_nodes,
-                )?;
-                let next_instr =
-                    if let Some(shape_idents_to_node_keys) = result.shape_idents_to_node_keys {
-                        // apply the shape idents to node keys mapping
-
-                        let mut query_result_map = HashMap::new();
-                        for (ident, node_key) in shape_idents_to_node_keys {
-                            // TODO: add helper function, or add new variant to AbstractOutputNodeMarker, or just use that one for the shape query mapping and get rid of ShapeNodeIdentifier.
-                            let output_marker = AbstractOutputNodeMarker(ident.into());
-                            query_result_map.insert(output_marker, node_key);
-                        }
-                        if let Some(abstract_output_id) = abstract_output_id {
-                            previous_results.insert(abstract_output_id.clone(), query_result_map);
-                        }
-
+                Instruction::BuiltinQuery(query, arg, query_instr) => {
+                    let concrete_arg = self.abstract_to_concrete_arg(arg)?;
+                    let result = run_builtin_query::<S>(self.g, query, concrete_arg)?;
+                    let next_instr = if result.taken {
                         &query_instr.taken
                     } else {
                         &query_instr.not_taken
                     };
-                run_instructions(
-                    g,
-                    previous_results,
-                    our_output_map,
-                    op_ctx,
-                    next_instr,
-                    subst,
-                    outer_hidden_nodes,
-                )?;
+                    // TODO: don't use function stack (ie, dont recurse), instead use explicit stack
+                    self.run(next_instr)?
+                }
+                Instruction::ShapeQuery(query, args, query_instr) => {
+                    // ShapeQueries dont have context mappings, so we can just pass an empty hashmap.
+                    // TODO: ^ rethink the above, it's a bit of an ungly hack. Why not have it take an AbstractOperationArgument as well?
+                    let concrete_arg = self.abstract_to_concrete_arg(&AbstractOperationArgument::new_for_shape_query(args.clone()))?;
+                    let result = run_shape_query(
+                        self.g,
+                        query,
+                        &concrete_arg.selected_input_nodes,
+                        &concrete_arg.hidden_nodes,
+                    )?;
+                    let next_instr =
+                        if let Some(shape_idents_to_node_keys) = result.shape_idents_to_node_keys {
+                            // apply the shape idents to node keys mapping
+
+                            let mut query_result_map = HashMap::new();
+                            for (ident, node_key) in shape_idents_to_node_keys {
+                                // TODO: add helper function, or add new variant to AbstractOutputNodeMarker, or just use that one for the shape query mapping and get rid of ShapeNodeIdentifier.
+                                let output_marker = AbstractOutputNodeMarker(ident.into());
+                                query_result_map.insert(output_marker, node_key);
+                            }
+                            if let Some(abstract_output_id) = abstract_output_id {
+                                self.extend_abstract_mapping(
+                                    abstract_output_id.clone(),
+                                    query_result_map,
+                                );
+                            }
+
+                            &query_instr.taken
+                        } else {
+                            &query_instr.not_taken
+                        };
+                    self.run(
+                        next_instr,
+                    )?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn extend_abstract_mapping(
+        &mut self,
+        abstract_output_id: AbstractOperationResultMarker,
+        output_map: HashMap<AbstractOutputNodeMarker, NodeKey>,
+    ) {
+        for (marker, node_key) in output_map {
+            self.abstract_to_concrete
+                .insert(AbstractNodeId::DynamicOutputMarker(abstract_output_id, marker), node_key);
+        }
+    }
+
+    fn aid_to_node_key(
+        &self,
+        aid: AbstractNodeId,
+    ) -> OperationResult<NodeKey> {
+        // Get a param aid from our argument's substitution, and the rest from the map.
+        match aid {
+            AbstractNodeId::ParameterMarker(subst_marker) => {
+                self.arg.subst.mapping.get(&subst_marker).copied()
+                    .ok_or(OperationError::UnknownParameterMarker(subst_marker))
+            }
+            AbstractNodeId::DynamicOutputMarker(output_id, output_marker) => {
+                let key = self.abstract_to_concrete
+                    .get(&AbstractNodeId::DynamicOutputMarker(output_id, output_marker))
+                    .copied()
+                    .ok_or(OperationError::UnknownOutputNodeMarker(output_marker))?;
+                Ok(key)
             }
         }
     }
-    Ok(())
-}
 
-// TODO: decide if we really want to have this be fallible, since we may want to instead have some
-//  invariant that this works. And encode fallibility in a 'builder'.
-fn get_concrete_arg<S: Semantics>(
-    explicit_args: &[AbstractNodeId],
-    context_mapping: &HashMap<SubstMarker, AbstractNodeId>,
-    our_subst: &ParameterSubstitution,
-    previous_results: &HashMap<
-        AbstractOperationResultMarker,
-        HashMap<AbstractOutputNodeMarker, NodeKey>,
-    >,
-    outer_hidden_nodes: &HashSet<NodeKey>,
-) -> OperationResult<OperationArgument<'static>> {
-    log::trace!(
-        "Getting concrete arg for subst: {our_subst:#?}, explicit_args: {explicit_args:#?}, context_mapping: {context_mapping:#?}, previous_results: {previous_results:#?}, outer_hidden_nodes: {outer_hidden_nodes:#?}"
-    );
-    let selected_keys: Vec<NodeKey> = explicit_args
-        .iter()
-        .map(|arg| aid_to_node_key(arg.clone(), our_subst, previous_results))
-        .collect::<OperationResult<_>>()?;
-
-    let new_subst = ParameterSubstitution::new(
-        context_mapping
+    // TODO: decide if we really want to have this be fallible, since we may want to instead have some
+    //  invariant that this works. And encode fallibility in a 'builder'
+    fn abstract_to_concrete_arg(
+        &self,
+        arg: &AbstractOperationArgument,
+    ) -> OperationResult<OperationArgument<'static>> {
+        log::trace!(
+            "Getting concrete arg of abstract arg: {arg:#?} previous_results: {:#?}, our operation's argument: {:#?}",
+                &self.abstract_to_concrete,
+                &self.arg,
+        );
+        let selected_keys: Vec<NodeKey> = arg.selected_input_nodes
             .iter()
-            .map(|(subst_marker, abstract_node_id)| {
-                Ok((
-                    subst_marker.clone(),
-                    aid_to_node_key(abstract_node_id.clone(), our_subst, previous_results)?,
-                ))
-            })
-            .collect::<OperationResult<_>>()?,
-    );
+            .map(|arg| self.aid_to_node_key(*arg))
+            .collect::<OperationResult<_>>()?;
 
-    let mut hidden_nodes: HashSet<_> = our_subst
-        .mapping
-        .values()
-        .copied()
-        .chain(
-            previous_results
-                .values()
-                .flat_map(|map| map.values())
-                .copied(),
-        )
-        .collect();
-    hidden_nodes.extend(outer_hidden_nodes);
+        let new_subst = ParameterSubstitution::new(
+            arg.subst_to_aid
+                .iter()
+                .map(|(subst_marker, abstract_node_id)| {
+                    Ok((
+                        subst_marker.clone(),
+                        self.aid_to_node_key(abstract_node_id.clone())?,
+                    ))
+                })
+                .collect::<OperationResult<_>>()?,
+        );
 
-    Ok(OperationArgument {
-        selected_input_nodes: selected_keys.into(),
-        subst: new_subst,
-        hidden_nodes,
-    })
-}
-
-fn aid_to_node_key(
-    aid: AbstractNodeId,
-    subst: &ParameterSubstitution,
-    previous_results: &HashMap<
-        AbstractOperationResultMarker,
-        HashMap<AbstractOutputNodeMarker, NodeKey>,
-    >,
-) -> OperationResult<NodeKey> {
-    match aid {
-        AbstractNodeId::ParameterMarker(subst_marker) => subst
+        let hidden_nodes: HashSet<_> = self.arg.subst
             .mapping
-            .get(&subst_marker)
+            .values()
             .copied()
-            .ok_or(OperationError::UnknownParameterMarker(subst_marker)),
-        AbstractNodeId::DynamicOutputMarker(output_id, output_marker) => {
-            let output_map = previous_results
-                .get(&output_id)
-                .ok_or(OperationError::UnknownOperationResultMarker(output_id))?;
-            output_map
-                .get(&output_marker)
-                .copied()
-                .ok_or(OperationError::UnknownOutputNodeMarker(output_marker))
-        }
+            .chain(
+                self.abstract_to_concrete
+                    .values()
+                    .copied(),
+            )
+            .chain(self.arg.hidden_nodes.iter().copied())
+            .collect();
+
+        Ok(OperationArgument {
+            selected_input_nodes: selected_keys.into(),
+            subst: new_subst,
+            hidden_nodes,
+        })
     }
 }
 
