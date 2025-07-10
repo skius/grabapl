@@ -1945,11 +1945,13 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         let mut arg_aid_to_node_keys: BiMap<AbstractNodeId, NodeKey> = BiMap::new();
 
         /// Collects the AID and adds it to all relevant mappings.
+        /// The passed AID is a node that is part of the pre-existing graph.
         let mut collect_aid = |aid: AbstractNodeId| -> Result<(), OperationBuilderError> {
             if arg_aid_to_param_subst.contains_left(&aid) {
                 // we already processed this
                 return Ok(());
             }
+            // invent a new subst marker for this AID.
             let subst_marker =
                 SubstMarker::from((param.explicit_input_nodes.len() as u32).to_string());
             let key = self.get_current_key_from_aid(aid)?;
@@ -1961,6 +1963,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                     "internal error: node key should be in state graph since it is in the mapping",
                 )
                 .clone();
+            // the shape query will expect the same AV
             let param_key = param.parameter_graph.add_node(abstract_value);
             param
                 .subst_to_node_keys
@@ -1968,7 +1971,9 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             param
                 .node_keys_to_subst
                 .insert(param_key, subst_marker.clone());
+            // context-matching here is against the purpose of shape queries, so every argument is explicit
             param.explicit_input_nodes.push(subst_marker.clone());
+            // we need to push in the same sequence as expected in explicit_input_nodes
             abstract_args.push(aid.clone());
             arg_aid_to_param_subst.insert(aid.clone(), subst_marker.clone());
             arg_aid_to_node_keys.insert(aid.clone(), key);
@@ -2131,7 +2136,10 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
 
         let ud_instruction = UDInstruction::ShapeQuery(
             gsq,
-            abstract_args,
+            AbstractOperationArgument{
+                selected_input_nodes: abstract_args,
+                subst_to_aid: arg_aid_to_param_subst.into_right_map(),
+            },
             QueryInstructions {
                 taken: ud_true_branch,
                 not_taken: ud_false_branch,

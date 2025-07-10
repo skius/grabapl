@@ -173,7 +173,7 @@ pub enum Instruction<S: Semantics> {
     #[debug("ShapeQuery(???, {_1:#?}, {_2:#?})")]
     ShapeQuery(
         GraphShapeQuery<S>,
-        Vec<AbstractNodeId>,
+        AbstractOperationArgument,
         QueryInstructions<S>,
     ),
 }
@@ -346,10 +346,10 @@ impl<'a, S: Semantics> Runner<'a, S> {
                     // TODO: don't use function stack (ie, dont recurse), instead use explicit stack
                     self.run(next_instr)?
                 }
-                Instruction::ShapeQuery(query, args, query_instr) => {
+                Instruction::ShapeQuery(query, arg, query_instr) => {
                     // ShapeQueries dont have context mappings, so we can just pass an empty hashmap.
                     // TODO: ^ rethink the above, it's a bit of an ungly hack. Why not have it take an AbstractOperationArgument as well?
-                    let concrete_arg = self.abstract_to_concrete_arg(&AbstractOperationArgument::new_for_shape_query(args.clone()))?;
+                    let concrete_arg = self.abstract_to_concrete_arg(&arg)?;
                     let result = run_shape_query(
                         self.g,
                         query,

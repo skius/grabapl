@@ -17,6 +17,14 @@ impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> BiMap<L, 
     pub fn into_inner(self) -> (HashMap<L, R>, HashMap<R, L>) {
         (self.left_to_right, self.right_to_left)
     }
+    
+    pub fn into_left_map(self) -> HashMap<L, R> {
+        self.left_to_right
+    }
+    
+    pub fn into_right_map(self) -> HashMap<R, L> {
+        self.right_to_left
+    }
 
     pub fn insert(&mut self, left: L, right: R) {
         // Ensure no existing mapping for left or right

@@ -259,7 +259,9 @@ pub fn get_count_list_len_user_defined_operation(
         Some("next_child_query".into()),
         Instruction::ShapeQuery(
             shape_query,
-            vec![input_node],
+            AbstractOperationArgument {  selected_input_nodes: vec![input_node],
+                subst_to_aid: HashMap::from([("input".into(), input_node)]),
+            },
             QueryInstructions {
                 not_taken: vec![],
                 taken: vec![(
@@ -341,7 +343,9 @@ pub fn get_insert_bst_user_defined_operation(
                         ]),
                     }
                 },
-                vec![root_node],
+                AbstractOperationArgument {  selected_input_nodes: vec![root_node],
+                    subst_to_aid: HashMap::from([("input".into(), root_node)]),
+                },
                 QueryInstructions {
                     taken: vec![
                         // we have two children, now we need to check if our value is gt or smaller than the root
@@ -378,7 +382,9 @@ pub fn get_insert_bst_user_defined_operation(
                                     shape_idents_to_node_keys: HashMap::from([("child".into(), child)]),
                                 }
                             },
-                            vec![root_node],
+                            AbstractOperationArgument {  selected_input_nodes: vec![root_node],
+                                subst_to_aid: HashMap::from([("input".into(), root_node)]),
+                            },
                             QueryInstructions {
                                 taken: vec![
                                     // we have one child, now we need to check if our value is gt or smaller than the root
@@ -530,7 +536,9 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                     )]),
                                                 }
                                             },
-                                            vec![root_node],
+                                            AbstractOperationArgument {  selected_input_nodes: vec![root_node],
+                                                subst_to_aid: HashMap::from([("input".into(), root_node)]),
+                                            },
                                             QueryInstructions {
                                                 taken: vec![
                                                     // we have a right child, recurse on it
@@ -641,7 +649,9 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                     )]),
                                                 }
                                             },
-                                            vec![root_node],
+                                            AbstractOperationArgument {  selected_input_nodes: vec![root_node],
+                                                subst_to_aid: HashMap::from([("input".into(), root_node)]),
+                                            },
                                             QueryInstructions {
                                                 taken: vec![
                                                     // we have a left child, recurse on it
@@ -801,7 +811,9 @@ pub fn get_node_heights_user_defined_operation(
         Some("left_child_query".into()),
         Instruction::ShapeQuery(
             left_child_query,
-            vec![root_node],
+            AbstractOperationArgument {  selected_input_nodes: vec![root_node],
+                subst_to_aid: HashMap::from([("input".into(), root_node)]),
+            },
             QueryInstructions {
                 taken: vec![
                     // we have a left child, recurse on it
@@ -829,7 +841,9 @@ pub fn get_node_heights_user_defined_operation(
         Some("right_child_query".into()),
         Instruction::ShapeQuery(
             right_child_query,
-            vec![root_node],
+            AbstractOperationArgument {  selected_input_nodes: vec![root_node],
+                subst_to_aid: HashMap::from([("input".into(), root_node)]),
+            },
             QueryInstructions {
                 taken: vec![
                     // we have a right child, recurse on it
