@@ -256,7 +256,6 @@ fn get_custom_op_new_node_in_regular_query_branches() -> UserDefinedOperation<Te
 
     builder.end_query().unwrap();
 
-    // TODO: define the new node to be visible in the output
     let output_aid = AbstractNodeId::DynamicOutputMarker("new".into(), "new".into());
     builder
         .return_node(output_aid, "output".into(), NodeType::Object)
