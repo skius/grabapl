@@ -38,9 +38,10 @@ interned_string_newtype!(
     AbstractOperationResultMarker::Custom
 );
 
-// #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
-// pub struct NamedMarker(Intern<String>);
-// interned_string_newtype!(NamedMarker);
+#[derive(derive_more::Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
+#[debug("N({_0})")]
+pub struct NamedMarker(Intern<String>);
+interned_string_newtype!(NamedMarker);
 
 /// Identifies a node in the user defined operation view.
 #[derive(Clone, Copy, From, Debug, Eq, PartialEq, Hash)]
@@ -49,8 +50,8 @@ pub enum AbstractNodeId {
     ParameterMarker(SubstMarker),
     /// A node that was created as a result of another operation.
     DynamicOutputMarker(AbstractOperationResultMarker, AbstractOutputNodeMarker),
-    // /// A node that was given an explicit name
-    // Named(NamedMarker),
+    /// A node that was given an explicit name. Parameters cannot be renamed.
+    Named(NamedMarker),
 }
 
 impl AbstractNodeId {
@@ -65,6 +66,12 @@ impl AbstractNodeId {
         let output_id = output_id.into();
         let output_marker = output_marker.into();
         AbstractNodeId::DynamicOutputMarker(output_id, output_marker)
+    }
+
+    pub fn named(
+        name: impl Into<NamedMarker>,
+    ) -> Self {
+        AbstractNodeId::Named(name.into())
     }
 }
 
@@ -176,6 +183,11 @@ pub enum Instruction<S: Semantics> {
         AbstractOperationArgument,
         QueryInstructions<S>,
     ),
+    #[debug("RenameNode({old:#?} ==> {new:#?})")]
+    RenameNode {
+        old: AbstractNodeId,
+        new: AbstractNodeId,
+    },
 }
 
 #[derive(derive_more::Debug)]
@@ -196,6 +208,7 @@ pub type InstructionWithResultMarker<S> = (Option<AbstractOperationResultMarker>
 //  ==> see big-picture-todos.md for a solution. TL;DR: store implicitly matched context nodes in the form of an explicit mapping from AbstractNodeId to the context nodes.
 
 pub struct AbstractUserDefinedOperationOutput<S: Semantics> {
+    // TODO: can probably remove S::NodeAbstract here since it's in the signature.
     pub new_nodes: HashMap<AbstractNodeId, (AbstractOutputNodeMarker, S::NodeAbstract)>,
 }
 
@@ -375,6 +388,14 @@ impl<'a, S: Semantics> Runner<'a, S> {
                         };
                     self.run(next_instr)?;
                 }
+                Instruction::RenameNode {
+                    old, new
+                } => {
+                    let Some(key) = self.abstract_to_concrete.remove(old) else {
+                        return Err(OperationError::UnknownAID(*old));
+                    };
+                    self.abstract_to_concrete.insert(*old, key);
+                }
             }
         }
         Ok(())
@@ -403,15 +424,12 @@ impl<'a, S: Semantics> Runner<'a, S> {
                 .get(&subst_marker)
                 .copied()
                 .ok_or(OperationError::UnknownParameterMarker(subst_marker)),
-            AbstractNodeId::DynamicOutputMarker(output_id, output_marker) => {
+            AbstractNodeId::DynamicOutputMarker(..) | AbstractNodeId::Named(..)  => {
                 let key = self
                     .abstract_to_concrete
-                    .get(&AbstractNodeId::DynamicOutputMarker(
-                        output_id,
-                        output_marker,
-                    ))
+                    .get(&aid)
                     .copied()
-                    .ok_or(OperationError::UnknownOutputNodeMarker(output_marker))?;
+                    .ok_or(OperationError::UnknownAID(aid))?;
                 Ok(key)
             }
         }

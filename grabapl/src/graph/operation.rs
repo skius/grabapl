@@ -7,7 +7,7 @@ pub mod user_defined;
 
 use crate::graph::EdgeAttribute;
 use crate::graph::operation::builtin::LibBuiltinOperation;
-use crate::graph::operation::user_defined::{AbstractOperationResultMarker, UserDefinedOperation};
+use crate::graph::operation::user_defined::{AbstractNodeId, AbstractOperationResultMarker, UserDefinedOperation};
 use crate::graph::pattern::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument,
     OperationOutput, OperationParameter, ParameterSubstitution,
@@ -345,6 +345,8 @@ pub enum OperationError {
     UnknownOperationResultMarker(AbstractOperationResultMarker),
     #[error("unknown output node marker: {0:?}")]
     UnknownOutputNodeMarker(AbstractOutputNodeMarker),
+    #[error("Unknown AID: {0:?}")]
+    UnknownAID(AbstractNodeId),
 }
 
 impl From<SubstitutionError> for OperationError {

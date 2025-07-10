@@ -2,10 +2,7 @@ use crate::graph::operation::builder::BuilderInstruction::ExpectParameterEdge;
 use crate::graph::operation::builtin::LibBuiltinOperation;
 use crate::graph::operation::query::{BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier};
 use crate::graph::operation::signature::{AbstractSignatureNodeId, OperationSignature};
-use crate::graph::operation::user_defined::{
-    AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker,
-    AbstractUserDefinedOperationOutput, OpLikeInstruction, QueryInstructions, UserDefinedOperation,
-};
+use crate::graph::operation::user_defined::{AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, AbstractUserDefinedOperationOutput, NamedMarker, OpLikeInstruction, QueryInstructions, UserDefinedOperation};
 use crate::graph::operation::{BuiltinOperation, OperationError, get_substitution};
 use crate::graph::pattern::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationParameter,
@@ -91,6 +88,10 @@ enum BuilderInstruction<S: Semantics> {
     ReturnNode(AbstractNodeId, AbstractOutputNodeMarker, S::NodeAbstract),
     #[debug("ReturnEdge({_0:?}, {_1:?}, ???)")]
     ReturnEdge(AbstractNodeId, AbstractNodeId, S::EdgeAbstract),
+    #[debug("RenameNode({_0:?}, {_1:?})")]
+    /// Rename a dynamic output marker.
+    /// Invariants in the interpreter require that this is never a parameter node. (E.g., since we may want to return it)
+    RenameNode(AbstractNodeId, NamedMarker)
 }
 
 impl<S: Semantics> BuilderInstruction<S> {
@@ -165,6 +166,8 @@ pub enum OperationBuilderError {
     ShapeEdgeTargetNotFound,
     #[error("Shape edge source node not found")]
     ShapeEdgeSourceNotFound,
+    #[error("Cannot rename parameter node {0:?}, only new nodes from operation calls can be renamed")]
+    CannotRenameParameterNode(AbstractNodeId),
 }
 
 pub struct OperationBuilder<'a, S: Semantics> {
@@ -184,13 +187,22 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         }
     }
 
-    // TODO: add undo_one_instruction method that just pops the last instruction.
     pub fn undo_last_instruction(&mut self) {
         if !self.instructions.is_empty() {
             self.instructions.pop();
         }
         self.check_instructions()
             .expect("internal error: a prefix slice of instructions should always be valid");
+    }
+
+    pub fn rename_node(
+        &mut self,
+        old_aid: AbstractNodeId,
+        new_name: impl Into<NamedMarker>,
+    ) -> Result<(), OperationBuilderError> {
+        let new_name = new_name.into();
+        self.instructions.push(BuilderInstruction::RenameNode(old_aid, new_name));
+        self.check_instructions_or_rollback()
     }
 
     pub fn expect_parameter_node(
@@ -572,6 +584,11 @@ enum IntermediateInstruction<S: Semantics> {
         Vec<AbstractNodeId>,
         IntermediateQueryInstructions<S>,
     ),
+    // TODO: move to oplike?
+    RenameNode {
+        aid: AbstractNodeId,
+        new_name: NamedMarker,
+    },
 }
 
 #[derive(derive_more::Debug)]
@@ -881,6 +898,17 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                         marker: op_marker.clone(),
                         graph_instructions: gsq_instructions,
                         query_instructions: branch_instructions,
+                    },
+                ))
+            }
+            BuilderInstruction::RenameNode(old_aid, new_name) => {
+                iter.next();
+                self.path.push(IntermediateStatePath::Advance);
+                Ok((
+                    None,
+                    IntermediateInstruction::RenameNode {
+                        aid: *old_aid,
+                        new_name: *new_name,
                     },
                 ))
             }
@@ -1270,6 +1298,7 @@ pub struct IntermediateState<S: Semantics> {
     pub edge_may_be_written_to: HashMap<(AbstractNodeId, AbstractNodeId), S::EdgeAbstract>,
 
     // TODO: make query path
+    // TODO: should probably remove query_path from the state struct, and add it to a final returned StateWithQueryPath struct?
     pub query_path: Vec<QueryPath>,
 }
 
@@ -1290,6 +1319,18 @@ impl<S: Semantics> Clone for IntermediateState<S> {
 }
 
 impl<S: Semantics> IntermediateState<S> {
+    pub fn new() -> Self {
+        IntermediateState {
+            graph: AbstractGraph::<S>::new(),
+            node_keys_to_aid: BiMap::new(),
+            node_may_originate_from_shape_query: HashSet::new(),
+            edge_may_originate_from_shape_query: HashSet::new(),
+            node_may_be_written_to: HashMap::new(),
+            edge_may_be_written_to: HashMap::new(),
+            query_path: Vec::new(),
+        }
+    }
+
     pub fn node_av_of_aid(&self, aid: &AbstractNodeId) -> Option<&S::NodeAbstract> {
         let node_key = self.node_keys_to_aid.get_right(aid)?;
         self.graph.get_node_attr(*node_key)
@@ -1303,6 +1344,72 @@ impl<S: Semantics> IntermediateState<S> {
         let source_key = self.node_keys_to_aid.get_right(source)?;
         let target_key = self.node_keys_to_aid.get_right(target)?;
         self.graph.get_edge_attr((*source_key, *target_key))
+    }
+
+    /// Modifies all mappings so that all mentions of `old_aid` are replaced with `new_aid`.
+    pub fn rename_aid(
+        &mut self,
+        old_aid: AbstractNodeId,
+        new_aid: AbstractNodeId,
+    ) -> Result<(), OperationBuilderError> {
+        // Update the mappings
+        if let Some(node_key) = self.node_keys_to_aid.remove_right(&old_aid) {
+            self.node_keys_to_aid.insert(node_key, new_aid);
+        } else {
+            bail!(OperationBuilderError::NotFoundAid(old_aid));
+        }
+
+        // Update the shape query sets
+        if self.node_may_originate_from_shape_query.remove(&old_aid) {
+            self.node_may_originate_from_shape_query.insert(new_aid);
+        }
+        // edges too
+        self.edge_may_originate_from_shape_query = self.edge_may_originate_from_shape_query.iter().map(|&(src, dst)|{
+            let new_src = if src == old_aid {
+                new_aid
+            } else {
+                src
+            };
+            let new_dst = if dst == old_aid {
+                new_aid
+            } else {
+                dst
+            };
+            (new_src, new_dst)
+        }).collect();
+
+        // Update writes
+        if let Some(node_av) = self.node_may_be_written_to.remove(&old_aid) {
+            self.node_may_be_written_to.insert(new_aid, node_av);
+        }
+        self.edge_may_be_written_to = self.edge_may_be_written_to.iter().map(|(&(src, dst), edge_av)| {
+            let new_src = if src == old_aid { new_aid } else { src };
+            let new_dst = if dst == old_aid { new_aid } else { dst };
+            ((new_src, new_dst), edge_av.clone())
+        }).collect();
+
+        Ok(())
+    }
+
+    pub fn from_param(param: &OperationParameter<S>) -> Self {
+        let initial_graph = param.parameter_graph.clone();
+
+        let mut initial_mapping = BiMap::new();
+
+        for (key, subst) in param.node_keys_to_subst.iter() {
+            let aid = AbstractNodeId::ParameterMarker(subst.clone());
+            initial_mapping.insert(*key, aid);
+        }
+
+        IntermediateState {
+            graph: initial_graph,
+            node_keys_to_aid: initial_mapping,
+            node_may_originate_from_shape_query: HashSet::new(),
+            edge_may_originate_from_shape_query: HashSet::new(),
+            node_may_be_written_to: HashMap::new(),
+            edge_may_be_written_to: HashMap::new(),
+            query_path: Vec::new(),
+        }
     }
 }
 
@@ -1320,6 +1427,9 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
                             AbstractOperationResultMarker::Implicit(num) => "<unnamed>",
                         };
                         write!(f, "O({}, {})", op_marker, node_marker.0)
+                    }
+                    AbstractNodeId::Named(name) => {
+                        write!(f, "{:?}", name)
                     }
                 }
             }
@@ -1402,24 +1512,9 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         op_ctx: &'a OperationContext<S>,
         partial_self_user_defined_op: &'a UserDefinedOperation<S>,
     ) -> Self {
-        let initial_graph = op_param.parameter_graph.clone();
 
-        let mut initial_mapping = BiMap::new();
 
-        for (key, subst) in op_param.node_keys_to_subst.iter() {
-            let aid = AbstractNodeId::ParameterMarker(subst.clone());
-            initial_mapping.insert(*key, aid);
-        }
-
-        let initial_state = IntermediateState {
-            graph: initial_graph,
-            node_keys_to_aid: initial_mapping,
-            node_may_originate_from_shape_query: HashSet::new(),
-            edge_may_originate_from_shape_query: HashSet::new(),
-            node_may_be_written_to: HashMap::new(),
-            edge_may_be_written_to: HashMap::new(),
-            query_path: Vec::new(),
-        };
+        let initial_state = IntermediateState::from_param(&op_param);
 
         let current_state = initial_state.clone();
 
@@ -1505,10 +1600,10 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         }
 
         let get_param_or_output_sig_id = |aid: &AbstractNodeId| {
-            match aid {
-                AbstractNodeId::ParameterMarker(s) => Ok(AbstractSignatureNodeId::ExistingNode(*s)),
-                AbstractNodeId::DynamicOutputMarker(_, _) => {
-                    // we must be returning this node
+            match *aid {
+                AbstractNodeId::ParameterMarker(s) => Ok(AbstractSignatureNodeId::ExistingNode(s)),
+                AbstractNodeId::DynamicOutputMarker(_, _) | AbstractNodeId::Named(..) => {
+                    // we must be returning this node if we want to return an incident edge.
                     let Some((output_marker, _)) = ud_output.new_nodes.get(aid) else {
                         bail!(OperationBuilderError::NotFoundReturnNode(aid.clone()));
                     };
@@ -1699,7 +1794,30 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                 graph_instructions,
                 query_instructions,
             ),
+            IntermediateInstruction::RenameNode {
+                aid, new_name
+            } => {
+                let new_aid = AbstractNodeId::named(new_name);
+
+                Ok((self.rename_node(aid, new_aid)?, InterpretedInstruction::OpLike)) // TODO: return a proper instruction
+            }
         }
+    }
+
+    fn rename_node(
+        &mut self,
+        old_aid: AbstractNodeId,
+        new_aid: AbstractNodeId,
+    ) -> Result<UDInstruction<S>, OperationBuilderError> {
+        // don't allow renaming ParameterMarker nodes
+        if let AbstractNodeId::ParameterMarker(_) = old_aid {
+            bail!(OperationBuilderError::CannotRenameParameterNode(old_aid));
+        }
+        self.current_state.rename_aid(old_aid, new_aid)?;
+        Ok(UDInstruction::RenameNode {
+            old: old_aid,
+            new: new_aid,
+        })
     }
 
     fn interpret_op_like(
@@ -1982,19 +2100,23 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
 
         /// Collects the AID if it is part of the pre-existing graph.
         let mut collect_non_shape_ident =
-            |aid: &AbstractNodeId| -> Result<(), OperationBuilderError> {
+            |&aid: &AbstractNodeId| -> Result<(), OperationBuilderError> {
                 match aid {
                     AbstractNodeId::ParameterMarker(_) => {
                         // we need this.
-                        collect_aid(aid.clone())?;
+                        collect_aid(aid)?;
                     }
                     AbstractNodeId::DynamicOutputMarker(orm, node_marker) => {
                         // we need this, but only if it is not from the current graph shape query.
-                        if orm != &gsq_op_marker {
-                            collect_aid(aid.clone())?;
+                        if orm != gsq_op_marker {
+                            collect_aid(aid)?;
                         }
                     }
-                }
+                    AbstractNodeId::Named(..) => {
+                        // same as above dynamic, except we know that it is not from the current graph shape query since we couldn't have
+                        // renamed the matched node yet.
+                        collect_aid(aid)?;
+                    }                }
                 Ok(())
             };
 
@@ -2331,16 +2453,7 @@ fn merge_states<S: Semantics>(
     // TODO: handle `is_true_shape`.
     //  ^ actually, we're doing that in interpret_graph_shape_query, so we don't need to do it here, I think.
 
-    let mut new_state = IntermediateState {
-        graph: Graph::new(),
-        node_keys_to_aid: BiMap::new(),
-        node_may_originate_from_shape_query: HashSet::new(),
-        edge_may_originate_from_shape_query: HashSet::new(),
-        node_may_be_written_to: HashMap::new(),
-        edge_may_be_written_to: HashMap::new(),
-        // TODO: should probably remove query_path from the state struct, and add it to a final returned StateWithQueryPath struct?
-        query_path: Vec::new(),
-    };
+    let mut new_state = IntermediateState::new();
 
     let mut common_aids = HashSet::new();
     // First, collect all AIDs that are present in both states.
@@ -2350,7 +2463,7 @@ fn merge_states<S: Semantics>(
         }
     }
 
-    // Now, for each common AID, we need to merge the nodes from both states.
+    // Now, for each common AID, we need to merge the nodes and info from both states.
     for aid in common_aids {
         let key_true = *state_true
             .node_keys_to_aid
