@@ -488,3 +488,10 @@ pub struct AbstractOperationOutput<S: Semantics> {
 //  in the abstract, i.e., it has to store the mapping?
 //  Then at concrete execution time, the user defined op only updates mappings for nodes that
 //  it actually expects from the abstract output.
+// UPDATE: This *may* be a problem. However, it's unlikely to be a problem.
+// For this to be a problem, an operation needs to _sometimes_ return a node. Simply adding a node is not enough,
+// since the UDO runner only updates the mapping for _returned_ nodes (as told by the ...Output struct family).
+// The only operations that can _sometimes_ return a node are builtin operations.
+// Hence I would argue this is a documentation issue (or slight client-DX issue), in that we need to document the
+// BuiltinOperation trait better to indicate that _returned_ nodes must always be returned, and also be specified
+// as a returned node in the operation's signature.
