@@ -451,6 +451,8 @@ interned_string_newtype!(AbstractOutputNodeMarker);
 /// It also allows operations to name their output nodes with `AbstractOutputNodeMarker`.
 pub struct OperationOutput {
     pub new_nodes: HashMap<AbstractOutputNodeMarker, NodeKey>,
+    // TODO: figure out if this is needed in the concrete? This can be used in the UDO runner to remove nodes from the mapping,
+    //  but is there actually a downside to keeping nodes in the mapping? Think about edge cases.
     pub removed_nodes: Vec<NodeKey>,
 }
 

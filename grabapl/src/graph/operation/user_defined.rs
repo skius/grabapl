@@ -160,10 +160,9 @@ pub enum OpLikeInstruction<S: Semantics> {
 
 #[derive(derive_more::Debug)]
 pub enum Instruction<S: Semantics> {
-    // TODO: Split out into Instruction::OperationLike (which includes both Builtin and Operation) (done)
-    //  and Instruction::QueryLike (which includes BuiltinQuery and potential future custom queries).
     #[debug("OpLike({_0:#?}, {_1:#?})")]
     OpLike(OpLikeInstruction<S>, AbstractOperationArgument),
+    // TODO: Split into Instruction::QueryLike (which includes BuiltinQuery and potential future custom queries).
     #[debug("BuiltinQuery(???, {_1:#?}, {_2:#?})")]
     BuiltinQuery(
         S::BuiltinQuery,
@@ -173,6 +172,7 @@ pub enum Instruction<S: Semantics> {
     #[debug("ShapeQuery(???, {_1:#?}, {_2:#?})")]
     ShapeQuery(
         GraphShapeQuery<S>,
+        // Note: a shape query should have no abstract, implicitly matched argument nodes. Hence the subst mapping in the argument is just for the explicitly selected nodes.
         AbstractOperationArgument,
         QueryInstructions<S>,
     ),
@@ -345,8 +345,6 @@ impl<'a, S: Semantics> Runner<'a, S> {
                     self.run(next_instr)?
                 }
                 Instruction::ShapeQuery(query, arg, query_instr) => {
-                    // ShapeQueries dont have context mappings, so we can just pass an empty hashmap.
-                    // TODO: ^ rethink the above, it's a bit of an ungly hack. Why not have it take an AbstractOperationArgument as well?
                     let concrete_arg = self.abstract_to_concrete_arg(&arg)?;
                     let result = run_shape_query(
                         self.g,
