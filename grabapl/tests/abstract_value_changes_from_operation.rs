@@ -1272,24 +1272,43 @@ fn shape_query_cannot_match_existing_nodes() {
 fn rename_nodes_and_merge_test() {
     let op_ctx = OperationContext::<TestSemantics>::new();
     let mut builder = OperationBuilder::new(&op_ctx);
-    builder.expect_parameter_node("p0", NodeType::Object).unwrap();
+    builder
+        .expect_parameter_node("p0", NodeType::Object)
+        .unwrap();
     let p0 = AbstractNodeId::param("p0");
     // assert that we cannot rename a param
     let res = builder.rename_node(p0, "test");
-    assert!(res.is_err(), "Expected to not be able to rename a parameter marker");
+    assert!(
+        res.is_err(),
+        "Expected to not be able to rename a parameter marker"
+    );
 
     // first branches: merge two nodes with same output marker, but different operation marker
-    builder.start_query(TestQuery::ValueEqualTo(NodeValue::Integer(0)), vec![p0]).unwrap();
+    builder
+        .start_query(TestQuery::ValueEqualTo(NodeValue::Integer(0)), vec![p0])
+        .unwrap();
     builder.enter_true_branch().unwrap();
-    builder.add_named_operation("op1".into(), BuilderOpLike::LibBuiltin(LibBuiltinOperation::AddNode {
-        value: NodeValue::String("hello".into()),
-    }), vec![]).unwrap();
+    builder
+        .add_named_operation(
+            "op1".into(),
+            BuilderOpLike::LibBuiltin(LibBuiltinOperation::AddNode {
+                value: NodeValue::String("hello".into()),
+            }),
+            vec![],
+        )
+        .unwrap();
     let true_branch_aid = AbstractNodeId::dynamic_output("op1", "new");
     builder.rename_node(true_branch_aid, "a").unwrap();
     builder.enter_false_branch().unwrap();
-    builder.add_named_operation("op2".into(), BuilderOpLike::LibBuiltin(LibBuiltinOperation::AddNode {
-        value: NodeValue::Integer(0),
-    }), vec![]).unwrap();
+    builder
+        .add_named_operation(
+            "op2".into(),
+            BuilderOpLike::LibBuiltin(LibBuiltinOperation::AddNode {
+                value: NodeValue::Integer(0),
+            }),
+            vec![],
+        )
+        .unwrap();
     let false_branch_aid = AbstractNodeId::dynamic_output("op2", "new");
     builder.rename_node(false_branch_aid, "a").unwrap();
     builder.end_query().unwrap();
@@ -1306,16 +1325,26 @@ fn rename_nodes_and_merge_test() {
     // second branches: shape queries with same operation marker, but different output markers
     // also assert that we cannot return these
     builder.start_shape_query("query").unwrap();
-    builder.expect_shape_node("wow".into(), NodeType::Integer).unwrap();
+    builder
+        .expect_shape_node("wow".into(), NodeType::Integer)
+        .unwrap();
     let wow_aid = AbstractNodeId::dynamic_output("query", "wow");
-    builder.expect_shape_edge(p0, wow_aid, EdgeType::Wildcard).unwrap();
+    builder
+        .expect_shape_edge(p0, wow_aid, EdgeType::Wildcard)
+        .unwrap();
     builder.enter_true_branch().unwrap();
     builder.rename_node(wow_aid, "b").unwrap();
     builder.enter_false_branch().unwrap();
     // in false branch create a new node ("wow", "new")
-    builder.add_named_operation("wow".into(), BuilderOpLike::LibBuiltin(LibBuiltinOperation::AddNode {
-        value: NodeValue::String("Something".into()),
-    }), vec![]).unwrap();
+    builder
+        .add_named_operation(
+            "wow".into(),
+            BuilderOpLike::LibBuiltin(LibBuiltinOperation::AddNode {
+                value: NodeValue::String("Something".into()),
+            }),
+            vec![],
+        )
+        .unwrap();
     let false_branch_aid = AbstractNodeId::dynamic_output("wow", "new");
     builder.rename_node(false_branch_aid, "b").unwrap();
     builder.end_query().unwrap();

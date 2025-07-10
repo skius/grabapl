@@ -2,7 +2,11 @@ use crate::graph::operation::builder::BuilderInstruction::ExpectParameterEdge;
 use crate::graph::operation::builtin::LibBuiltinOperation;
 use crate::graph::operation::query::{BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier};
 use crate::graph::operation::signature::{AbstractSignatureNodeId, OperationSignature};
-use crate::graph::operation::user_defined::{AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, AbstractUserDefinedOperationOutput, NamedMarker, OpLikeInstruction, QueryInstructions, UserDefinedOperation};
+use crate::graph::operation::user_defined::{
+    AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker,
+    AbstractUserDefinedOperationOutput, NamedMarker, OpLikeInstruction, QueryInstructions,
+    UserDefinedOperation,
+};
 use crate::graph::operation::{BuiltinOperation, OperationError, get_substitution};
 use crate::graph::pattern::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationParameter,
@@ -91,7 +95,7 @@ enum BuilderInstruction<S: Semantics> {
     #[debug("RenameNode({_0:?}, {_1:?})")]
     /// Rename a dynamic output marker.
     /// Invariants in the interpreter require that this is never a parameter node. (E.g., since we may want to return it)
-    RenameNode(AbstractNodeId, NamedMarker)
+    RenameNode(AbstractNodeId, NamedMarker),
 }
 
 impl<S: Semantics> BuilderInstruction<S> {
@@ -166,7 +170,9 @@ pub enum OperationBuilderError {
     ShapeEdgeTargetNotFound,
     #[error("Shape edge source node not found")]
     ShapeEdgeSourceNotFound,
-    #[error("Cannot rename parameter node {0:?}, only new nodes from operation calls can be renamed")]
+    #[error(
+        "Cannot rename parameter node {0:?}, only new nodes from operation calls can be renamed"
+    )]
     CannotRenameParameterNode(AbstractNodeId),
 }
 
@@ -201,7 +207,8 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         new_name: impl Into<NamedMarker>,
     ) -> Result<(), OperationBuilderError> {
         let new_name = new_name.into();
-        self.instructions.push(BuilderInstruction::RenameNode(old_aid, new_name));
+        self.instructions
+            .push(BuilderInstruction::RenameNode(old_aid, new_name));
         self.check_instructions_or_rollback()
     }
 
@@ -1364,29 +1371,29 @@ impl<S: Semantics> IntermediateState<S> {
             self.node_may_originate_from_shape_query.insert(new_aid);
         }
         // edges too
-        self.edge_may_originate_from_shape_query = self.edge_may_originate_from_shape_query.iter().map(|&(src, dst)|{
-            let new_src = if src == old_aid {
-                new_aid
-            } else {
-                src
-            };
-            let new_dst = if dst == old_aid {
-                new_aid
-            } else {
-                dst
-            };
-            (new_src, new_dst)
-        }).collect();
+        self.edge_may_originate_from_shape_query = self
+            .edge_may_originate_from_shape_query
+            .iter()
+            .map(|&(src, dst)| {
+                let new_src = if src == old_aid { new_aid } else { src };
+                let new_dst = if dst == old_aid { new_aid } else { dst };
+                (new_src, new_dst)
+            })
+            .collect();
 
         // Update writes
         if let Some(node_av) = self.node_may_be_written_to.remove(&old_aid) {
             self.node_may_be_written_to.insert(new_aid, node_av);
         }
-        self.edge_may_be_written_to = self.edge_may_be_written_to.iter().map(|(&(src, dst), edge_av)| {
-            let new_src = if src == old_aid { new_aid } else { src };
-            let new_dst = if dst == old_aid { new_aid } else { dst };
-            ((new_src, new_dst), edge_av.clone())
-        }).collect();
+        self.edge_may_be_written_to = self
+            .edge_may_be_written_to
+            .iter()
+            .map(|(&(src, dst), edge_av)| {
+                let new_src = if src == old_aid { new_aid } else { src };
+                let new_dst = if dst == old_aid { new_aid } else { dst };
+                ((new_src, new_dst), edge_av.clone())
+            })
+            .collect();
 
         Ok(())
     }
@@ -1512,8 +1519,6 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         op_ctx: &'a OperationContext<S>,
         partial_self_user_defined_op: &'a UserDefinedOperation<S>,
     ) -> Self {
-
-
         let initial_state = IntermediateState::from_param(&op_param);
 
         let current_state = initial_state.clone();
@@ -1794,12 +1799,13 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                 graph_instructions,
                 query_instructions,
             ),
-            IntermediateInstruction::RenameNode {
-                aid, new_name
-            } => {
+            IntermediateInstruction::RenameNode { aid, new_name } => {
                 let new_aid = AbstractNodeId::named(new_name);
 
-                Ok((self.rename_node(aid, new_aid)?, InterpretedInstruction::OpLike)) // TODO: return a proper instruction
+                Ok((
+                    self.rename_node(aid, new_aid)?,
+                    InterpretedInstruction::OpLike,
+                )) // TODO: return a proper instruction
             }
         }
     }
@@ -2116,7 +2122,8 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                         // same as above dynamic, except we know that it is not from the current graph shape query since we couldn't have
                         // renamed the matched node yet.
                         collect_aid(aid)?;
-                    }                }
+                    }
+                }
                 Ok(())
             };
 

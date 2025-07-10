@@ -68,9 +68,7 @@ impl AbstractNodeId {
         AbstractNodeId::DynamicOutputMarker(output_id, output_marker)
     }
 
-    pub fn named(
-        name: impl Into<NamedMarker>,
-    ) -> Self {
+    pub fn named(name: impl Into<NamedMarker>) -> Self {
         AbstractNodeId::Named(name.into())
     }
 }
@@ -388,9 +386,7 @@ impl<'a, S: Semantics> Runner<'a, S> {
                         };
                     self.run(next_instr)?;
                 }
-                Instruction::RenameNode {
-                    old, new
-                } => {
+                Instruction::RenameNode { old, new } => {
                     let Some(key) = self.abstract_to_concrete.remove(old) else {
                         return Err(OperationError::UnknownAID(*old));
                     };
@@ -424,7 +420,7 @@ impl<'a, S: Semantics> Runner<'a, S> {
                 .get(&subst_marker)
                 .copied()
                 .ok_or(OperationError::UnknownParameterMarker(subst_marker)),
-            AbstractNodeId::DynamicOutputMarker(..) | AbstractNodeId::Named(..)  => {
+            AbstractNodeId::DynamicOutputMarker(..) | AbstractNodeId::Named(..) => {
                 let key = self
                     .abstract_to_concrete
                     .get(&aid)
