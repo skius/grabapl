@@ -2012,23 +2012,22 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         gsq_instructions: Vec<GraphShapeQueryInstruction<S>>,
         query_instructions: IntermediateQueryInstructions<S>,
     ) -> Result<(UDInstruction<S>, InterpretedInstruction<S>), OperationBuilderError> {
-        let mut state_before = self.current_state.clone();
+        let state_before = self.current_state.clone();
 
         // preparation for false branch
         let false_branch_state = self.current_state.clone();
         let initial_false_branch_state = false_branch_state.clone();
 
         // first pass: collect the initial graph (the parameter)
-        // TODO: switch to ParameterBuilder
-        let mut param = OperationParameter::new_empty();
+        let mut param_builder = OperationParameterBuilder::new();
 
         let mut abstract_args = Vec::new();
 
         let mut arg_aid_to_param_subst: BiMap<AbstractNodeId, SubstMarker> = BiMap::new();
         let mut arg_aid_to_node_keys: BiMap<AbstractNodeId, NodeKey> = BiMap::new();
 
-        /// Collects the AID and adds it to all relevant mappings.
-        /// The passed AID is a node that is part of the pre-existing graph.
+        // Collects the AID and adds it to all relevant mappings.
+        // The passed AID is a node that is part of the pre-existing graph.
         let mut collect_aid = |aid: AbstractNodeId| -> Result<(), OperationBuilderError> {
             if arg_aid_to_param_subst.contains_left(&aid) {
                 // we already processed this
@@ -2036,7 +2035,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             }
             // invent a new subst marker for this AID.
             let subst_marker =
-                SubstMarker::from((param.explicit_input_nodes.len() as u32).to_string());
+                param_builder.next_subst_marker();
             let key = self.get_current_key_from_aid(aid)?;
             let abstract_value = self
                 .current_state
@@ -2047,12 +2046,8 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                 )
                 .clone();
             // the shape query will expect the same AV
-            let param_key = param.parameter_graph.add_node(abstract_value);
-            param
-                .node_keys_to_subst
-                .insert(param_key, subst_marker.clone());
             // context-matching here is against the purpose of shape queries, so every argument is explicit
-            param.explicit_input_nodes.push(subst_marker.clone());
+            param_builder.expect_explicit_input_node(subst_marker, abstract_value).change_context(OperationBuilderError::InternalError("node should not be in param"))?;
             // we need to push in the same sequence as expected in explicit_input_nodes
             abstract_args.push(aid.clone());
             arg_aid_to_param_subst.insert(aid.clone(), subst_marker.clone());
@@ -2060,7 +2055,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             Ok(())
         };
 
-        /// Collects the AID if it is part of the pre-existing graph.
+        // Collects the AID if it is part of the pre-existing graph.
         let mut collect_non_shape_ident =
             |&aid: &AbstractNodeId| -> Result<(), OperationBuilderError> {
                 match aid {
@@ -2096,6 +2091,12 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                 }
             }
         }
+        
+        let param = param_builder
+            .build()
+            .change_context(OperationBuilderError::InternalError(
+                "Failed to build operation parameter for graph shape query",
+            ))?;
 
         // second pass:
         // modify to have the expected graph as well as shape ident mappings.

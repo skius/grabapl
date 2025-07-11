@@ -28,6 +28,16 @@ impl<S: Semantics> OperationParameterBuilder<S> {
             subst_to_node_keys: BiMap::new(),
         }
     }
+    
+    pub fn next_subst_marker(&mut self) -> SubstMarker {
+        let mut next_index = self.subst_to_node_keys.len();
+        let mut next = next_index.to_string();
+        while self.subst_to_node_keys.contains_left(&SubstMarker::from(&*next)) {
+            next_index += 1;
+            next = next_index.to_string();
+        }
+        SubstMarker::from(next)
+    }
 
     pub fn expect_explicit_input_node(
         &mut self,

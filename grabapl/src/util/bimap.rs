@@ -21,6 +21,10 @@ impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> BiMap<L, 
         }
         this
     }
+    
+    pub fn len(&self) -> usize {
+        self.left_to_right.len()
+    }
 
     pub fn into_inner(self) -> (HashMap<L, R>, HashMap<R, L>) {
         (self.left_to_right, self.right_to_left)
