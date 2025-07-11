@@ -419,6 +419,14 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
             builder_result.return_edges,
         )?;
 
+        // TODO: this is bad. we check validity of parameter both here and when encountering the next instructions.
+        //  would be nicer if we had some way of indicating "validate this once current input phase is over"
+        //  e.g., validate parameter once the parameter definition phase is over OR the function needs to be built.
+        // check if the parameter is valid:
+        user_def_op.parameter.check_validity().change_context(
+            OperationBuilderError::InvalidParameter,
+        )?;
+
         Ok(user_def_op)
     }
 
@@ -779,6 +787,13 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
         let mut iter = builder_instructions.iter().peekable();
 
         let op_parameter = Self::build_operation_parameter(&mut iter)?;
+
+        // check validity of the parameter if there's more instructions, since that implies the parameter should be done.
+        if iter.peek().is_some() {
+            op_parameter.check_validity().change_context(
+                OperationBuilderError::InvalidParameter,
+            )?;
+        }
 
         let mut builder = Self {
             _phantom_data: PhantomData,
@@ -2091,7 +2106,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                 }
             }
         }
-        
+
         let param = param_builder
             .build()
             .change_context(OperationBuilderError::InternalError(

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+use petgraph::visit::UndirectedAdaptor;
 use crate::graph::pattern::OperationParameter;
 use crate::graph::semantics::AbstractGraph;
 use crate::util::bimap::BiMap;
@@ -91,7 +93,7 @@ impl<S: Semantics> OperationParameterBuilder<S> {
 
     pub fn build(self) -> Result<OperationParameter<S>, ParameterBuilderError> {
         // TODO: check that all context nodes are linked with edges to explicit input nodes.
-
+        
         Ok(OperationParameter {
             explicit_input_nodes: self.explicit_input_nodes,
             parameter_graph: self.parameter_graph,

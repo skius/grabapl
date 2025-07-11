@@ -8,8 +8,18 @@ use internment::Intern;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
+use petgraph::visit::UndirectedAdaptor;
+use thiserror::Error;
+use crate::graph::operation::builder::OperationBuilderError;
+use crate::graph::operation::parameterbuilder::ParameterBuilderError;
 use crate::util::bimap::BiMap;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
+
+#[derive(Debug, Error)]
+pub enum OperationParameterError {
+    #[error("Context node {0:?} is not connected to any explicit input nodes in the parameter graph")]
+    ContextNodeNotConnected(SubstMarker),
+}
 
 pub struct OperationParameter<S: Semantics> {
     /// The ordered input nodes that must be explicitly selected.
@@ -39,6 +49,34 @@ impl<S: Semantics> OperationParameter<S> {
             parameter_graph: AbstractGraph::<S>::new(),
             node_keys_to_subst: BiMap::new(),
         }
+    }
+
+    pub fn check_validity(
+        &self,
+    ) -> Result<(), OperationParameterError> {
+        // we want weak connected components, hence we use UndirectedAdaptor
+        let undi = UndirectedAdaptor(&self.parameter_graph.graph);
+        let components = petgraph::algo::tarjan_scc(&undi);
+
+        for component in components {
+            let mut contains_explicit_input = false;
+            for key in &component {
+                let subst_marker = self.node_keys_to_subst.get_left(key)
+                    .expect("internal error: should find subst marker for node key");
+                if self.explicit_input_nodes.contains(subst_marker) {
+                    contains_explicit_input = true;
+                    break;
+                }
+            }
+            if !contains_explicit_input {
+                let example_context_node = component[0];
+                let subst_marker = self.node_keys_to_subst.get_left(&example_context_node)
+                    .expect("internal error: should find subst marker for node key");
+                return Err(OperationParameterError::ContextNodeNotConnected(*subst_marker));
+            }
+        }
+
+        Ok(())
     }
 }
 

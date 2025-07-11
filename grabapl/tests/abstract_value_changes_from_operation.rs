@@ -1006,6 +1006,8 @@ fn shape_query_doesnt_match_nodes_for_which_handles_exist() {
         .unwrap();
     let p0 = AbstractNodeId::param("p0");
     let c0 = AbstractNodeId::param("c0");
+    builder.expect_parameter_edge("p0", "c0", EdgeType::Wildcard)
+        .unwrap();
     // call op 0
     builder
         .add_operation(BuilderOpLike::FromOperationId(0), vec![p0])
