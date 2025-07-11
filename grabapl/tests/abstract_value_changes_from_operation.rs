@@ -1417,8 +1417,7 @@ fn shape_query_allows_refinement_of_existing_nodes_and_edges() {
             vec![p1.clone()],
         )
         .unwrap();
-    
-    
+
 
     // finalize and test
     let operation = builder.build(0).unwrap();
@@ -1436,10 +1435,68 @@ fn shape_query_allows_refinement_of_existing_nodes_and_edges() {
 
         let p0_value = g.get_node_attr(p0_key);
         assert_eq!(p0_value, Some(&NodeValue::String("has child".to_string())));
-        
+
         let p1_value = g.get_node_attr(p1_key);
         assert_eq!(p1_value, Some(&NodeValue::String("was integer".to_string())));
     }
+}
 
+#[test_log::test]
+fn shape_query_av_refinement_works_in_branch_merge() {
+    let mut op_ctx = OperationContext::<TestSemantics>::new();
+    let mut builder = OperationBuilder::new(&op_ctx);
+    // we expect a p0: Object
+    builder
+        .expect_parameter_node("p0", NodeType::Object)
+        .unwrap();
+    let p0 = AbstractNodeId::param("p0");
+    // check if p0 is actually an Integer
+    builder.start_shape_query("q").unwrap();
+    builder.expect_shape_node_change(p0, NodeType::Integer).unwrap();
+    builder.enter_false_branch().unwrap();
+    // if not, turn it into an integer
+    builder
+        .add_operation(
+            BuilderOpLike::LibBuiltin(LibBuiltinOperation::SetNode {
+                param: NodeType::Object,
+                value: NodeValue::Integer(42),
+            }),
+            vec![p0.clone()],
+        )
+        .unwrap();
+    builder.end_query().unwrap();
 
+    // assert that after the merge we statically know that p0 is an Integer
+    let state = builder.show_state().unwrap();
+    let p0_av = state.node_av_of_aid(&p0);
+    assert_eq!(
+        p0_av,
+        Some(&NodeType::Integer),
+        "Expected p0 to be Integer after the shape query refinement"
+    );
+
+    let op = builder.build(0).unwrap();
+    op_ctx.add_custom_operation(0, op);
+
+    // check behavior in concrete
+    let mut g = TestSemantics::new_concrete_graph();
+    let p0_key = g.add_node(NodeValue::String("not an integer".to_string()));
+    run_from_concrete(&mut g, &op_ctx, 0, &[p0_key]).unwrap();
+    // assert that p0 is now an integer
+    let p0_value = g.get_node_attr(p0_key);
+    assert_eq!(
+        p0_value,
+        Some(&NodeValue::Integer(42)),
+        "Expected p0 to be set to Integer after the shape query did not match"
+    );
+
+    let p1_key = g.add_node(NodeValue::Integer(100));
+    run_from_concrete(&mut g, &op_ctx, 0, &[p1_key]).unwrap();
+    // assert that p1 did not change since the true branch does nothing
+    let p1_value = g.get_node_attr(p1_key);
+    assert_eq!(
+        p1_value,
+        Some(&NodeValue::Integer(100)),
+        "Expected p1 to not change"
+    );
 }

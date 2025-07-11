@@ -79,6 +79,8 @@ enum BuilderInstruction<S: Semantics> {
     EndQuery,
     #[debug("ExpectShapeNode({_0:?}, ???)")]
     ExpectShapeNode(AbstractOutputNodeMarker, S::NodeAbstract),
+    #[debug("ExpectShapeNodeChange({_0:?}, ???)")]
+    ExpectShapeNodeChange(AbstractNodeId, S::NodeAbstract),
     #[debug("ExpectShapeEdge({_0:?}, {_1:?}, ???)")]
     ExpectShapeEdge(AbstractNodeId, AbstractNodeId, S::EdgeAbstract),
     #[debug("AddNamedOperation({_0:?}, ???, args: {_2:?})")]
@@ -309,6 +311,16 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         // TODO: check that any shape nodes are not free floating. maybe this should be in a GraphShapeQuery validator?
         self.instructions
             .push(BuilderInstruction::ExpectShapeNode(marker, node));
+        self.check_instructions_or_rollback()
+    }
+
+    pub fn expect_shape_node_change(
+        &mut self,
+        aid: AbstractNodeId,
+        node: S::NodeAbstract,
+    ) -> Result<(), OperationBuilderError> {
+        self.instructions
+            .push(BuilderInstruction::ExpectShapeNodeChange(aid, node));
         self.check_instructions_or_rollback()
     }
 
@@ -636,6 +648,8 @@ struct IntermediateQueryInstructions<S: Semantics> {
 enum GraphShapeQueryInstruction<S: Semantics> {
     #[debug("ExpectShapeNode({_0:#?})")]
     ExpectShapeNode(AbstractOutputNodeMarker, S::NodeAbstract),
+    #[debug("ExpectShapeNodeChange({_0:#?})")]
+    ExpectShapeNodeChange(AbstractNodeId, S::NodeAbstract),
     #[debug("ExpectShapeEdge({_0:#?}, {_1:#?})")]
     ExpectShapeEdge(AbstractNodeId, AbstractNodeId, S::EdgeAbstract),
 }
@@ -1021,6 +1035,13 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     gsq_instructions.push(GraphShapeQueryInstruction::ExpectShapeNode(
                         marker.clone(),
                         abstract_value.clone(),
+                    ));
+                }
+                BuilderInstruction::ExpectShapeNodeChange(aid, new_av) => {
+                    iter.next();
+                    gsq_instructions.push(GraphShapeQueryInstruction::ExpectShapeNodeChange(
+                        aid.clone(),
+                        new_av.clone(),
                     ));
                 }
                 BuilderInstruction::ExpectShapeEdge(source, target, abstract_value) => {
@@ -2104,6 +2125,10 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                     collect_non_shape_ident(src)?;
                     collect_non_shape_ident(target)?;
                 }
+                GraphShapeQueryInstruction::ExpectShapeNodeChange(aid, _) => {
+                    // we need this node to be in the initial graph.
+                    collect_non_shape_ident(aid)?;
+                }
             }
         }
 
@@ -2182,6 +2207,19 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                     self.current_state
                         .node_may_originate_from_shape_query
                         .insert(aid.clone());
+                }
+                GraphShapeQueryInstruction::ExpectShapeNodeChange(aid, av) => {
+                    // set the expected av
+                    let key = aid_to_node_key_hack!(aid.clone())?;
+                    expected_graph.set_node_attr(key, av.clone());
+
+                    // now update the state for the true branch.
+                    let state_key = self
+                        .get_current_key_from_aid(aid)
+                        .change_context(OperationBuilderError::NotFoundAid(aid))?;
+                    self.current_state
+                        .graph
+                        .set_node_attr(state_key, av);
                 }
                 GraphShapeQueryInstruction::ExpectShapeEdge(src, target, av) => {
                     let src_key = aid_to_node_key_hack!(src.clone())?;
