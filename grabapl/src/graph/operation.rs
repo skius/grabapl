@@ -180,8 +180,8 @@ args: {selected_inputs:?}"
         .zip(selected_inputs.iter())
         .map(|((param_marker, argument_node_key))| {
             let param_node_key = param
-                .subst_to_node_keys
-                .get(param_marker)
+                .node_keys_to_subst
+                .get_right(param_marker)
                 .expect("internal error: invalid parameter marker");
             (*param_node_key, *argument_node_key)
         })
@@ -223,7 +223,8 @@ args: {selected_inputs:?}"
                 let param_node_key = param_ref.from_index(param_idx);
                 let arg_node_key = arg_ref.from_index(arg_idx);
                 (
-                    param.node_keys_to_subst[&param_node_key].clone(),
+                    // unwrap is ok since it was returned by param_ref.from_index
+                    param.node_keys_to_subst.get_left(&param_node_key).unwrap().clone(),
                     arg_node_key,
                 )
             })

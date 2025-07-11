@@ -274,12 +274,12 @@ impl<S: Semantics> OperationParameter<S> {
             .zip(other.explicit_input_nodes.iter())
         {
             let self_key = self
-                .subst_to_node_keys
-                .get(self_subst)
+                .node_keys_to_subst
+                .get_right(self_subst)
                 .expect("internal error: missing subst marker in self");
             let other_key = other
-                .subst_to_node_keys
-                .get(other_subst)
+                .node_keys_to_subst
+                .get_right(other_subst)
                 .expect("internal error: missing subst marker in other");
             let self_type = self
                 .parameter_graph

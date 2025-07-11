@@ -256,8 +256,8 @@ fn get_shape_query_substitution<S: Semantics>(
     for (subst_marker, dynamic_node_key) in &subst.mapping {
         let desired_node_key = query
             .parameter
-            .subst_to_node_keys
-            .get(subst_marker)
+            .node_keys_to_subst
+            .get_right(subst_marker)
             .expect("internal error: parameter substitution incorrect");
         // that key must be mapped to the same node in the dynamic query we're running
         enforced_desired_to_dynamic.insert(*desired_node_key, *dynamic_node_key);

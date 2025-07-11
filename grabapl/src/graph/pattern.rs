@@ -8,6 +8,7 @@ use internment::Intern;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
+use crate::util::bimap::BiMap;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
 
 pub struct OperationParameter<S: Semantics> {
@@ -15,12 +16,10 @@ pub struct OperationParameter<S: Semantics> {
     pub explicit_input_nodes: Vec<SubstMarker>,
     /// The initial abstract state that the operation expects.
     pub parameter_graph: AbstractGraph<S>,
-    // TODO: Use a BidiHashMap
     // TODO: Actually, because an operation may accept the same node multiple times, we may want to to have the inverse actually be a multimap? so NodeKey -> Vec<SubstMarker>
-    /// Maps the user-defined substitution markers to the node keys in the pattern graph.
-    pub subst_to_node_keys: HashMap<SubstMarker, NodeKey>,
-    /// Maps node keys in the pattern graph to the user-defined substitution markers.
-    pub node_keys_to_subst: HashMap<NodeKey, SubstMarker>,
+    //  ^ is if we support node aliasing.
+    /// Associates node keys of the parameter graph with the substitution markers.
+    pub node_keys_to_subst: BiMap<NodeKey, SubstMarker>,
 }
 
 impl<S: Semantics> Clone for OperationParameter<S> {
@@ -28,7 +27,6 @@ impl<S: Semantics> Clone for OperationParameter<S> {
         OperationParameter {
             explicit_input_nodes: self.explicit_input_nodes.clone(),
             parameter_graph: self.parameter_graph.clone(),
-            subst_to_node_keys: self.subst_to_node_keys.clone(),
             node_keys_to_subst: self.node_keys_to_subst.clone(),
         }
     }
@@ -39,8 +37,7 @@ impl<S: Semantics> OperationParameter<S> {
         OperationParameter {
             explicit_input_nodes: Vec::new(),
             parameter_graph: AbstractGraph::<S>::new(),
-            subst_to_node_keys: HashMap::new(),
-            node_keys_to_subst: HashMap::new(),
+            node_keys_to_subst: BiMap::new(),
         }
     }
 }

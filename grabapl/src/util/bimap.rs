@@ -13,9 +13,24 @@ impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> BiMap<L, 
             right_to_left: HashMap::new(),
         }
     }
+    
+    pub fn from<const N: usize>(pairs: [(L, R); N]) -> Self {
+        let mut this = BiMap::new();
+        for (left, right) in pairs {
+            this.insert(left, right);
+        }
+        this
+    }
 
     pub fn into_inner(self) -> (HashMap<L, R>, HashMap<R, L>) {
         (self.left_to_right, self.right_to_left)
+    }
+
+    pub fn into_reversed(self) -> BiMap<R, L> {
+        BiMap {
+            left_to_right: self.right_to_left,
+            right_to_left: self.left_to_right,
+        }
     }
 
     pub fn into_left_map(self) -> HashMap<L, R> {
@@ -75,6 +90,10 @@ impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> BiMap<L, 
 
     pub fn left_values(&self) -> impl Iterator<Item = &L> {
         self.right_to_left.values()
+    }
+    
+    pub fn iter(&self) -> impl Iterator<Item = (&L, &R)> {
+        self.left_to_right.iter()
     }
 }
 

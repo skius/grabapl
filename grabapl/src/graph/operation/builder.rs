@@ -15,7 +15,7 @@ use crate::graph::pattern::{
 use crate::graph::semantics::{AbstractGraph, AbstractMatcher};
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
-use error_stack::{Report, Result, ResultExt, bail, report};
+use error_stack::{Report, Result, ResultExt, bail, report, FutureExt};
 use petgraph::dot;
 use petgraph::dot::Dot;
 use petgraph::prelude::GraphMap;
@@ -27,6 +27,7 @@ use std::marker::PhantomData;
 use std::mem;
 use std::slice::Iter;
 use thiserror::Error;
+use crate::graph::operation::parameterbuilder::OperationParameterBuilder;
 /*
 General overview:
 
@@ -174,6 +175,8 @@ pub enum OperationBuilderError {
         "Cannot rename parameter node {0:?}, only new nodes from operation calls can be renamed"
     )]
     CannotRenameParameterNode(AbstractNodeId),
+    #[error("Invalid parameter")]
+    InvalidParameter,
 }
 
 pub struct OperationBuilder<'a, S: Semantics> {
@@ -1085,47 +1088,19 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
     fn build_operation_parameter(
         iter: &mut Peekable<Iter<BuilderInstruction<S>>>,
     ) -> Result<OperationParameter<S>, OperationBuilderError> {
-        let mut operation_parameter = OperationParameter::<S> {
-            explicit_input_nodes: Vec::new(),
-            parameter_graph: AbstractGraph::<S>::new(),
-            subst_to_node_keys: HashMap::new(),
-            node_keys_to_subst: HashMap::new(),
-        };
+        let mut builder = OperationParameterBuilder::new();
 
         while let Some(instruction) = iter.peek() {
             match instruction {
                 BuilderInstruction::ExpectParameterNode(marker, node_abstract) => {
                     iter.next();
-                    if operation_parameter.subst_to_node_keys.contains_key(marker) {
-                        bail!(OperationBuilderError::ReusedSubstMarker(marker.clone()));
-                    }
-                    let key = operation_parameter
-                        .parameter_graph
-                        .add_node(node_abstract.clone());
-                    operation_parameter
-                        .subst_to_node_keys
-                        .insert(marker.clone(), key);
-                    operation_parameter
-                        .node_keys_to_subst
-                        .insert(key, marker.clone());
-                    operation_parameter
-                        .explicit_input_nodes
-                        .push(marker.clone());
+                    builder.expect_explicit_input_node(*marker, node_abstract.clone())
+                        .change_context(OperationBuilderError::InvalidParameter)?;
                 }
                 BuilderInstruction::ExpectContextNode(marker, node_abstract) => {
                     iter.next();
-                    if operation_parameter.subst_to_node_keys.contains_key(marker) {
-                        bail!(OperationBuilderError::ReusedSubstMarker(marker.clone()));
-                    }
-                    let key = operation_parameter
-                        .parameter_graph
-                        .add_node(node_abstract.clone());
-                    operation_parameter
-                        .subst_to_node_keys
-                        .insert(marker.clone(), key);
-                    operation_parameter
-                        .node_keys_to_subst
-                        .insert(key, marker.clone());
+                    builder.expect_context_node(*marker, node_abstract.clone())
+                        .change_context(OperationBuilderError::InvalidParameter)?;
                 }
                 BuilderInstruction::ExpectParameterEdge(
                     source_marker,
@@ -1133,23 +1108,11 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     edge_abstract,
                 ) => {
                     iter.next();
-                    let source_key = operation_parameter
-                        .subst_to_node_keys
-                        .get(source_marker)
-                        .ok_or(OperationBuilderError::NotFoundSubstMarker(
-                            source_marker.clone(),
-                        ))?;
-                    let target_key = operation_parameter
-                        .subst_to_node_keys
-                        .get(target_marker)
-                        .ok_or(OperationBuilderError::NotFoundSubstMarker(
-                            target_marker.clone(),
-                        ))?;
-                    operation_parameter.parameter_graph.add_edge(
-                        *source_key,
-                        *target_key,
+                    builder.expect_edge(
+                        *source_marker,
+                        *target_marker,
                         edge_abstract.clone(),
-                    );
+                    ).change_context(OperationBuilderError::InvalidParameter)?;
                 }
                 _ => {
                     break;
@@ -1157,7 +1120,7 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
             }
         }
 
-        Ok(operation_parameter)
+        builder.build().change_context(OperationBuilderError::InvalidParameter)
     }
 
     // TODO: also collect ReturnEdge
@@ -1404,7 +1367,7 @@ impl<S: Semantics> IntermediateState<S> {
         let mut initial_mapping = BiMap::new();
 
         for (key, subst) in param.node_keys_to_subst.iter() {
-            let aid = AbstractNodeId::ParameterMarker(subst.clone());
+            let aid = AbstractNodeId::ParameterMarker(*subst);
             initial_mapping.insert(*key, aid);
         }
 
@@ -1663,7 +1626,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         let initial_subst_nodes = self
             .op_param
             .node_keys_to_subst
-            .values()
+            .right_values()
             .cloned()
             .collect::<HashSet<_>>();
         let current_subst_nodes = self
@@ -1688,10 +1651,10 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
 
         let mut initial_edges = HashSet::new();
         for (source, target, _) in self.op_param.parameter_graph.graph.all_edges() {
-            let Some(source_subst) = self.op_param.node_keys_to_subst.get(&source) else {
+            let Some(source_subst) = self.op_param.node_keys_to_subst.get_left(&source) else {
                 continue; // should not happen, but just in case
             };
-            let Some(target_subst) = self.op_param.node_keys_to_subst.get(&target) else {
+            let Some(target_subst) = self.op_param.node_keys_to_subst.get_left(&target) else {
                 continue; // should not happen, but just in case
             };
             initial_edges.insert((*source_subst, *target_subst));
@@ -2056,12 +2019,8 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         let initial_false_branch_state = false_branch_state.clone();
 
         // first pass: collect the initial graph (the parameter)
-        let mut param = OperationParameter::<S> {
-            explicit_input_nodes: vec![],
-            parameter_graph: AbstractGraph::<S>::new(),
-            subst_to_node_keys: HashMap::new(),
-            node_keys_to_subst: HashMap::new(),
-        };
+        // TODO: switch to ParameterBuilder
+        let mut param = OperationParameter::new_empty();
 
         let mut abstract_args = Vec::new();
 
@@ -2089,9 +2048,6 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                 .clone();
             // the shape query will expect the same AV
             let param_key = param.parameter_graph.add_node(abstract_value);
-            param
-                .subst_to_node_keys
-                .insert(subst_marker.clone(), param_key);
             param
                 .node_keys_to_subst
                 .insert(param_key, subst_marker.clone());

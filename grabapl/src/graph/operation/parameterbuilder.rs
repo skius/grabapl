@@ -82,12 +82,10 @@ impl<S: Semantics> OperationParameterBuilder<S> {
     pub fn build(self) -> Result<OperationParameter<S>, ParameterBuilderError> {
         // TODO: check that all context nodes are linked with edges to explicit input nodes.
 
-        let (subst_to_node_keys, node_keys_to_subst) = self.subst_to_node_keys.into_inner();
         Ok(OperationParameter {
             explicit_input_nodes: self.explicit_input_nodes,
             parameter_graph: self.parameter_graph,
-            subst_to_node_keys,
-            node_keys_to_subst,
+            node_keys_to_subst: self.subst_to_node_keys.into_reversed(),
         })
     }
 }

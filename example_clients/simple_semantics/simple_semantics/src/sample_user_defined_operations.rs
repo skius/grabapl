@@ -8,6 +8,7 @@ use grabapl::graph::operation::user_defined::{
 use grabapl::graph::pattern::{OperationArgument, OperationParameter};
 use grabapl::{OperationContext, OperationId};
 use std::collections::HashMap;
+use grabapl::util::bimap::BiMap;
 
 fn mk_builtin_instruction(
     op: BuiltinOperation,
@@ -50,8 +51,7 @@ pub fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemanti
     let param = OperationParameter {
         explicit_input_nodes: vec!["input".into()],
         parameter_graph: g,
-        subst_to_node_keys: HashMap::from([("input".into(), a)]),
-        node_keys_to_subst: HashMap::from([(a, "input".into())]),
+        node_keys_to_subst: BiMap::from([(a, "input".into())]),
     };
 
     let input_node = AbstractNodeId::param("input");
@@ -240,8 +240,7 @@ pub fn get_count_list_len_user_defined_operation(
         let param = OperationParameter {
             explicit_input_nodes: vec!["input".into()],
             parameter_graph: g,
-            subst_to_node_keys: HashMap::from([("input".into(), head)]),
-            node_keys_to_subst: HashMap::from([(head, "input".into())]),
+            node_keys_to_subst: BiMap::from([(head, "input".into())]),
         };
 
         let child = expected_g.add_node(());
@@ -330,8 +329,7 @@ pub fn get_insert_bst_user_defined_operation(
                         parameter: OperationParameter {
                             explicit_input_nodes: vec!["input".into()],
                             parameter_graph: g,
-                            subst_to_node_keys: HashMap::from([("input".into(), head)]),
-                            node_keys_to_subst: HashMap::from([(head, "input".into())]),
+                            node_keys_to_subst: BiMap::from([(head, "input".into())]),
                         },
                         expected_graph: expected_g,
                         node_keys_to_shape_idents: HashMap::from([
@@ -375,8 +373,7 @@ pub fn get_insert_bst_user_defined_operation(
                                     parameter: OperationParameter {
                                         explicit_input_nodes: vec!["input".into()],
                                         parameter_graph: g,
-                                        subst_to_node_keys: HashMap::from([("input".into(), head)]),
-                                        node_keys_to_subst: HashMap::from([(head, "input".into())]),
+                                        node_keys_to_subst: BiMap::from([(head, "input".into())]),
                                     },
                                     expected_graph: expected_g,
                                     node_keys_to_shape_idents: HashMap::from([(child, "child".into())]),
@@ -517,11 +514,7 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                     parameter: OperationParameter {
                                                         explicit_input_nodes: vec!["input".into()],
                                                         parameter_graph: g,
-                                                        subst_to_node_keys: HashMap::from([(
-                                                            "input".into(),
-                                                            head,
-                                                        )]),
-                                                        node_keys_to_subst: HashMap::from([(
+                                                        node_keys_to_subst: BiMap::from([(
                                                             head,
                                                             "input".into(),
                                                         )]),
@@ -634,11 +627,7 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                     parameter: OperationParameter {
                                                         explicit_input_nodes: vec!["input".into()],
                                                         parameter_graph: g,
-                                                        subst_to_node_keys: HashMap::from([(
-                                                            "input".into(),
-                                                            head,
-                                                        )]),
-                                                        node_keys_to_subst: HashMap::from([(
+                                                        node_keys_to_subst: BiMap::from([(
                                                             head,
                                                             "input".into(),
                                                         )]),
@@ -786,8 +775,7 @@ pub fn get_node_heights_user_defined_operation(
             parameter: OperationParameter {
                 explicit_input_nodes: vec!["input".into()],
                 parameter_graph: g,
-                subst_to_node_keys: HashMap::from([("input".into(), head)]),
-                node_keys_to_subst: HashMap::from([(head, "input".into())]),
+                node_keys_to_subst: BiMap::from([(head, "input".into())]),
             },
             expected_graph: expected_g,
             node_keys_to_shape_idents: HashMap::from([(left_child, "left".into())]),
@@ -805,8 +793,7 @@ pub fn get_node_heights_user_defined_operation(
             parameter: OperationParameter {
                 explicit_input_nodes: vec!["input".into()],
                 parameter_graph: g,
-                subst_to_node_keys: HashMap::from([("input".into(), head)]),
-                node_keys_to_subst: HashMap::from([(head, "input".into())]),
+                node_keys_to_subst: BiMap::from([(head, "input".into())]),
             },
             expected_graph: expected_g,
             node_keys_to_shape_idents: HashMap::from([(right_child, "right".into())]),
