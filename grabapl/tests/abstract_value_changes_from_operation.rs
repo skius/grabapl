@@ -19,6 +19,7 @@ use std::collections::{HashMap, HashSet};
 
 mod util;
 use util::semantics::*;
+use crate::util::interval_semantics::EdgeValue;
 
 #[test]
 fn no_modifications_dont_change_abstract_value() {
@@ -1365,4 +1366,80 @@ fn rename_nodes_and_merge_test() {
         res.is_err(),
         "Expected to not be able to return a renamed node that partially comes from a shape query",
     );
+}
+
+#[test_log::test]
+fn shape_query_allows_refinement_of_existing_nodes_and_edges() {
+    let mut op_ctx = OperationContext::<TestSemantics>::new();
+    let mut builder = OperationBuilder::new(&op_ctx);
+    // we expect a p0: Object -*-> p1: Object
+    builder
+        .expect_parameter_node("p0", NodeType::Object)
+        .unwrap();
+    builder
+        .expect_parameter_node("p1", NodeType::Object)
+        .unwrap();
+    let p0 = AbstractNodeId::param("p0");
+    let p1 = AbstractNodeId::param("p1");
+    builder
+        .expect_parameter_edge("p0", "p1", EdgeType::Wildcard)
+        .unwrap();
+
+    // first: start a shape query to check if p0->p1 has type "child"
+    builder.start_shape_query("q").unwrap();
+    builder.expect_shape_edge(p0, p1, EdgeType::Exact("child".to_string())).unwrap();
+    builder.enter_true_branch().unwrap();
+    // if it does, set p0 to "has child"
+    builder
+        .add_operation(
+            BuilderOpLike::LibBuiltin(LibBuiltinOperation::SetNode {
+                param: NodeType::Object,
+                value: NodeValue::String("has child".to_string()),
+            }),
+            vec![p0.clone()],
+        )
+        .unwrap();
+    builder.end_query().unwrap();
+
+    // also, check if p1 has type Integer.
+    builder.start_shape_query("q1").unwrap();
+    builder
+        .expect_shape_node_change(p1, NodeType::Integer)
+        .unwrap();
+    builder.enter_true_branch().unwrap();
+    // if it does, set p1 to "was integer"
+    builder
+        .add_operation(
+            BuilderOpLike::LibBuiltin(LibBuiltinOperation::SetNode {
+                param: NodeType::Object,
+                value: NodeValue::String("was integer".to_string()),
+            }),
+            vec![p1.clone()],
+        )
+        .unwrap();
+    
+    
+
+    // finalize and test
+    let operation = builder.build(0).unwrap();
+    op_ctx.add_custom_operation(0, operation);
+
+    {
+        // in the concrete:
+        // check that p0->p1 has type "child" and p0 is set to "has child" and p1 is set to "was integer"
+        let mut g = TestSemantics::new_concrete_graph();
+        let p0_key = g.add_node(NodeValue::Integer(42));
+        let p1_key = g.add_node(NodeValue::Integer(43));
+        g.add_edge(p0_key, p1_key, "child".to_string());
+
+        run_from_concrete(&mut g, &op_ctx, 0, &[p0_key, p1_key]).unwrap();
+
+        let p0_value = g.get_node_attr(p0_key);
+        assert_eq!(p0_value, Some(&NodeValue::String("has child".to_string())));
+        
+        let p1_value = g.get_node_attr(p1_key);
+        assert_eq!(p1_value, Some(&NodeValue::String("was integer".to_string())));
+    }
+
+
 }

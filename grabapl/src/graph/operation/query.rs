@@ -267,15 +267,21 @@ fn get_shape_query_substitution<S: Semantics>(
         if let Some(expected_dynamic_node_key) =
             enforced_desired_to_dynamic.get(desired_shape_node_key)
         {
-            return expected_dynamic_node_key == dynamic_graph_node_key;
-        }
-        // we let the enforced mapping take precedence, but now we ignore all hidden nodes
-        if hidden_nodes.contains(dynamic_graph_node_key) {
-            log::info!(
+            // if we have an enforced mapping ...
+            if expected_dynamic_node_key != dynamic_graph_node_key {
+                // ... and the mapping does not match, we early-exit
+                // (but crucially don't return if it does match: we still need to check the attributes)
+                return false;
+            }
+        } else {
+            // out of the non-enforced-mapping nodes, we explicitly don't want to match hidden nodes
+            if hidden_nodes.contains(dynamic_graph_node_key) {
+                log::info!(
                 "Skipping hidden node {:?} in dynamic graph for shape query",
                 dynamic_graph_node_key
             );
-            return false;
+                return false;
+            }            
         }
 
         let desired_shape_attr = desired_shape
