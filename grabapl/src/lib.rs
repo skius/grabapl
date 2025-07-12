@@ -1,8 +1,7 @@
 pub mod graph;
 pub mod util;
 mod experimental;
-
-use util::log;
+pub mod operation;
 
 use crate::graph::*;
 use derive_more::From;
@@ -15,17 +14,8 @@ pub use graph::OperationContext;
 pub use graph::OperationId;
 pub use graph::semantics::Semantics;
 use internment::Intern;
-use petgraph::algo::subgraph_isomorphisms_iter;
-use petgraph::dot::Dot;
-use petgraph::prelude::{DiGraphMap, GraphMap, StableDiGraph};
 use petgraph::visit::{IntoEdgesDirected, IntoNeighborsDirected, NodeRef};
-use petgraph::{Direction, dot};
-use std::borrow::Cow;
-use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::fmt::Debug;
-use std::iter;
-
 /// A marker for substitution in the graph.
 ///
 /// Useful for programmatically defined operations to know the substitution of their input pattern.
@@ -45,8 +35,6 @@ interned_string_newtype!(SubstMarker);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use petgraph::algo::subgraph_isomorphisms_iter;
-
     // #[test]
     // this is an old test with old test matching behavior.
     fn child_order() {

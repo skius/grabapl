@@ -1,9 +1,9 @@
-use crate::graph::operation::builtin::LibBuiltinOperation;
-use crate::graph::operation::query::{
+use crate::operation::builtin::LibBuiltinOperation;
+use crate::operation::query::{
     BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier, run_builtin_query, run_shape_query,
 };
-use crate::graph::operation::signature::{AbstractSignatureNodeId, OperationSignature};
-use crate::graph::operation::{
+use crate::operation::signature::{AbstractSignatureNodeId, OperationSignature};
+use crate::operation::{
     OperationError, OperationResult, run_builtin_operation, run_lib_builtin_operation,
     run_operation,
 };

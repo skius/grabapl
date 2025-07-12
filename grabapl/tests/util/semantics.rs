@@ -1,6 +1,6 @@
-use grabapl::graph::operation::BuiltinOperation;
-use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
-use grabapl::graph::operation::query::{BuiltinQuery, ConcreteQueryOutput};
+use grabapl::operation::BuiltinOperation;
+use grabapl::operation::parameterbuilder::OperationParameterBuilder;
+use grabapl::operation::query::{BuiltinQuery, ConcreteQueryOutput};
 use grabapl::graph::parameter::{
     AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter,
 };

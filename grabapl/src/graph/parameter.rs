@@ -1,5 +1,5 @@
 use crate::graph::GraphTrait;
-use crate::graph::operation::{OperationError, OperationResult};
+use crate::operation::{OperationError, OperationResult};
 use crate::graph::semantics::AbstractGraph;
 use crate::util::log;
 use crate::{Graph, NodeKey, Semantics, SubstMarker, interned_string_newtype};
@@ -10,8 +10,8 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use petgraph::visit::UndirectedAdaptor;
 use thiserror::Error;
-use crate::graph::operation::builder::OperationBuilderError;
-use crate::graph::operation::parameterbuilder::ParameterBuilderError;
+use crate::operation::builder::OperationBuilderError;
+use crate::operation::parameterbuilder::ParameterBuilderError;
 use crate::util::bimap::BiMap;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
 // renamed. 

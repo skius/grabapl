@@ -1,5 +1,5 @@
-use crate::graph::operation::BuiltinOperation;
-use crate::graph::operation::parameterbuilder::OperationParameterBuilder;
+use crate::operation::BuiltinOperation;
+use crate::operation::parameterbuilder::OperationParameterBuilder;
 use crate::graph::parameter::{
     AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter,
 };

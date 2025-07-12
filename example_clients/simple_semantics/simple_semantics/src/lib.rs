@@ -1,11 +1,11 @@
 pub mod sample_user_defined_operations;
 
-use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
-use grabapl::graph::operation::query::{
+use grabapl::operation::parameterbuilder::OperationParameterBuilder;
+use grabapl::operation::query::{
     AbstractQueryChange, AbstractQueryOutput, BuiltinQuery as BuiltinQueryTrait,
     ConcreteQueryOutput, EdgeChange, NodeChange,
 };
-use grabapl::graph::operation::run_operation;
+use grabapl::operation::run_operation;
 use grabapl::graph::parameter::{
     AbstractOperationOutput, GraphWithSubstitution, NewNodeMarker, OperationArgument,
     OperationOutput, OperationParameter, ParameterSubstitution,
@@ -309,7 +309,7 @@ impl Clone for BuiltinOperation {
     }
 }
 
-impl grabapl::graph::operation::BuiltinOperation for BuiltinOperation {
+impl grabapl::operation::BuiltinOperation for BuiltinOperation {
     type S = SimpleSemantics;
 
     fn parameter(&self) -> OperationParameter<Self::S> {

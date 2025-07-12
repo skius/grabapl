@@ -1,8 +1,8 @@
 mod util;
 
-use grabapl::graph::operation::builder::{BuilderOpLike, OperationBuilder, OperationBuilderError};
-use grabapl::graph::operation::run_from_concrete;
-use grabapl::graph::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
+use grabapl::operation::builder::{BuilderOpLike, OperationBuilder, OperationBuilderError};
+use grabapl::operation::run_from_concrete;
+use grabapl::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
 use grabapl::{OperationContext, OperationId, Semantics};
 use proptest::proptest;
 use std::cmp::Ordering::Greater;

@@ -1,7 +1,7 @@
 use crate::{BuiltinOperation, BuiltinQuery, EdgePattern, SimpleSemantics};
-use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
-use grabapl::graph::operation::query::GraphShapeQuery;
-use grabapl::graph::operation::user_defined::{
+use grabapl::operation::parameterbuilder::OperationParameterBuilder;
+use grabapl::operation::query::GraphShapeQuery;
+use grabapl::operation::user_defined::{
     AbstractNodeId, AbstractOperationArgument, Instruction, OpLikeInstruction, QueryInstructions,
     UserDefinedOperation,
 };
@@ -16,7 +16,7 @@ fn mk_builtin_instruction(
 ) -> Instruction<SimpleSemantics> {
     let arg = AbstractOperationArgument::infer_explicit_for_param(
         args,
-        &<BuiltinOperation as grabapl::graph::operation::BuiltinOperation>::parameter(&op),
+        &<BuiltinOperation as grabapl::operation::BuiltinOperation>::parameter(&op),
     )
     .unwrap();
     Instruction::OpLike(OpLikeInstruction::Builtin(op), arg)
@@ -29,7 +29,7 @@ fn mk_builtin_query(
 ) -> Instruction<SimpleSemantics> {
     let arg = AbstractOperationArgument::infer_explicit_for_param(
         args,
-        &<BuiltinQuery as grabapl::graph::operation::query::BuiltinQuery>::parameter(&query),
+        &<BuiltinQuery as grabapl::operation::query::BuiltinQuery>::parameter(&query),
     )
     .unwrap();
     Instruction::BuiltinQuery(query, arg, instructions)

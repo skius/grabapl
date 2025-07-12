@@ -1,6 +1,6 @@
 use crate::graph::EdgeAttribute;
-use crate::graph::operation::OperationResult;
-use crate::graph::operation::user_defined::{AbstractOperationResultMarker, QueryInstructions};
+use crate::operation::OperationResult;
+use crate::operation::user_defined::{AbstractOperationResultMarker, QueryInstructions};
 use crate::graph::parameter::{
     AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationParameter,
     ParameterSubstitution,

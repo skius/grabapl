@@ -1,8 +1,8 @@
 mod util;
 
 use grabapl::OperationContext;
-use grabapl::graph::operation::builder::{BuilderOpLike, OperationBuilder};
-use grabapl::graph::operation::user_defined::AbstractNodeId;
+use grabapl::operation::builder::{BuilderOpLike, OperationBuilder};
+use grabapl::operation::user_defined::AbstractNodeId;
 use util::semantics::*;
 
 #[test_log::test]

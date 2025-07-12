@@ -1,9 +1,9 @@
 mod util;
 
 use grabapl::OperationContext;
-use grabapl::graph::operation::builder::{BuilderOpLike, OperationBuilder};
-use grabapl::graph::operation::builtin::LibBuiltinOperation;
-use grabapl::graph::operation::user_defined::AbstractNodeId;
+use grabapl::operation::builder::{BuilderOpLike, OperationBuilder};
+use grabapl::operation::builtin::LibBuiltinOperation;
+use grabapl::operation::user_defined::AbstractNodeId;
 use util::interval_semantics::*;
 
 #[test_log::test]

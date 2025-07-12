@@ -1,13 +1,13 @@
-use crate::graph::operation::builder::BuilderInstruction::ExpectParameterEdge;
-use crate::graph::operation::builtin::LibBuiltinOperation;
-use crate::graph::operation::query::{BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier};
-use crate::graph::operation::signature::{AbstractSignatureNodeId, OperationSignature};
-use crate::graph::operation::user_defined::{
+use crate::operation::builder::BuilderInstruction::ExpectParameterEdge;
+use crate::operation::builtin::LibBuiltinOperation;
+use crate::operation::query::{BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier};
+use crate::operation::signature::{AbstractSignatureNodeId, OperationSignature};
+use crate::operation::user_defined::{
     AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker,
     AbstractUserDefinedOperationOutput, NamedMarker, OpLikeInstruction, QueryInstructions,
     UserDefinedOperation,
 };
-use crate::graph::operation::{BuiltinOperation, OperationError, get_substitution};
+use crate::operation::{BuiltinOperation, OperationError, get_substitution};
 use crate::graph::parameter::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationParameter,
     ParameterSubstitution,
@@ -27,7 +27,7 @@ use std::marker::PhantomData;
 use std::mem;
 use std::slice::Iter;
 use thiserror::Error;
-use crate::graph::operation::parameterbuilder::OperationParameterBuilder;
+use crate::operation::parameterbuilder::OperationParameterBuilder;
 /*
 General overview:
 
@@ -132,7 +132,7 @@ pub enum OperationBuilderError {
     #[error("Could not find operation ID: {0}")]
     NotFoundOperationId(OperationId),
     #[error("Could not apply operation due to mismatched arguments: {0}")]
-    SubstitutionError(#[from] crate::graph::operation::SubstitutionError),
+    SubstitutionError(#[from] crate::operation::SubstitutionError),
     #[error("Could not apply operation due to mismatched arguments")]
     SubstitutionErrorNew,
     #[error("Could not abstractly apply operation {0} due to: {1}")]

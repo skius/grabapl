@@ -1,6 +1,6 @@
 use crate::Graph;
-use crate::graph::operation::BuiltinOperation;
-use crate::graph::operation::query::BuiltinQuery;
+use crate::operation::BuiltinOperation;
+use crate::operation::query::BuiltinQuery;
 use crate::graph::{EdgeAttribute, NodeAttribute};
 use petgraph::data::Build;
 // /// Returns the corresponding abstract value/type for a given concrete value.

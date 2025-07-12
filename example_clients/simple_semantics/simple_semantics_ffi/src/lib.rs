@@ -18,7 +18,7 @@ use grabapl::SubstMarker;
 mod ffi {
     use super::prompt;
     use ::grabapl::Semantics;
-    use ::grabapl::graph::operation::builder::{
+    use grabapl::operation::builder::{
         OperationBuilder as RustOperationBuilder,
         OperationBuilderError as RustOperationBuilderError,
     };
@@ -30,12 +30,12 @@ mod ffi {
     use std::str::FromStr;
 
     use super::{RustEdgeAbstract, RustEdgeConcrete, RustNodeAbstract, RustNodeConcrete};
-    use ::grabapl::graph::operation::user_defined::AbstractNodeId as RustAbstractNodeId;
-    use grabapl::graph::operation::builder::BuilderOpLike as RustBuilderOpLike;
-    use grabapl::graph::operation::user_defined::AbstractOperationResultMarker;
+    use grabapl::operation::user_defined::AbstractNodeId as RustAbstractNodeId;
+    use grabapl::operation::builder::BuilderOpLike as RustBuilderOpLike;
+    use grabapl::operation::user_defined::AbstractOperationResultMarker;
     use grabapl::graph::parameter::AbstractOutputNodeMarker;
 
-    use grabapl::graph::operation::builder::IntermediateState as RustIntermediateState;
+    use grabapl::operation::builder::IntermediateState as RustIntermediateState;
 
     #[diplomat::opaque]
     pub struct ConcreteGraph(RustConcreteGraph<SimpleSemantics>);
@@ -90,7 +90,7 @@ mod ffi {
         }
 
         pub fn run(&self, graph: &mut ConcreteGraph, op_ctx: &OpCtx, op_id: u32, args: &[u32]) {
-            grabapl::graph::operation::run_from_concrete::<SimpleSemantics>(
+            grabapl::operation::run_from_concrete::<SimpleSemantics>(
                 &mut graph.0,
                 &op_ctx.0,
                 op_id,
@@ -286,7 +286,7 @@ mod ffi {
     // Option again because cloning is difficult so we want to take.
     #[diplomat::opaque]
     pub struct UserDefinedOperation(
-        Option<grabapl::graph::operation::user_defined::UserDefinedOperation<SimpleSemantics>>,
+        Option<grabapl::operation::user_defined::UserDefinedOperation<SimpleSemantics>>,
     );
 
     #[diplomat::opaque]
@@ -306,7 +306,7 @@ mod ffi {
 
         pub fn query_context(&self, dw: &mut DiplomatWrite) {
             let last = self.0.query_path.last();
-            if let Some(grabapl::graph::operation::builder::QueryPath::Query(name)) = last {
+            if let Some(grabapl::operation::builder::QueryPath::Query(name)) = last {
                 write!(
                     dw,
                     "Currently designing query: {}. Enter true or false branch to proceed.\n",

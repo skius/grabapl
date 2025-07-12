@@ -1,11 +1,11 @@
 use error_stack::FrameKind;
-use grabapl::graph::operation::builder::{BuilderOpLike, OperationBuilder, OperationBuilderError};
-use grabapl::graph::operation::builtin::LibBuiltinOperation;
-use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
-use grabapl::graph::operation::query::{BuiltinQuery, ConcreteQueryOutput};
-use grabapl::graph::operation::signature::{AbstractSignatureEdgeId, AbstractSignatureNodeId};
-use grabapl::graph::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
-use grabapl::graph::operation::{BuiltinOperation, run_from_concrete};
+use grabapl::operation::builder::{BuilderOpLike, OperationBuilder, OperationBuilderError};
+use grabapl::operation::builtin::LibBuiltinOperation;
+use grabapl::operation::parameterbuilder::OperationParameterBuilder;
+use grabapl::operation::query::{BuiltinQuery, ConcreteQueryOutput};
+use grabapl::operation::signature::{AbstractSignatureEdgeId, AbstractSignatureNodeId};
+use grabapl::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
+use grabapl::operation::{BuiltinOperation, run_from_concrete};
 use grabapl::graph::parameter::{
     AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter,
     ParameterSubstitution,

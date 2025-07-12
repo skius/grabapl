@@ -1,7 +1,5 @@
 use derive_more::From;
 use petgraph::Direction;
-use petgraph::algo::{general_subgraph_monomorphisms_iter, subgraph_isomorphisms_iter};
-use petgraph::dot::Dot;
 use petgraph::graphmap::{DiGraphMap, GraphMap};
 use petgraph::visit::NodeIndexable;
 use std::cmp::Ordering;
@@ -10,13 +8,12 @@ use std::fmt::Debug;
 use std::hash::RandomState;
 
 pub mod dot;
-pub mod operation;
 pub mod parameter;
 pub mod semantics;
 
 pub use dot::DotCollector;
-pub use operation::OperationContext;
-pub use operation::OperationId;
+pub use crate::operation::OperationContext;
+pub use crate::operation::OperationId;
 pub use semantics::Semantics;
 
 #[derive(Debug, Clone)]
@@ -83,9 +80,9 @@ pub enum EdgeInsertionOrder {
 /// A graph with ordered edges and arbitrary associated edge and node data.
 #[derive(Clone, Debug)]
 pub struct Graph<NodeAttr, EdgeAttr> {
-    graph: DiGraphMap<NodeKey, EdgeAttribute<EdgeAttr>, RandomState>,
-    max_node_key: NodeKey,
-    node_attr_map: HashMap<NodeKey, NodeAttribute<NodeAttr>>,
+    pub(crate) graph: DiGraphMap<NodeKey, EdgeAttribute<EdgeAttr>, RandomState>,
+    pub(crate) max_node_key: NodeKey,
+    pub(crate) node_attr_map: HashMap<NodeKey, NodeAttribute<NodeAttr>>,
 }
 
 impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
@@ -483,10 +480,6 @@ impl<NodeAttr, EdgeAttr> GraphTrait for Graph<NodeAttr, EdgeAttr> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use petgraph::algo::subgraph_isomorphisms_iter;
-    use std::collections::HashMap;
-
     // #[test]
     // fn subgraph_isomorphism_test() {
     //     let mut big_graph = Graph::<&str, ()>::new();

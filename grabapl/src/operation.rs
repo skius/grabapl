@@ -6,8 +6,8 @@ pub mod signature;
 pub mod user_defined;
 
 use crate::graph::EdgeAttribute;
-use crate::graph::operation::builtin::LibBuiltinOperation;
-use crate::graph::operation::user_defined::{
+use crate::operation::builtin::LibBuiltinOperation;
+use crate::operation::user_defined::{
     AbstractNodeId, AbstractOperationResultMarker, UserDefinedOperation,
 };
 use crate::graph::parameter::{
