@@ -1500,3 +1500,62 @@ fn shape_query_av_refinement_works_in_branch_merge() {
         "Expected p1 to not change"
     );
 }
+
+// Check that deleting a node in an inner op, then calling that on an abstract graph with an edge connected to it results in a signature that
+// indicates the edge was also deleted.
+#[test_log::test]
+fn delete_node_deletes_all_incident_edges_in_signature() {
+    let mut op_ctx = OperationContext::<TestSemantics>::new();
+    let op_deleting_one_node = {
+        let mut builder = OperationBuilder::new(&op_ctx);
+        // expect p0: Object
+        builder.expect_parameter_node("p0", NodeType::Object).unwrap();
+        let p0 = AbstractNodeId::param("p0");
+        // delete it
+        builder.add_operation(BuilderOpLike::LibBuiltin(LibBuiltinOperation::RemoveNode {
+            param: NodeType::Object,
+        }), vec![p0]).unwrap();
+        let op = builder.build(0).unwrap();
+        // assert op is deleting a node
+        let signature = op.signature();
+        assert_eq!(
+            signature.output.maybe_deleted_nodes,
+            HashSet::from([SubstMarker::from("p0").into()]),
+            "Expected the operation to delete p0"
+        );
+        op
+    };
+    op_ctx.add_custom_operation(0, op_deleting_one_node);
+
+    // now call that operation from an operation that expects a p0: Object -child-> p1: Object
+    let mut builder = OperationBuilder::new(&op_ctx);
+    builder
+        .expect_parameter_node("p0", NodeType::Object)
+        .unwrap();
+    builder
+        .expect_parameter_node("p1", NodeType::Object)
+        .unwrap();
+    let p0 = AbstractNodeId::param("p0");
+    let p1 = AbstractNodeId::param("p1");
+    builder
+        .expect_parameter_edge("p0", "p1", EdgeType::Wildcard)
+        .unwrap();
+    // call the operation that deletes p1
+    builder
+        .add_operation(BuilderOpLike::FromOperationId(0), vec![p1])
+        .unwrap();
+    // assert that the signature indicates that p1 was deleted, and hence the edge p0->p1 was also deleted
+    let op = builder.build(1).unwrap();
+    let signature = op.signature();
+    assert_eq!(
+        signature.output.maybe_deleted_nodes,
+        HashSet::from([SubstMarker::from("p1")]),
+        "Expected the operation to delete p1"
+    );
+    assert_eq!(
+        signature.output.maybe_deleted_edges,
+        HashSet::from([("p0".into(), "p1".into())]),
+        "Expected the operation to delete the edge p0->p1"
+    );
+
+}
