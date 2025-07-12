@@ -26,6 +26,9 @@ use std::marker::PhantomData;
 use std::mem;
 use std::slice::Iter;
 use thiserror::Error;
+
+mod stack_based_builder;
+
 /*
 General overview:
 
@@ -52,6 +55,7 @@ pub enum BuilderOpLike<S: Semantics> {
     Recurse,
 }
 
+// TODO: rename to BuilderMessage? since Instruction is already used in the user-defined operation context.
 #[derive(derive_more::Debug)]
 enum BuilderInstruction<S: Semantics> {
     #[debug("ExpectParameterNode({_0:?}, ???)")]
