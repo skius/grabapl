@@ -2,8 +2,6 @@ use crate::operation::signature::parameter::OperationParameter;
 use crate::semantics::AbstractGraph;
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, Semantics, SubstMarker};
-use petgraph::visit::UndirectedAdaptor;
-use std::collections::HashSet;
 use thiserror::Error;
 
 #[derive(Debug, Error, Clone)]

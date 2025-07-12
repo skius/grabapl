@@ -1,24 +1,13 @@
-use error_stack::FrameKind;
-use grabapl::operation::builder::{BuilderOpLike, OperationBuilder, OperationBuilderError};
+use grabapl::operation::builder::{BuilderOpLike, OperationBuilder};
 use grabapl::operation::builtin::LibBuiltinOperation;
-use grabapl::operation::query::{BuiltinQuery, ConcreteQueryOutput};
-use grabapl::operation::signature::parameter::{
-    AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter,
-    ParameterSubstitution,
-};
-use grabapl::operation::signature::parameterbuilder::OperationParameterBuilder;
-use grabapl::operation::signature::{AbstractSignatureEdgeId, AbstractSignatureNodeId};
+use grabapl::operation::query::BuiltinQuery;
 use grabapl::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
 use grabapl::operation::{BuiltinOperation, run_from_concrete};
-use grabapl::semantics::{
-    AbstractGraph, AbstractJoin, AbstractMatcher, ConcreteGraph, ConcreteToAbstract,
-};
-use grabapl::{Graph, OperationContext, OperationId, Semantics, SubstMarker};
-use log_crate::info;
+use grabapl::semantics::ConcreteGraph;
+use grabapl::{OperationContext, OperationId, Semantics, SubstMarker};
 use std::collections::{HashMap, HashSet};
 
 mod util;
-use crate::util::interval_semantics::EdgeValue;
 use util::semantics::*;
 
 #[test]
@@ -145,7 +134,7 @@ fn modifications_change_abstract_value_even_if_same_internal_type_for_custom() {
 
 #[test]
 fn modifications_change_abstract_value_even_if_same_internal_type_for_builtin() {
-    let mut op_ctx = OperationContext::<TestSemantics>::new();
+    let op_ctx = OperationContext::<TestSemantics>::new();
     let mut builder = OperationBuilder::new(&op_ctx);
 
     builder
@@ -902,7 +891,7 @@ fn recursion_signature_is_sound_when_changed_after_and_last_node_set_to_string()
 
 #[test_log::test]
 fn recursion_breaks_when_modification_changes_after_use() {
-    let mut op_ctx = OperationContext::<TestSemantics>::new();
+    let op_ctx = OperationContext::<TestSemantics>::new();
     let mut builder = OperationBuilder::new(&op_ctx);
     // we're writing a recursive operation
     builder
@@ -1575,7 +1564,7 @@ fn delete_node_deletes_all_incident_edges_in_signature() {
 
 #[test_log::test]
 fn delete_node_after_writing_to_it() {
-    let mut op_ctx = OperationContext::<TestSemantics>::new();
+    let op_ctx = OperationContext::<TestSemantics>::new();
     let mut builder = OperationBuilder::new(&op_ctx);
     // expect p0: Object
     builder

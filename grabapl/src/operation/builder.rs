@@ -1,4 +1,3 @@
-use crate::operation::builder::BuilderInstruction::ExpectParameterEdge;
 use crate::operation::builtin::LibBuiltinOperation;
 use crate::operation::query::{BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier};
 use crate::operation::signature::parameter::{
@@ -16,13 +15,12 @@ use crate::operation::{BuiltinOperation, OperationError, get_substitution};
 use crate::semantics::{AbstractGraph, AbstractMatcher};
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
-use error_stack::{FutureExt, Report, Result, ResultExt, bail, report};
+use error_stack::{FutureExt, Result, ResultExt, bail, report};
 use petgraph::dot;
 use petgraph::dot::Dot;
-use petgraph::prelude::GraphMap;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 use std::iter::Peekable;
 use std::marker::PhantomData;
 use std::mem;
@@ -2260,7 +2258,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         //  Most importantly, that there are no free floating shape nodes.
         // TODO: do this with under the is_finished flag.
 
-        let mut initial_true_branch_state = self.current_state.clone();
+        let initial_true_branch_state = self.current_state.clone();
 
         let (ud_true_branch, interp_true_branch) =
             self.interpret_instructions(query_instructions.true_branch)?;

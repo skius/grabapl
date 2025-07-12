@@ -1,12 +1,9 @@
-use grabapl::graph::EdgeAttribute;
 use grabapl::operation::builder::{BuilderOpLike, OperationBuilder};
-use grabapl::operation::query::{GraphShapeQuery, ShapeNodeIdentifier};
-use grabapl::operation::signature::parameter::{OperationOutput, OperationParameter};
 use grabapl::operation::user_defined::{
-    AbstractNodeId, QueryInstructions, QueryTaken, UserDefinedOperation,
+    AbstractNodeId, UserDefinedOperation,
 };
-use grabapl::operation::{run_from_concrete, run_operation};
-use grabapl::{DotCollector, NodeKey, OperationContext, OperationId, Semantics};
+use grabapl::operation::run_from_concrete;
+use grabapl::{DotCollector, OperationContext, OperationId, Semantics};
 use simple_semantics::sample_user_defined_operations::{
     get_count_list_len_user_defined_operation, get_insert_bst_user_defined_operation,
     get_labeled_edges_insert_bst_user_defined_operation, get_mk_n_to_0_list_user_defined_operation,

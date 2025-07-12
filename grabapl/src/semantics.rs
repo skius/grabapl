@@ -1,5 +1,5 @@
 use crate::Graph;
-use crate::graph::{EdgeAttribute, NodeAttribute};
+use crate::graph::NodeAttribute;
 use crate::operation::BuiltinOperation;
 use crate::operation::query::BuiltinQuery;
 use petgraph::data::Build;
@@ -162,10 +162,10 @@ pub trait Semantics {
     }
 }
 
-pub type ConcreteGraph<S: Semantics> =
+pub type ConcreteGraph<S> =
     Graph<<S as Semantics>::NodeConcrete, <S as Semantics>::EdgeConcrete>;
 
-pub type AbstractGraph<S: Semantics> =
+pub type AbstractGraph<S> =
     Graph<<S as Semantics>::NodeAbstract, <S as Semantics>::EdgeAbstract>;
 
 pub trait ConcreteToAbstract {

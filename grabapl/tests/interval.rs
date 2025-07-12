@@ -8,7 +8,7 @@ use util::interval_semantics::*;
 
 #[test_log::test]
 fn example() {
-    let mut op_ctx = OperationContext::<IntervalSemantics>::new();
+    let op_ctx = OperationContext::<IntervalSemantics>::new();
     let mut builder = OperationBuilder::new(&op_ctx);
     builder
         .expect_parameter_node("p0", NodeType::new(0, 10))

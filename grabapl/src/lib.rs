@@ -4,7 +4,6 @@ pub mod operation;
 pub mod semantics;
 pub mod util;
 
-use crate::graph::*;
 use derive_more::From;
 pub use graph::DotCollector;
 pub use graph::EdgeInsertionOrder;
@@ -14,9 +13,7 @@ pub use graph::NodeKey;
 pub use graph::OperationContext;
 pub use graph::OperationId;
 use internment::Intern;
-use petgraph::visit::{IntoEdgesDirected, IntoNeighborsDirected, NodeRef};
 pub use semantics::Semantics;
-use std::fmt::Debug;
 /// A marker for substitution in the graph.
 ///
 /// Useful for programmatically defined operations to know the substitution of their input pattern.

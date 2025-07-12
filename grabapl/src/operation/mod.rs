@@ -13,7 +13,7 @@ use crate::semantics::{
     AbstractGraph, AbstractMatcher, ConcreteGraph, ConcreteToAbstract, Semantics,
 };
 use crate::util::log;
-use crate::{DotCollector, Graph, NodeKey, SubstMarker};
+use crate::{Graph, NodeKey, SubstMarker};
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
 use signature::parameter::{
@@ -22,7 +22,6 @@ use signature::parameter::{
 };
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
-use std::marker::PhantomData;
 use thiserror::Error;
 
 // TODO: We might want to be able to supply additional data to builtin operations. For example, a Set Value operation should be 'generic' over its value without
@@ -174,7 +173,7 @@ args: {selected_inputs:?}"
         .explicit_input_nodes
         .iter()
         .zip(selected_inputs.iter())
-        .map(|((param_marker, argument_node_key))| {
+        .map(|(param_marker, argument_node_key)| {
             let param_node_key = param
                 .node_keys_to_subst
                 .get_right(param_marker)

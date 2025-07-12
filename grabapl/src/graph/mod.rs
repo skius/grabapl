@@ -1,7 +1,6 @@
 use derive_more::From;
 use petgraph::Direction;
 use petgraph::graphmap::{DiGraphMap, GraphMap};
-use petgraph::visit::NodeIndexable;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::Debug;

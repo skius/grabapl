@@ -1,6 +1,6 @@
 use chumsky::Parser;
 use chumsky::prelude::*;
-use chumsky::text::{ident, keyword, whitespace};
+use chumsky::text::{ident, whitespace};
 use grabapl::SubstMarker;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

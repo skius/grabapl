@@ -1,14 +1,8 @@
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
-use petgraph::Direction;
 use petgraph::algo::isomorphism::general_subgraph_monomorphisms_iter_with_partial_mapping;
-use petgraph::algo::{general_subgraph_monomorphisms_iter, subgraph_isomorphisms_iter};
-use petgraph::data::{Build, DataMap};
+use petgraph::algo::general_subgraph_monomorphisms_iter;
+use petgraph::data::Build;
 use petgraph::prelude::DiGraphMap;
-use petgraph::visit::{
-    Data, EdgeCount, GetAdjacencyMatrix, GraphBase, GraphProp, GraphRef, IntoEdgeReferences,
-    IntoEdges, IntoEdgesDirected, IntoNeighbors, IntoNeighborsDirected, NodeCompactIndexable,
-    NodeCount, NodeIndexable,
-};
 use std::hash::RandomState;
 
 type G = DiGraphMap<u32, (), RandomState>;

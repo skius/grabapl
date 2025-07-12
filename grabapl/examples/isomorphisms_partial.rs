@@ -1,4 +1,4 @@
-use criterion::{BenchmarkId, Criterion, black_box};
+use criterion::black_box;
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::algo::isomorphism::general_subgraph_monomorphisms_iter_with_partial_mapping;
 use petgraph::graphmap::DiGraphMap;

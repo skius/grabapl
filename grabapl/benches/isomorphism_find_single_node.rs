@@ -1,7 +1,6 @@
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use petgraph::Direction;
 use petgraph::algo::isomorphism::general_subgraph_monomorphisms_iter_with_partial_mapping;
-use petgraph::algo::{general_subgraph_monomorphisms_iter, subgraph_isomorphisms_iter};
 use petgraph::data::{Build, DataMap};
 use petgraph::prelude::DiGraphMap;
 use petgraph::visit::{

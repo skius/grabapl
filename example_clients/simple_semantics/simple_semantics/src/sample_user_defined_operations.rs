@@ -1,6 +1,6 @@
 use crate::{BuiltinOperation, BuiltinQuery, EdgePattern, SimpleSemantics};
 use grabapl::operation::query::GraphShapeQuery;
-use grabapl::operation::signature::parameter::{OperationArgument, OperationParameter};
+use grabapl::operation::signature::parameter::OperationParameter;
 use grabapl::operation::signature::parameterbuilder::OperationParameterBuilder;
 use grabapl::operation::user_defined::{
     AbstractNodeId, AbstractOperationArgument, Instruction, OpLikeInstruction, QueryInstructions,

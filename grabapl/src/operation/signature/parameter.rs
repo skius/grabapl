@@ -1,17 +1,14 @@
 use crate::graph::GraphTrait;
-use crate::operation::builder::OperationBuilderError;
-use crate::operation::signature::parameterbuilder::ParameterBuilderError;
 use crate::operation::{OperationError, OperationResult};
 use crate::semantics::AbstractGraph;
 use crate::util::bimap::BiMap;
 use crate::util::log;
-use crate::{Graph, NodeKey, Semantics, SubstMarker, interned_string_newtype};
+use crate::{NodeKey, Semantics, SubstMarker, interned_string_newtype};
 use derive_more::From;
 use internment::Intern;
 use petgraph::visit::UndirectedAdaptor;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-use std::marker::PhantomData;
 use thiserror::Error;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
 // renamed.

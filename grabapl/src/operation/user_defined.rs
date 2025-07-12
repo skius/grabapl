@@ -1,18 +1,17 @@
 use crate::operation::builtin::LibBuiltinOperation;
 use crate::operation::query::{
-    BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier, run_builtin_query, run_shape_query,
+    BuiltinQuery, GraphShapeQuery, run_builtin_query, run_shape_query,
 };
 use crate::operation::signature::parameter::{
-    AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, NodeMarker,
+    AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution,
     OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution,
 };
-use crate::operation::signature::{AbstractSignatureNodeId, OperationSignature};
+use crate::operation::signature::OperationSignature;
 use crate::operation::{
     OperationError, OperationResult, run_builtin_operation, run_lib_builtin_operation,
     run_operation,
 };
 use crate::semantics::{AbstractGraph, ConcreteGraph};
-use crate::util::bimap::BiMap;
 use crate::util::log;
 use crate::{
     NodeKey, OperationContext, OperationId, Semantics, SubstMarker, interned_string_newtype,
@@ -20,7 +19,6 @@ use crate::{
 use derive_more::with_trait::From;
 use internment::Intern;
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
 use std::str::FromStr;
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.

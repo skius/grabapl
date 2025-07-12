@@ -1,20 +1,19 @@
 pub mod sample_user_defined_operations;
 
 use grabapl::operation::query::{
-    AbstractQueryChange, AbstractQueryOutput, BuiltinQuery as BuiltinQueryTrait,
-    ConcreteQueryOutput, EdgeChange, NodeChange,
+    BuiltinQuery as BuiltinQueryTrait,
+    ConcreteQueryOutput,
 };
-use grabapl::operation::run_operation;
 use grabapl::operation::signature::parameter::{
-    AbstractOperationOutput, GraphWithSubstitution, NewNodeMarker, OperationArgument,
-    OperationOutput, OperationParameter, ParameterSubstitution,
+    AbstractOperationOutput, GraphWithSubstitution, NewNodeMarker,
+    OperationOutput, OperationParameter,
 };
 use grabapl::operation::signature::parameterbuilder::OperationParameterBuilder;
 use grabapl::semantics::{
     AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, MatchJoiner,
     Semantics,
 };
-use grabapl::{DotCollector, EdgeInsertionOrder, OperationContext, SubstMarker};
+use grabapl::SubstMarker;
 use std::collections::HashMap;
 use std::convert::Into;
 use std::fmt::Debug;
@@ -570,7 +569,7 @@ impl grabapl::operation::BuiltinOperation for BuiltinOperation {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
 
     #[test]
     fn it_works() {}
