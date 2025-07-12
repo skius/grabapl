@@ -42,9 +42,9 @@ TODO: Add option to ignore parent order?
 // Because we'll want to work abstractly with a pattern graph, we'll want the pattern type to be the type that pattern matches against.
 // In other words, we want the pattern type to be the analogue of the PL-"type", with subtyping. eg. a wildcard is just the analogue of the Top type
 
-use grabapl::{Semantics, SubstMarker};
-use grabapl::operation::query::{ShapeNodeIdentifier};
+use grabapl::operation::query::ShapeNodeIdentifier;
 use grabapl::operation::signature::parameter::OperationParameter;
+use grabapl::{Semantics, SubstMarker};
 
 pub struct WithSubstMarker<T> {
     marker: SubstMarker,
@@ -169,7 +169,6 @@ impl<T> WithSubstMarker<T> {
 //     }
 // }
 
-
 pub struct AbstractQueryOutput<S: Semantics> {
     pub changes: Vec<AbstractQueryChange<S>>,
 }
@@ -197,7 +196,6 @@ pub struct ShapeQuery<S: Semantics> {
     pub parameter: OperationParameter<S>,
     pub changes: Vec<ShapeQueryChange<S>>,
 }
-
 
 #[derive(Copy, Clone)]
 pub enum AbstractShapeNodeIdentifier {
@@ -249,7 +247,6 @@ pub enum ShapeEdgeChange<S: Semantics> {
 //     pub parameter: OperationParameter<S>,
 //     pub expected_graph: Graph<GraphShapeQueryNodeWrapper<S>, GraphShapeQueryEdgeWrapper<S>>,
 // }
-
 
 // TODO: What to do about operations that conditionally _remove_ nodes or edges?
 //  This implies that our abstract graph may not only be an underapproximation of the concrete graph, but also an overapproximation.
