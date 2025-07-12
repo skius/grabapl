@@ -1,6 +1,11 @@
 use crate::operation::builder::BuilderInstruction::ExpectParameterEdge;
 use crate::operation::builtin::LibBuiltinOperation;
 use crate::operation::query::{BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier};
+use crate::operation::signature::parameter::{
+    AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationParameter,
+    ParameterSubstitution,
+};
+use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
 use crate::operation::signature::{AbstractSignatureNodeId, OperationSignature};
 use crate::operation::user_defined::{
     AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker,
@@ -8,14 +13,10 @@ use crate::operation::user_defined::{
     UserDefinedOperation,
 };
 use crate::operation::{BuiltinOperation, OperationError, get_substitution};
-use crate::operation::signature::parameter::{
-    AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationParameter,
-    ParameterSubstitution,
-};
 use crate::semantics::{AbstractGraph, AbstractMatcher};
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
-use error_stack::{Report, Result, ResultExt, bail, report, FutureExt};
+use error_stack::{FutureExt, Report, Result, ResultExt, bail, report};
 use petgraph::dot;
 use petgraph::dot::Dot;
 use petgraph::prelude::GraphMap;
@@ -27,7 +28,6 @@ use std::marker::PhantomData;
 use std::mem;
 use std::slice::Iter;
 use thiserror::Error;
-use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
 /*
 General overview:
 
@@ -435,9 +435,10 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         //  would be nicer if we had some way of indicating "validate this once current input phase is over"
         //  e.g., validate parameter once the parameter definition phase is over OR the function needs to be built.
         // check if the parameter is valid:
-        user_def_op.parameter.check_validity().change_context(
-            OperationBuilderError::InvalidParameter,
-        )?;
+        user_def_op
+            .parameter
+            .check_validity()
+            .change_context(OperationBuilderError::InvalidParameter)?;
 
         Ok(user_def_op)
     }
@@ -804,9 +805,9 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
 
         // check validity of the parameter if there's more instructions, since that implies the parameter should be done.
         if iter.peek().is_some() {
-            op_parameter.check_validity().change_context(
-                OperationBuilderError::InvalidParameter,
-            )?;
+            op_parameter
+                .check_validity()
+                .change_context(OperationBuilderError::InvalidParameter)?;
         }
 
         let mut builder = Self {
@@ -1130,12 +1131,14 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
             match instruction {
                 BuilderInstruction::ExpectParameterNode(marker, node_abstract) => {
                     iter.next();
-                    builder.expect_explicit_input_node(*marker, node_abstract.clone())
+                    builder
+                        .expect_explicit_input_node(*marker, node_abstract.clone())
                         .change_context(OperationBuilderError::InvalidParameter)?;
                 }
                 BuilderInstruction::ExpectContextNode(marker, node_abstract) => {
                     iter.next();
-                    builder.expect_context_node(*marker, node_abstract.clone())
+                    builder
+                        .expect_context_node(*marker, node_abstract.clone())
                         .change_context(OperationBuilderError::InvalidParameter)?;
                 }
                 BuilderInstruction::ExpectParameterEdge(
@@ -1144,11 +1147,9 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     edge_abstract,
                 ) => {
                     iter.next();
-                    builder.expect_edge(
-                        *source_marker,
-                        *target_marker,
-                        edge_abstract.clone(),
-                    ).change_context(OperationBuilderError::InvalidParameter)?;
+                    builder
+                        .expect_edge(*source_marker, *target_marker, edge_abstract.clone())
+                        .change_context(OperationBuilderError::InvalidParameter)?;
                 }
                 _ => {
                     break;
@@ -1156,7 +1157,9 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
             }
         }
 
-        builder.build().change_context(OperationBuilderError::InvalidParameter)
+        builder
+            .build()
+            .change_context(OperationBuilderError::InvalidParameter)
     }
 
     // TODO: also collect ReturnEdge
@@ -2070,8 +2073,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                 return Ok(());
             }
             // invent a new subst marker for this AID.
-            let subst_marker =
-                param_builder.next_subst_marker();
+            let subst_marker = param_builder.next_subst_marker();
             let key = self.get_current_key_from_aid(aid)?;
             let abstract_value = self
                 .current_state
@@ -2083,7 +2085,11 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                 .clone();
             // the shape query will expect the same AV
             // context-matching here is against the purpose of shape queries, so every argument is explicit
-            param_builder.expect_explicit_input_node(subst_marker, abstract_value).change_context(OperationBuilderError::InternalError("node should not be in param"))?;
+            param_builder
+                .expect_explicit_input_node(subst_marker, abstract_value)
+                .change_context(OperationBuilderError::InternalError(
+                    "node should not be in param",
+                ))?;
             // we need to push in the same sequence as expected in explicit_input_nodes
             abstract_args.push(aid.clone());
             arg_aid_to_param_subst.insert(aid.clone(), subst_marker.clone());
@@ -2217,9 +2223,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                     let state_key = self
                         .get_current_key_from_aid(aid)
                         .change_context(OperationBuilderError::NotFoundAid(aid))?;
-                    self.current_state
-                        .graph
-                        .set_node_attr(state_key, av);
+                    self.current_state.graph.set_node_attr(state_key, av);
                 }
                 GraphShapeQueryInstruction::ExpectShapeEdge(src, target, av) => {
                     let src_key = aid_to_node_key_hack!(src.clone())?;

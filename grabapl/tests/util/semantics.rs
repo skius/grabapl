@@ -1,9 +1,9 @@
 use grabapl::operation::BuiltinOperation;
-use grabapl::operation::signature::parameterbuilder::OperationParameterBuilder;
 use grabapl::operation::query::{BuiltinQuery, ConcreteQueryOutput};
 use grabapl::operation::signature::parameter::{
     AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter,
 };
+use grabapl::operation::signature::parameterbuilder::OperationParameterBuilder;
 use grabapl::semantics::{
     AbstractGraph, AbstractJoin, AbstractMatcher, ConcreteGraph, ConcreteToAbstract,
 };

@@ -13,7 +13,7 @@ impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> BiMap<L, 
             right_to_left: HashMap::new(),
         }
     }
-    
+
     pub fn from<const N: usize>(pairs: [(L, R); N]) -> Self {
         let mut this = BiMap::new();
         for (left, right) in pairs {
@@ -21,7 +21,7 @@ impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> BiMap<L, 
         }
         this
     }
-    
+
     pub fn len(&self) -> usize {
         self.left_to_right.len()
     }
@@ -95,7 +95,7 @@ impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> BiMap<L, 
     pub fn left_values(&self) -> impl Iterator<Item = &L> {
         self.right_to_left.values()
     }
-    
+
     pub fn iter(&self) -> impl Iterator<Item = (&L, &R)> {
         self.left_to_right.iter()
     }

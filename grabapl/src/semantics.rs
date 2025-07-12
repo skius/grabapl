@@ -1,7 +1,7 @@
 use crate::Graph;
+use crate::graph::{EdgeAttribute, NodeAttribute};
 use crate::operation::BuiltinOperation;
 use crate::operation::query::BuiltinQuery;
-use crate::graph::{EdgeAttribute, NodeAttribute};
 use petgraph::data::Build;
 // /// Returns the corresponding abstract value/type for a given concrete value.
 // pub trait ToAbstract {
@@ -152,8 +152,7 @@ pub trait Semantics {
         abstract_graph.max_node_key = c.max_node_key;
 
         for (src, dst, weight) in c.graph.all_edges() {
-            let edge_abstract =
-                Self::EdgeConcreteToAbstract::concrete_to_abstract(weight.attr());
+            let edge_abstract = Self::EdgeConcreteToAbstract::concrete_to_abstract(weight.attr());
             // TODO: make this better (don't depend on Graph internals)
             let new_edge_attr = weight.with(edge_abstract);
             abstract_graph.graph.add_edge(src, dst, new_edge_attr);

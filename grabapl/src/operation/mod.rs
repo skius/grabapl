@@ -9,10 +9,6 @@ use crate::operation::builtin::LibBuiltinOperation;
 use crate::operation::user_defined::{
     AbstractNodeId, AbstractOperationResultMarker, UserDefinedOperation,
 };
-use signature::parameter::{
-    AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument,
-    OperationOutput, OperationParameter, ParameterSubstitution,
-};
 use crate::semantics::{
     AbstractGraph, AbstractMatcher, ConcreteGraph, ConcreteToAbstract, Semantics,
 };
@@ -20,6 +16,10 @@ use crate::util::log;
 use crate::{DotCollector, Graph, NodeKey, SubstMarker};
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
+use signature::parameter::{
+    AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument,
+    OperationOutput, OperationParameter, ParameterSubstitution,
+};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -220,7 +220,11 @@ args: {selected_inputs:?}"
                 let arg_node_key = arg_ref.from_index(arg_idx);
                 (
                     // unwrap is ok since it was returned by param_ref.from_index
-                    param.node_keys_to_subst.get_left(&param_node_key).unwrap().clone(),
+                    param
+                        .node_keys_to_subst
+                        .get_left(&param_node_key)
+                        .unwrap()
+                        .clone(),
                     arg_node_key,
                 )
             })

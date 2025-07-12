@@ -1,6 +1,5 @@
 pub mod sample_user_defined_operations;
 
-use grabapl::operation::signature::parameterbuilder::OperationParameterBuilder;
 use grabapl::operation::query::{
     AbstractQueryChange, AbstractQueryOutput, BuiltinQuery as BuiltinQueryTrait,
     ConcreteQueryOutput, EdgeChange, NodeChange,
@@ -10,6 +9,7 @@ use grabapl::operation::signature::parameter::{
     AbstractOperationOutput, GraphWithSubstitution, NewNodeMarker, OperationArgument,
     OperationOutput, OperationParameter, ParameterSubstitution,
 };
+use grabapl::operation::signature::parameterbuilder::OperationParameterBuilder;
 use grabapl::semantics::{
     AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, MatchJoiner,
     Semantics,

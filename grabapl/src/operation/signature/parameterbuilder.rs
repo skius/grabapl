@@ -1,9 +1,9 @@
-use std::collections::HashSet;
-use petgraph::visit::UndirectedAdaptor;
 use crate::operation::signature::parameter::OperationParameter;
 use crate::semantics::AbstractGraph;
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, Semantics, SubstMarker};
+use petgraph::visit::UndirectedAdaptor;
+use std::collections::HashSet;
 use thiserror::Error;
 
 #[derive(Debug, Error, Clone)]
@@ -30,11 +30,14 @@ impl<S: Semantics> OperationParameterBuilder<S> {
             subst_to_node_keys: BiMap::new(),
         }
     }
-    
+
     pub fn next_subst_marker(&mut self) -> SubstMarker {
         let mut next_index = self.subst_to_node_keys.len();
         let mut next = next_index.to_string();
-        while self.subst_to_node_keys.contains_left(&SubstMarker::from(&*next)) {
+        while self
+            .subst_to_node_keys
+            .contains_left(&SubstMarker::from(&*next))
+        {
             next_index += 1;
             next = next_index.to_string();
         }
@@ -93,7 +96,7 @@ impl<S: Semantics> OperationParameterBuilder<S> {
 
     pub fn build(self) -> Result<OperationParameter<S>, ParameterBuilderError> {
         // TODO: check that all context nodes are linked with edges to explicit input nodes.
-        
+
         Ok(OperationParameter {
             explicit_input_nodes: self.explicit_input_nodes,
             parameter_graph: self.parameter_graph,

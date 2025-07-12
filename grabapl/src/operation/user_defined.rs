@@ -2,14 +2,14 @@ use crate::operation::builtin::LibBuiltinOperation;
 use crate::operation::query::{
     BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier, run_builtin_query, run_shape_query,
 };
+use crate::operation::signature::parameter::{
+    AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, NodeMarker,
+    OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution,
+};
 use crate::operation::signature::{AbstractSignatureNodeId, OperationSignature};
 use crate::operation::{
     OperationError, OperationResult, run_builtin_operation, run_lib_builtin_operation,
     run_operation,
-};
-use crate::operation::signature::parameter::{
-    AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, NodeMarker,
-    OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution,
 };
 use crate::semantics::{AbstractGraph, ConcreteGraph};
 use crate::util::bimap::BiMap;

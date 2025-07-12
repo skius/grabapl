@@ -18,22 +18,22 @@ use grabapl::SubstMarker;
 mod ffi {
     use super::prompt;
     use ::grabapl::Semantics;
+    use error_stack::Report;
     use grabapl::operation::builder::{
         OperationBuilder as RustOperationBuilder,
         OperationBuilderError as RustOperationBuilderError,
     };
     use grabapl::semantics::AbstractGraph as RustAbstractGraph;
     use grabapl::semantics::ConcreteGraph as RustConcreteGraph;
-    use error_stack::Report;
     use simple_semantics::{BuiltinOperation, BuiltinQuery as RustBuiltinQuery, SimpleSemantics};
     use std::fmt::Write;
     use std::str::FromStr;
 
     use super::{RustEdgeAbstract, RustEdgeConcrete, RustNodeAbstract, RustNodeConcrete};
-    use grabapl::operation::user_defined::AbstractNodeId as RustAbstractNodeId;
     use grabapl::operation::builder::BuilderOpLike as RustBuilderOpLike;
-    use grabapl::operation::user_defined::AbstractOperationResultMarker;
     use grabapl::operation::signature::parameter::AbstractOutputNodeMarker;
+    use grabapl::operation::user_defined::AbstractNodeId as RustAbstractNodeId;
+    use grabapl::operation::user_defined::AbstractOperationResultMarker;
 
     use grabapl::operation::builder::IntermediateState as RustIntermediateState;
 

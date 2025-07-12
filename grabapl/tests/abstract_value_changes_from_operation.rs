@@ -1,15 +1,15 @@
 use error_stack::FrameKind;
 use grabapl::operation::builder::{BuilderOpLike, OperationBuilder, OperationBuilderError};
 use grabapl::operation::builtin::LibBuiltinOperation;
-use grabapl::operation::signature::parameterbuilder::OperationParameterBuilder;
 use grabapl::operation::query::{BuiltinQuery, ConcreteQueryOutput};
-use grabapl::operation::signature::{AbstractSignatureEdgeId, AbstractSignatureNodeId};
-use grabapl::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
-use grabapl::operation::{BuiltinOperation, run_from_concrete};
 use grabapl::operation::signature::parameter::{
     AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter,
     ParameterSubstitution,
 };
+use grabapl::operation::signature::parameterbuilder::OperationParameterBuilder;
+use grabapl::operation::signature::{AbstractSignatureEdgeId, AbstractSignatureNodeId};
+use grabapl::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
+use grabapl::operation::{BuiltinOperation, run_from_concrete};
 use grabapl::semantics::{
     AbstractGraph, AbstractJoin, AbstractMatcher, ConcreteGraph, ConcreteToAbstract,
 };
@@ -18,8 +18,8 @@ use log_crate::info;
 use std::collections::{HashMap, HashSet};
 
 mod util;
-use util::semantics::*;
 use crate::util::interval_semantics::EdgeValue;
+use util::semantics::*;
 
 #[test]
 fn no_modifications_dont_change_abstract_value() {
@@ -1007,7 +1007,8 @@ fn shape_query_doesnt_match_nodes_for_which_handles_exist() {
         .unwrap();
     let p0 = AbstractNodeId::param("p0");
     let c0 = AbstractNodeId::param("c0");
-    builder.expect_parameter_edge("p0", "c0", EdgeType::Wildcard)
+    builder
+        .expect_parameter_edge("p0", "c0", EdgeType::Wildcard)
         .unwrap();
     // call op 0
     builder
@@ -1387,7 +1388,9 @@ fn shape_query_allows_refinement_of_existing_nodes_and_edges() {
 
     // first: start a shape query to check if p0->p1 has type "child"
     builder.start_shape_query("q").unwrap();
-    builder.expect_shape_edge(p0, p1, EdgeType::Exact("child".to_string())).unwrap();
+    builder
+        .expect_shape_edge(p0, p1, EdgeType::Exact("child".to_string()))
+        .unwrap();
     builder.enter_true_branch().unwrap();
     // if it does, set p0 to "has child"
     builder
@@ -1418,7 +1421,6 @@ fn shape_query_allows_refinement_of_existing_nodes_and_edges() {
         )
         .unwrap();
 
-
     // finalize and test
     let operation = builder.build(0).unwrap();
     op_ctx.add_custom_operation(0, operation);
@@ -1437,7 +1439,10 @@ fn shape_query_allows_refinement_of_existing_nodes_and_edges() {
         assert_eq!(p0_value, Some(&NodeValue::String("has child".to_string())));
 
         let p1_value = g.get_node_attr(p1_key);
-        assert_eq!(p1_value, Some(&NodeValue::String("was integer".to_string())));
+        assert_eq!(
+            p1_value,
+            Some(&NodeValue::String("was integer".to_string()))
+        );
     }
 }
 
@@ -1452,7 +1457,9 @@ fn shape_query_av_refinement_works_in_branch_merge() {
     let p0 = AbstractNodeId::param("p0");
     // check if p0 is actually an Integer
     builder.start_shape_query("q").unwrap();
-    builder.expect_shape_node_change(p0, NodeType::Integer).unwrap();
+    builder
+        .expect_shape_node_change(p0, NodeType::Integer)
+        .unwrap();
     builder.enter_false_branch().unwrap();
     // if not, turn it into an integer
     builder
@@ -1509,12 +1516,19 @@ fn delete_node_deletes_all_incident_edges_in_signature() {
     let op_deleting_one_node = {
         let mut builder = OperationBuilder::new(&op_ctx);
         // expect p0: Object
-        builder.expect_parameter_node("p0", NodeType::Object).unwrap();
+        builder
+            .expect_parameter_node("p0", NodeType::Object)
+            .unwrap();
         let p0 = AbstractNodeId::param("p0");
         // delete it
-        builder.add_operation(BuilderOpLike::LibBuiltin(LibBuiltinOperation::RemoveNode {
-            param: NodeType::Object,
-        }), vec![p0]).unwrap();
+        builder
+            .add_operation(
+                BuilderOpLike::LibBuiltin(LibBuiltinOperation::RemoveNode {
+                    param: NodeType::Object,
+                }),
+                vec![p0],
+            )
+            .unwrap();
         let op = builder.build(0).unwrap();
         // assert op is deleting a node
         let signature = op.signature();
@@ -1557,7 +1571,6 @@ fn delete_node_deletes_all_incident_edges_in_signature() {
         HashSet::from([("p0".into(), "p1".into())]),
         "Expected the operation to delete the edge p0->p1"
     );
-
 }
 
 #[test_log::test]
@@ -1565,7 +1578,9 @@ fn delete_node_after_writing_to_it() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();
     let mut builder = OperationBuilder::new(&op_ctx);
     // expect p0: Object
-    builder.expect_parameter_node("p0", NodeType::Object).unwrap();
+    builder
+        .expect_parameter_node("p0", NodeType::Object)
+        .unwrap();
     let p0 = AbstractNodeId::param("p0");
     // write to it
     builder
@@ -1578,9 +1593,14 @@ fn delete_node_after_writing_to_it() {
         )
         .unwrap();
     // delete it
-    builder.add_operation(BuilderOpLike::LibBuiltin(LibBuiltinOperation::RemoveNode {
-        param: NodeType::Object,
-    }), vec![p0]).unwrap();
+    builder
+        .add_operation(
+            BuilderOpLike::LibBuiltin(LibBuiltinOperation::RemoveNode {
+                param: NodeType::Object,
+            }),
+            vec![p0],
+        )
+        .unwrap();
     let op = builder.build(0).unwrap();
     // assert op is deleting a node
     let signature = op.signature();

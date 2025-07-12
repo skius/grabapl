@@ -1,24 +1,26 @@
 use crate::graph::GraphTrait;
+use crate::operation::builder::OperationBuilderError;
+use crate::operation::signature::parameterbuilder::ParameterBuilderError;
 use crate::operation::{OperationError, OperationResult};
 use crate::semantics::AbstractGraph;
+use crate::util::bimap::BiMap;
 use crate::util::log;
 use crate::{Graph, NodeKey, Semantics, SubstMarker, interned_string_newtype};
 use derive_more::From;
 use internment::Intern;
+use petgraph::visit::UndirectedAdaptor;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
-use petgraph::visit::UndirectedAdaptor;
 use thiserror::Error;
-use crate::operation::builder::OperationBuilderError;
-use crate::operation::signature::parameterbuilder::ParameterBuilderError;
-use crate::util::bimap::BiMap;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
-// renamed. 
+// renamed.
 
 #[derive(Debug, Error)]
 pub enum OperationParameterError {
-    #[error("Context node {0:?} is not connected to any explicit input nodes in the parameter graph")]
+    #[error(
+        "Context node {0:?} is not connected to any explicit input nodes in the parameter graph"
+    )]
     ContextNodeNotConnected(SubstMarker),
 }
 
@@ -52,9 +54,7 @@ impl<S: Semantics> OperationParameter<S> {
         }
     }
 
-    pub fn check_validity(
-        &self,
-    ) -> Result<(), OperationParameterError> {
+    pub fn check_validity(&self) -> Result<(), OperationParameterError> {
         // we want weak connected components, hence we use UndirectedAdaptor
         let undi = UndirectedAdaptor(&self.parameter_graph.graph);
         let components = petgraph::algo::tarjan_scc(&undi);
@@ -62,7 +62,9 @@ impl<S: Semantics> OperationParameter<S> {
         for component in components {
             let mut contains_explicit_input = false;
             for key in &component {
-                let subst_marker = self.node_keys_to_subst.get_left(key)
+                let subst_marker = self
+                    .node_keys_to_subst
+                    .get_left(key)
                     .expect("internal error: should find subst marker for node key");
                 if self.explicit_input_nodes.contains(subst_marker) {
                     contains_explicit_input = true;
@@ -71,9 +73,13 @@ impl<S: Semantics> OperationParameter<S> {
             }
             if !contains_explicit_input {
                 let example_context_node = component[0];
-                let subst_marker = self.node_keys_to_subst.get_left(&example_context_node)
+                let subst_marker = self
+                    .node_keys_to_subst
+                    .get_left(&example_context_node)
                     .expect("internal error: should find subst marker for node key");
-                return Err(OperationParameterError::ContextNodeNotConnected(*subst_marker));
+                return Err(OperationParameterError::ContextNodeNotConnected(
+                    *subst_marker,
+                ));
             }
         }
 

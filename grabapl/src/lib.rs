@@ -1,8 +1,8 @@
-pub mod graph;
-pub mod util;
 mod experimental;
+pub mod graph;
 pub mod operation;
 pub mod semantics;
+pub mod util;
 
 use crate::graph::*;
 use derive_more::From;
@@ -13,9 +13,9 @@ pub use graph::Graph;
 pub use graph::NodeKey;
 pub use graph::OperationContext;
 pub use graph::OperationId;
-pub use semantics::Semantics;
 use internment::Intern;
 use petgraph::visit::{IntoEdgesDirected, IntoNeighborsDirected, NodeRef};
+pub use semantics::Semantics;
 use std::fmt::Debug;
 /// A marker for substitution in the graph.
 ///

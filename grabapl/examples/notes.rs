@@ -19,7 +19,6 @@ TODO: Add option to ignore parent order?
 
 /* === Old notes === */
 
-
 // TODO: should we instead have an 'AbstractAttribute' as well, and the pattern matcher works on that?
 // From every concrete graph you can get its abstract graph. That should be like the type.
 // so a concrete i32 attr node (say '5') would for example get mapped into a 'i32' node.
@@ -61,8 +60,6 @@ pub struct PatternWrapper<P> {
     marker: SubstMarker,
     kind: PatternKind,
 }
-
-
 
 impl<P> PatternWrapper<P> {
     pub fn new_input(pattern: P, marker: SubstMarker) -> Self {
@@ -169,6 +166,5 @@ impl<T> WithSubstMarker<T> {
 //         Ok(())
 //     }
 // }
-
 
 fn main() {}

@@ -9,10 +9,10 @@ use std::hash::RandomState;
 
 pub mod dot;
 
-pub use dot::DotCollector;
 pub use crate::operation::OperationContext;
 pub use crate::operation::OperationId;
 pub use crate::semantics::Semantics;
+pub use dot::DotCollector;
 
 #[derive(Debug, Clone)]
 pub struct NodeAttribute<NodeAttr> {

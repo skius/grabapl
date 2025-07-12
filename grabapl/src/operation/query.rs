@@ -1,10 +1,10 @@
 use crate::graph::EdgeAttribute;
 use crate::operation::OperationResult;
-use crate::operation::user_defined::{AbstractOperationResultMarker, QueryInstructions};
 use crate::operation::signature::parameter::{
     AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationParameter,
     ParameterSubstitution,
 };
+use crate::operation::user_defined::{AbstractOperationResultMarker, QueryInstructions};
 use crate::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics};
 use crate::util::log;
 use crate::{Graph, NodeKey, OperationContext, OperationId, SubstMarker, interned_string_newtype};
@@ -277,11 +277,11 @@ fn get_shape_query_substitution<S: Semantics>(
             // out of the non-enforced-mapping nodes, we explicitly don't want to match hidden nodes
             if hidden_nodes.contains(dynamic_graph_node_key) {
                 log::info!(
-                "Skipping hidden node {:?} in dynamic graph for shape query",
-                dynamic_graph_node_key
-            );
+                    "Skipping hidden node {:?} in dynamic graph for shape query",
+                    dynamic_graph_node_key
+                );
                 return false;
-            }            
+            }
         }
 
         let desired_shape_attr = desired_shape
