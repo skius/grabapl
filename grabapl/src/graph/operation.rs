@@ -131,9 +131,6 @@ impl<'a, S: Semantics> Operation<'a, S> {
     // TODO: support getting the signature from also a builtin operation?
 }
 
-// TODO: Builtin operations should be a trait that follows some generic pattern of mutating the graph
-// also,
-
 pub type OperationId = u32;
 
 #[derive(Error, Debug, Clone)]
