@@ -1559,3 +1559,45 @@ fn delete_node_deletes_all_incident_edges_in_signature() {
     );
 
 }
+
+// TODO: check what happens if a UDOp writes to a param and then deletes the param. What is the signature?
+#[test_log::test]
+fn delete_node_after_writing_to_it() {
+    let mut op_ctx = OperationContext::<TestSemantics>::new();
+    let mut builder = OperationBuilder::new(&op_ctx);
+    // expect p0: Object
+    builder.expect_parameter_node("p0", NodeType::Object).unwrap();
+    let p0 = AbstractNodeId::param("p0");
+    // write to it
+    builder
+        .add_operation(
+            BuilderOpLike::LibBuiltin(LibBuiltinOperation::SetNode {
+                param: NodeType::Object,
+                value: NodeValue::String("Hello".to_string()),
+            }),
+            vec![p0.clone()],
+        )
+        .unwrap();
+    // delete it
+    builder.add_operation(BuilderOpLike::LibBuiltin(LibBuiltinOperation::RemoveNode {
+        param: NodeType::Object,
+    }), vec![p0]).unwrap();
+    let op = builder.build(0).unwrap();
+    // assert op is deleting a node
+    let signature = op.signature();
+    assert_eq!(
+        signature.output.maybe_deleted_nodes,
+        HashSet::from([SubstMarker::from("p0").into()]),
+        "Expected the operation to delete p0"
+    );
+    // TODO: decide if this should be inside the signature or not.
+    //  the node has been deleted, so really this is useless information and could confuse consumers.
+    //  so add an invariant to opsignature that a node can only be mentioned in either deleted or changed?
+    //  could use an enum for that. and make it a hashmap to enforce uniqueness: p0 => Deleted/Changed.
+    // TODO: do this!
+    assert_eq!(
+        signature.output.maybe_changed_nodes,
+        HashMap::from([(SubstMarker::from("p0").into(), NodeType::String)]),
+        "Expected the operation to change p0 to Object before deleting it"
+    );
+}

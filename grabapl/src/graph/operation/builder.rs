@@ -987,6 +987,7 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
         let mut false_branch_instructions = None;
 
         // did the user finish the query and should we check that it's finished?
+        // TODO: this doesn't capture the case where the user finishes the entire UDOp without entering a branch or ending the query.
         let mut did_query_finish = false;
 
         while let Some(instruction) = iter.peek() {
@@ -1046,10 +1047,9 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                 }
                 BuilderInstruction::ExpectShapeEdge(source, target, abstract_value) => {
                     iter.next();
-                    // TODO: we need a current view of the abstract graph (or, well, AID mappings) so that we can build the GraphShapeQuery here which requires
+                    // Note: we need a current view of the abstract graph (or, well, AID mappings) so that we can build the GraphShapeQuery here which requires
                     //  an actual `Graph`.
-
-                    // instead, switch to deferred approach by just passing along the instructions
+                    // So we just follow a deferred approach by just passing along the instructions
                     gsq_instructions.push(GraphShapeQueryInstruction::ExpectShapeEdge(
                         source.clone(),
                         target.clone(),
