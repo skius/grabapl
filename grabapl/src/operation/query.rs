@@ -1,8 +1,7 @@
 use crate::graph::EdgeAttribute;
 use crate::operation::OperationResult;
 use crate::operation::signature::parameter::{
-    GraphWithSubstitution, OperationArgument, OperationParameter,
-    ParameterSubstitution,
+    GraphWithSubstitution, OperationArgument, OperationParameter, ParameterSubstitution,
 };
 use crate::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics};
 use crate::util::log;

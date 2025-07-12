@@ -12,7 +12,6 @@ type RustNodeAbstract = <SimpleSemantics as Semantics>::NodeAbstract;
 type RustNodeConcrete = <SimpleSemantics as Semantics>::NodeConcrete;
 type RustEdgeConcrete = <SimpleSemantics as Semantics>::EdgeConcrete;
 
-
 #[diplomat::bridge]
 mod ffi {
     use super::prompt;
@@ -30,9 +29,8 @@ mod ffi {
 
     use super::RustEdgeAbstract;
     use grabapl::operation::builder::BuilderOpLike as RustBuilderOpLike;
-    
+
     use grabapl::operation::user_defined::AbstractNodeId as RustAbstractNodeId;
-    
 
     use grabapl::operation::builder::IntermediateState as RustIntermediateState;
 

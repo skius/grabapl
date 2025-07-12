@@ -162,11 +162,9 @@ pub trait Semantics {
     }
 }
 
-pub type ConcreteGraph<S> =
-    Graph<<S as Semantics>::NodeConcrete, <S as Semantics>::EdgeConcrete>;
+pub type ConcreteGraph<S> = Graph<<S as Semantics>::NodeConcrete, <S as Semantics>::EdgeConcrete>;
 
-pub type AbstractGraph<S> =
-    Graph<<S as Semantics>::NodeAbstract, <S as Semantics>::EdgeAbstract>;
+pub type AbstractGraph<S> = Graph<<S as Semantics>::NodeAbstract, <S as Semantics>::EdgeAbstract>;
 
 pub trait ConcreteToAbstract {
     type Concrete;

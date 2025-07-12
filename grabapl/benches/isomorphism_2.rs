@@ -1,6 +1,6 @@
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
-use petgraph::algo::isomorphism::general_subgraph_monomorphisms_iter_with_partial_mapping;
 use petgraph::algo::general_subgraph_monomorphisms_iter;
+use petgraph::algo::isomorphism::general_subgraph_monomorphisms_iter_with_partial_mapping;
 use petgraph::data::Build;
 use petgraph::prelude::DiGraphMap;
 use std::hash::RandomState;
