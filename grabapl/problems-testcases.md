@@ -455,3 +455,63 @@ Calling operation calls that operation with `a -Integer-> b`.
 All good - caller will notice that a new edge gets created, and hence will know that its existing edge must be updated.
 
 Note that this is only true because we don't allow multiple parallel edges.
+
+## User-defined queries (UDQ) brainstorming
+
+Would love to reuse the existing operation builder for parts of a UDQ.
+
+Can queries modify?
+* If yes, queries are just different in that their result can be used to enter two different branches.
+* If no, we need to limit the modification capabilities of regular operations.
+
+Can we somehow make the "branching capability" first-class? I.e., can we allow the user to somehow return
+such a thing manually?
+
+We could add an associated OutputType to our Semantics trait, and operations can return such a type.
+That type must then implement an interface that supports our "start_query" semantics somehow.
+So there's no difference between a UDQ and UDF. When a UDF is used in operation context, the outputtype is ignored,
+but when it's used in place of a start_query, the outputtype is used to determine the query branches.
+Actually, we need to have an option for UDFs to opt-out from being used as queries. Needs to be in the signature.
+
+Initially, the output type should just be isomorphic to `bool` - i.e., we can pick one of two branches.
+
+If a UDF opts-in to being used as a query, how can it actually return a true/false value?
+
+Algot Web does this by having a "global mutable result variable" that the user can set to true/false as the program progresses.
+
+I dislike this, as it doesn't feel as first-class as nodes and edges.
+Maybe they don't return a bool, but they return a specific node, of a specific type, where the type supports a "ToBool" trait?
+(for ToBool to work in our framework, the NodeConcrete value needs a ToBool -> Option<bool> method, where dynamically non-bool types just return None.)
+(also: NodeAbstract needs a IsBool method that returns true on types that dynamically will return Some() for ToBool)
+So, for a UDF to opt-in to being a UDQ, it would explicitly mark one of its returned nodes as the query result node. The builder asserts that the supposed type in fact supports ToBool.
+
+What should the semantics of the bool result node be?
+* If operation was called in a query context, the result node is deleted. Note: this requires it to be non-connected just to avoid confusingly deleting edges.
+* If not, keep the bool node around, so we can do bool operations?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
