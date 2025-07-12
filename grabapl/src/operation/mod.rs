@@ -24,19 +24,11 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use thiserror::Error;
 
-// TODO: We might want to be able to supply additional data to builtin operations. For example, a Set Value operation should be 'generic' over its value without
-//  needing to store a separate operation in the OpCtx for every value...
 pub trait BuiltinOperation: Debug {
     type S: Semantics;
 
     /// The pattern to match against the graph.
     fn parameter(&self) -> OperationParameter<Self::S>;
-
-    // TODO: needs an apply_abstract operation that applies the changes to the abstract graph.
-    // For example, "add node" adds the node.
-    // In general, we still need a way to refer to new changes, e.g., how do we refer
-    // to a new node added by an operation?
-    // In a frontend that's easy, the user 'sees' the node and can just select it.
 
     /// *If the operation argument matches*, what happens to the abstract graph?
     fn apply_abstract(
@@ -44,8 +36,6 @@ pub trait BuiltinOperation: Debug {
         g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>,
     ) -> AbstractOperationOutput<Self::S>;
 
-    // TODO: OperationOutput returned here should only represent Abstract changes. Basically the guaranteed new nodes so that other ops can refer to it.
-    //  Maybe we could have something be returned in apply_abstract (just a Vec<SubstMarker>?) to indicate _which_ nodes are guaranteed to be added, and apply then returns a map with those substmarkers as keys?
     fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>) -> OperationOutput;
 }
 
@@ -168,7 +158,6 @@ args: {selected_inputs:?}"
     // TODO: this won't work if the user selects the same node multiple times. We cannot have a subgraph where two nodes of the subgraph actually match to just a single one in the input graph.
     //  A fix might be to split the isomorphism finding to per-explicitly-selected node?
 
-    // TODO: should we not return an error here?
     let enforced_param_to_arg_node_key_mapping = param
         .explicit_input_nodes
         .iter()
@@ -204,7 +193,6 @@ args: {selected_inputs:?}"
         S::EdgeMatcher::matches(arg_attr, &param_attr)
     };
 
-    // TODO: error could indicate that this is not due to edge orderedness, but just general shape.
     let isos = general_subgraph_monomorphisms_iter(&param_ref, &arg_ref, &mut nm, &mut em)
         .ok_or_else(return_arg_does_not_match_error_with_dbg_info)?;
 
@@ -254,7 +242,6 @@ fn run_lib_builtin_operation<S: Semantics>(
     op: &LibBuiltinOperation<S>,
     arg: OperationArgument,
 ) -> OperationResult<OperationOutput> {
-    // TODO: we probably dont need to pass the OperationArgument down. Might just cause confusion.
     let mut gws = GraphWithSubstitution::new(g, &arg.subst);
     let output = op.apply(&mut gws);
 
@@ -266,12 +253,6 @@ fn run_builtin_operation<S: Semantics>(
     op: &S::BuiltinOperation,
     arg: OperationArgument,
 ) -> OperationResult<OperationOutput> {
-    // can we run it?
-    // let param = op.parameter();
-    // let abstract_g = S::concrete_to_abstract(&g);
-    // let subst = get_substitution(&abstract_g, &param, &selected_inputs)?;
-
-    // TODO: we probably dont need to pass the OperationArgument down. Might just cause confusion.
     let mut gws = GraphWithSubstitution::new(g, &arg.subst);
     let output = op.apply(&mut gws);
 
@@ -284,11 +265,6 @@ fn run_custom_operation<S: Semantics>(
     op: &UserDefinedOperation<S>,
     arg: OperationArgument,
 ) -> OperationResult<OperationOutput> {
-    // can we run it?
-    // let param = &op.parameter;
-    // let abstract_g = S::concrete_to_abstract(&g);
-    // let subst = get_substitution(&abstract_g, param, &selected_inputs)?;
-
     let output = op.apply(op_ctx, g, &arg)?;
 
     Ok(output)

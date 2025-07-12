@@ -283,4 +283,20 @@ pub enum ShapeEdgeChange<S: Semantics> {
 //
 //   Can the input abstract graph just be a subgraph of the actual abstract graph? Just enough to imply all the necessary context like "next child" or "prev child" or similar?
 
+// TODO: OperationOutput should also include substractive changes to the graph,
+//  i.e.:
+//  * nodes that were removed
+//  * edges that were removed
+//  * abstract values whose attributes were changed
+// TODO: this last point seems tricky. How can we know which attrs were changed?
+//  I guess: for Builtins, we can just run the apply_abstract and try to do some
+//  'merge'. Well, actually, the apply_abstract does the merge for us.
+//  For UserDefinedOp, we need to determine the least common ancestor
+
+// TODO: needs an apply_abstract operation that applies the changes to the abstract graph.
+// For example, "add node" adds the node.
+// In general, we still need a way to refer to new changes, e.g., how do we refer
+// to a new node added by an operation?
+// In a frontend that's easy, the user 'sees' the node and can just select it.
+
 fn main() {}

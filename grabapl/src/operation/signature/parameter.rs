@@ -443,7 +443,6 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
     }
 }
 
-// TODO: maybe this is not needed and ParameterSubstitution is already enough?
 #[derive(Debug)]
 pub struct OperationArgument<'a> {
     pub selected_input_nodes: Cow<'a, [NodeKey]>,
@@ -456,32 +455,10 @@ pub struct OperationArgument<'a> {
     pub hidden_nodes: HashSet<NodeKey>,
 }
 
-// impl<'a> OperationArgument<'a> {
-//     pub fn infer_explicit_for_param(
-//         selected_nodes: &'a [NodeKey],
-//         param: &OperationParameter<impl Semantics>,
-//     ) -> OperationResult<Self> {
-//         let subst = ParameterSubstitution::infer_explicit_for_param(selected_nodes, param)?;
-//         Ok(OperationArgument {
-//             selected_input_nodes: selected_nodes.into(),
-//             subst,
-//         })
-//     }
-// }
-
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
 pub struct AbstractOutputNodeMarker(pub Intern<String>);
 interned_string_newtype!(AbstractOutputNodeMarker);
 
-// TODO: OperationOutput should also include substractive changes to the graph,
-//  i.e.:
-//  * nodes that were removed
-//  * edges that were removed
-//  * abstract values whose attributes were changed
-// TODO: this last point seems tricky. How can we know which attrs were changed?
-//  I guess: for Builtins, we can just run the apply_abstract and try to do some
-//  'merge'. Well, actually, the apply_abstract does the merge for us.
-//  For UserDefinedOp, we need to determine the least common ancestor
 /// Keeps track of node changes that happened during the operation execution.
 ///
 /// This is mainly useful for keeping track of which nodes still exist after the operation,
@@ -504,15 +481,11 @@ impl OperationOutput {
     }
 }
 
-// TODO: this is a "signature" arguably. rename?
 pub struct AbstractOperationOutput<S: Semantics> {
     pub new_nodes: HashMap<AbstractOutputNodeMarker, NodeKey>,
     pub removed_nodes: Vec<NodeKey>,
     pub new_edges: Vec<(NodeKey, NodeKey)>,
     pub removed_edges: Vec<(NodeKey, NodeKey)>,
-    // TODO: we actually do need to keep track of changed abstract values.
-    //  The reason for this is so that we can determine an userdefined operation's abstract changes as well,
-    //  without needing to simulate it every time we want to abstractly apply it.
     /// These maps contain any abstract values that are set (not necessarily changed) during the operation execution.
     pub changed_abstract_values_nodes: HashMap<NodeKey, S::NodeAbstract>,
     pub changed_abstract_values_edges: HashMap<(NodeKey, NodeKey), S::EdgeAbstract>,
@@ -532,5 +505,5 @@ pub struct AbstractOperationOutput<S: Semantics> {
 // since the UDO runner only updates the mapping for _returned_ nodes (as told by the ...Output struct family).
 // The only operations that can _sometimes_ return a node are builtin operations.
 // Hence I would argue this is a documentation issue (or slight client-DX issue), in that we need to document the
-// BuiltinOperation trait better to indicate that _returned_ nodes must always be returned, and also be specified
+// BuiltinOperation trait better to indicate that _returned_ nodes must *always* be returned, and also be specified
 // as a returned node in the operation's signature.
