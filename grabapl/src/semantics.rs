@@ -153,13 +153,9 @@ pub trait Semantics {
 
         for (src, dst, weight) in c.graph.all_edges() {
             let edge_abstract =
-                Self::EdgeConcreteToAbstract::concrete_to_abstract(&weight.edge_attr);
+                Self::EdgeConcreteToAbstract::concrete_to_abstract(weight.attr());
             // TODO: make this better (don't depend on Graph internals)
-            let new_edge_attr = EdgeAttribute::new(
-                edge_abstract,
-                weight.source_out_order,
-                weight.target_in_order,
-            );
+            let new_edge_attr = weight.with(edge_abstract);
             abstract_graph.graph.add_edge(src, dst, new_edge_attr);
         }
 
@@ -167,49 +163,11 @@ pub trait Semantics {
     }
 }
 
-// TODO: do we need this? it's just easier to use this than spell it out
-// pub trait Semantics:
-//     Semantics<NodeConcrete: Clone, NodeAbstract: Clone, EdgeConcrete: Clone, EdgeAbstract: Clone>
-// {
-//
-// }
-// impl<S: Semantics> Semantics for S
-// where
-//     S::NodeConcrete: Clone,
-//     S::EdgeConcrete: Clone,
-//     S::NodeAbstract: Clone,
-//     S::EdgeAbstract: Clone,
-// {
-// }
-
 pub type ConcreteGraph<S: Semantics> =
     Graph<<S as Semantics>::NodeConcrete, <S as Semantics>::EdgeConcrete>;
 
 pub type AbstractGraph<S: Semantics> =
     Graph<<S as Semantics>::NodeAbstract, <S as Semantics>::EdgeAbstract>;
-
-// impl<NC: ToAbstract + Clone, EC: ToAbstract + Clone> Graph<NC, EC>
-// {
-//     pub(crate) fn to_abstract(&self) -> Graph<NC::Abstract, EC::Abstract> {
-//         let mut abstract_graph = Graph::new();
-//         for (node_key, node_concrete) in self.nodes() {
-//             let node_abstract = node_concrete.to_abstract();
-//             // TODO: make this better (don't depend on Graph internals)
-//             abstract_graph.graph.add_node(node_key);
-//             abstract_graph.node_attr_map.insert(node_key, NodeAttribute::new(node_abstract));
-//         }
-//         abstract_graph.max_node_key = self.max_node_key;
-//
-//         for (src, dst, weight) in self.graph.all_edges() {
-//             let edge_abstract = weight.edge_attr.to_abstract();
-//             // TODO: make this better (don't depend on Graph internals)
-//             let new_edge_attr = EdgeAttribute::new(edge_abstract, weight.source_out_order, weight.target_in_order);
-//             abstract_graph.graph.add_edge(src, dst, new_edge_attr);
-//         }
-//
-//         abstract_graph
-//     }
-// }
 
 pub trait ConcreteToAbstract {
     type Concrete;

@@ -1,9 +1,9 @@
 use crate::operation::BuiltinOperation;
-use crate::operation::parameterbuilder::OperationParameterBuilder;
-use crate::graph::parameter::{
+use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
+use crate::operation::signature::parameter::{
     AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter,
 };
-use crate::graph::semantics::{AbstractGraph, ConcreteGraph, ConcreteToAbstract};
+use crate::semantics::{AbstractGraph, ConcreteGraph, ConcreteToAbstract};
 use crate::{Semantics, SubstMarker};
 use std::collections::HashMap;
 

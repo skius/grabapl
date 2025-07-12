@@ -8,13 +8,11 @@ use std::fmt::Debug;
 use std::hash::RandomState;
 
 pub mod dot;
-pub mod parameter;
-pub mod semantics;
 
 pub use dot::DotCollector;
 pub use crate::operation::OperationContext;
 pub use crate::operation::OperationId;
-pub use semantics::Semantics;
+pub use crate::semantics::Semantics;
 
 #[derive(Debug, Clone)]
 pub struct NodeAttribute<NodeAttr> {
@@ -49,6 +47,14 @@ impl<EdgeAttr> EdgeAttribute<EdgeAttr> {
             source_out_order,
             target_in_order,
         }
+    }
+
+    pub fn attr(&self) -> &EdgeAttr {
+        &self.edge_attr
+    }
+
+    pub fn with<NewAttr>(&self, new_attr: NewAttr) -> EdgeAttribute<NewAttr> {
+        EdgeAttribute::new(new_attr, self.source_out_order, self.target_in_order)
     }
 }
 
@@ -308,77 +314,6 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
             None
         }
     }
-
-    // TODO: delete. outdated.
-    // /// Attempts to match the pattern to the graph on the specified inputs.
-    // ///
-    // /// `inputs` is the ordered list of concrete nodes from `self` that need to match up with `pattern.parameter_nodes`.
-    // ///
-    // /// The return value is a mapping from the pattern node keys to the graph node keys if a match is found.
-    // pub fn try_match_pattern<NAP, EAP>(
-    //     &self,
-    //     inputs: &[NodeKey],
-    //     pattern: &InputPattern<NAP, EAP>,
-    //     // nm: &mut NM,
-    //     // em: &mut EM,
-    // ) -> Option<HashMap<NodeKey, NodeKey>>
-    // where
-    //     NAP: PatternAttributeMatcher<Attr = NodeAttr>,
-    //     EAP: PatternAttributeMatcher<Attr = EdgeAttr>,
-    //     // NM: FnMut(&NodeKey, &NodeKey) -> bool,
-    //     // EM: FnMut(&EdgeAttribute<EAP::Pattern>, &EdgeAttribute<EdgeAttr>) -> bool,
-    // {
-    //     let mut expected_input_mapping = HashMap::new();
-    //     for (&param_marker, &input_node) in pattern.parameter_nodes.iter().zip(inputs.iter()) {
-    //         let param_node = pattern
-    //             .subst_to_node_keys
-    //             .get(&param_marker)
-    //             .expect("Internal error: parameter node not found in pattern");
-    //         expected_input_mapping.insert(*param_node, input_node);
-    //     }
-    //
-    //     let mut nm = |pat_node: &_, data_node: &_| {
-    //         if let Some(expected_data) = expected_input_mapping.get(pat_node) {
-    //             return *expected_data == *data_node;
-    //         }
-    //
-    //         let pat_attr = &pattern
-    //             .pattern_graph
-    //             .get_node_attr(*pat_node)
-    //             .unwrap()
-    //             .value;
-    //         let data_attr = self.get_node_attr(*data_node).unwrap();
-    //         NAP::matches(&data_attr, &pat_attr)
-    //     };
-    //
-    //     let mut em = |pat_edge: &EdgeAttribute<EAP::Pattern>,
-    //                   data_edge: &EdgeAttribute<EdgeAttr>| {
-    //         EAP::matches(&data_edge.edge_attr, &pat_edge.edge_attr)
-    //     };
-    //
-    //     let self_ref = &self.graph;
-    //     let pattern_ref = &pattern.pattern_graph.graph;
-    //
-    //     let isos = general_subgraph_monomorphisms_iter(&pattern_ref, &self_ref, &mut nm, &mut em)?;
-    //
-    //     let mapping_from_vec = |index_mapping: &[usize]| {
-    //         let mut mapping = HashMap::new();
-    //         for (src, target) in index_mapping.iter().copied().enumerate() {
-    //             let src_node = pattern.pattern_graph.graph.from_index(src);
-    //             let target_node = self.graph.from_index(target);
-    //             mapping.insert(src_node, target_node);
-    //         }
-    //         mapping
-    //     };
-    //
-    //     for iso in isos {
-    //         // TODO: handle edge orderedness
-    //         let mapped = mapping_from_vec(iso.as_ref());
-    //         return Some(mapped);
-    //     }
-    //
-    //     None
-    // }
 }
 
 pub trait GraphTrait {

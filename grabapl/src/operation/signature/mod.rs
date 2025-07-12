@@ -1,12 +1,12 @@
 use crate::SubstMarker;
-use crate::graph::parameter::{
-    AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, NewNodeMarker,
-    NodeMarker, OperationParameter,
-};
-use crate::graph::semantics::{AbstractGraph, AbstractJoin, AbstractMatcher, Semantics};
+use crate::semantics::{AbstractGraph, AbstractJoin, AbstractMatcher, Semantics};
 use crate::util::bimap::BiMap;
 use derive_more::From;
 use std::collections::{HashMap, HashSet};
+use crate::operation::signature::parameter::{AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, NodeMarker, OperationParameter};
+
+pub mod parameter;
+pub mod parameterbuilder;
 
 pub type AbstractSignatureEdgeId = (AbstractSignatureNodeId, AbstractSignatureNodeId);
 pub type ParameterEdgeId = (SubstMarker, SubstMarker);

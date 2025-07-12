@@ -1,16 +1,16 @@
 pub mod sample_user_defined_operations;
 
-use grabapl::operation::parameterbuilder::OperationParameterBuilder;
+use grabapl::operation::signature::parameterbuilder::OperationParameterBuilder;
 use grabapl::operation::query::{
     AbstractQueryChange, AbstractQueryOutput, BuiltinQuery as BuiltinQueryTrait,
     ConcreteQueryOutput, EdgeChange, NodeChange,
 };
 use grabapl::operation::run_operation;
-use grabapl::graph::parameter::{
+use grabapl::operation::signature::parameter::{
     AbstractOperationOutput, GraphWithSubstitution, NewNodeMarker, OperationArgument,
     OperationOutput, OperationParameter, ParameterSubstitution,
 };
-use grabapl::graph::semantics::{
+use grabapl::semantics::{
     AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, MatchJoiner,
     Semantics,
 };
@@ -40,7 +40,7 @@ impl AbstractMatcher for EdgeMatcher {
 }
 
 pub struct EdgeJoiner;
-impl grabapl::graph::semantics::AbstractJoin for EdgeJoiner {
+impl grabapl::semantics::AbstractJoin for EdgeJoiner {
     type Abstract = EdgePattern;
 
     fn join(a: &Self::Abstract, b: &Self::Abstract) -> Option<Self::Abstract> {

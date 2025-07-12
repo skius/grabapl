@@ -7,11 +7,11 @@ use crate::operation::{
     OperationError, OperationResult, run_builtin_operation, run_lib_builtin_operation,
     run_operation,
 };
-use crate::graph::parameter::{
+use crate::operation::signature::parameter::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, NodeMarker,
     OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution,
 };
-use crate::graph::semantics::{AbstractGraph, ConcreteGraph};
+use crate::semantics::{AbstractGraph, ConcreteGraph};
 use crate::util::bimap::BiMap;
 use crate::util::log;
 use crate::{

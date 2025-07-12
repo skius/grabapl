@@ -1,11 +1,11 @@
 use crate::graph::EdgeAttribute;
 use crate::operation::OperationResult;
 use crate::operation::user_defined::{AbstractOperationResultMarker, QueryInstructions};
-use crate::graph::parameter::{
+use crate::operation::signature::parameter::{
     AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument, OperationParameter,
     ParameterSubstitution,
 };
-use crate::graph::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics};
+use crate::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics};
 use crate::util::log;
 use crate::{Graph, NodeKey, OperationContext, OperationId, SubstMarker, interned_string_newtype};
 use derive_more::From;

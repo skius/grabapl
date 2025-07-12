@@ -22,8 +22,8 @@ mod ffi {
         OperationBuilder as RustOperationBuilder,
         OperationBuilderError as RustOperationBuilderError,
     };
-    use ::grabapl::graph::semantics::AbstractGraph as RustAbstractGraph;
-    use ::grabapl::graph::semantics::ConcreteGraph as RustConcreteGraph;
+    use grabapl::semantics::AbstractGraph as RustAbstractGraph;
+    use grabapl::semantics::ConcreteGraph as RustConcreteGraph;
     use error_stack::Report;
     use simple_semantics::{BuiltinOperation, BuiltinQuery as RustBuiltinQuery, SimpleSemantics};
     use std::fmt::Write;
@@ -33,7 +33,7 @@ mod ffi {
     use grabapl::operation::user_defined::AbstractNodeId as RustAbstractNodeId;
     use grabapl::operation::builder::BuilderOpLike as RustBuilderOpLike;
     use grabapl::operation::user_defined::AbstractOperationResultMarker;
-    use grabapl::graph::parameter::AbstractOutputNodeMarker;
+    use grabapl::operation::signature::parameter::AbstractOutputNodeMarker;
 
     use grabapl::operation::builder::IntermediateState as RustIntermediateState;
 

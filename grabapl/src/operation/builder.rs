@@ -8,11 +8,11 @@ use crate::operation::user_defined::{
     UserDefinedOperation,
 };
 use crate::operation::{BuiltinOperation, OperationError, get_substitution};
-use crate::graph::parameter::{
+use crate::operation::signature::parameter::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationParameter,
     ParameterSubstitution,
 };
-use crate::graph::semantics::{AbstractGraph, AbstractMatcher};
+use crate::semantics::{AbstractGraph, AbstractMatcher};
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
 use error_stack::{Report, Result, ResultExt, bail, report, FutureExt};
@@ -27,7 +27,7 @@ use std::marker::PhantomData;
 use std::mem;
 use std::slice::Iter;
 use thiserror::Error;
-use crate::operation::parameterbuilder::OperationParameterBuilder;
+use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
 /*
 General overview:
 

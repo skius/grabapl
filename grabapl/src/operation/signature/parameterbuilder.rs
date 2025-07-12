@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use petgraph::visit::UndirectedAdaptor;
-use crate::graph::parameter::OperationParameter;
-use crate::graph::semantics::AbstractGraph;
+use crate::operation::signature::parameter::OperationParameter;
+use crate::semantics::AbstractGraph;
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, Semantics, SubstMarker};
 use thiserror::Error;

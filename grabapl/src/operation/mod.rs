@@ -1,6 +1,5 @@
 pub mod builder;
 pub mod builtin;
-pub mod parameterbuilder;
 pub mod query;
 pub mod signature;
 pub mod user_defined;
@@ -10,11 +9,11 @@ use crate::operation::builtin::LibBuiltinOperation;
 use crate::operation::user_defined::{
     AbstractNodeId, AbstractOperationResultMarker, UserDefinedOperation,
 };
-use crate::graph::parameter::{
+use signature::parameter::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument,
     OperationOutput, OperationParameter, ParameterSubstitution,
 };
-use crate::graph::semantics::{
+use crate::semantics::{
     AbstractGraph, AbstractMatcher, ConcreteGraph, ConcreteToAbstract, Semantics,
 };
 use crate::util::log;
