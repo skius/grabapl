@@ -52,8 +52,6 @@ pub enum BuilderOpLike<S: Semantics> {
     Recurse,
 }
 
-// TODO: perhaps this should include a "GiveNodeExplicitName" instruction that gives a node a name of a single string?
-//  this would need to be a variant of AbstractNodeId.
 #[derive(derive_more::Debug)]
 enum BuilderInstruction<S: Semantics> {
     #[debug("ExpectParameterNode({_0:?}, ???)")]
@@ -186,7 +184,6 @@ pub struct OperationBuilder<'a, S: Semantics> {
     previous_user_defined_operation: RefCell<UserDefinedOperation<S>>,
 }
 
-// TODO: all message adding, validate all args by building temp graph
 impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBuilder<'a, S> {
     pub fn new(op_ctx: &'a OperationContext<S>) -> Self {
         Self {
@@ -457,9 +454,6 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
 
     fn check_instructions(&self) -> Result<(), OperationBuilderError> {
         let builder_result = IntermediateStateBuilder::run(&self.instructions, self.op_ctx)?;
-        // TODO: how do we pass builder_result.return_nodes to the interpreter?
-        //  maybe have a check_validity function?
-        //  Or we could just call create_user_defined_operation directly here and check its result.
 
         let partial_user_def_op = {
             let prev_user_ref = self.previous_user_defined_operation.borrow();
@@ -538,7 +532,9 @@ impl<
         // result.push_str(&"Graph at current point:\n".to_string());
         // result.push_str(&dot);
         // result
-
+        // TODO: an error implies the builder contains incorrect partial information.
+        //  in such a case, it should have rolled back the last instruction.
+        //  hence we should be fine to unwrap and not return a Result here.
         Ok(self.get_intermediate_state()?.0)
     }
 
@@ -549,43 +545,6 @@ impl<
         let mapping = state.node_keys_to_aid.into_inner().0;
         let query_path = state.query_path;
         format!("\nIntermediate State:\n{dot}\nmapping: {mapping:#?}\nTODO query path")
-    }
-
-    fn build_debug_graph_at_current_point(
-        &self,
-    ) -> (
-        Graph<S::NodeAbstract, S::EdgeAbstract>,
-        HashMap<SubstMarker, NodeKey>,
-    ) {
-        let mut g = Graph::new();
-        let mut subst_to_node_keys: HashMap<SubstMarker, NodeKey> = HashMap::new();
-
-        for instruction in &self.instructions {
-            match instruction {
-                BuilderInstruction::ExpectParameterNode(marker, node) => {
-                    let key = g.add_node(node.clone());
-                    subst_to_node_keys.insert(marker.clone(), key);
-                }
-                BuilderInstruction::ExpectContextNode(marker, node) => {
-                    let key = g.add_node(node.clone());
-                    subst_to_node_keys.insert(marker.clone(), key);
-                }
-                BuilderInstruction::ExpectParameterEdge(source_marker, target_marker, edge) => {
-                    let source_key = *subst_to_node_keys
-                        .get(source_marker)
-                        .expect("Source marker not found in subst_to_node_keys");
-                    let target_key = *subst_to_node_keys
-                        .get(target_marker)
-                        .expect("Target marker not found in subst_to_node_keys");
-                    g.add_edge(source_key, target_key, edge.clone());
-                }
-                _ => {
-                    eprintln!("Skipping instruction");
-                }
-            }
-        }
-
-        (g, subst_to_node_keys)
     }
 }
 
