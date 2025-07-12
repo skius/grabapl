@@ -10,7 +10,7 @@ use crate::graph::operation::builtin::LibBuiltinOperation;
 use crate::graph::operation::user_defined::{
     AbstractNodeId, AbstractOperationResultMarker, UserDefinedOperation,
 };
-use crate::graph::pattern::{
+use crate::graph::parameter::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument,
     OperationOutput, OperationParameter, ParameterSubstitution,
 };

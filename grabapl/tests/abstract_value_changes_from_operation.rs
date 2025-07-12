@@ -6,7 +6,7 @@ use grabapl::graph::operation::query::{BuiltinQuery, ConcreteQueryOutput};
 use grabapl::graph::operation::signature::{AbstractSignatureEdgeId, AbstractSignatureNodeId};
 use grabapl::graph::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
 use grabapl::graph::operation::{BuiltinOperation, run_from_concrete};
-use grabapl::graph::pattern::{
+use grabapl::graph::parameter::{
     AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter,
     ParameterSubstitution,
 };
@@ -1560,7 +1560,6 @@ fn delete_node_deletes_all_incident_edges_in_signature() {
 
 }
 
-// TODO: check what happens if a UDOp writes to a param and then deletes the param. What is the signature?
 #[test_log::test]
 fn delete_node_after_writing_to_it() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();

@@ -11,7 +11,7 @@ use std::hash::RandomState;
 
 pub mod dot;
 pub mod operation;
-pub mod pattern;
+pub mod parameter;
 pub mod semantics;
 
 pub use dot::DotCollector;

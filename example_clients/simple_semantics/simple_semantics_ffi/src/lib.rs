@@ -33,7 +33,7 @@ mod ffi {
     use ::grabapl::graph::operation::user_defined::AbstractNodeId as RustAbstractNodeId;
     use grabapl::graph::operation::builder::BuilderOpLike as RustBuilderOpLike;
     use grabapl::graph::operation::user_defined::AbstractOperationResultMarker;
-    use grabapl::graph::pattern::AbstractOutputNodeMarker;
+    use grabapl::graph::parameter::AbstractOutputNodeMarker;
 
     use grabapl::graph::operation::builder::IntermediateState as RustIntermediateState;
 

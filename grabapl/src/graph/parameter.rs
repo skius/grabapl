@@ -2,7 +2,7 @@ use crate::graph::GraphTrait;
 use crate::graph::operation::{OperationError, OperationResult};
 use crate::graph::semantics::AbstractGraph;
 use crate::util::log;
-use crate::{Graph, NodeKey, Semantics, SubstMarker, WithSubstMarker, interned_string_newtype};
+use crate::{Graph, NodeKey, Semantics, SubstMarker, interned_string_newtype};
 use derive_more::From;
 use internment::Intern;
 use std::borrow::Cow;
@@ -14,6 +14,7 @@ use crate::graph::operation::builder::OperationBuilderError;
 use crate::graph::operation::parameterbuilder::ParameterBuilderError;
 use crate::util::bimap::BiMap;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
+// renamed. 
 
 #[derive(Debug, Error)]
 pub enum OperationParameterError {
@@ -27,7 +28,7 @@ pub struct OperationParameter<S: Semantics> {
     /// The initial abstract state that the operation expects.
     pub parameter_graph: AbstractGraph<S>,
     // TODO: Actually, because an operation may accept the same node multiple times, we may want to to have the inverse actually be a multimap? so NodeKey -> Vec<SubstMarker>
-    //  ^ is if we support node aliasing.
+    //  (^ is if we support node aliasing.)
     /// Associates node keys of the parameter graph with the substitution markers.
     pub node_keys_to_subst: BiMap<NodeKey, SubstMarker>,
 }

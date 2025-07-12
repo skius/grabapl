@@ -1,7 +1,7 @@
 use grabapl::graph::operation::BuiltinOperation;
 use grabapl::graph::operation::parameterbuilder::OperationParameterBuilder;
 use grabapl::graph::operation::query::{BuiltinQuery, ConcreteQueryOutput};
-use grabapl::graph::pattern::{
+use grabapl::graph::parameter::{
     AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter,
 };
 use grabapl::graph::semantics::{

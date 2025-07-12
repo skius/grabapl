@@ -5,8 +5,8 @@ use grabapl::graph::operation::user_defined::{
     AbstractNodeId, QueryInstructions, QueryTaken, UserDefinedOperation,
 };
 use grabapl::graph::operation::{run_from_concrete, run_operation};
-use grabapl::graph::pattern::{OperationOutput, OperationParameter};
-use grabapl::{DotCollector, NodeKey, OperationContext, OperationId, Semantics, WithSubstMarker};
+use grabapl::graph::parameter::{OperationOutput, OperationParameter};
+use grabapl::{DotCollector, NodeKey, OperationContext, OperationId, Semantics};
 use simple_semantics::sample_user_defined_operations::{
     get_count_list_len_user_defined_operation, get_insert_bst_user_defined_operation,
     get_labeled_edges_insert_bst_user_defined_operation, get_mk_n_to_0_list_user_defined_operation,

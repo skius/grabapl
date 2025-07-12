@@ -6,7 +6,7 @@ use grabapl::graph::operation::query::{
     ConcreteQueryOutput, EdgeChange, NodeChange,
 };
 use grabapl::graph::operation::run_operation;
-use grabapl::graph::pattern::{
+use grabapl::graph::parameter::{
     AbstractOperationOutput, GraphWithSubstitution, NewNodeMarker, OperationArgument,
     OperationOutput, OperationParameter, ParameterSubstitution,
 };
@@ -14,7 +14,7 @@ use grabapl::graph::semantics::{
     AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, MatchJoiner,
     Semantics,
 };
-use grabapl::{DotCollector, EdgeInsertionOrder, OperationContext, SubstMarker, WithSubstMarker};
+use grabapl::{DotCollector, EdgeInsertionOrder, OperationContext, SubstMarker};
 use std::collections::HashMap;
 use std::convert::Into;
 use std::fmt::Debug;

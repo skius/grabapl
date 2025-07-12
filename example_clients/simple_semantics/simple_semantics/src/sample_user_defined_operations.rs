@@ -5,7 +5,7 @@ use grabapl::graph::operation::user_defined::{
     AbstractNodeId, AbstractOperationArgument, Instruction, OpLikeInstruction, QueryInstructions,
     UserDefinedOperation,
 };
-use grabapl::graph::pattern::{OperationArgument, OperationParameter};
+use grabapl::graph::parameter::{OperationArgument, OperationParameter};
 use grabapl::{OperationContext, OperationId};
 use std::collections::HashMap;
 use grabapl::util::bimap::BiMap;

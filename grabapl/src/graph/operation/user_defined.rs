@@ -7,7 +7,7 @@ use crate::graph::operation::{
     OperationError, OperationResult, run_builtin_operation, run_lib_builtin_operation,
     run_operation,
 };
-use crate::graph::pattern::{
+use crate::graph::parameter::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, NodeMarker,
     OperationArgument, OperationOutput, OperationParameter, ParameterSubstitution,
 };

@@ -8,7 +8,7 @@ use crate::graph::operation::user_defined::{
     UserDefinedOperation,
 };
 use crate::graph::operation::{BuiltinOperation, OperationError, get_substitution};
-use crate::graph::pattern::{
+use crate::graph::parameter::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationParameter,
     ParameterSubstitution,
 };

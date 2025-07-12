@@ -1,6 +1,6 @@
 use crate::graph::operation::BuiltinOperation;
 use crate::graph::operation::parameterbuilder::OperationParameterBuilder;
-use crate::graph::pattern::{
+use crate::graph::parameter::{
     AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter,
 };
 use crate::graph::semantics::{AbstractGraph, ConcreteGraph, ConcreteToAbstract};

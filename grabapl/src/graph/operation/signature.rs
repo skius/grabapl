@@ -1,5 +1,5 @@
 use crate::SubstMarker;
-use crate::graph::pattern::{
+use crate::graph::parameter::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, NewNodeMarker,
     NodeMarker, OperationParameter,
 };
@@ -304,7 +304,7 @@ impl<S: Semantics> OperationParameter<S> {
         // The "straightforward" way to make this automatic would be to have the context graph's IDs be externally visible and part
         // of the signature, then `self` would only be a subtype of `other` if all of its context graph's IDs are also present in `other`'s context graph,
         // with the same connections/shape.
-        // TODO: implement above?
+        // TODO: implement above? (it's kind of implemented - UDOps store the context graph mapping by context node ID.)
 
         // TODO: implement subgraph checks for context graph.
 
