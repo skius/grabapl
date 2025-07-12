@@ -191,8 +191,17 @@ pub(crate) fn run_builtin_query<S: Semantics>(
 }
 
 // TODO: We could make the graph shape query have match arms in the form of a list of (match_arm_name, expected_graph) list that get checked in sequence
-// and the QueryInstructions would contain a hashmap from match_arm_name to the list of instructions to take assuming that match arm is taken.
+//  and the QueryInstructions would contain a hashmap from match_arm_name to the list of instructions to take assuming that match arm is taken.
 
+/// Runs a shape query on the given concrete graph.
+///
+/// It works by finding an isomorphism between the expected abstract graph (of the shape query) and
+/// most precise abstraction of the concrete graph. The selected inputs anchor the shape query to a
+/// specific region of the concrete graph.
+///
+/// This is for concrete graphs. Abstract graphs handle shape queries explicitly in the [`OperationBuilder`].
+///
+/// [`OperationBuilder`]: crate::operation::builder::OperationBuilder
 pub(crate) fn run_shape_query<S: Semantics>(
     g: &mut ConcreteGraph<S>,
     query: &GraphShapeQuery<S>,
@@ -200,31 +209,7 @@ pub(crate) fn run_shape_query<S: Semantics>(
     hidden_nodes: &HashSet<NodeKey>,
 ) -> OperationResult<ConcreteShapeQueryResult> {
     let abstract_graph = S::concrete_to_abstract(g);
-    // assert that the abstract graph matches the parameter. this is not the dynamic check yet, this is just asserting
-    // that the preconditions of the query are met.
-    // ^ since we have an invariant that graphshapequeries dont have context graphs, the returned substitution should just always be the explicit node mapping.
-    // let subst = get_substitution(&abstract_graph, &query.parameter, &selected_inputs)?;
-
     let subst = ParameterSubstitution::infer_explicit_for_param(selected_inputs, &query.parameter)?;
-
-    // Check if the concrete graph matches the expected shape
-    // needs to satisfy conditions 1-3 and a-c from above TODO
-
-    // What are we looking for?
-    //  We want a mapping from the ShapeNodeIdentifiers in the shape query to the found matched nodes in the concrete graph, if they exist.
-    //  At the same time, the concrete graph must match the expected abstract shape changes.
-
-    // Hmm...
-    // Maybe it would be nicer to have the ShapeQuery be an explicit Graph with some special node/edge types?
-    // The current "list of instructions" is potentially good for an interactive shape query builder, but maybe not the underlying raw representation?
-    // let's put ^ on the backburner for now.
-
-    // What do we need from our isomorphism?
-    //  1. It needs to search the desired abstract subgraph in the concrete graph (turned into an abstract graph)
-    //  2. It needs to assert that the subgraph matches the original parameter substitution result
-    //  3. It needs to assert that for any changed pattern, the new pattern is valid according to the instructions.
-
-    // actually, let's try the graph approach first.
 
     // TODO: implement edge order?
 

@@ -82,6 +82,7 @@ pub trait AbstractJoin {
         // But this would induce a Clone requirement which I don't want to have just yet.
         // TODO: revisit if Abstract: Clone is useful.
         // ==> we have MatchJoiner now. If we had Clone, we could add a type default to the Semantics trait for type NodeJoin = MatchJoiner<Self::NodeMatcher>;
+        // aaand we have the clone requirement now. Oh. no type defaults, so can't add MatchJoiner as default.
         None
     }
 }
@@ -109,11 +110,6 @@ pub trait Semantics {
     /// The specific join process for edges.
     type EdgeJoin: AbstractJoin<Abstract = Self::EdgeAbstract>;
 
-    // TODO: does the inverse make sense?
-    // Could we somehow benefit from something that takes (abstract, concrete) and returns an 'unwrapped' concrete?
-    // eg: abstract is enum { i32, String }, and concrete is enum { i32(i32), String(String) }, then
-    // the function would unwrap the specific type we need. but I don't think there is a way in rust for this to
-    // help us statically.
     type NodeConcreteToAbstract: ConcreteToAbstract<Concrete = Self::NodeConcrete, Abstract = Self::NodeAbstract>;
     type EdgeConcreteToAbstract: ConcreteToAbstract<Concrete = Self::EdgeConcrete, Abstract = Self::EdgeAbstract>;
 
