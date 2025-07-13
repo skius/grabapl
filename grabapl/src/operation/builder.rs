@@ -11,7 +11,7 @@ use crate::operation::user_defined::{
     AbstractUserDefinedOperationOutput, NamedMarker, OpLikeInstruction, QueryInstructions,
     UserDefinedOperation,
 };
-use crate::operation::{BuiltinOperation, OperationError, get_substitution};
+use crate::operation::{BuiltinOperation, OperationError, get_substitution, Operation};
 use crate::semantics::{AbstractGraph, AbstractMatcher};
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
@@ -136,7 +136,9 @@ pub enum OperationBuilderError {
     #[error("Could not apply operation due to mismatched arguments")]
     SubstitutionErrorNew,
     #[error("Could not abstractly apply operation {0} due to: {1}")]
-    AbstractApplyOperationError(OperationId, OperationError),
+    AbstractApplyOperationErrorWithId(OperationId, OperationError),
+    #[error("Could not abstractly apply operation due to: {0}")]
+    AbstractApplyOperationError(OperationError),
     #[error("Superfluous instruction {0}")]
     SuperfluousInstruction(String),
     #[error("Already selected to return node {0:?}")]
@@ -1289,10 +1291,31 @@ impl<S: Semantics> Clone for IntermediateState<S> {
 }
 
 impl<S: Semantics> IntermediateState<S> {
-    pub fn new() -> Self {
+    fn new() -> Self {
         IntermediateState {
             graph: AbstractGraph::<S>::new(),
             node_keys_to_aid: BiMap::new(),
+            node_may_originate_from_shape_query: HashSet::new(),
+            edge_may_originate_from_shape_query: HashSet::new(),
+            node_may_be_written_to: HashMap::new(),
+            edge_may_be_written_to: HashMap::new(),
+            query_path: Vec::new(),
+        }
+    }
+
+    fn from_param(param: &OperationParameter<S>) -> Self {
+        let initial_graph = param.parameter_graph.clone();
+
+        let mut initial_mapping = BiMap::new();
+
+        for (key, subst) in param.node_keys_to_subst.iter() {
+            let aid = AbstractNodeId::ParameterMarker(*subst);
+            initial_mapping.insert(*key, aid);
+        }
+
+        IntermediateState {
+            graph: initial_graph,
+            node_keys_to_aid: initial_mapping,
             node_may_originate_from_shape_query: HashSet::new(),
             edge_may_originate_from_shape_query: HashSet::new(),
             node_may_be_written_to: HashMap::new(),
@@ -1361,25 +1384,116 @@ impl<S: Semantics> IntermediateState<S> {
         Ok(())
     }
 
-    pub fn from_param(param: &OperationParameter<S>) -> Self {
-        let initial_graph = param.parameter_graph.clone();
+    fn interpret_op(
+        &mut self,
+        op_ctx: &OperationContext<S>,
+        marker: AbstractOperationResultMarker,
+        op: Operation<S>,
+        args: Vec<AbstractNodeId>,
+    ) -> Result<AbstractOperationArgument, OperationBuilderError> {
+        let param = op.parameter();
+        let (subst, abstract_arg) = self
+            .get_substitution(&param, args)?;
 
-        let mut initial_mapping = BiMap::new();
+        // now apply op and store result
+        let operation_output = {
+            let mut gws = GraphWithSubstitution::new(&mut self.graph, &subst);
+            op.apply_abstract(op_ctx, &mut gws)
+                .map_err(|e| {
+                    OperationBuilderError::AbstractApplyOperationError(e)
+                })?
+        };
+        self.handle_abstract_output_changes(marker, operation_output)?;
 
-        for (key, subst) in param.node_keys_to_subst.iter() {
-            let aid = AbstractNodeId::ParameterMarker(*subst);
-            initial_mapping.insert(*key, aid);
+        Ok(abstract_arg)
+    }
+
+    fn handle_abstract_output_changes(
+        &mut self,
+        marker: AbstractOperationResultMarker,
+        operation_output: AbstractOperationOutput<S>,
+    ) -> Result<(), OperationBuilderError> {
+        // go over new nodes
+        for (node_marker, node_key) in operation_output.new_nodes {
+            let aid = AbstractNodeId::DynamicOutputMarker(marker.clone(), node_marker);
+            // TODO: override the may_come_from_shape_query set here! remove the node - it's a non-shape-query node.
+            self.node_keys_to_aid.insert(node_key, aid);
+        }
+        for node_key in operation_output.removed_nodes {
+            // remove the node from the mapping
+            self.node_keys_to_aid.remove_left(&node_key);
         }
 
-        IntermediateState {
-            graph: initial_graph,
-            node_keys_to_aid: initial_mapping,
-            node_may_originate_from_shape_query: HashSet::new(),
-            edge_may_originate_from_shape_query: HashSet::new(),
-            node_may_be_written_to: HashMap::new(),
-            edge_may_be_written_to: HashMap::new(),
-            query_path: Vec::new(),
+        // collect changes
+        // TODO: What is a good idea regarding changes abstract values?
+        //  I think it's a good idea to just propagate what we know for a fact _could_ be written (but in its most precise form).
+        //  If instead we said "merge it with the current value", then we make it potentially join with the parameter.
+        for (key, node_abstract) in operation_output.changed_abstract_values_nodes {
+            let aid = self
+                .get_aid_from_key(&key)
+                .expect("internal error: changed node not found in mapping");
+            self.node_may_be_written_to
+                .insert(aid, node_abstract);
         }
+        for ((source, target), edge_abstract) in operation_output.changed_abstract_values_edges {
+            let source_aid = self
+                .get_aid_from_key(&source)
+                .expect("internal error: changed edge source not found in mapping");
+            let target_aid = self
+                .get_aid_from_key(&target)
+                .expect("internal error: changed edge target not found in mapping");
+            self.edge_may_be_written_to
+                .insert((source_aid, target_aid), edge_abstract);
+        }
+
+        Ok(())
+    }
+
+    fn get_substitution(
+        &self,
+        param: &OperationParameter<S>,
+        args: Vec<AbstractNodeId>,
+    ) -> Result<(ParameterSubstitution, AbstractOperationArgument), OperationBuilderError> {
+        let selected_inputs = args
+            .iter()
+            .map(|aid| self.get_key_from_aid(aid))
+            .collect::<Result<Vec<_>, _>>()
+            .change_context(OperationBuilderError::SelectedInputsNotFoundAid)?;
+        let subst = get_substitution(&self.graph, &param, &selected_inputs)
+            .change_context(OperationBuilderError::SubstitutionErrorNew)?;
+        let subst_to_aid = subst.mapping.iter().map(|(subst, key)| {
+            let aid = self.get_aid_from_key(key)
+                .change_context(OperationBuilderError::InternalError("node key should be in mapping, because all node keys from the abstract graph should be in the mapping"))
+                .unwrap();
+            (subst.clone(), aid)
+        }).collect();
+
+        let abstract_arg = AbstractOperationArgument {
+            selected_input_nodes: args,
+            subst_to_aid,
+        };
+
+        Ok((subst, abstract_arg))
+    }
+
+    fn get_key_from_aid(
+        &self,
+        aid: &AbstractNodeId,
+    ) -> Result<NodeKey, OperationBuilderError> {
+        self.node_keys_to_aid
+            .get_right(aid)
+            .cloned()
+            .ok_or(report!(OperationBuilderError::NotFoundAid(*aid)))
+    }
+
+    fn get_aid_from_key(
+        &self,
+        key: &NodeKey,
+    ) -> Result<AbstractNodeId, OperationBuilderError> {
+        self.node_keys_to_aid
+            .get_left(key)
+            .cloned()
+            .ok_or(report!(OperationBuilderError::InternalError("could not find node key")))
     }
 }
 
@@ -1795,27 +1909,27 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         oplike: IntermediateOpLike<S>,
     ) -> Result<UDInstruction<S>, OperationBuilderError> {
         match oplike {
-            IntermediateOpLike::Builtin(op, args) => {
-                let abstract_arg = self
-                    .interpret_builtin_like_op(marker, &op, args)
+            IntermediateOpLike::Builtin(builtin_op, args) => {
+                let op = Operation::Builtin(&builtin_op);
+                let abstract_arg = self.interpret_op(marker, op, args)
                     .attach_printable_lazy(|| {
-                        format!("Failed to interpret builtin operation: {op:?}")
+                        format!("Failed to interpret builtin operation: {builtin_op:?}")
                     })?;
 
                 Ok(UDInstruction::OpLike(
-                    OpLikeInstruction::Builtin(op),
+                    OpLikeInstruction::Builtin(builtin_op),
                     abstract_arg,
                 ))
             }
-            IntermediateOpLike::LibBuiltin(op, args) => {
-                let abstract_arg = self
-                    .interpret_builtin_like_op(marker, &op, args)
+            IntermediateOpLike::LibBuiltin(lib_builtin_op, args) => {
+                let op = Operation::LibBuiltin(&lib_builtin_op);
+                let abstract_arg = self.interpret_op(marker, op, args)
                     .attach_printable_lazy(|| {
-                        format!("Failed to interpret lib builtin operation: {op:?}")
+                        format!("Failed to interpret lib builtin operation: {lib_builtin_op:?}")
                     })?;
 
                 Ok(UDInstruction::OpLike(
-                    OpLikeInstruction::LibBuiltin(op),
+                    OpLikeInstruction::LibBuiltin(lib_builtin_op),
                     abstract_arg,
                 ))
             }
@@ -1824,18 +1938,10 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                     .op_ctx
                     .get(id)
                     .ok_or(OperationBuilderError::NotFoundOperationId(id))?;
-                let param = op.parameter();
-                let (subst, abstract_arg) = self.get_current_substitution(&param, args)?;
-
-                let operation_output = {
-                    let mut gws = GraphWithSubstitution::new(&mut self.current_state.graph, &subst);
-                    op.apply_abstract(self.op_ctx, &mut gws)
-                };
-                // go over new nodes
-                let operation_output = operation_output
-                    .map_err(|e| OperationBuilderError::AbstractApplyOperationError(id, e))?;
-
-                self.handle_abstract_output_changes(marker, operation_output)?;
+                let abstract_arg = self.interpret_op(marker, op, args)
+                    .attach_printable_lazy(|| {
+                        format!("Failed to interpret operation: {id:?}")
+                    })?;
 
                 Ok(UDInstruction::OpLike(
                     OpLikeInstruction::Operation(id),
@@ -1848,24 +1954,17 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
 
                 // TODO: use approach from `problems-testcases.md`
 
-                let (subst, abstract_arg) = self.get_current_substitution(&self.op_param, args)?;
-                // apply the operation to the current graph
-                // TODO: apply op
                 // this should probably use some pre-defined (at the beginning) abstract changes to the graph.
 
                 // Hack: pretend the partial user defined operation is the full operation.
                 // TODO: remove this hack. Make it so only explicit changes via ExpectRecursionChange... instructions are allowed.
-                //  (note: it's also unsound for now, since changes _after_ the recursion call are ignored.)
+                //  (note: it's also unsound for now, since changes _after_ the recursion call are ignored. -- actually, not quite. see tests)
+                let op = Operation::Custom(&self.partial_self_user_defined_op);
 
-                let operation_output = {
-                    let mut gws = GraphWithSubstitution::new(&mut self.current_state.graph, &subst);
-                    self.partial_self_user_defined_op
-                        .apply_abstract(self.op_ctx, &mut gws)
-                };
-                let operation_output = operation_output.map_err(|e| {
-                    OperationBuilderError::AbstractApplyOperationError(self.self_op_id, e)
-                })?;
-                self.handle_abstract_output_changes(marker, operation_output)?;
+                let abstract_arg = self.interpret_op(marker, op, args)
+                    .attach_printable_lazy(|| {
+                        "Failed to interpret recursive call"
+                    })?;
 
                 Ok(UDInstruction::OpLike(
                     OpLikeInstruction::Operation(self.self_op_id),
@@ -1875,71 +1974,16 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         }
     }
 
-    fn interpret_builtin_like_op<B: BuiltinOperation<S = S>>(
+    fn interpret_op(
         &mut self,
         marker: Option<AbstractOperationResultMarker>,
-        op: &B,
+        op: Operation<S>,
         args: Vec<AbstractNodeId>,
     ) -> Result<AbstractOperationArgument, OperationBuilderError> {
-        let param = op.parameter();
-        let (subst, abstract_arg) = self
-            .get_current_substitution(&param, args)
-            .attach_printable_lazy(|| {
-                format!("Failed to get current substitution for builtin operation: {op:?}")
-            })?;
-
-        // now apply op and store result
-        let operation_output = {
-            let mut gws = GraphWithSubstitution::new(&mut self.current_state.graph, &subst);
-            op.apply_abstract(&mut gws)
-        };
-        self.handle_abstract_output_changes(marker, operation_output)?;
-
-        Ok(abstract_arg)
-    }
-
-    fn handle_abstract_output_changes(
-        &mut self,
-        marker: Option<AbstractOperationResultMarker>,
-        operation_output: AbstractOperationOutput<S>,
-    ) -> Result<(), OperationBuilderError> {
-        // go over new nodes
         let marker = marker.unwrap_or_else(|| self.get_new_unnamed_abstract_operation_marker());
-        for (node_marker, node_key) in operation_output.new_nodes {
-            let aid = AbstractNodeId::DynamicOutputMarker(marker.clone(), node_marker);
-            // TODO: override the may_come_from_shape_query set here! remove the node - it's a non-shape-query node.
-            self.current_state.node_keys_to_aid.insert(node_key, aid);
-        }
-        for node_key in operation_output.removed_nodes {
-            // remove the node from the mapping
-            self.current_state.node_keys_to_aid.remove_left(&node_key);
-        }
 
-        // collect changes
-        // TODO: What is a good idea regarding changes abstract values?
-        //  I think it's a good idea to just propagate what we know for a fact _could_ be written (but in its most precise form).
-        //  If instead we said "merge it with the current value", then we make it potentially join with the parameter.
-        for (key, node_abstract) in operation_output.changed_abstract_values_nodes {
-            let aid = self
-                .get_current_aid_from_key(key)
-                .expect("internal error: changed node not found in mapping");
-            self.current_state
-                .node_may_be_written_to
-                .insert(aid, node_abstract);
-        }
-        for ((source, target), edge_abstract) in operation_output.changed_abstract_values_edges {
-            let source_aid = self
-                .get_current_aid_from_key(source)
-                .expect("internal error: changed edge source not found in mapping");
-            let target_aid = self
-                .get_current_aid_from_key(target)
-                .expect("internal error: changed edge target not found in mapping");
-            self.current_state
-                .edge_may_be_written_to
-                .insert((source_aid, target_aid), edge_abstract);
-        }
-
-        Ok(())
+        self.current_state
+            .interpret_op(&self.op_ctx, marker.clone(), op, args)
     }
 
     fn interpret_builtin_query(
@@ -2265,26 +2309,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         param: &OperationParameter<S>,
         args: Vec<AbstractNodeId>,
     ) -> Result<(ParameterSubstitution, AbstractOperationArgument), OperationBuilderError> {
-        let selected_inputs = args
-            .iter()
-            .map(|aid| self.get_current_key_from_aid(*aid))
-            .collect::<Result<Vec<_>, _>>()
-            .change_context(OperationBuilderError::SelectedInputsNotFoundAid)?;
-        let subst = get_substitution(&self.current_state.graph, &param, &selected_inputs)
-            .change_context(OperationBuilderError::SubstitutionErrorNew)?;
-        let subst_to_aid = subst.mapping.iter().map(|(subst, key)| {
-            let aid = self.get_current_aid_from_key(*key)
-                .change_context(OperationBuilderError::InternalError("node key should be in mapping, because all node keys from the abstract graph should be in the mapping"))
-                .unwrap();
-            (subst.clone(), aid)
-        }).collect();
-
-        let abstract_arg = AbstractOperationArgument {
-            selected_input_nodes: args,
-            subst_to_aid,
-        };
-
-        Ok((subst, abstract_arg))
+        self.current_state.get_substitution(param, args)
     }
 
     fn get_new_unnamed_abstract_operation_marker(&mut self) -> AbstractOperationResultMarker {
@@ -2298,10 +2323,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         aid: AbstractNodeId,
     ) -> Result<NodeKey, OperationBuilderError> {
         self.current_state
-            .node_keys_to_aid
-            .get_right(&aid)
-            .copied()
-            .ok_or(report!(OperationBuilderError::NotFoundAid(aid.clone())))
+            .get_key_from_aid(&aid)
     }
 
     fn get_current_aid_from_key(
@@ -2309,12 +2331,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         key: NodeKey,
     ) -> Result<AbstractNodeId, OperationBuilderError> {
         self.current_state
-            .node_keys_to_aid
-            .get_left(&key)
-            .cloned()
-            .ok_or(report!(OperationBuilderError::InternalError(
-                "could not find node key"
-            )))
+            .get_aid_from_key(&key)
     }
 }
 
