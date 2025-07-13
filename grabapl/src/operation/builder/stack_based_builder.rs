@@ -1,13 +1,14 @@
+use std::cell::RefCell;
 use std::fmt::{Debug, Formatter};
 use derive_more::From;
 use derive_more::with_trait::TryInto;
 use error_stack::{bail, report, Report, ResultExt};
 use thiserror::Error;
-use crate::{OperationContext, Semantics};
-use crate::operation::builder::{merge_states, BuilderInstruction, BuilderOpLike, IntermediateState, OperationBuilderError, UDInstructionsWithMarker};
-use crate::operation::signature::parameter::OperationParameter;
+use crate::{OperationContext, OperationId, Semantics, SubstMarker};
+use crate::operation::builder::{merge_states, BuilderInstruction, BuilderOpLike, IntermediateInterpreter, IntermediateState, IntermediateStateBuilder, OperationBuilderInefficient, OperationBuilderError, UDInstructionsWithMarker};
+use crate::operation::signature::parameter::{AbstractOutputNodeMarker, OperationParameter};
 use crate::operation::signature::parameterbuilder::{OperationParameterBuilder, ParameterBuilderError};
-use crate::operation::user_defined::{AbstractNodeId, AbstractOperationResultMarker, Instruction, UserDefinedOperation};
+use crate::operation::user_defined::{AbstractNodeId, AbstractOperationResultMarker, Instruction, NamedMarker, UserDefinedOperation};
 
 use error_stack::Result;
 
@@ -21,6 +22,55 @@ pub enum BuilderError {
     OutsideError,
     #[error("todo: {0}")]
     NeedsSpecificVariant(&'static str),
+}
+
+struct BuildingParameterFrame<S: Semantics> {
+    parameter_builder: OperationParameterBuilder<S>,
+}
+
+impl<S: Semantics> BuildingParameterFrame<S> {
+    fn new() -> Self {
+        BuildingParameterFrame {
+            parameter_builder: OperationParameterBuilder::new(),
+        }
+    }
+
+    fn consume(
+        builder: &mut Builder<S>,
+        instruction_opt: &mut Option<BuilderInstruction<S>>,
+    ) -> Result<(), BuilderError> {
+        use BuilderInstruction as BI;
+
+        let this: &mut BuildingParameterFrame<S> = builder.stack.expect_mut();
+
+        let instruction = instruction_opt.take().unwrap();
+
+        match instruction {
+            BI::ExpectParameterNode(marker, av) => {
+                this.parameter_builder.expect_explicit_input_node(marker, av)
+                    .change_context(BuilderError::ParameterBuildError)?;
+            }
+            BI::ExpectContextNode(marker, av) => {
+                this.parameter_builder.expect_context_node(marker, av).change_context(BuilderError::ParameterBuildError)?;
+            }
+            BI::ExpectParameterEdge(src, dst, edge) => {
+                this.parameter_builder.expect_edge(src, dst, edge).change_context(BuilderError::ParameterBuildError)?;
+            }
+            _ => {
+                // The user has decided that they're done building the parameter by sending a different instruction
+                // restore instruction so we can continue
+                let _ = instruction_opt.insert(instruction);
+
+                let this: BuildingParameterFrame<S> = builder.stack.expect_pop();
+                let parameter = this.parameter_builder.build().change_context(BuilderError::ParameterBuildError)?;
+                let frame = CollectingInstructionsFrame::from_param(&parameter);
+                builder.data.built.parameter = Some(parameter);
+
+                builder.push_frame(frame);
+            },
+        };
+        Ok(())
+    }
 }
 
 struct CollectingInstructionsFrame<S: Semantics> {
@@ -65,7 +115,7 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
                 this.handle_operation(&mut builder.data, Some(output_name), builder_op_like, args)?;
             }
             // We enter a new context
-            BI::StartQuery(ref query, ..) => {
+            BI::StartQuery(..) => {
                 let query_frame = QueryFrame::new(&this.current_state, instruction)?;
 
                 // but the new query frame is on top
@@ -85,6 +135,9 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
                 // then reset the instruction, and the main builder loop would do the dynamic dispatch to the correct frame, which could
                 // then consume from the data stack (conditionally if it expects something).
 
+                // TODO: what to do if below returns an error?
+                //  we would lose the frame and all the instructions in it!
+                //  for this case, solved by having explicit data_stack.
                 QueryFrame::push_branch(
                     builder,
                     our_frame,
@@ -113,16 +166,20 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
                 )
             }
             BI::ReturnNode(..) => {
-                todo!()
+                // todo!()
             }
             BI::StartShapeQuery(..) => {
-                todo!()
+                // todo!()
             }
             _ => {
                 // put it back - actually no. should leave it out? since we haven't changed the frame, and thus we'd just get called again and again.
                 // actually, it doesn't matter, since we return an error.
+                let err = Err(report!(BuilderError::UnexpectedInstruction))
+                    .attach_printable_lazy(|| {
+                        format!("Unexpected instruction in CollectingInstructionsFrame: {:?}", &instruction)
+                    });
                 let _ = instruction_opt.insert(instruction);
-                bail!(BuilderError::UnexpectedInstruction)
+                return err;
             },
         }
 
@@ -299,7 +356,7 @@ impl<S: Semantics> QueryFrame<S> {
 #[derive(From, TryInto)]
 #[try_into(owned, ref, ref_mut)]
 enum Frame<S: Semantics> {
-    BuildingParameter(OperationParameterBuilder<S>),
+    BuildingParameter(BuildingParameterFrame<S>),
     CollectingInstructions(CollectingInstructionsFrame<S>),
     Query(QueryFrame<S>),
 }
@@ -311,7 +368,7 @@ struct FrameStack<S: Semantics> {
 impl<S: Semantics> FrameStack<S> {
     pub fn new() -> Self {
         FrameStack {
-            frames: vec![Frame::BuildingParameter(OperationParameterBuilder::new())],
+            frames: vec![Frame::BuildingParameter(BuildingParameterFrame::new())],
         }
     }
 
@@ -376,6 +433,7 @@ impl<S: Semantics> BuiltData<S> {
 
 struct BuilderData<'a, S: Semantics> {
     op_ctx: &'a OperationContext<S>,
+    self_op_id: OperationId,
     built: BuiltData<S>,
 }
 
@@ -384,6 +442,7 @@ impl<'a, S: Semantics> BuilderData<'a, S> {
         BuilderData {
             op_ctx,
             built: BuiltData::new(),
+            self_op_id: 0,
         }
     }
 }
@@ -404,8 +463,8 @@ impl<'a, S: Semantics> Builder<'a, S> {
 
     pub fn show(&self) -> BuilderShowData<S> {
         match self.stack.last() {
-            Some(Frame::BuildingParameter(param_builder)) => {
-                BuilderShowData::ParameterBuilder(param_builder)
+            Some(Frame::BuildingParameter(frame)) => {
+                BuilderShowData::ParameterBuilder(&frame.parameter_builder)
             }
             Some(Frame::CollectingInstructions(frame)) => {
                 BuilderShowData::CollectingInstructions(&frame.current_state)
@@ -419,6 +478,11 @@ impl<'a, S: Semantics> Builder<'a, S> {
         }
     }
 
+    /// Note: Should only be called before issuing recursion instructions.
+    pub fn update_self_op_id(&mut self, self_op_id: OperationId) {
+        self.data.self_op_id = self_op_id;
+    }
+
     pub fn consume(&mut self, instruction: BuilderInstruction<S>) -> Result<(), BuilderError> {
         let mut instruction_opt = Some(instruction);
 
@@ -427,15 +491,13 @@ impl<'a, S: Semantics> Builder<'a, S> {
             let curr_frame = self.stack.last().unwrap();
             match curr_frame {
                 Frame::BuildingParameter(..) => {
-                    self.consume_for_building_parameter(&mut instruction_opt)?;
+                    BuildingParameterFrame::consume(self, &mut instruction_opt)?;
                 }
                 Frame::CollectingInstructions(..) => {
                     CollectingInstructionsFrame::consume(self, &mut instruction_opt)?;
-                    // self.consume_for_collecting_instructions(&mut instruction_opt, frame)?;
                 }
                 Frame::Query(..) => {
                     QueryFrame::consume(self, &mut instruction_opt)?;
-                    // query_frame.consume(self, &mut instruction_opt)?;
                 }
             }
         }
@@ -443,63 +505,23 @@ impl<'a, S: Semantics> Builder<'a, S> {
         Ok(())
     }
 
+    fn build(&mut self) -> Result<UserDefinedOperation<S>, BuilderError> {
+        while self.stack.frames.len() > 1 {
+            self.consume(BuilderInstruction::EndQuery)?;
+        }
+
+        let frame: CollectingInstructionsFrame<S> = self.stack.expect_pop();
+
+        let mut user_def_op = UserDefinedOperation::new_noop();
+        user_def_op.instructions = frame.instructions;
+        user_def_op.parameter = self.data.built.parameter.clone().unwrap();
+        Ok(user_def_op)
+    }
+
     fn push_frame(&mut self, frame: impl Into<Frame<S>>) {
         self.stack.push(frame.into());
     }
 
-    fn consume_for_building_parameter(
-        &mut self,
-        instruction_opt: &mut Option<BuilderInstruction<S>>,
-    ) -> Result<(), BuilderError> {
-        use BuilderInstruction as BI;
-
-        let mut param_builder: OperationParameterBuilder<S> = self.stack.expect_pop();
-
-        let instruction = instruction_opt.as_ref().unwrap();
-
-        let next_frame = match instruction {
-            // TODO: ugly double match.
-            //  instead: have BuilderInstruction have eg a .is_for_parameter() method.
-            BI::ExpectParameterNode(..) | BI::ExpectContextNode(..) | BI::ExpectParameterEdge(..) => {
-                // consume instruction
-                let instruction = instruction_opt.take().unwrap();
-                match instruction {
-                    BI::ExpectParameterNode(marker, av) => {
-                        param_builder.expect_explicit_input_node(marker, av)
-                            .change_context(BuilderError::ParameterBuildError)?;
-                        Frame::BuildingParameter(param_builder)
-                    }
-                    BI::ExpectContextNode(marker, av) => {
-                        param_builder.expect_context_node(marker, av).change_context(BuilderError::ParameterBuildError)?;
-                        Frame::BuildingParameter(param_builder)
-                    }
-                    BI::ExpectParameterEdge(src, dst, edge) => {
-                        param_builder.expect_edge(src, dst, edge).change_context(BuilderError::ParameterBuildError)?;
-                        Frame::BuildingParameter(param_builder)
-                    }
-                    _ => unreachable!("we just checked that this matches"),
-                }
-            }
-            _ => {
-                // The user has decided that they're done building the parameter by sending a different instruction
-                let parameter = param_builder.build().change_context(BuilderError::ParameterBuildError)?;
-                let frame = CollectingInstructionsFrame::from_param(&parameter);
-                self.data.built.parameter = Some(parameter);
-
-                Frame::CollectingInstructions(frame)
-            },
-        };
-        self.stack.push(next_frame);
-        Ok(())
-    }
-
-    // fn consume_for_collecting_instructions(
-    //     &mut self,
-    //     instruction_opt: &mut Option<BuilderInstruction<S>>,
-    //     mut frame: CollectingInstructionsFrame<S>,
-    // ) -> Result<(), BuilderError> {
-    //     frame.consume(self, instruction_opt)
-    // }
 }
 
 pub enum BuilderShowData<'a, S: Semantics> {
@@ -525,5 +547,256 @@ impl<'a, S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> Debug for Build
                 write!(f, "Other: {}", data)
             }
         }
+    }
+}
+
+
+pub struct OperationBuilder2<'a, S: Semantics> {
+    op_ctx: &'a OperationContext<S>,
+    instructions: Vec<BuilderInstruction<S>>,
+    active: Builder<'a, S>,
+}
+
+impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBuilder2<'a, S> {
+    pub fn new(op_ctx: &'a OperationContext<S>) -> Self {
+        Self {
+            instructions: Vec::new(),
+            op_ctx,
+            active: Builder::new(op_ctx),
+        }
+    }
+
+    pub fn undo_last_instruction(&mut self) {
+        if !self.instructions.is_empty() {
+            self.instructions.pop();
+        }
+        self.rebuild_active_from_instructions()
+    }
+
+    pub fn rename_node(
+        &mut self,
+        old_aid: AbstractNodeId,
+        new_name: impl Into<NamedMarker>,
+    ) -> Result<(), OperationBuilderError> {
+        let new_name = new_name.into();
+        self.push_instruction(BuilderInstruction::RenameNode(old_aid, new_name))
+    }
+
+    pub fn expect_parameter_node(
+        &mut self,
+        marker: impl Into<SubstMarker>,
+        node: S::NodeAbstract,
+    ) -> Result<(), OperationBuilderError> {
+        let marker = marker.into();
+        self.push_instruction(BuilderInstruction::ExpectParameterNode(marker, node))
+    }
+
+    pub fn expect_context_node(
+        &mut self,
+        marker: impl Into<SubstMarker>,
+        node: S::NodeAbstract,
+    ) -> Result<(), OperationBuilderError> {
+        let marker = marker.into();
+        self.push_instruction(BuilderInstruction::ExpectContextNode(marker, node))
+    }
+
+    pub fn expect_parameter_edge(
+        &mut self,
+        source_marker: impl Into<SubstMarker>,
+        target_marker: impl Into<SubstMarker>,
+        edge: S::EdgeAbstract,
+    ) -> Result<(), OperationBuilderError> {
+        let source_marker = source_marker.into();
+        let target_marker = target_marker.into();
+        self.push_instruction(BuilderInstruction::ExpectParameterEdge(
+                source_marker,
+                target_marker,
+                edge,
+            ))
+    }
+
+    pub fn start_query(
+        &mut self,
+        query: S::BuiltinQuery,
+        args: Vec<AbstractNodeId>,
+    ) -> Result<(), OperationBuilderError> {
+        // todo!()
+        self.push_instruction(BuilderInstruction::StartQuery(query, args))
+    }
+
+    pub fn enter_true_branch(&mut self) -> Result<(), OperationBuilderError> {
+        // todo!()
+        self.push_instruction(BuilderInstruction::EnterTrueBranch)
+    }
+
+    pub fn enter_false_branch(&mut self) -> Result<(), OperationBuilderError> {
+        // todo!()
+        self.push_instruction(BuilderInstruction::EnterFalseBranch)
+    }
+
+    // TODO: get rid of AbstractOperationResultMarker requirement. Either completely or make it optional and autogenerate one.
+    //  How to specify which shape node? ==> the shape node markers should be unique per path
+    // TODO: Shape queries cannot shape-test for abstract values of existing nodes yet!
+    // TODO: Also add test for existing edges between existing nodes.
+    pub fn start_shape_query(
+        &mut self,
+        op_marker: impl Into<AbstractOperationResultMarker>,
+    ) -> Result<(), OperationBuilderError> {
+        // todo!()
+        self.push_instruction(BuilderInstruction::StartShapeQuery(op_marker.into()))
+    }
+
+    pub fn end_query(&mut self) -> Result<(), OperationBuilderError> {
+        // todo!()
+        self.push_instruction(BuilderInstruction::EndQuery)
+    }
+
+    // TODO: should expect_*_node really expect a marker? maybe it should instead return a marker?
+    //  it could also take an Option<Marker> so that it can autogenerate one if it's none so the caller doesn't have to deal with it.
+    pub fn expect_shape_node(
+        &mut self,
+        marker: AbstractOutputNodeMarker,
+        node: S::NodeAbstract,
+    ) -> Result<(), OperationBuilderError> {
+        // TODO: check that any shape nodes are not free floating. maybe this should be in a GraphShapeQuery validator?
+        self.push_instruction(BuilderInstruction::ExpectShapeNode(marker, node))
+    }
+
+    pub fn expect_shape_node_change(
+        &mut self,
+        aid: AbstractNodeId,
+        node: S::NodeAbstract,
+    ) -> Result<(), OperationBuilderError> {
+        self.push_instruction(BuilderInstruction::ExpectShapeNodeChange(aid, node))
+    }
+
+    pub fn expect_shape_edge(
+        &mut self,
+        source: AbstractNodeId,
+        target: AbstractNodeId,
+        edge: S::EdgeAbstract,
+    ) -> Result<(), OperationBuilderError> {
+        // TODO:
+        self.push_instruction(BuilderInstruction::ExpectShapeEdge(source, target, edge))
+    }
+
+    pub fn add_named_operation(
+        &mut self,
+        name: AbstractOperationResultMarker,
+        op: BuilderOpLike<S>,
+        args: Vec<AbstractNodeId>,
+    ) -> Result<(), OperationBuilderError> {
+        // TODO
+        self.push_instruction(BuilderInstruction::AddNamedOperation(name, op, args))
+    }
+
+    pub fn add_operation(
+        &mut self,
+        op: BuilderOpLike<S>,
+        args: Vec<AbstractNodeId>,
+    ) -> Result<(), OperationBuilderError> {
+        // todo!()
+        self.push_instruction(BuilderInstruction::AddOperation(op, args))
+    }
+
+    /// Indicate that a node should be marked in the output with the given abstract value.
+    ///
+    /// Note that the abstract value must be a supertype of the node's statically determined type.
+    /// Also, the node must be visible in the end context of the operation, and must never have
+    /// been statically determined by a shape query.
+    ///
+    /// These instructions must be the very last instructions in the operation builder.
+    pub fn return_node(
+        &mut self,
+        aid: AbstractNodeId,
+        output_marker: AbstractOutputNodeMarker,
+        node: S::NodeAbstract,
+    ) -> Result<(), OperationBuilderError> {
+        // dont support returning parameter nodes
+        if let AbstractNodeId::ParameterMarker(..) = &aid {
+            bail!(OperationBuilderError::CannotReturnParameter(aid));
+        }
+        self.push_instruction(BuilderInstruction::ReturnNode(aid, output_marker, node))
+    }
+
+    /// Indicate that an edge should be marked in the output with the given abstract value.
+    ///
+    /// Note that the edge must be a supertype of the edge's statically determined type.
+    /// Also, the edge must be visible in the end context of the operation, and must never have
+    /// been statically determined by a shape query.
+    ///
+    /// Further, new edges may only be returned if both endpoints of the edge are either parameter
+    /// nodes or new nodes also returned by the operation.
+    ///
+    /// These instructions must be the very last instructions in the operation builder.
+    pub fn return_edge(
+        &mut self,
+        src: AbstractNodeId,
+        dst: AbstractNodeId,
+        edge: S::EdgeAbstract,
+    ) -> Result<(), OperationBuilderError> {
+        // TODO: validate that the edge did not already exist in the param graph anyway.
+        self.push_instruction(BuilderInstruction::ReturnEdge(src, dst, edge))
+    }
+
+    // TODO: This should run further post processing checks.
+    //  Stuff like Context nodes must be connected, etc.
+    pub fn build(
+        &mut self,
+        self_op_id: OperationId,
+    ) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
+        let res = self.active.build();
+        if let Ok(op) = res {
+            return Ok(op);
+        }
+
+        // if we failed, we need to rebuild the active builder from the instructions
+        self.rebuild_active_from_instructions();
+        res.change_context(OperationBuilderError::NewBuilderError)
+    }
+
+    fn push_instruction(&mut self, instruction: BuilderInstruction<S>) -> Result<(), OperationBuilderError> {
+        self.instructions.push(instruction.clone());
+        let res =self.active.consume(instruction).change_context(OperationBuilderError::NewBuilderError);
+        if res.is_err() {
+           // rollback
+            self.instructions.pop();
+            self.rebuild_active_from_instructions();
+        }
+
+        res
+    }
+
+    fn rebuild_active_from_instructions(&mut self) {
+        self.active = Builder::new(self.op_ctx);
+        for instruction in &self.instructions {
+            self.active.consume(instruction.clone()).expect("internal error: should not fail to consume previously fine instruction");
+        }
+    }
+}
+
+impl<
+    'a,
+    S: Semantics<
+        NodeAbstract: Debug,
+        EdgeAbstract: Debug,
+        BuiltinOperation: Clone,
+        BuiltinQuery: Clone,
+    >,
+> OperationBuilder2<'a, S> {
+    pub fn show_state(&self) -> Result<IntermediateState<S>, OperationBuilderError> {
+        let mut inner = self.active.show();
+        if let BuilderShowData::CollectingInstructions(state) = &mut inner {
+            // we have a state, so we can return it
+            Ok(state.clone())
+        } else {
+            // TODO: improve
+            Err(report!(OperationBuilderError::NewBuilderError))
+        }
+    }
+
+    pub fn format_state(&self) -> String {
+        let mut inner = self.active.show();
+        format!("{:?}", inner)
     }
 }

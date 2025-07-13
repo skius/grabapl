@@ -270,7 +270,7 @@ mod ffi {
         }
 
         pub fn finalize(
-            &self,
+            &mut self,
             op_id: u32,
         ) -> Result<Box<UserDefinedOperation>, Box<OperationBuilderError>> {
             self.0

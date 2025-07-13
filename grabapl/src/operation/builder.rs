@@ -86,6 +86,17 @@ impl<S: Semantics> BuilderOpLike<S> {
     }
 }
 
+impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for BuilderOpLike<S> {
+    fn clone(&self) -> Self {
+        match self {
+            BuilderOpLike::Builtin(op) => BuilderOpLike::Builtin(op.clone()),
+            BuilderOpLike::LibBuiltin(op) => BuilderOpLike::LibBuiltin(op.clone()),
+            BuilderOpLike::FromOperationId(id) => BuilderOpLike::FromOperationId(*id),
+            BuilderOpLike::Recurse => BuilderOpLike::Recurse,
+        }
+    }
+}
+
 // TODO: rename to BuilderMessage? since Instruction is already used in the user-defined operation context.
 #[derive(derive_more::Debug)]
 pub enum BuilderInstruction<S: Semantics> {
@@ -140,6 +151,34 @@ impl<S: Semantics> BuilderInstruction<S> {
         match self {
             EnterTrueBranch | EnterFalseBranch | EndQuery | ReturnNode(..) | ReturnEdge(..) => true,
             _ => false,
+        }
+    }
+}
+
+impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for BuilderInstruction<S> {
+    fn clone(&self) -> Self {
+        use BuilderInstruction::*;
+        match self {
+            ExpectParameterNode(marker, node) => ExpectParameterNode(marker.clone(), node.clone()),
+            ExpectContextNode(marker, node) => ExpectContextNode(marker.clone(), node.clone()),
+            ExpectParameterEdge(source_marker, target_marker, edge) => {
+                ExpectParameterEdge(source_marker.clone(), target_marker.clone(), edge.clone())
+            }
+            StartQuery(query, args) => StartQuery(query.clone(), args.clone()),
+            EnterTrueBranch => EnterTrueBranch,
+            EnterFalseBranch => EnterFalseBranch,
+            StartShapeQuery(op_marker) => StartShapeQuery(op_marker.clone()),
+            EndQuery => EndQuery,
+            ExpectShapeNode(marker, node) => ExpectShapeNode(marker.clone(), node.clone()),
+            ExpectShapeNodeChange(aid, node) => ExpectShapeNodeChange(aid.clone(), node.clone()),
+            ExpectShapeEdge(source, target, edge) => {
+                ExpectShapeEdge(source.clone(), target.clone(), edge.clone())
+            }
+            AddNamedOperation(name, op, args) => AddNamedOperation(name.clone(), op.clone(), args.clone()),
+            AddOperation(op, args) => AddOperation(op.clone(), args.clone()),
+            ReturnNode(aid, output_marker, node) => ReturnNode(aid.clone(), output_marker.clone(), node.clone()),
+            ReturnEdge(src, dst, edge) => ReturnEdge(src.clone(), dst.clone(), edge.clone()),
+            RenameNode(old_aid, new_name) => RenameNode(old_aid.clone(), new_name.clone()),
         }
     }
 }
@@ -212,16 +251,25 @@ pub enum OperationBuilderError {
     CannotRenameParameterNode(AbstractNodeId),
     #[error("Invalid parameter")]
     InvalidParameter,
+    // just for testing of the explicit stack-based builder
+    #[error("New builder error")]
+    NewBuilderError,
 }
 
-pub struct OperationBuilder<'a, S: Semantics> {
+// type alias to switch between implementations globally
+// pub type OperationBuilder<'a, S> = OperationBuilderInefficient<'a, S>;
+pub type OperationBuilder<'a, S> = stack_based_builder::OperationBuilder2<'a, S>;
+
+
+
+pub struct OperationBuilderInefficient<'a, S: Semantics> {
     op_ctx: &'a OperationContext<S>,
     instructions: Vec<BuilderInstruction<S>>,
     // hack for recursion
     previous_user_defined_operation: RefCell<UserDefinedOperation<S>>,
 }
 
-impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBuilder<'a, S> {
+impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBuilderInefficient<'a, S> {
     pub fn new(op_ctx: &'a OperationContext<S>) -> Self {
         Self {
             instructions: Vec::new(),
@@ -519,7 +567,7 @@ impl<
             BuiltinOperation: Clone,
             BuiltinQuery: Clone,
         >,
-> OperationBuilder<'a, S>
+> OperationBuilderInefficient<'a, S>
 {
     fn get_intermediate_state(
         &self,
