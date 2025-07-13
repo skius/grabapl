@@ -122,7 +122,7 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
                 builder.push_frame(query_frame);
             }
             // need to handle instructions that change the branch - endquery, entertrue, enterfalse
-            BI::EnterFalseBranch | BI::EnterTrueBranch | BI::EndQuery => {
+            instruction if instruction.can_break_body() => {
                 // our frame needs to somehow be passed to the query frame that should be one below us.
                 // I guess this is a "push" (vs pull) model, where we now access the query frame below us and push the data?
                 // TODO: make this actually be a result? the expect_...
@@ -138,10 +138,13 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
                 // TODO: what to do if below returns an error?
                 //  we would lose the frame and all the instructions in it!
                 //  for this case, solved by having explicit data_stack.
-                QueryFrame::push_branch(
-                    builder,
-                    our_frame,
-                )?;
+                // QueryFrame::push_branch(
+                //     builder,
+                //     our_frame,
+                // )?;
+
+                // data_stack is the return_stack
+                builder.return_stack.push(our_frame);
 
                 // put instruction back, since we want QueryFrame to take over
                 let _ = instruction_opt.insert(instruction);
@@ -259,37 +262,6 @@ impl<S: Semantics> QueryFrame<S> {
         }
     }
 
-    fn push_branch(
-        builder: &mut Builder<S>,
-        frame: CollectingInstructionsFrame<S>,
-    ) -> Result<(), BuilderError> {
-        let this: &mut QueryFrame<S> = builder.stack.expect_mut();
-
-        // We just finished a branch and got `frame` as result.
-
-        if let Some(branch) = this.currently_entered_branch {
-            if branch {
-                if this.true_instructions.is_some() {
-                    // should not happen
-                    bail!(BuilderError::NeedsSpecificVariant("true branch already entered"));
-                }
-                this.true_instructions = Some(frame);
-            } else {
-                if this.false_instructions.is_some() {
-                    // should not happen
-                    bail!(BuilderError::NeedsSpecificVariant("false branch already entered"));
-                }
-                this.false_instructions = Some(frame);
-            }
-        } else {
-            // We are not in a branch, this hsould not happen
-            bail!(BuilderError::NeedsSpecificVariant("not in a branch, but trying to push branch instructions"));
-        }
-        this.currently_entered_branch = None; // reset, since we just pushed the branch
-
-        Ok(())
-    }
-
     pub fn consume(
         builder: &mut Builder<S>,
         instruction_opt: &mut Option<BuilderInstruction<S>>,
@@ -297,6 +269,19 @@ impl<S: Semantics> QueryFrame<S> {
         use BuilderInstruction as BI;
 
         let this: &mut QueryFrame<S> = builder.stack.expect_mut();
+
+        if let Some(branch) = this.currently_entered_branch && builder.return_stack.top_is::<CollectingInstructionsFrame<S>>() {
+            // TODO: is there a situation where this.currently_entered_branch is None but we have a branch frame?
+
+            let branch_frame: CollectingInstructionsFrame<S> = builder.return_stack.expect_pop();
+            if branch {
+                this.true_instructions = Some(branch_frame);
+            } else {
+                this.false_instructions = Some(branch_frame);
+            }
+
+            this.currently_entered_branch = None;
+        }
 
         // We accept: EnterTrue, EnterFalse, and EndQuery.
 
@@ -366,9 +351,17 @@ struct FrameStack<S: Semantics> {
 }
 
 impl<S: Semantics> FrameStack<S> {
-    pub fn new() -> Self {
+    pub fn new_initial() -> Self {
         FrameStack {
+            // TODO: add an outermost frame that can handle return nodes as well.
+            //  that way, a ReturnNode instruction will fall down all the way to that frame, at which point no other instructions will be accepted.
             frames: vec![Frame::BuildingParameter(BuildingParameterFrame::new())],
+        }
+    }
+
+    pub fn new_empty() -> Self {
+        FrameStack {
+            frames: vec![],
         }
     }
 
@@ -386,6 +379,14 @@ impl<S: Semantics> FrameStack<S> {
 
     pub fn last_mut(&mut self) -> Option<&mut Frame<S>> {
         self.frames.last_mut()
+    }
+
+    pub fn top_is<'a, F>(&'a self) -> bool
+    where S: 'a,
+        F: 'a,
+          &'a Frame<S>: TryInto<&'a F>
+    {
+        self.frames.last().map_or(false, |f| f.try_into().is_ok())
     }
 
     pub fn expect_mut<'a, F>(&'a mut self) -> F
@@ -450,6 +451,7 @@ impl<'a, S: Semantics> BuilderData<'a, S> {
 pub struct Builder<'a, S: Semantics> {
     data: BuilderData<'a, S>,
     stack: FrameStack<S>,
+    return_stack: FrameStack<S>,
 }
 
 
@@ -457,7 +459,8 @@ impl<'a, S: Semantics> Builder<'a, S> {
     pub fn new(op_ctx: &'a OperationContext<S>) -> Self {
         Builder {
             data: BuilderData::new(op_ctx),
-            stack: FrameStack::new(),
+            stack: FrameStack::new_initial(),
+            return_stack: FrameStack::new_empty(),
         }
     }
 
@@ -487,7 +490,6 @@ impl<'a, S: Semantics> Builder<'a, S> {
         let mut instruction_opt = Some(instruction);
 
         while instruction_opt.is_some() {
-            // TODO: don't pop
             let curr_frame = self.stack.last().unwrap();
             match curr_frame {
                 Frame::BuildingParameter(..) => {
@@ -506,11 +508,12 @@ impl<'a, S: Semantics> Builder<'a, S> {
     }
 
     fn build(&mut self) -> Result<UserDefinedOperation<S>, BuilderError> {
-        while self.stack.frames.len() > 1 {
+        // this is a bit of a hack. it just works because all nested frames right now can be ended with EndQuery.
+        while self.stack.frames.len() > 0 {
             self.consume(BuilderInstruction::EndQuery)?;
         }
 
-        let frame: CollectingInstructionsFrame<S> = self.stack.expect_pop();
+        let frame: CollectingInstructionsFrame<S> = self.return_stack.expect_pop();
 
         let mut user_def_op = UserDefinedOperation::new_noop();
         user_def_op.instructions = frame.instructions;
