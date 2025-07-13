@@ -27,7 +27,7 @@ use std::mem;
 use std::slice::Iter;
 use thiserror::Error;
 
-mod stack_based_builder;
+pub mod stack_based_builder;
 
 /*
 General overview:
@@ -55,9 +55,40 @@ pub enum BuilderOpLike<S: Semantics> {
     Recurse,
 }
 
+impl<S: Semantics> BuilderOpLike<S> {
+    fn as_operation<'a>(&'a self, op_ctx: &'a OperationContext<S>, partial_user_def_op: &'a UserDefinedOperation<S>) -> Result<Operation<'a, S>, OperationBuilderError> {
+        let op = match self {
+            BuilderOpLike::Builtin(op) => Operation::Builtin(op),
+            BuilderOpLike::LibBuiltin(op) => Operation::LibBuiltin(op),
+            BuilderOpLike::FromOperationId(id) => {
+                let op = op_ctx
+                    .get(*id)
+                    .ok_or_else(|| OperationBuilderError::NotFoundOperationId(*id))?;
+                op
+            }
+            BuilderOpLike::Recurse => {
+                Operation::Custom(partial_user_def_op)
+            }
+        };
+        Ok(op)
+    }
+
+    fn to_op_like_instruction(
+        self,
+        self_op_id: OperationId,
+    ) -> OpLikeInstruction<S> {
+        match self {
+            BuilderOpLike::Builtin(op) => OpLikeInstruction::Builtin(op),
+            BuilderOpLike::LibBuiltin(op) => OpLikeInstruction::LibBuiltin(op),
+            BuilderOpLike::FromOperationId(id) => OpLikeInstruction::Operation(id),
+            BuilderOpLike::Recurse => OpLikeInstruction::Operation(self_op_id),
+        }
+    }
+}
+
 // TODO: rename to BuilderMessage? since Instruction is already used in the user-defined operation context.
 #[derive(derive_more::Debug)]
-enum BuilderInstruction<S: Semantics> {
+pub enum BuilderInstruction<S: Semantics> {
     #[debug("ExpectParameterNode({_0:?}, ???)")]
     ExpectParameterNode(SubstMarker, S::NodeAbstract),
     #[debug("ExpectContextNode({_0:?}, ???)")]
@@ -1415,6 +1446,9 @@ impl<S: Semantics> IntermediateState<S> {
     ) -> Result<(), OperationBuilderError> {
         // go over new nodes
         for (node_marker, node_key) in operation_output.new_nodes {
+            // TODO: we don't actually need a marker in case the user does not want the output I think?
+            //  i.e., if AddOperation instead of AddNamedOperation is used, we can just skip below?
+
             let aid = AbstractNodeId::DynamicOutputMarker(marker.clone(), node_marker);
             // TODO: override the may_come_from_shape_query set here! remove the node - it's a non-shape-query node.
             self.node_keys_to_aid.insert(node_key, aid);
@@ -1908,6 +1942,9 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         marker: Option<AbstractOperationResultMarker>,
         oplike: IntermediateOpLike<S>,
     ) -> Result<UDInstruction<S>, OperationBuilderError> {
+
+
+
         match oplike {
             IntermediateOpLike::Builtin(builtin_op, args) => {
                 let op = Operation::Builtin(&builtin_op);

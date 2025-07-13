@@ -20,6 +20,16 @@ pub struct OperationParameterBuilder<S: Semantics> {
     subst_to_node_keys: BiMap<SubstMarker, NodeKey>,
 }
 
+impl<S: Semantics> Clone for OperationParameterBuilder<S> {
+    fn clone(&self) -> Self {
+        OperationParameterBuilder {
+            explicit_input_nodes: self.explicit_input_nodes.clone(),
+            parameter_graph: self.parameter_graph.clone(),
+            subst_to_node_keys: self.subst_to_node_keys.clone(),
+        }
+    }
+}
+
 impl<S: Semantics> OperationParameterBuilder<S> {
     pub fn new() -> Self {
         OperationParameterBuilder {

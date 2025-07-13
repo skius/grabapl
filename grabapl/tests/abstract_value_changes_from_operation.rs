@@ -1,7 +1,7 @@
-use grabapl::operation::builder::{BuilderOpLike, OperationBuilder};
+use grabapl::operation::builder::{stack_based_builder, BuilderOpLike, OperationBuilder};
 use grabapl::operation::builtin::LibBuiltinOperation;
 use grabapl::operation::query::BuiltinQuery;
-use grabapl::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
+use grabapl::operation::user_defined::{AbstractNodeId, AbstractOperationResultMarker, UserDefinedOperation};
 use grabapl::operation::{BuiltinOperation, run_from_concrete};
 use grabapl::semantics::ConcreteGraph;
 use grabapl::{OperationContext, OperationId, Semantics, SubstMarker};
@@ -1609,3 +1609,68 @@ fn delete_node_after_writing_to_it() {
         "Expected the operation to change p0 to Object before deleting it"
     );
 }
+
+// Just for testing the new builder. TODO: delete.
+#[test_log::test]
+fn new_builder_test() {
+    let op_ctx = OperationContext::<TestSemantics>::new();
+    let mut builder = stack_based_builder::Builder::new(&op_ctx);
+
+    use grabapl::operation::builder::BuilderInstruction as BI;
+
+    builder.consume(BI::ExpectParameterNode("p0".into(), NodeType::Object))
+        .unwrap();
+
+    builder.consume(BI::AddNamedOperation("hello".into(),
+        BuilderOpLike::LibBuiltin(LibBuiltinOperation::AddNode {
+            value: NodeValue::String("Hello".to_string()),
+        }),
+        vec![])).unwrap();
+    let show_data = builder.show();
+    println!("{:?}", show_data);
+
+
+    builder.consume(BI::RenameNode(AbstractNodeId::dynamic_output("hello", "new"), "renamed".into())).unwrap();
+    let show_data = builder.show();
+    println!("{:?}", show_data);
+
+
+    let res =     builder.consume(BI::ExpectParameterNode("p0".into(), NodeType::Object));
+    println!("{:?}", res);
+
+    assert!(false);
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
