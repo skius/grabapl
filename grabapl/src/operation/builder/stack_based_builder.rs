@@ -12,9 +12,25 @@ enum BuilderError {
     ParameterBuildError(#[from] ParameterBuilderError),
 }
 
+struct CollectingInstructionsFrame<S: Semantics> {
+    instructions: UDInstructionsWithMarker<S>,
+    current_state: IntermediateState<S>,
+}
+
+impl<S: Semantics> CollectingInstructionsFrame<S> {
+    pub fn from_param(
+        parameter: &OperationParameter<S>,
+    ) -> Self {
+        CollectingInstructionsFrame {
+            instructions: vec![],
+            current_state: IntermediateState::from_param(parameter),
+        }
+    }
+}
+
 enum Frame<S: Semantics> {
     BuildingParameter(OperationParameterBuilder<S>),
-    CollectingInstructions(UDInstructionsWithMarker<S>),
+    CollectingInstructions(CollectingInstructionsFrame<S>),
 }
 
 struct BuiltData<S: Semantics> {
@@ -56,16 +72,13 @@ impl<'a, S: Semantics> Builder<'a, S> {
         let mut instruction_opt = Some(instruction);
 
         while instruction_opt.is_some() {
-            // TODO: maybe instead have signature of the consume_for_* methods take a mutable reference to the curr_frame, and return
-            //  an option of the next frame if they want to change the frame?
-            // actually no, not possible, since the mutable reference borrows from self, but we want to pass self as well.
             let curr_frame = self.stack.pop().unwrap();
             match curr_frame {
                 Frame::BuildingParameter(param_builder) => {
                     self.consume_for_building_parameter(&mut instruction_opt, param_builder)?;
                 }
-                Frame::CollectingInstructions(instructions) => {
-                    self.consume_for_collecting_instructions(&mut instruction_opt, instructions)?;
+                Frame::CollectingInstructions(frame) => {
+                    self.consume_for_collecting_instructions(&mut instruction_opt, frame)?;
                 }
             }
         }
@@ -107,9 +120,10 @@ impl<'a, S: Semantics> Builder<'a, S> {
             _ => {
                 // The user has decided that they're done building the parameter by sending a different instruction
                 let parameter = param_builder.build()?;
+                let frame = CollectingInstructionsFrame::from_param(&parameter);
                 self.built.parameter = Some(parameter);
 
-                Frame::CollectingInstructions(vec![])
+                Frame::CollectingInstructions(frame)
             },
         };
         self.stack.push(next_frame);
@@ -119,7 +133,7 @@ impl<'a, S: Semantics> Builder<'a, S> {
     fn consume_for_collecting_instructions(
         &mut self,
         instruction_opt: &mut Option<BuilderInstruction<S>>,
-        mut instructions: UDInstructionsWithMarker<S>,
+        mut frame: CollectingInstructionsFrame<S>,
     ) -> Result<(), BuilderError> {
         let instruction = instruction_opt.as_ref().unwrap();
         match instruction {
@@ -130,7 +144,7 @@ impl<'a, S: Semantics> Builder<'a, S> {
                     _ => todo!()
                 };
 
-                self.built.intermediate_state.as_mut().unwrap().apply_op(lib_builtin_op)
+                // self.built.intermediate_state.as_mut().unwrap().apply_op(lib_builtin_op)
                 // TODO: have "ApplyAbstract" trait auto-implemented for everything where necessary, and have intermediate state
                 //  generically accept such a thing to abstract apply. obviously if there's more data that intermediate state
                 //  needs for apply_abstract then maybe it doesnt work.

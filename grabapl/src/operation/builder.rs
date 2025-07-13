@@ -1317,7 +1317,7 @@ impl<S: Semantics> IntermediateState<S> {
     }
 
     /// Modifies all mappings so that all mentions of `old_aid` are replaced with `new_aid`.
-    pub fn rename_aid(
+    fn rename_aid(
         &mut self,
         old_aid: AbstractNodeId,
         new_aid: AbstractNodeId,
@@ -1768,7 +1768,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                 Ok((
                     self.rename_node(aid, new_aid)?,
                     InterpretedInstruction::OpLike,
-                )) // TODO: return a proper instruction
+                ))
             }
         }
     }
