@@ -1546,7 +1546,7 @@ impl<S: Semantics> IntermediateState<S> {
     fn interpret_op(
         &mut self,
         op_ctx: &OperationContext<S>,
-        marker: AbstractOperationResultMarker,
+        marker: Option<AbstractOperationResultMarker>,
         op: Operation<S>,
         args: Vec<AbstractNodeId>,
     ) -> Result<AbstractOperationArgument, OperationBuilderError> {
@@ -1579,17 +1579,20 @@ impl<S: Semantics> IntermediateState<S> {
 
     fn handle_abstract_output_changes(
         &mut self,
-        marker: AbstractOperationResultMarker,
+        marker: Option<AbstractOperationResultMarker>,
         operation_output: AbstractOperationOutput<S>,
     ) -> Result<(), OperationBuilderError> {
         // go over new nodes
         for (node_marker, node_key) in operation_output.new_nodes {
-            // TODO: we don't actually need a marker in case the user does not want the output I think?
-            //  i.e., if AddOperation instead of AddNamedOperation is used, we can just skip below?
+            if let Some(op_marker) = marker {
+                let aid = AbstractNodeId::DynamicOutputMarker(op_marker, node_marker);
+                // TODO: override the may_come_from_shape_query set here! remove the node - it's a non-shape-query node.
+                self.node_keys_to_aid.insert(node_key, aid);
+            } else {
+                // we don't keep track of it, so better remove it from the graph
+                self.graph.remove_node(node_key);
+            }
 
-            let aid = AbstractNodeId::DynamicOutputMarker(marker.clone(), node_marker);
-            // TODO: override the may_come_from_shape_query set here! remove the node - it's a non-shape-query node.
-            self.node_keys_to_aid.insert(node_key, aid);
         }
         for node_key in operation_output.removed_nodes {
             // remove the node from the mapping
@@ -2178,10 +2181,8 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         op: Operation<S>,
         args: Vec<AbstractNodeId>,
     ) -> Result<AbstractOperationArgument, OperationBuilderError> {
-        let marker = marker.unwrap_or_else(|| self.get_new_unnamed_abstract_operation_marker());
-
         self.current_state
-            .interpret_op(&self.op_ctx, marker.clone(), op, args)
+            .interpret_op(&self.op_ctx, marker, op, args)
     }
 
     fn interpret_builtin_query(

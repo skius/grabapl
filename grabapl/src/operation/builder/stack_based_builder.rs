@@ -229,17 +229,12 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
         op_like: BuilderOpLike<S>,
         args: Vec<AbstractNodeId>,
     ) -> Result<(), BuilderError> {
-        let output_name_forced_marker = output_name.unwrap_or_else(|| {
-            // TODO: better? do we even really need implicit?
-            AbstractOperationResultMarker::Implicit(0)
-        });
-
         let op = op_like
             .as_operation(builder_data.op_ctx, &builder_data.partial_self_op)
             .change_context(BuilderError::OutsideError)?;
         let abstract_arg = self
             .current_state
-            .interpret_op(builder_data.op_ctx, output_name_forced_marker, op, args)
+            .interpret_op(builder_data.op_ctx, output_name, op, args)
             .change_context(BuilderError::OutsideError)?;
 
         let op_like_instr = op_like.to_op_like_instruction(builder_data.self_op_id);
