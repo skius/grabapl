@@ -15,7 +15,7 @@ fn insert_bst_builder_test(
     self_op_id: OperationId,
 ) -> UserDefinedOperation<SimpleSemantics> {
     // OperationBuilder has an inner state enum. in fact, that is a stack referencing the current query stack it is inside.
-    let mut op_builder = OperationBuilder::new(op_ctx);
+    let mut op_builder = OperationBuilder::new(op_ctx, self_op_id);
     let show = |op_builder: &OperationBuilder<_>| {
         println!("{}\n----------", op_builder.format_state());
     };
@@ -243,7 +243,7 @@ fn insert_bst_builder_test(
 
     // TODO: finish operation
 
-    op_builder.build(self_op_id).unwrap()
+    op_builder.build().unwrap()
 }
 
 fn main() {

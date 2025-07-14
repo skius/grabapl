@@ -1247,9 +1247,7 @@ pub struct OperationBuilder2<'a, S: Semantics> {
 }
 
 impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBuilder2<'a, S> {
-    pub fn new(op_ctx: &'a OperationContext<S>) -> Self {
-        // TODO: add self_op_id to parameters
-        let self_op_id = 0;
+    pub fn new(op_ctx: &'a OperationContext<S>, self_op_id: OperationId) -> Self {
         Self {
             instructions: Vec::new(),
             op_ctx,
@@ -1436,9 +1434,7 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
     // TODO: remove self_op_id since that is actually not used here.
     pub fn build(
         &mut self,
-        self_op_id: OperationId,
     ) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
-        self.active.update_self_op_id(self_op_id);
         // build on a clone
         let res = self.active.clone().build();
         res.change_context(OperationBuilderError::NewBuilderError)

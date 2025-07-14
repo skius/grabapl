@@ -10,7 +10,7 @@ use util::semantics::*;
 
 fn bubble_sort_op(op_id: OperationId) -> UserDefinedOperation<TestSemantics> {
     let op_ctx = OperationContext::new();
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, op_id);
 
     // first node
     builder
@@ -46,12 +46,12 @@ fn bubble_sort_op(op_id: OperationId) -> UserDefinedOperation<TestSemantics> {
         .add_operation(BuilderOpLike::Recurse, vec![child])
         .unwrap();
 
-    builder.build(op_id).unwrap()
+    builder.build().unwrap()
 }
 
 fn bubble_sort_op_2(op_id: OperationId) -> UserDefinedOperation<TestSemantics> {
     let op_ctx = OperationContext::new();
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, op_id);
 
     // first node
     builder
@@ -87,12 +87,12 @@ fn bubble_sort_op_2(op_id: OperationId) -> UserDefinedOperation<TestSemantics> {
         .add_operation(BuilderOpLike::Recurse, vec![parent])
         .unwrap();
 
-    builder.build(op_id).unwrap()
+    builder.build().unwrap()
 }
 
 fn list_len_op(op_id: OperationId) -> UserDefinedOperation<TestSemantics> {
     let op_ctx = OperationContext::new();
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, op_id);
 
     // first node
     builder
@@ -126,12 +126,12 @@ fn list_len_op(op_id: OperationId) -> UserDefinedOperation<TestSemantics> {
         .unwrap();
     builder.end_query().unwrap();
 
-    builder.build(op_id).unwrap()
+    builder.build().unwrap()
 }
 
 fn bubble_sort_n_times_op(op_id: OperationId) -> UserDefinedOperation<TestSemantics> {
     let op_ctx = OperationContext::new();
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, op_id);
 
     // first node
     builder
@@ -186,7 +186,7 @@ fn bubble_sort_n_times_op(op_id: OperationId) -> UserDefinedOperation<TestSemant
         .add_operation(BuilderOpLike::Recurse, vec![child, n])
         .unwrap();
 
-    builder.build(op_id).unwrap()
+    builder.build().unwrap()
 }
 
 fn main_bubble_sort_op(
@@ -194,7 +194,7 @@ fn main_bubble_sort_op(
     n_times_op_id: OperationId,
     op_ctx: &OperationContext<TestSemantics>,
 ) -> UserDefinedOperation<TestSemantics> {
-    let mut builder = OperationBuilder::new(op_ctx);
+    let mut builder = OperationBuilder::new(op_ctx, op_id);
     // first node
     builder
         .expect_parameter_node("p0", NodeType::Integer)
@@ -257,7 +257,7 @@ fn main_bubble_sort_op(
         .add_operation(BuilderOpLike::Recurse, vec![p0, n])
         .unwrap();
 
-    builder.build(op_id).unwrap()
+    builder.build().unwrap()
 }
 
 fn wrap_main_bubble_sort_op(
@@ -266,7 +266,7 @@ fn wrap_main_bubble_sort_op(
     list_len_op_id: OperationId,
     op_ctx: &OperationContext<TestSemantics>,
 ) -> UserDefinedOperation<TestSemantics> {
-    let mut builder = OperationBuilder::new(op_ctx);
+    let mut builder = OperationBuilder::new(op_ctx, op_id);
     // first node
     builder
         .expect_parameter_node("p0", NodeType::Integer)
@@ -324,7 +324,7 @@ fn wrap_main_bubble_sort_op(
         )
         .unwrap();
 
-    builder.build(op_id).unwrap()
+    builder.build().unwrap()
 }
 
 #[test]

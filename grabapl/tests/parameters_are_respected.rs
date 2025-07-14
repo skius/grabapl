@@ -8,7 +8,7 @@ use util::semantics::*;
 #[test_log::test]
 fn types_must_be_subtypes() {
     let op_ctx = OperationContext::<TestSemantics>::new();
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 0);
     builder
         .expect_parameter_node("p0", NodeType::Object)
         .unwrap();

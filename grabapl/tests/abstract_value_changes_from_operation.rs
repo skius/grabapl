@@ -13,7 +13,7 @@ use util::semantics::*;
 #[test]
 fn no_modifications_dont_change_abstract_value() {
     let op_ctx = OperationContext::<TestSemantics>::new();
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 0);
 
     builder
         .expect_parameter_node("a", NodeType::Integer)
@@ -40,7 +40,7 @@ fn no_modifications_dont_change_abstract_value() {
 
 fn get_abstract_value_changing_operation() -> UserDefinedOperation<TestSemantics> {
     let op_ctx = OperationContext::<TestSemantics>::new();
-    let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx);
+    let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx, 0);
     builder
         .expect_parameter_node("p0", NodeType::Object)
         .unwrap();
@@ -74,12 +74,12 @@ fn get_abstract_value_changing_operation() -> UserDefinedOperation<TestSemantics
         )
         .unwrap();
     builder.end_query().unwrap();
-    builder.build(0).unwrap()
+    builder.build().unwrap()
 }
 
 fn get_abstract_value_changing_operation_no_branches() -> UserDefinedOperation<TestSemantics> {
     let op_ctx = OperationContext::<TestSemantics>::new();
-    let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx);
+    let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx, 0);
     builder
         .expect_parameter_node("p0", NodeType::Object)
         .unwrap();
@@ -96,14 +96,14 @@ fn get_abstract_value_changing_operation_no_branches() -> UserDefinedOperation<T
             vec![p0],
         )
         .unwrap();
-    builder.build(0).unwrap()
+    builder.build().unwrap()
 }
 
 #[test]
 fn modifications_change_abstract_value_even_if_same_internal_type_for_custom() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();
     op_ctx.add_custom_operation(0, get_abstract_value_changing_operation());
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 1);
 
     builder
         .expect_parameter_node("a", NodeType::Integer)
@@ -135,7 +135,7 @@ fn modifications_change_abstract_value_even_if_same_internal_type_for_custom() {
 #[test]
 fn modifications_change_abstract_value_even_if_same_internal_type_for_builtin() {
     let op_ctx = OperationContext::<TestSemantics>::new();
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 0);
 
     builder
         .expect_parameter_node("a", NodeType::Integer)
@@ -176,7 +176,7 @@ fn modifications_change_abstract_value_even_if_same_internal_type_for_builtin() 
 fn modifications_change_abstract_value_even_if_same_internal_type_for_custom_with_builtin() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();
     op_ctx.add_custom_operation(0, get_abstract_value_changing_operation_no_branches());
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 1);
 
     builder
         .expect_parameter_node("a", NodeType::Integer)
@@ -207,7 +207,7 @@ fn modifications_change_abstract_value_even_if_same_internal_type_for_custom_wit
 
 fn get_custom_op_new_node_in_regular_query_branches() -> UserDefinedOperation<TestSemantics> {
     let op_ctx = OperationContext::<TestSemantics>::new();
-    let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx);
+    let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx, 0);
     builder
         .expect_parameter_node("p0", NodeType::Object)
         .unwrap();
@@ -251,12 +251,12 @@ fn get_custom_op_new_node_in_regular_query_branches() -> UserDefinedOperation<Te
         .return_node(output_aid, "output".into(), NodeType::Object)
         .unwrap();
 
-    builder.build(0).unwrap()
+    builder.build().unwrap()
 }
 
 fn get_custom_op_new_node_in_shape_query_branches() -> UserDefinedOperation<TestSemantics> {
     let op_ctx = OperationContext::<TestSemantics>::new();
-    let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx);
+    let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx, 0);
     builder
         .expect_parameter_node("p0", NodeType::Object)
         .unwrap();
@@ -294,14 +294,14 @@ fn get_custom_op_new_node_in_shape_query_branches() -> UserDefinedOperation<Test
         "`output_aid` partially originates from a shape query, hence it may not be returned"
     );
 
-    builder.build(0).unwrap()
+    builder.build().unwrap()
 }
 
 #[test]
 fn new_node_from_both_branches_is_visible_for_regular_query() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();
     op_ctx.add_custom_operation(0, get_custom_op_new_node_in_regular_query_branches());
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 1);
     builder
         .expect_parameter_node("p0", NodeType::Integer)
         .unwrap();
@@ -333,7 +333,7 @@ fn new_node_from_both_branches_is_visible_for_regular_query() {
             vec![returned_node, p0.clone()],
         )
         .unwrap();
-    let operation = builder.build(1).unwrap();
+    let operation = builder.build().unwrap();
     op_ctx.add_custom_operation(1, operation);
 
     let mut concrete_graph = ConcreteGraph::<TestSemantics>::new();
@@ -351,7 +351,7 @@ fn new_node_from_both_branches_is_visible_for_regular_query() {
 fn new_node_from_both_branches_is_invisible_for_shape_query() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();
     op_ctx.add_custom_operation(0, get_custom_op_new_node_in_shape_query_branches());
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 1);
     let input_marker = SubstMarker::from("input");
     builder
         .expect_parameter_node(input_marker.clone(), NodeType::Integer)
@@ -379,7 +379,7 @@ fn new_node_from_both_branches_is_invisible_for_shape_query() {
 fn return_node_partially_from_shape_query_fails() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();
     let helper_op = {
-        let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx);
+        let mut builder = OperationBuilder::<TestSemantics>::new(&op_ctx, 0);
         builder
             .expect_parameter_node("p0", NodeType::Integer)
             .unwrap();
@@ -413,12 +413,12 @@ fn return_node_partially_from_shape_query_fails() {
             res.is_err(),
             "Expected returning a node partially originating from a shape query to fail"
         );
-        builder.build(0).unwrap()
+        builder.build().unwrap()
     };
     op_ctx.add_custom_operation(0, helper_op);
 
     // now see what happens if we try to run this in a builder
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 1);
     builder
         .expect_parameter_node("p0", NodeType::Integer)
         .unwrap();
@@ -469,7 +469,7 @@ fn return_node_partially_from_shape_query_fails() {
                 vec![c0, p0],
             )
             .unwrap();
-        let operation = builder.build(1).unwrap();
+        let operation = builder.build().unwrap();
         op_ctx.add_custom_operation(1, operation);
 
         let mut concrete_graph = ConcreteGraph::<TestSemantics>::new();
@@ -511,7 +511,7 @@ fn builder_infers_correct_signatures() {
     };
 
     let mut op_ctx = OperationContext::<TestSemantics>::new();
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 0);
     param_instructions(&mut builder);
     // param: p0->c0, p1, p2->c1, p0->c1
     // delete p1, delete c0 (which implies deletion of edge p0->c0), set p0, delete edge p2->c1, set c1, set p0->c1
@@ -635,7 +635,7 @@ fn builder_infers_correct_signatures() {
         res.is_err(),
         "Expected returning edge p0->n1 to fail because n1 is not returned"
     );
-    let operation = builder.build(0).unwrap();
+    let operation = builder.build().unwrap();
     // get signature
     let signature = operation.signature();
 
@@ -718,7 +718,7 @@ fn builder_infers_correct_signatures() {
     // that calls this operation.
 
     op_ctx.add_custom_operation(0, operation);
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 1);
     // same parameter graph so we can call the other operation
     param_instructions(&mut builder);
 
@@ -726,7 +726,7 @@ fn builder_infers_correct_signatures() {
     builder
         .add_operation(BuilderOpLike::FromOperationId(0), vec![p0, p1, p2])
         .unwrap();
-    let operation = builder.build(1).unwrap();
+    let operation = builder.build().unwrap();
     let signature = operation.signature();
     // assert changes and deletions
     // note that the expected node changes are different for c1, since
@@ -754,7 +754,7 @@ macro_rules! recursion_signature_is_sound {
     };
     ($fst:literal, $snd:literal, $set_last_to_string:literal, $p0_typ:expr, $c0_typ:expr) => {
         let op_ctx = OperationContext::<TestSemantics>::new();
-        let mut builder = OperationBuilder::new(&op_ctx);
+        let mut builder = OperationBuilder::new(&op_ctx, 0);
         // the operation we're designing takes p0->c0, the start of a linked list, and sets all nodes (except the last node) to Integer.
         // it does the "except the last node" check by first seeing if there is a child, and only then recursing.
         builder
@@ -823,7 +823,7 @@ macro_rules! recursion_signature_is_sound {
                 .unwrap();
         }
 
-        let operation = builder.build(0).unwrap();
+        let operation = builder.build().unwrap();
         let signature = operation.signature();
         // assert that the signature is correct
         assert_eq!(
@@ -892,7 +892,7 @@ fn recursion_signature_is_sound_when_changed_after_and_last_node_set_to_string()
 #[test_log::test]
 fn recursion_breaks_when_modification_changes_after_use() {
     let op_ctx = OperationContext::<TestSemantics>::new();
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 0);
     // we're writing a recursive operation
     builder
         .expect_parameter_node("p0", NodeType::Integer)
@@ -940,7 +940,7 @@ fn shape_query_doesnt_match_nodes_for_which_handles_exist() {
         op_id: OperationId,
     ) -> UserDefinedOperation<TestSemantics> {
         let op_ctx = OperationContext::<TestSemantics>::new();
-        let mut builder = OperationBuilder::new(&op_ctx);
+        let mut builder = OperationBuilder::new(&op_ctx, op_id);
         builder
             .expect_parameter_node("p0", NodeType::Object)
             .unwrap();
@@ -980,12 +980,12 @@ fn shape_query_doesnt_match_nodes_for_which_handles_exist() {
             )
             .unwrap();
 
-        builder.build(op_id).unwrap()
+        builder.build().unwrap()
     }
 
     let mut op_ctx = OperationContext::<TestSemantics>::new();
     op_ctx.add_custom_operation(0, get_shape_query_modifying_operation(0));
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 1);
     builder
         .expect_parameter_node("p0", NodeType::Object)
         .unwrap();
@@ -1010,7 +1010,7 @@ fn shape_query_doesnt_match_nodes_for_which_handles_exist() {
         "Expected c0 to remain unchanged, since the operation does not know about the inner operation's shape query"
     );
 
-    let op = builder.build(1).unwrap();
+    let op = builder.build().unwrap();
     op_ctx.add_custom_operation(1, op);
 
     // now run the operation with a concrete graph
@@ -1088,7 +1088,7 @@ fn may_writes_remember_previous_abstract_value() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();
 
     let op = {
-        let mut builder = OperationBuilder::new(&op_ctx);
+        let mut builder = OperationBuilder::new(&op_ctx, 0);
         // an operation that takes a p0: Object and changes it to a String.
         // TODO: we could loosen the constraints and make it so that a known, unconditional change, even in a user defined op, leads to unconditional changes in the caller.
         //  but at the moment, any changes in UDOs are considered "may" changes.
@@ -1120,11 +1120,11 @@ fn may_writes_remember_previous_abstract_value() {
             &NodeType::Object,
             "Expected p0 to remain Object after conditional change to String"
         );
-        builder.build(0).unwrap()
+        builder.build().unwrap()
     };
     op_ctx.add_custom_operation(0, op);
 
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 1);
     builder
         .expect_parameter_node("p0", NodeType::Object)
         .unwrap();
@@ -1159,7 +1159,7 @@ fn may_writes_remember_previous_abstract_value() {
         "Expected p0 to be Object after conditional, user-defined SetNode"
     );
 
-    let op = builder.build(1).unwrap();
+    let op = builder.build().unwrap();
     op_ctx.add_custom_operation(1, op);
 
     // See here for broken type safety:
@@ -1178,7 +1178,7 @@ fn may_writes_remember_previous_abstract_value() {
     }
 
     // furthermore, just because a operation _may_ change a node, it doesn't unnecessarily make the caller's av less precise.
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 2);
     builder
         .expect_parameter_node("p0", NodeType::String)
         .unwrap();
@@ -1199,7 +1199,7 @@ fn may_writes_remember_previous_abstract_value() {
 #[test_log::test]
 fn shape_query_cannot_match_existing_nodes() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 0);
     // we expect a p0: Object -child-> p1: Object
     builder
         .expect_parameter_node("p0", NodeType::Object)
@@ -1241,7 +1241,7 @@ fn shape_query_cannot_match_existing_nodes() {
         "Expected p1 to remain Object after running the shape query, since it was not matched"
     );
     // finish
-    let op = builder.build(0).unwrap();
+    let op = builder.build().unwrap();
     op_ctx.add_custom_operation(0, op);
 
     // run on concrete graph.
@@ -1262,7 +1262,7 @@ fn shape_query_cannot_match_existing_nodes() {
 #[test_log::test]
 fn rename_nodes_and_merge_test() {
     let op_ctx = OperationContext::<TestSemantics>::new();
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 0);
     builder
         .expect_parameter_node("p0", NodeType::Object)
         .unwrap();
@@ -1359,7 +1359,7 @@ fn rename_nodes_and_merge_test() {
 #[test_log::test]
 fn shape_query_allows_refinement_of_existing_nodes_and_edges() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 0);
     // we expect a p0: Object -*-> p1: Object
     builder
         .expect_parameter_node("p0", NodeType::Object)
@@ -1409,7 +1409,7 @@ fn shape_query_allows_refinement_of_existing_nodes_and_edges() {
         .unwrap();
 
     // finalize and test
-    let operation = builder.build(0).unwrap();
+    let operation = builder.build().unwrap();
     op_ctx.add_custom_operation(0, operation);
 
     {
@@ -1436,7 +1436,7 @@ fn shape_query_allows_refinement_of_existing_nodes_and_edges() {
 #[test_log::test]
 fn shape_query_av_refinement_works_in_branch_merge() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 0);
     // we expect a p0: Object
     builder
         .expect_parameter_node("p0", NodeType::Object)
@@ -1469,7 +1469,7 @@ fn shape_query_av_refinement_works_in_branch_merge() {
         "Expected p0 to be Integer after the shape query refinement"
     );
 
-    let op = builder.build(0).unwrap();
+    let op = builder.build().unwrap();
     op_ctx.add_custom_operation(0, op);
 
     // check behavior in concrete
@@ -1501,7 +1501,7 @@ fn shape_query_av_refinement_works_in_branch_merge() {
 fn delete_node_deletes_all_incident_edges_in_signature() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();
     let op_deleting_one_node = {
-        let mut builder = OperationBuilder::new(&op_ctx);
+        let mut builder = OperationBuilder::new(&op_ctx, 0);
         // expect p0: Object
         builder
             .expect_parameter_node("p0", NodeType::Object)
@@ -1516,7 +1516,7 @@ fn delete_node_deletes_all_incident_edges_in_signature() {
                 vec![p0],
             )
             .unwrap();
-        let op = builder.build(0).unwrap();
+        let op = builder.build().unwrap();
         // assert op is deleting a node
         let signature = op.signature();
         assert_eq!(
@@ -1529,7 +1529,7 @@ fn delete_node_deletes_all_incident_edges_in_signature() {
     op_ctx.add_custom_operation(0, op_deleting_one_node);
 
     // now call that operation from an operation that expects a p0: Object -child-> p1: Object
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 1);
     builder
         .expect_parameter_node("p0", NodeType::Object)
         .unwrap();
@@ -1546,7 +1546,7 @@ fn delete_node_deletes_all_incident_edges_in_signature() {
         .add_operation(BuilderOpLike::FromOperationId(0), vec![p1])
         .unwrap();
     // assert that the signature indicates that p1 was deleted, and hence the edge p0->p1 was also deleted
-    let op = builder.build(1).unwrap();
+    let op = builder.build().unwrap();
     let signature = op.signature();
     assert_eq!(
         signature.output.maybe_deleted_nodes,
@@ -1563,7 +1563,7 @@ fn delete_node_deletes_all_incident_edges_in_signature() {
 #[test_log::test]
 fn delete_node_after_writing_to_it() {
     let op_ctx = OperationContext::<TestSemantics>::new();
-    let mut builder = OperationBuilder::new(&op_ctx);
+    let mut builder = OperationBuilder::new(&op_ctx, 0);
     // expect p0: Object
     builder
         .expect_parameter_node("p0", NodeType::Object)
@@ -1588,7 +1588,7 @@ fn delete_node_after_writing_to_it() {
             vec![p0],
         )
         .unwrap();
-    let op = builder.build(0).unwrap();
+    let op = builder.build().unwrap();
     // assert op is deleting a node
     let signature = op.signature();
     assert_eq!(

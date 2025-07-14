@@ -267,14 +267,16 @@ pub type OperationBuilder<'a, S> = stack_based_builder::OperationBuilder2<'a, S>
 
 pub struct OperationBuilderInefficient<'a, S: Semantics> {
     op_ctx: &'a OperationContext<S>,
+    self_op_id: OperationId,
     instructions: Vec<BuilderInstruction<S>>,
     // hack for recursion
     previous_user_defined_operation: RefCell<UserDefinedOperation<S>>,
 }
 
 impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBuilderInefficient<'a, S> {
-    pub fn new(op_ctx: &'a OperationContext<S>) -> Self {
+    pub fn new(op_ctx: &'a OperationContext<S>, self_op_id: OperationId) -> Self {
         Self {
+            self_op_id,
             instructions: Vec::new(),
             op_ctx,
             previous_user_defined_operation: RefCell::new(UserDefinedOperation::new_noop()),
@@ -491,7 +493,6 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
     //  Stuff like Context nodes must be connected, etc.
     pub fn build(
         &self,
-        self_op_id: OperationId,
     ) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
         // Here we would typically finalize the operation and return it.
         // For now, we just return Ok to indicate success.
@@ -502,7 +503,7 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         let instructions = builder_result.instructions;
         let prev_user_ref = self.previous_user_defined_operation.borrow();
         let mut interpreter = IntermediateInterpreter::new_for_self_op_id(
-            self_op_id,
+            self.self_op_id,
             param,
             self.op_ctx,
             &prev_user_ref,
