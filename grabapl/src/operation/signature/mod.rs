@@ -6,8 +6,8 @@ use crate::operation::signature::parameter::{
 use crate::semantics::{AbstractGraph, AbstractJoin, AbstractMatcher, Semantics};
 use crate::util::bimap::BiMap;
 use derive_more::From;
-use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
 pub mod parameter;
 pub mod parameterbuilder;
@@ -36,18 +36,20 @@ pub enum AbstractSignatureNodeId {
 ///
 /// Operations with the same signature should be soundly interchangeable, with only the concrete
 /// implementation differing.
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(bound = "S: crate::serde::SemanticsSerde"))]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(bound = "S: crate::serde::SemanticsSerde")
+)]
 pub struct OperationSignature<S: Semantics> {
     /// The operation's name.
     // TODO: decide if this should be unique and used in place of OperationId.
     //  If so, interning it would probably be sensible.
     pub name: String,
     /// The operation's parameter, i.e., the expected input nodes, edges, and their types.
-
     pub parameter: OperationParameter<S>,
     /// The operation's output, i.e., the deleted nodes and edges, potential new nodes and edges,
     /// and changes to existing nodes and edges.
-
     pub output: AbstractOutputChanges<S>,
 }
 
@@ -82,7 +84,11 @@ impl<S: Semantics> OperationSignature<S> {
 
 /// The changes to the graph that an operation will cause.
 #[derive(derive_more::Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(bound = "S: crate::serde::SemanticsSerde"))]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(bound = "S: crate::serde::SemanticsSerde")
+)]
 pub struct AbstractOutputChanges<S: Semantics> {
     /// New nodes that are guaranteed to be created with a value of the given type.
     pub new_nodes: HashMap<AbstractOutputNodeMarker, S::NodeAbstract>,

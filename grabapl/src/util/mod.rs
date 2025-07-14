@@ -1,8 +1,8 @@
-use std::fmt::Display;
-use std::ops::Deref;
 use derive_more::{From, Into};
 use internment::Intern;
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
+use std::ops::Deref;
 
 pub mod bimap;
 
@@ -45,7 +45,6 @@ impl<'de> Deserialize<'de> for InternString {
         Ok(InternString(interned_string))
     }
 }
-
 
 // TODO: In general, consider if we really want a global interning pool for strings that is non-droppable (i.e., causes leaks).
 //  I think it's fine, because it's essentially just for variable names.

@@ -1,9 +1,9 @@
 mod util;
 
 use grabapl::operation::builder::{BuilderOpLike, OperationBuilder};
+use grabapl::operation::run_from_concrete;
 use grabapl::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
 use grabapl::{OperationContext, Semantics};
-use grabapl::operation::run_from_concrete;
 use util::semantics::*;
 
 #[cfg(feature = "serde")]

@@ -10,15 +10,15 @@ use crate::operation::{
     run_operation,
 };
 use crate::semantics::{AbstractGraph, ConcreteGraph};
-use crate::util::{log, InternString};
+use crate::util::{InternString, log};
 use crate::{
     NodeKey, OperationContext, OperationId, Semantics, SubstMarker, interned_string_newtype,
 };
 use derive_more::with_trait::From;
 use internment::Intern;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
-use serde::{Deserialize, Serialize};
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
@@ -159,7 +159,11 @@ impl AbstractOperationArgument {
 }
 
 #[derive(derive_more::Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(bound = "S: crate::serde::SemanticsSerde"))]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(bound = "S: crate::serde::SemanticsSerde")
+)]
 pub enum OpLikeInstruction<S: Semantics> {
     #[debug("Builtin(???)")]
     Builtin(S::BuiltinOperation),
@@ -180,7 +184,11 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for OpLik
 }
 
 #[derive(derive_more::Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(bound = "S: crate::serde::SemanticsSerde"))]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(bound = "S: crate::serde::SemanticsSerde")
+)]
 pub enum Instruction<S: Semantics> {
     #[debug("OpLike({_0:#?}, {_1:#?})")]
     OpLike(OpLikeInstruction<S>, AbstractOperationArgument),
@@ -224,7 +232,11 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Instr
 }
 
 #[derive(derive_more::Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(bound = "S: crate::serde::SemanticsSerde"))]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(bound = "S: crate::serde::SemanticsSerde")
+)]
 pub struct QueryInstructions<S: Semantics> {
     // TODO: does it make sense to rename these? true_branch and false_branch?
     #[debug("[{}]", taken.iter().map(|(opt, inst)| format!("({opt:#?}, {:#?})", inst)).collect::<Vec<_>>().join(", "))]
@@ -266,7 +278,11 @@ impl AbstractUserDefinedOperationOutput {
 }
 
 // A 'custom'/user-defined operation
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(bound = "S: crate::serde::SemanticsSerde"))]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(bound = "S: crate::serde::SemanticsSerde")
+)]
 pub struct UserDefinedOperation<S: Semantics> {
     pub parameter: OperationParameter<S>,
     // cached signature. there is definitely some duplicated information here.

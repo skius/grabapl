@@ -2,14 +2,14 @@ use crate::graph::GraphTrait;
 use crate::operation::{OperationError, OperationResult};
 use crate::semantics::AbstractGraph;
 use crate::util::bimap::BiMap;
-use crate::util::{log, InternString};
+use crate::util::{InternString, log};
 use crate::{NodeKey, Semantics, SubstMarker, interned_string_newtype};
 use derive_more::From;
 use internment::Intern;
 use petgraph::visit::UndirectedAdaptor;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
 // renamed.
@@ -22,8 +22,11 @@ pub enum OperationParameterError {
     ContextNodeNotConnected(SubstMarker),
 }
 
-
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(bound = "S: crate::serde::SemanticsSerde"))]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(bound = "S: crate::serde::SemanticsSerde")
+)]
 pub struct OperationParameter<S: Semantics> {
     /// The ordered input nodes that must be explicitly selected.
     pub explicit_input_nodes: Vec<SubstMarker>,

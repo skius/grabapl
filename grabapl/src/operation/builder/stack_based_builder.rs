@@ -167,7 +167,8 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
                 this.handle_operation(&mut builder.data, Some(output_name), builder_op_like, args)?;
             }
             BI::StartQuery(..) => {
-                let (query_frame, branches_frame) = QueryFrame::new(&this.current_state, instruction)?;
+                let (query_frame, branches_frame) =
+                    QueryFrame::new(&this.current_state, instruction)?;
 
                 builder.push_frame(query_frame);
                 builder.push_frame(branches_frame);
@@ -292,16 +293,18 @@ impl<S: Semantics> BranchesFrame<S> {
 
         if let Some(branch) = this.currently_entered_branch
             && builder
-            .return_stack
-            .top_is::<CollectingInstructionsFrame<S>>()
+                .return_stack
+                .top_is::<CollectingInstructionsFrame<S>>()
         {
             if branch {
                 // We are in the true branch
-                let branch_frame: CollectingInstructionsFrame<S> = builder.return_stack.expect_pop();
+                let branch_frame: CollectingInstructionsFrame<S> =
+                    builder.return_stack.expect_pop();
                 this.true_branch = Some(branch_frame);
             } else {
                 // We are in the false branch
-                let branch_frame: CollectingInstructionsFrame<S> = builder.return_stack.expect_pop();
+                let branch_frame: CollectingInstructionsFrame<S> =
+                    builder.return_stack.expect_pop();
                 this.false_branch = Some(branch_frame);
             }
             this.currently_entered_branch = None;
@@ -329,8 +332,9 @@ impl<S: Semantics> BranchesFrame<S> {
                     ));
                 }
                 // We enter the false branch
-                let false_frame =
-                    CollectingInstructionsFrame::from_state(this.initial_false_branch_state.clone());
+                let false_frame = CollectingInstructionsFrame::from_state(
+                    this.initial_false_branch_state.clone(),
+                );
                 this.currently_entered_branch = Some(false);
                 builder.push_frame(false_frame);
             }
@@ -349,7 +353,9 @@ impl<S: Semantics> BranchesFrame<S> {
     }
 
     fn into_merged_state_and_query_instructions(
-        self, default_true_state: &IntermediateState<S>, default_false_state: &IntermediateState<S>,
+        self,
+        default_true_state: &IntermediateState<S>,
+        default_false_state: &IntermediateState<S>,
     ) -> Result<(IntermediateState<S>, QueryInstructions<S>), BuilderError> {
         let true_branch_state_ref = self
             .true_branch
@@ -453,8 +459,11 @@ impl<S: Semantics> QueryFrame<S> {
         // we need to handle everything that happens at the end of a query frame - i.e., merging states
         let branches_frame: BranchesFrame<S> = builder.return_stack.expect_pop();
 
-        let (merged_branch, query_instructions) =
-            branches_frame.into_merged_state_and_query_instructions(&self.before_branches_state, &self.before_branches_state)?;
+        let (merged_branch, query_instructions) = branches_frame
+            .into_merged_state_and_query_instructions(
+                &self.before_branches_state,
+                &self.before_branches_state,
+            )?;
 
         let outer_frame: &mut CollectingInstructionsFrame<S> = builder.stack.expect_mut();
         outer_frame.current_state = merged_branch;
@@ -812,10 +821,8 @@ impl<S: Semantics> BuildingShapeQueryFrame<S> {
             self.true_branch_state.clone(),
         );
 
-        let branches_frame = BranchesFrame::new(
-            self.true_branch_state.clone(),
-            self.initial_state.clone(),
-        );
+        let branches_frame =
+            BranchesFrame::new(self.true_branch_state.clone(), self.initial_state.clone());
 
         Ok((built_frame, branches_frame))
     }
@@ -885,8 +892,11 @@ impl<S: Semantics> BuiltShapeQueryFrame<S> {
 
         let branches_frame: BranchesFrame<S> = builder.return_stack.expect_pop();
 
-        let (merged_branch, query_instructions) =
-            branches_frame.into_merged_state_and_query_instructions(&self.initial_true_branch_state, &self.initial_false_branch_state)?;
+        let (merged_branch, query_instructions) = branches_frame
+            .into_merged_state_and_query_instructions(
+                &self.initial_true_branch_state,
+                &self.initial_false_branch_state,
+            )?;
 
         let outer_frame: &mut CollectingInstructionsFrame<S> = builder.stack.expect_mut();
         outer_frame.current_state = merged_branch;
@@ -1084,9 +1094,7 @@ impl<'a, S: Semantics> Builder<'a, S> {
                 BuilderShowData::CollectingInstructions(&frame.current_state)
             }
             Some(Frame::Query(frame)) => BuilderShowData::QueryFrame(&frame.before_branches_state),
-            Some(Frame::Branches(frame)) => {
-                BuilderShowData::Other("BranchesFrame".to_string())
-            }
+            Some(Frame::Branches(frame)) => BuilderShowData::Other("BranchesFrame".to_string()),
             Some(Frame::Return(frame)) => {
                 BuilderShowData::ReturnFrame(&frame.instr_frame.current_state)
             }

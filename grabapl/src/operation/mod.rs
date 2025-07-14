@@ -16,13 +16,13 @@ use crate::util::log;
 use crate::{Graph, NodeKey, SubstMarker};
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
+use serde::{Deserialize, Serialize};
 use signature::parameter::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument,
     OperationOutput, OperationParameter, ParameterSubstitution,
 };
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub trait BuiltinOperation: Debug {
@@ -41,7 +41,11 @@ pub trait BuiltinOperation: Debug {
 }
 
 /// Contains available operations
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(bound = "S: crate::serde::SemanticsSerde"))]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(bound = "S: crate::serde::SemanticsSerde")
+)]
 pub struct OperationContext<S: Semantics> {
     builtins: HashMap<OperationId, S::BuiltinOperation>,
     libbuiltins: HashMap<OperationId, LibBuiltinOperation<S>>,

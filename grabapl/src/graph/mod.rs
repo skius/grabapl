@@ -1,12 +1,12 @@
 use derive_more::From;
 use petgraph::Direction;
 use petgraph::graphmap::{DiGraphMap, GraphMap};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::RandomState;
-use serde::{Deserialize, Serialize};
-use serde::de::DeserializeOwned;
 
 pub mod dot;
 
@@ -91,7 +91,10 @@ pub enum EdgeInsertionOrder {
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Graph<NodeAttr, EdgeAttr> {
-    #[cfg_attr(feature = "serde", serde(bound = "EdgeAttr: Serialize + Clone + DeserializeOwned"))]
+    #[cfg_attr(
+        feature = "serde",
+        serde(bound = "EdgeAttr: Serialize + Clone + DeserializeOwned")
+    )]
     pub(crate) graph: DiGraphMap<NodeKey, EdgeAttribute<EdgeAttr>, RandomState>,
     pub(crate) max_node_key: NodeKey,
     pub(crate) node_attr_map: HashMap<NodeKey, NodeAttribute<NodeAttr>>,

@@ -5,12 +5,16 @@ use crate::operation::signature::parameter::{
 use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
 use crate::semantics::{AbstractGraph, ConcreteGraph, ConcreteToAbstract};
 use crate::{Semantics, SubstMarker};
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Operations that are available for every semantics.
 #[derive(derive_more::Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(bound = "S: crate::serde::SemanticsSerde"))]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(bound = "S: crate::serde::SemanticsSerde")
+)]
 pub enum LibBuiltinOperation<S: Semantics> {
     #[debug("AddNode")]
     AddNode { value: S::NodeConcrete },

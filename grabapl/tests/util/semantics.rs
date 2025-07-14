@@ -1,3 +1,4 @@
+use derive_more::From;
 use grabapl::operation::BuiltinOperation;
 use grabapl::operation::query::{BuiltinQuery, ConcreteQueryOutput};
 use grabapl::operation::signature::parameter::{
@@ -8,10 +9,9 @@ use grabapl::semantics::{
     AbstractGraph, AbstractJoin, AbstractMatcher, ConcreteGraph, ConcreteToAbstract,
 };
 use grabapl::{Semantics, SubstMarker};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::Deref;
-use derive_more::From;
-use serde::{Deserialize, Serialize};
 
 pub struct TestSemantics;
 
@@ -453,7 +453,6 @@ impl Deref for MyOrdering {
     }
 }
 
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum TestQuery {
@@ -543,8 +542,6 @@ impl Semantics for TestSemantics {
     type BuiltinOperation = TestOperation;
     type BuiltinQuery = TestQuery;
 }
-
-
 
 // additions for serde support
 #[cfg(feature = "serde")]

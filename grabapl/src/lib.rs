@@ -2,10 +2,11 @@ mod experimental;
 pub mod graph;
 pub mod operation;
 pub mod semantics;
-pub mod util;
 #[cfg(feature = "serde")]
 mod serde;
+pub mod util;
 
+use crate::util::InternString;
 use ::serde::{Deserialize, Serialize};
 use derive_more::From;
 pub use graph::DotCollector;
@@ -17,7 +18,6 @@ pub use graph::OperationContext;
 pub use graph::OperationId;
 use internment::Intern;
 pub use semantics::Semantics;
-use crate::util::InternString;
 
 /// A marker for substitution in the graph.
 ///

@@ -1592,7 +1592,6 @@ impl<S: Semantics> IntermediateState<S> {
                 // we don't keep track of it, so better remove it from the graph
                 self.graph.remove_node(node_key);
             }
-
         }
         for node_key in operation_output.removed_nodes {
             // remove the node from the mapping
