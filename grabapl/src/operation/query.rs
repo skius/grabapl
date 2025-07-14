@@ -51,6 +51,16 @@ pub struct GraphShapeQuery<S: Semantics> {
     pub node_keys_to_shape_idents: BiMap<NodeKey, ShapeNodeIdentifier>,
 }
 
+impl<S: Semantics> Clone for GraphShapeQuery<S> {
+    fn clone(&self) -> Self {
+        GraphShapeQuery {
+            parameter: self.parameter.clone(),
+            expected_graph: self.expected_graph.clone(),
+            node_keys_to_shape_idents: self.node_keys_to_shape_idents.clone(),
+        }
+    }
+}
+
 pub struct ConcreteShapeQueryResult {
     /// The `NodeKey`s are the concrete keys of the real graph
     /// Some(mapping) if the shape query matched, None if it did not match.

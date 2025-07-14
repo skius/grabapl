@@ -914,7 +914,7 @@ fn recursion_breaks_when_modification_changes_after_use() {
         )
         .unwrap();
     // now, change the abstract value of p0 to String
-    builder
+    let res = builder
         .add_operation(
             BuilderOpLike::Builtin(TestOperation::SetTo {
                 op_typ: NodeType::Object,
@@ -922,13 +922,11 @@ fn recursion_breaks_when_modification_changes_after_use() {
                 value: NodeValue::String("Changed".to_string()),
             }),
             vec![p0],
-        )
-        .unwrap();
-    // ^ this is invalid.
-    // let res = builder.build(0);
-    // res.unwrap();
-    // ^ but we only crash here. Since we don't recompute the entire function with the added operation until then.
-    // TODO: recompute it after every operation?
+        );
+    assert!(
+        res.is_err(),
+        "Expected changing the abstract value of p0 to fail, since it is used in a recursive call after which it is used as an integer"
+    );
 }
 
 #[test_log::test]
@@ -1614,7 +1612,7 @@ fn delete_node_after_writing_to_it() {
 #[test_log::test]
 fn new_builder_test() {
     let op_ctx = OperationContext::<TestSemantics>::new();
-    let mut builder = stack_based_builder::Builder::new(&op_ctx);
+    let mut builder = stack_based_builder::Builder::new(&op_ctx, 0);
 
     use grabapl::operation::builder::BuilderInstruction as BI;
 

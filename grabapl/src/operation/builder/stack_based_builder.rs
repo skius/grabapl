@@ -45,6 +45,14 @@ struct BuildingParameterFrame<S: Semantics> {
     parameter_builder: OperationParameterBuilder<S>,
 }
 
+impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for BuildingParameterFrame<S> {
+    fn clone(&self) -> Self {
+        BuildingParameterFrame {
+            parameter_builder: self.parameter_builder.clone(),
+        }
+    }
+}
+
 impl<S: Semantics> BuildingParameterFrame<S> {
     fn new() -> Self {
         BuildingParameterFrame {
@@ -93,6 +101,15 @@ impl<S: Semantics> BuildingParameterFrame<S> {
 struct CollectingInstructionsFrame<S: Semantics> {
     instructions: UDInstructionsWithMarker<S>,
     current_state: IntermediateState<S>,
+}
+
+impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for CollectingInstructionsFrame<S> {
+    fn clone(&self) -> Self {
+        CollectingInstructionsFrame {
+            instructions: self.instructions.clone(),
+            current_state: self.current_state.clone(),
+        }
+    }
 }
 
 impl<S: Semantics> CollectingInstructionsFrame<S> {
@@ -193,14 +210,7 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
                 builder.push_frame(shape_query_frame);
             }
             _ => {
-                // put it back - actually no. should leave it out? since we haven't changed the frame, and thus we'd just get called again and again.
-                // actually, it doesn't matter, since we return an error.
-                let err = Err(report!(BuilderError::UnexpectedInstruction))
-                    .attach_printable_lazy(|| {
-                        format!("Unexpected instruction in CollectingInstructionsFrame: {:?}", &instruction)
-                    });
-                let _ = instruction_opt.insert(instruction);
-                return err;
+                bail_unexpected_instruction!(instruction, instruction_opt, "CollectingInstructionsFrame");
             },
         }
 
@@ -209,7 +219,7 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
 
     pub fn handle_operation(
         &mut self,
-        builder: &mut BuilderData<S>,
+        builder_data: &mut BuilderData<S>,
         output_name: Option<AbstractOperationResultMarker>,
         op_like: BuilderOpLike<S>,
         args: Vec<AbstractNodeId>,
@@ -222,14 +232,16 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
         // TODO: get an actual recursion op
         //  hmm. Maybe we could do this by having a running signature (well, AbstractOutputChanges), and OperationParameter?
         //  that's all that's needed for apply_abstract. And it doesn't require clone on operations!
-        let self_op_unfinished = UserDefinedOperation::new_noop();
-        let op = op_like.as_operation(builder.op_ctx, &self_op_unfinished)
+        //  buuut the thing were a future change affects us will not work anymore. unless the wrapper (the thing that handles the builder)
+        //  still builds and caches an operation before every call. that might actually be fine, I guess.
+        // let self_op_unfinished = UserDefinedOperation::new_noop();
+        let self_op_unfinished = &builder_data.partial_self_op;
+        let op = op_like.as_operation(builder_data.op_ctx, &self_op_unfinished)
             .change_context(BuilderError::OutsideError)?;
-        let abstract_arg = self.current_state.interpret_op(builder.op_ctx, output_name_forced_marker, op, args)
+        let abstract_arg = self.current_state.interpret_op(builder_data.op_ctx, output_name_forced_marker, op, args)
             .change_context(BuilderError::OutsideError)?;
 
-        // TODO: pass self_op_id
-        let op_like_instr = op_like.to_op_like_instruction(0);
+        let op_like_instr = op_like.to_op_like_instruction(builder_data.self_op_id);
 
         self.instructions.push(
             (
@@ -252,6 +264,19 @@ struct QueryFrame<S: Semantics> {
     true_instructions: Option<CollectingInstructionsFrame<S>>,
     false_instructions: Option<CollectingInstructionsFrame<S>>,
     currently_entered_branch: Option<bool>, // true for true branch, false for false branch
+}
+
+impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for QueryFrame<S> {
+    fn clone(&self) -> Self {
+        QueryFrame {
+            query: self.query.clone(),
+            abstract_arg: self.abstract_arg.clone(),
+            before_branches_state: self.before_branches_state.clone(),
+            true_instructions: self.true_instructions.clone(),
+            false_instructions: self.false_instructions.clone(),
+            currently_entered_branch: self.currently_entered_branch,
+        }
+    }
 }
 
 impl<S: Semantics> QueryFrame<S> {
@@ -327,13 +352,13 @@ impl<S: Semantics> QueryFrame<S> {
                 this.currently_entered_branch = Some(false);
                 builder.push_frame(false_frame);
             }
-            BI::EndQuery => {
+            BI::EndQuery | BI::Finalize => {
                 // We finish the query, and give the outer frame all our information.
                 let query_frame: QueryFrame<S> = builder.stack.expect_pop();
                 query_frame.handle_query_end(builder)?;
             }
             _ => {
-                bail!(BuilderError::UnexpectedInstruction);
+                bail_unexpected_instruction!(instruction, instruction_opt, "QueryFrame");
             }
         }
 
@@ -376,6 +401,14 @@ struct WrapperReturnFrame<S: Semantics> {
     phantom: PhantomData<S>,
 }
 
+impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for WrapperReturnFrame<S> {
+    fn clone(&self) -> Self {
+        WrapperReturnFrame {
+            phantom: PhantomData,
+        }
+    }
+}
+
 impl<S: Semantics> WrapperReturnFrame<S> {
     pub fn new() -> Self {
         Self {
@@ -404,7 +437,18 @@ struct ReturnFrame<S: Semantics> {
     // TODO: remove these?
     return_nodes: HashMap<AbstractNodeId, (AbstractOutputNodeMarker, S::NodeAbstract)>,
     return_edges: HashMap<(AbstractNodeId, AbstractNodeId), S::EdgeAbstract>,
+}
 
+impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for ReturnFrame<S> {
+    fn clone(&self) -> Self {
+        ReturnFrame {
+            instr_frame: self.instr_frame.clone(),
+            signature: self.signature.clone(),
+            abstract_ud_output: self.abstract_ud_output.clone(),
+            return_nodes: self.return_nodes.clone(),
+            return_edges: self.return_edges.clone(),
+        }
+    }
 }
 
 impl<S: Semantics> ReturnFrame<S> {
@@ -562,6 +606,19 @@ struct BuildingShapeQueryFrame<S: Semantics> {
     true_branch_state: IntermediateState<S>,
 }
 
+impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for BuildingShapeQueryFrame<S> {
+    fn clone(&self) -> Self {
+        BuildingShapeQueryFrame {
+            parameter: self.parameter.clone(),
+            abstract_arg: self.abstract_arg.clone(),
+            gsq_node_keys_to_shape_idents: self.gsq_node_keys_to_shape_idents.clone(),
+            query_marker: self.query_marker,
+            initial_state: self.initial_state.clone(),
+            true_branch_state: self.true_branch_state.clone(),
+        }
+    }
+}
+
 impl<S: Semantics> BuildingShapeQueryFrame<S> {
     pub fn new(query_marker: AbstractOperationResultMarker, initial_state: IntermediateState<S>) -> Self {
         let true_branch_state = initial_state.clone();
@@ -649,6 +706,21 @@ struct BuiltShapeQueryFrame<S: Semantics> {
     true_instructions: Option<CollectingInstructionsFrame<S>>,
     false_instructions: Option<CollectingInstructionsFrame<S>>,
     currently_entered_branch: Option<bool>, // true for true branch, false for false branch
+}
+
+impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for BuiltShapeQueryFrame<S> {
+    fn clone(&self) -> Self {
+        BuiltShapeQueryFrame {
+            query_marker: self.query_marker,
+            query: self.query.clone(),
+            abstract_arg: self.abstract_arg.clone(),
+            initial_false_branch_state: self.initial_false_branch_state.clone(),
+            initial_true_branch_state: self.initial_true_branch_state.clone(),
+            true_instructions: self.true_instructions.clone(),
+            false_instructions: self.false_instructions.clone(),
+            currently_entered_branch: self.currently_entered_branch,
+        }
+    }
 }
 
 impl<S: Semantics> BuiltShapeQueryFrame<S> {
@@ -771,8 +843,30 @@ enum Frame<S: Semantics> {
     WrapperReturn(WrapperReturnFrame<S>),
 }
 
+impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for Frame<S> {
+    fn clone(&self) -> Self {
+        match self {
+            Frame::BuildingParameter(frame) => Frame::BuildingParameter(frame.clone()),
+            Frame::CollectingInstructions(frame) => Frame::CollectingInstructions(frame.clone()),
+            Frame::Query(frame) => Frame::Query(frame.clone()),
+            Frame::BuildingShapeQuery(frame) => Frame::BuildingShapeQuery(frame.clone()),
+            Frame::BuiltShapeQuery(frame) => Frame::BuiltShapeQuery(frame.clone()),
+            Frame::Return(frame) => Frame::Return(frame.clone()),
+            Frame::WrapperReturn(frame) => Frame::WrapperReturn(frame.clone()),
+        }
+    }
+}
+
 struct FrameStack<S: Semantics> {
     frames: Vec<Frame<S>>,
+}
+
+impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for FrameStack<S> {
+    fn clone(&self) -> Self {
+        FrameStack {
+            frames: self.frames.clone(),
+        }
+    }
 }
 
 impl<S: Semantics> FrameStack<S> {
@@ -839,20 +933,21 @@ impl<S: Semantics> FrameStack<S> {
 
 struct BuiltData<S: Semantics> {
     parameter: Option<OperationParameter<S>>,
-    intermediate_state: Option<IntermediateState<S>>,
+}
+
+impl<S: Semantics> Clone for BuiltData<S> {
+    fn clone(&self) -> Self {
+        BuiltData {
+            parameter: self.parameter.clone(),
+        }
+    }
 }
 
 impl<S: Semantics> BuiltData<S> {
     pub fn new() -> Self {
         BuiltData {
             parameter: None,
-            intermediate_state: None,
         }
-    }
-
-    pub fn provide_parameter(&mut self, parameter: OperationParameter<S>) {
-        self.intermediate_state = Some(IntermediateState::from_param(&parameter));
-        self.parameter = Some(parameter);
     }
 }
 
@@ -860,14 +955,27 @@ struct BuilderData<'a, S: Semantics> {
     op_ctx: &'a OperationContext<S>,
     self_op_id: OperationId,
     built: BuiltData<S>,
+    partial_self_op: UserDefinedOperation<S>,
+}
+
+impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for BuilderData<'a, S> {
+    fn clone(&self) -> Self {
+        BuilderData {
+            op_ctx: self.op_ctx,
+            built: self.built.clone(),
+            self_op_id: self.self_op_id,
+            partial_self_op: self.partial_self_op.clone(),
+        }
+    }
 }
 
 impl<'a, S: Semantics> BuilderData<'a, S> {
-    pub fn new(op_ctx: &'a OperationContext<S>) -> Self {
+    pub fn new(op_ctx: &'a OperationContext<S>, self_op_id: OperationId) -> Self {
         BuilderData {
             op_ctx,
             built: BuiltData::new(),
-            self_op_id: 0,
+            self_op_id,
+            partial_self_op: UserDefinedOperation::new_noop(),
         }
     }
 }
@@ -878,11 +986,21 @@ pub struct Builder<'a, S: Semantics> {
     return_stack: FrameStack<S>,
 }
 
+impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for Builder<'a, S> {
+    fn clone(&self) -> Self {
+        Builder {
+            data: self.data.clone(),
+            stack: self.stack.clone(),
+            return_stack: self.return_stack.clone(),
+        }
+    }
+}
+
 
 impl<'a, S: Semantics> Builder<'a, S> {
-    pub fn new(op_ctx: &'a OperationContext<S>) -> Self {
+    pub fn new(op_ctx: &'a OperationContext<S>, self_op_id: OperationId) -> Self {
         Builder {
-            data: BuilderData::new(op_ctx),
+            data: BuilderData::new(op_ctx, self_op_id),
             stack: FrameStack::new_initial(),
             return_stack: FrameStack::new_empty(),
         }
@@ -924,6 +1042,10 @@ impl<'a, S: Semantics> Builder<'a, S> {
     /// Note: Should only be called before issuing recursion instructions.
     pub fn update_self_op_id(&mut self, self_op_id: OperationId) {
         self.data.self_op_id = self_op_id;
+    }
+
+    pub fn update_partial_self_op(&mut self, partial_self_op: UserDefinedOperation<S>) {
+        self.data.partial_self_op = partial_self_op;
     }
 
     pub fn consume(&mut self, instruction: BuilderInstruction<S>) -> Result<(), BuilderError> {
@@ -1121,14 +1243,18 @@ pub struct OperationBuilder2<'a, S: Semantics> {
     op_ctx: &'a OperationContext<S>,
     instructions: Vec<BuilderInstruction<S>>,
     active: Builder<'a, S>,
+    self_op_id: OperationId,
 }
 
 impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBuilder2<'a, S> {
     pub fn new(op_ctx: &'a OperationContext<S>) -> Self {
+        // TODO: add self_op_id to parameters
+        let self_op_id = 0;
         Self {
             instructions: Vec::new(),
             op_ctx,
-            active: Builder::new(op_ctx),
+            active: Builder::new(op_ctx, self_op_id),
+            self_op_id,
         }
     }
 
@@ -1307,36 +1433,69 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
 
     // TODO: This should run further post processing checks.
     //  Stuff like Context nodes must be connected, etc.
+    // TODO: remove self_op_id since that is actually not used here.
     pub fn build(
         &mut self,
         self_op_id: OperationId,
     ) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
-        let res = self.active.build();
-        if let Ok(op) = res {
-            return Ok(op);
-        }
-
-        // if we failed, we need to rebuild the active builder from the instructions
-        self.rebuild_active_from_instructions();
+        self.active.update_self_op_id(self_op_id);
+        // build on a clone
+        let res = self.active.clone().build();
         res.change_context(OperationBuilderError::NewBuilderError)
     }
 
     fn push_instruction(&mut self, instruction: BuilderInstruction<S>) -> Result<(), OperationBuilderError> {
-        self.instructions.push(instruction.clone());
-        let res =self.active.consume(instruction).change_context(OperationBuilderError::NewBuilderError);
+        let mut new_builder_stage_1 = self.active.clone();
+        let res = new_builder_stage_1.consume(instruction.clone());
         if res.is_err() {
-           // rollback
-            self.instructions.pop();
-            self.rebuild_active_from_instructions();
+            // We have not modified our state, so we can just early-exit.
+            return res.change_context(OperationBuilderError::NewBuilderError);
+        }
+        // we know that running the instruction once did not fail. However, in presence of recursion,
+        // it may fail only once a prior recursive call 'sees' the new instruction.
+
+        let new_self_op = new_builder_stage_1.build().change_context(OperationBuilderError::NewBuilderError)?;
+        // now that we have the new self op, let's try the instruction again.
+        let mut new_builder_stage_2 = self.build_builder_from_scratch_with_self_op(new_self_op)
+            .change_context(OperationBuilderError::NewBuilderError)?;
+        new_builder_stage_2.consume(instruction.clone())
+            .change_context(OperationBuilderError::NewBuilderError)?;
+        // TODO: add test that checks if maybe we change semantics by replaying all instructions with a different self op?
+        // at this point we know the building worked, so we can safely update our active builder.
+        // TODO: would be nice if we had an Eq constraint on BuiltinOperations, so that we could check that the result of building the stage 2 UDOp
+        //  is the same as `new_self_op`. Then we know nothing changed semantically.
+
+        self.active = new_builder_stage_2;
+        self.instructions.push(instruction.clone());
+        Ok(())
+
+        // before proper recursion:
+        // self.instructions.push(instruction.clone());
+        // let res =self.active.consume(instruction).change_context(OperationBuilderError::NewBuilderError);
+        // if res.is_err() {
+        //    // rollback
+        //     self.instructions.pop();
+        //     self.rebuild_active_from_instructions();
+        // }
+        //
+        // res
+    }
+
+    fn build_builder_from_scratch_with_self_op(&self, self_op: UserDefinedOperation<S>) -> Result<Builder<'a, S>, BuilderError> {
+        let mut builder = Builder::new(self.op_ctx, self.self_op_id);
+        builder.update_partial_self_op(self_op);
+        for instruction in &self.instructions {
+            builder.consume(instruction.clone())?;
         }
 
-        res
+        Ok(builder)
     }
 
     fn rebuild_active_from_instructions(&mut self) {
-        self.active = Builder::new(self.op_ctx);
-        for instruction in &self.instructions {
-            self.active.consume(instruction.clone()).expect("internal error: should not fail to consume previously fine instruction");
+        let instrs = std::mem::take(&mut self.instructions);
+        self.active = Builder::new(self.op_ctx, self.self_op_id);
+        for instruction in instrs {
+            self.push_instruction(instruction).expect("Rebuilding active builder from instructions should not fail");
         }
     }
 }

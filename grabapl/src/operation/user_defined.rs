@@ -163,6 +163,16 @@ pub enum OpLikeInstruction<S: Semantics> {
     Operation(OperationId),
 }
 
+impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for OpLikeInstruction<S> {
+    fn clone(&self) -> Self {
+        match self {
+            OpLikeInstruction::Builtin(op) => OpLikeInstruction::Builtin(op.clone()),
+            OpLikeInstruction::LibBuiltin(op) => OpLikeInstruction::LibBuiltin(op.clone()),
+            OpLikeInstruction::Operation(id) => OpLikeInstruction::Operation(*id),
+        }
+    }
+}
+
 #[derive(derive_more::Debug)]
 pub enum Instruction<S: Semantics> {
     #[debug("OpLike({_0:#?}, {_1:#?})")]
@@ -188,6 +198,22 @@ pub enum Instruction<S: Semantics> {
     },
 }
 
+impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Instruction<S> {
+    fn clone(&self) -> Self {
+        match self {
+            Instruction::OpLike(oplike, arg) => Instruction::OpLike(oplike.clone(), arg.clone()),
+            Instruction::BuiltinQuery(query, arg, query_instr) => {
+                Instruction::BuiltinQuery(query.clone(), arg.clone(), query_instr.clone())
+            }
+            Instruction::ShapeQuery(query, arg, query_instr) => {
+                Instruction::ShapeQuery(query.clone(), arg.clone(), query_instr.clone())
+            }
+            Instruction::RenameNode { old, new } => {
+                Instruction::RenameNode { old: *old, new: *new }
+            }
+        }
+    }}
+
 #[derive(derive_more::Debug)]
 pub struct QueryInstructions<S: Semantics> {
     // TODO: does it make sense to rename these? true_branch and false_branch?
@@ -197,6 +223,16 @@ pub struct QueryInstructions<S: Semantics> {
     pub not_taken: Vec<InstructionWithResultMarker<S>>,
 }
 
+impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for QueryInstructions<S> {
+    fn clone(&self) -> Self {
+        QueryInstructions {
+            taken: self.taken.clone(),
+            not_taken: self.not_taken.clone(),
+        }
+    }
+}
+
+
 pub type InstructionWithResultMarker<S> = (Option<AbstractOperationResultMarker>, Instruction<S>);
 
 // TODO: We probably want each instruction to statically know which nodes it uses in a call. We need this because
@@ -205,6 +241,7 @@ pub type InstructionWithResultMarker<S> = (Option<AbstractOperationResultMarker>
 //  This requires thinking about how to keep statically defined mappings in check when running the operation concretely.
 //  ==> see big-picture-todos.md for a solution. TL;DR: store implicitly matched context nodes in the form of an explicit mapping from AbstractNodeId to the context nodes.
 
+#[derive(Clone)]
 pub struct AbstractUserDefinedOperationOutput {
     // TODO: can probably remove S::NodeAbstract here since it's in the signature.
     pub new_nodes: HashMap<AbstractNodeId, AbstractOutputNodeMarker>,
@@ -227,6 +264,17 @@ pub struct UserDefinedOperation<S: Semantics> {
     pub instructions: Vec<InstructionWithResultMarker<S>>,
     // TODO: need to define output changes.
     pub output_changes: AbstractUserDefinedOperationOutput,
+}
+
+impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for UserDefinedOperation<S> {
+    fn clone(&self) -> Self {
+        UserDefinedOperation {
+            parameter: self.parameter.clone(),
+            signature: self.signature.clone(),
+            instructions: self.instructions.clone(),
+            output_changes: self.output_changes.clone(),
+        }
+    }
 }
 
 // TODO: use a private runner struct that keeps all the necessary mappings on self for easier methods.
