@@ -6,10 +6,11 @@ use serde::{Deserialize, Serialize};
 
 pub mod bimap;
 
+// newtype necessary for to Serialize/Deserialize support.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy, From)]
-pub struct MyInternString(Intern<String>);
+pub struct InternString(Intern<String>);
 
-impl Deref for MyInternString {
+impl Deref for InternString {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -17,14 +18,14 @@ impl Deref for MyInternString {
     }
 }
 
-impl Display for MyInternString {
+impl Display for InternString {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for MyInternString {
+impl Serialize for InternString {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -34,14 +35,14 @@ impl Serialize for MyInternString {
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for MyInternString {
+impl<'de> Deserialize<'de> for InternString {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
         let interned_string: Intern<String> = s.into();
-        Ok(MyInternString(interned_string))
+        Ok(InternString(interned_string))
     }
 }
 

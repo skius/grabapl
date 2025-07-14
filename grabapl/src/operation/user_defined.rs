@@ -10,7 +10,7 @@ use crate::operation::{
     run_operation,
 };
 use crate::semantics::{AbstractGraph, ConcreteGraph};
-use crate::util::{log, MyInternString};
+use crate::util::{log, InternString};
 use crate::{
     NodeKey, OperationContext, OperationId, Semantics, SubstMarker, interned_string_newtype,
 };
@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum AbstractOperationResultMarker {
-    Custom(MyInternString),
+    Custom(InternString),
     // NOTE: this may not be created by the user! since this is an unstable index, if the user
     // reorders operations, this marker may suddenly point to a different operation result.
     // Custom markers must always be used for arguments!
@@ -39,7 +39,7 @@ interned_string_newtype!(
 #[derive(derive_more::Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
 #[debug("N({_0})")]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct NamedMarker(MyInternString);
+pub struct NamedMarker(InternString);
 interned_string_newtype!(NamedMarker);
 
 /// Identifies a node in the user defined operation view.

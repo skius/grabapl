@@ -5,7 +5,7 @@ use crate::operation::signature::parameter::{
 };
 use crate::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics};
 use crate::util::bimap::BiMap;
-use crate::util::{log, MyInternString};
+use crate::util::{log, InternString};
 use crate::{NodeKey, SubstMarker, interned_string_newtype};
 use derive_more::From;
 use derive_more::with_trait::Into;
@@ -37,7 +37,7 @@ pub struct ConcreteQueryOutput {
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From, Into)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct ShapeNodeIdentifier(MyInternString);
+pub struct ShapeNodeIdentifier(InternString);
 interned_string_newtype!(ShapeNodeIdentifier);
 
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(bound = "S: crate::serde::SemanticsSerde"))]

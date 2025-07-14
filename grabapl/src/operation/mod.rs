@@ -22,6 +22,7 @@ use signature::parameter::{
 };
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub trait BuiltinOperation: Debug {
@@ -40,6 +41,7 @@ pub trait BuiltinOperation: Debug {
 }
 
 /// Contains available operations
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(bound = "S: crate::serde::SemanticsSerde"))]
 pub struct OperationContext<S: Semantics> {
     builtins: HashMap<OperationId, S::BuiltinOperation>,
     libbuiltins: HashMap<OperationId, LibBuiltinOperation<S>>,

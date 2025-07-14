@@ -2,7 +2,7 @@ use crate::graph::GraphTrait;
 use crate::operation::{OperationError, OperationResult};
 use crate::semantics::AbstractGraph;
 use crate::util::bimap::BiMap;
-use crate::util::{log, MyInternString};
+use crate::util::{log, InternString};
 use crate::{NodeKey, Semantics, SubstMarker, interned_string_newtype};
 use derive_more::From;
 use internment::Intern;
@@ -123,7 +123,7 @@ impl ParameterSubstitution {
 #[derive(Debug, Clone, Copy, From, Hash, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum NewNodeMarker {
-    Named(MyInternString),
+    Named(InternString),
     // TODO: hide this
     #[from(ignore)]
     Implicit(u32),
@@ -461,7 +461,7 @@ pub struct OperationArgument<'a> {
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct AbstractOutputNodeMarker(pub MyInternString);
+pub struct AbstractOutputNodeMarker(pub InternString);
 interned_string_newtype!(AbstractOutputNodeMarker);
 
 /// Keeps track of node changes that happened during the operation execution.

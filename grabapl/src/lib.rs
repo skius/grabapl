@@ -17,7 +17,7 @@ pub use graph::OperationContext;
 pub use graph::OperationId;
 use internment::Intern;
 pub use semantics::Semantics;
-use crate::util::MyInternString;
+use crate::util::InternString;
 
 /// A marker for substitution in the graph.
 ///
@@ -25,7 +25,7 @@ use crate::util::MyInternString;
 #[derive(derive_more::Debug, Clone, Copy, PartialEq, Eq, Hash, From)]
 #[debug("P({_0})")]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct SubstMarker(pub MyInternString);
+pub struct SubstMarker(pub InternString);
 interned_string_newtype!(SubstMarker);
 
 // TODO: maybe we could have an input builder? basically we want to have one connected component per input.
