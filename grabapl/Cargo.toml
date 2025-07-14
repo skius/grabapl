@@ -8,22 +8,25 @@ name = "grabapl"
 
 [dependencies]
 #petgraph = { git = "https://github.com/petgraph/petgraph.git", rev = "e2b28e59d0c37a8db9037997e84cc483ca94afc9"}
-petgraph = { path = "../playground/petgraph" }
+petgraph = { path = "../playground/petgraph", features = ["serde-1"] }
 derive_more = { version = "2.0.1", features = ["from", "into", "try_from", "try_into", "debug", "add", "add_assign"]}
 thiserror = "2.0.12"
 internment = "0.8.6"
 log_crate = { version = "0.4", optional = true, package = "log" }
 error-stack = "0.5.0"
+serde = { version = "1.0", features = ["derive", "std"], optional = true }
 
 [dev-dependencies]
 criterion = "0.5.1"
 proptest = "1.6.0"
 rand = "0.9.1"
 test-log = "0.2"
+serde_json = "1.0"
 
 [features]
-default = ["log"]
+default = ["log", "serde"]
 log = ["dep:log_crate"]
+serde = ["dep:serde"]
 
 [[bench]]
 name = "isomorphism_find_single_node"

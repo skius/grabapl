@@ -5,7 +5,7 @@ use crate::operation::signature::parameter::{
 };
 use crate::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics};
 use crate::util::bimap::BiMap;
-use crate::util::log;
+use crate::util::{log, MyInternString};
 use crate::{NodeKey, SubstMarker, interned_string_newtype};
 use derive_more::From;
 use derive_more::with_trait::Into;
@@ -13,6 +13,7 @@ use internment::Intern;
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
 use std::collections::{HashMap, HashSet};
+use serde::{Deserialize, Serialize};
 
 pub trait BuiltinQuery {
     type S: Semantics;
@@ -35,9 +36,11 @@ pub struct ConcreteQueryOutput {
 }
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From, Into)]
-pub struct ShapeNodeIdentifier(Intern<String>);
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct ShapeNodeIdentifier(MyInternString);
 interned_string_newtype!(ShapeNodeIdentifier);
 
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(bound = "S: crate::serde::SemanticsSerde"))]
 pub struct GraphShapeQuery<S: Semantics> {
     // TODO: perhaps we don't need a fullblown OperationParameter here, since we don't really need SubstMarker?
     //  yeah, we really don't want to deal with context graphs here.

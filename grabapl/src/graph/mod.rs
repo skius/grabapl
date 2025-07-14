@@ -5,6 +5,8 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::RandomState;
+use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
 
 pub mod dot;
 
@@ -14,6 +16,7 @@ pub use crate::semantics::Semantics;
 pub use dot::DotCollector;
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct NodeAttribute<NodeAttr> {
     pub node_attr: NodeAttr,
     // Additional attributes can be added here
@@ -26,6 +29,7 @@ impl<NodeAttr> NodeAttribute<NodeAttr> {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct EdgeAttribute<EdgeAttr> {
     pub edge_attr: EdgeAttr,
     // Additional attributes can be added here
@@ -73,6 +77,7 @@ type EdgeOrder = i32;
     From,
 )]
 #[debug("N({_0})")]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct NodeKey(pub u32);
 pub type EdgeKey = (NodeKey, NodeKey);
 
@@ -84,7 +89,9 @@ pub enum EdgeInsertionOrder {
 
 /// A graph with ordered edges and arbitrary associated edge and node data.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Graph<NodeAttr, EdgeAttr> {
+    #[cfg_attr(feature = "serde", serde(bound = "EdgeAttr: Serialize + Clone + DeserializeOwned"))]
     pub(crate) graph: DiGraphMap<NodeKey, EdgeAttribute<EdgeAttr>, RandomState>,
     pub(crate) max_node_key: NodeKey,
     pub(crate) node_attr_map: HashMap<NodeKey, NodeAttribute<NodeAttr>>,

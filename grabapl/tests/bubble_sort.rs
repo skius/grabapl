@@ -30,7 +30,7 @@ fn bubble_sort_op(op_id: OperationId) -> UserDefinedOperation<TestSemantics> {
     builder.enter_true_branch().unwrap();
     // if we have a child, check if p0 > child
     builder
-        .start_query(TestQuery::CmpFstSnd(Greater), vec![p0, child])
+        .start_query(TestQuery::CmpFstSnd(Greater.into()), vec![p0, child])
         .unwrap();
     builder.enter_true_branch().unwrap();
     // if p0 > child, swap values
@@ -71,7 +71,7 @@ fn bubble_sort_op_2(op_id: OperationId) -> UserDefinedOperation<TestSemantics> {
     builder.enter_true_branch().unwrap();
     // if we have a parent, check if parent > p0
     builder
-        .start_query(TestQuery::CmpFstSnd(Greater), vec![parent, p0])
+        .start_query(TestQuery::CmpFstSnd(Greater.into()), vec![parent, p0])
         .unwrap();
     builder.enter_true_branch().unwrap();
     // if parent > p0, swap values
@@ -163,7 +163,7 @@ fn bubble_sort_n_times_op(op_id: OperationId) -> UserDefinedOperation<TestSemant
     builder.enter_true_branch().unwrap();
     // if we have a child, check if p0 > child
     builder
-        .start_query(TestQuery::CmpFstSnd(Greater), vec![p0, child])
+        .start_query(TestQuery::CmpFstSnd(Greater.into()), vec![p0, child])
         .unwrap();
     builder.enter_true_branch().unwrap();
     // if p0 > child, swap values

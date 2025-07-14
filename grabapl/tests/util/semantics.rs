@@ -9,6 +9,9 @@ use grabapl::semantics::{
 };
 use grabapl::{Semantics, SubstMarker};
 use std::collections::HashMap;
+use std::ops::Deref;
+use derive_more::From;
+use serde::{Deserialize, Serialize};
 
 pub struct TestSemantics;
 
@@ -86,6 +89,7 @@ impl ConcreteToAbstract for EdgeConcreteToAbstract {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum NodeType {
     String,
     Integer,
@@ -95,6 +99,7 @@ pub enum NodeType {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum NodeValue {
     String(String),
     Integer(i32),
@@ -121,12 +126,14 @@ impl NodeValue {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum EdgeType {
     Wildcard,
     Exact(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum TestOperation {
     NoOp,
     SetTo {
@@ -142,6 +149,7 @@ pub enum TestOperation {
     },
     AddEdge {
         node_typ: NodeType,
+        // TODO: remove. unused.
         param_typ: EdgeType,
         target_typ: EdgeType,
         value: String,
@@ -434,11 +442,24 @@ impl BuiltinOperation for TestOperation {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Copy, From)]
+pub struct MyOrdering(std::cmp::Ordering);
+
+impl Deref for MyOrdering {
+    type Target = std::cmp::Ordering;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum TestQuery {
     ValuesEqual,
     ValueEqualTo(NodeValue),
-    CmpFstSnd(std::cmp::Ordering),
+    CmpFstSnd(MyOrdering),
 }
 
 impl BuiltinQuery for TestQuery {
@@ -501,7 +522,7 @@ impl BuiltinQuery for TestQuery {
                     }
                 };
                 ConcreteQueryOutput {
-                    taken: cmp_result == *ordering,
+                    taken: &cmp_result == ordering.deref(),
                 }
             }
         }
@@ -521,4 +542,40 @@ impl Semantics for TestSemantics {
     type EdgeConcreteToAbstract = EdgeConcreteToAbstract;
     type BuiltinOperation = TestOperation;
     type BuiltinQuery = TestQuery;
+}
+
+
+
+// additions for serde support
+#[cfg(feature = "serde")]
+impl Serialize for MyOrdering {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // serialize as -1, 0, or 1 for Less, Equal, Greater
+        let value = match self.0 {
+            std::cmp::Ordering::Less => -1,
+            std::cmp::Ordering::Equal => 0,
+            std::cmp::Ordering::Greater => 1,
+        };
+        value.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for MyOrdering {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = i32::deserialize(deserializer)?;
+        let ordering = match value {
+            -1 => std::cmp::Ordering::Less,
+            0 => std::cmp::Ordering::Equal,
+            1 => std::cmp::Ordering::Greater,
+            _ => return Err(serde::de::Error::custom("invalid ordering value")),
+        };
+        Ok(MyOrdering(ordering))
+    }
 }

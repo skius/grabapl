@@ -439,6 +439,8 @@ dependencies = [
  "petgraph",
  "proptest",
  "rand",
+ "serde",
+ "serde_json",
  "test-log",
  "thiserror",
 ]
@@ -621,6 +623,7 @@ dependencies = [
  "hashbrown",
  "indexmap",
  "serde",
+ "serde_derive",
 ]
 
 [[package]]

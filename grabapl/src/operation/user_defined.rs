@@ -10,7 +10,7 @@ use crate::operation::{
     run_operation,
 };
 use crate::semantics::{AbstractGraph, ConcreteGraph};
-use crate::util::log;
+use crate::util::{log, MyInternString};
 use crate::{
     NodeKey, OperationContext, OperationId, Semantics, SubstMarker, interned_string_newtype,
 };
@@ -18,11 +18,13 @@ use derive_more::with_trait::From;
 use internment::Intern;
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
+use serde::{Deserialize, Serialize};
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum AbstractOperationResultMarker {
-    Custom(Intern<String>),
+    Custom(MyInternString),
     // NOTE: this may not be created by the user! since this is an unstable index, if the user
     // reorders operations, this marker may suddenly point to a different operation result.
     // Custom markers must always be used for arguments!
@@ -36,11 +38,13 @@ interned_string_newtype!(
 
 #[derive(derive_more::Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
 #[debug("N({_0})")]
-pub struct NamedMarker(Intern<String>);
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct NamedMarker(MyInternString);
 interned_string_newtype!(NamedMarker);
 
 /// Identifies a node in the user defined operation view.
 #[derive(Clone, Copy, From, Debug, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum AbstractNodeId {
     /// A node in the parameter graph.
     ParameterMarker(SubstMarker),
@@ -106,6 +110,7 @@ impl FromStr for AbstractNodeId {
 /// The mapping for the implicitly matched context graph *needs* to be stored statically,
 /// since we define our operation parameters to be matched statically.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct AbstractOperationArgument {
     /// The nodes that were selected explicitly as input to the operation.
     pub selected_input_nodes: Vec<AbstractNodeId>,
@@ -154,6 +159,7 @@ impl AbstractOperationArgument {
 }
 
 #[derive(derive_more::Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(bound = "S: crate::serde::SemanticsSerde"))]
 pub enum OpLikeInstruction<S: Semantics> {
     #[debug("Builtin(???)")]
     Builtin(S::BuiltinOperation),
@@ -174,6 +180,7 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for OpLik
 }
 
 #[derive(derive_more::Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(bound = "S: crate::serde::SemanticsSerde"))]
 pub enum Instruction<S: Semantics> {
     #[debug("OpLike({_0:#?}, {_1:#?})")]
     OpLike(OpLikeInstruction<S>, AbstractOperationArgument),
@@ -217,6 +224,7 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Instr
 }
 
 #[derive(derive_more::Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(bound = "S: crate::serde::SemanticsSerde"))]
 pub struct QueryInstructions<S: Semantics> {
     // TODO: does it make sense to rename these? true_branch and false_branch?
     #[debug("[{}]", taken.iter().map(|(opt, inst)| format!("({opt:#?}, {:#?})", inst)).collect::<Vec<_>>().join(", "))]
@@ -243,6 +251,7 @@ pub type InstructionWithResultMarker<S> = (Option<AbstractOperationResultMarker>
 //  ==> see big-picture-todos.md for a solution. TL;DR: store implicitly matched context nodes in the form of an explicit mapping from AbstractNodeId to the context nodes.
 
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct AbstractUserDefinedOperationOutput {
     // TODO: can probably remove S::NodeAbstract here since it's in the signature.
     pub new_nodes: HashMap<AbstractNodeId, AbstractOutputNodeMarker>,
@@ -257,6 +266,7 @@ impl AbstractUserDefinedOperationOutput {
 }
 
 // A 'custom'/user-defined operation
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(bound = "S: crate::serde::SemanticsSerde"))]
 pub struct UserDefinedOperation<S: Semantics> {
     pub parameter: OperationParameter<S>,
     // cached signature. there is definitely some duplicated information here.

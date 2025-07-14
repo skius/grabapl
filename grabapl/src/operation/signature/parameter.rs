@@ -2,13 +2,14 @@ use crate::graph::GraphTrait;
 use crate::operation::{OperationError, OperationResult};
 use crate::semantics::AbstractGraph;
 use crate::util::bimap::BiMap;
-use crate::util::log;
+use crate::util::{log, MyInternString};
 use crate::{NodeKey, Semantics, SubstMarker, interned_string_newtype};
 use derive_more::From;
 use internment::Intern;
 use petgraph::visit::UndirectedAdaptor;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
 // renamed.
@@ -21,6 +22,8 @@ pub enum OperationParameterError {
     ContextNodeNotConnected(SubstMarker),
 }
 
+
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(bound = "S: crate::serde::SemanticsSerde"))]
 pub struct OperationParameter<S: Semantics> {
     /// The ordered input nodes that must be explicitly selected.
     pub explicit_input_nodes: Vec<SubstMarker>,
@@ -118,8 +121,9 @@ impl ParameterSubstitution {
 }
 
 #[derive(Debug, Clone, Copy, From, Hash, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub enum NewNodeMarker {
-    Named(Intern<String>),
+    Named(MyInternString),
     // TODO: hide this
     #[from(ignore)]
     Implicit(u32),
@@ -456,7 +460,8 @@ pub struct OperationArgument<'a> {
 }
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
-pub struct AbstractOutputNodeMarker(pub Intern<String>);
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct AbstractOutputNodeMarker(pub MyInternString);
 interned_string_newtype!(AbstractOutputNodeMarker);
 
 /// Keeps track of node changes that happened during the operation execution.

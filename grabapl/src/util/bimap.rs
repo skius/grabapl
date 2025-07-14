@@ -1,12 +1,15 @@
 use std::collections::HashMap;
+use std::hash::Hash;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
-pub struct BiMap<L, R> {
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct BiMap<L: Hash + Eq, R: Hash + Eq> {
     left_to_right: HashMap<L, R>,
     right_to_left: HashMap<R, L>,
 }
 
-impl<L: Eq + std::hash::Hash + Clone, R: Eq + std::hash::Hash + Clone> BiMap<L, R> {
+impl<L: Eq + Hash + Clone, R: Eq + Hash + Clone> BiMap<L, R> {
     pub fn new() -> Self {
         BiMap {
             left_to_right: HashMap::new(),

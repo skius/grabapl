@@ -3,7 +3,10 @@ pub mod graph;
 pub mod operation;
 pub mod semantics;
 pub mod util;
+#[cfg(feature = "serde")]
+mod serde;
 
+use ::serde::{Deserialize, Serialize};
 use derive_more::From;
 pub use graph::DotCollector;
 pub use graph::EdgeInsertionOrder;
@@ -14,12 +17,15 @@ pub use graph::OperationContext;
 pub use graph::OperationId;
 use internment::Intern;
 pub use semantics::Semantics;
+use crate::util::MyInternString;
+
 /// A marker for substitution in the graph.
 ///
 /// Useful for programmatically defined operations to know the substitution of their input pattern.
 #[derive(derive_more::Debug, Clone, Copy, PartialEq, Eq, Hash, From)]
 #[debug("P({_0})")]
-pub struct SubstMarker(pub Intern<String>);
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct SubstMarker(pub MyInternString);
 interned_string_newtype!(SubstMarker);
 
 // TODO: maybe we could have an input builder? basically we want to have one connected component per input.
