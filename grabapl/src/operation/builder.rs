@@ -260,8 +260,8 @@ pub enum OperationBuilderError {
 }
 
 // type alias to switch between implementations globally
-pub type OperationBuilder<'a, S> = OperationBuilderInefficient<'a, S>;
-// pub type OperationBuilder<'a, S> = stack_based_builder::OperationBuilder2<'a, S>;
+// pub type OperationBuilder<'a, S> = OperationBuilderInefficient<'a, S>;
+pub type OperationBuilder<'a, S> = stack_based_builder::OperationBuilder2<'a, S>;
 
 
 
@@ -1407,6 +1407,75 @@ impl<S: Semantics> IntermediateState<S> {
         }
     }
 
+    fn add_node(
+        &mut self,
+        aid: AbstractNodeId,
+        node_abstract: S::NodeAbstract,
+        from_shape_query: bool,
+    ) {
+        let node_key = self.graph.add_node(node_abstract);
+        self.node_keys_to_aid.insert(node_key, aid);
+        if from_shape_query {
+            self.node_may_originate_from_shape_query.insert(aid);
+        } else {
+            // TODO: might be able to remove the AID.
+        }
+    }
+
+    fn add_edge(
+        &mut self,
+        source: AbstractNodeId,
+        target: AbstractNodeId,
+        edge_abstract: S::EdgeAbstract,
+        from_shape_query: bool,
+    ) -> Result<(), OperationBuilderError> {
+        let source_key = self.node_keys_to_aid
+            .get_right(&source)
+            .ok_or(OperationBuilderError::NotFoundAid(source))?;
+        let target_key = self.node_keys_to_aid
+            .get_right(&target)
+            .ok_or(OperationBuilderError::NotFoundAid(target))?;
+
+        self.graph.add_edge(*source_key, *target_key, edge_abstract);
+
+        if from_shape_query {
+            self.edge_may_originate_from_shape_query.insert((source, target));
+        } else {
+            // TODO: might be able to remove the AID.
+        }
+        Ok(())
+    }
+
+    fn set_node_av(
+        &mut self,
+        aid: AbstractNodeId,
+        node_abstract: S::NodeAbstract,
+    ) -> Result<(), OperationBuilderError> {
+        let node_key = self.node_keys_to_aid
+            .get_right(&aid)
+            .ok_or(OperationBuilderError::NotFoundAid(aid))?;
+        self.graph.set_node_attr(*node_key, node_abstract);
+        Ok(())
+    }
+
+    fn contains_aid(&self, aid: &AbstractNodeId) -> bool {
+        self.node_keys_to_aid.contains_right(aid)
+    }
+
+    fn contains_edge(
+        &self,
+        source: &AbstractNodeId,
+        target: &AbstractNodeId,
+    ) -> bool {
+        let Some(source_key) = self.node_keys_to_aid.get_right(source) else {
+            return false;
+        };
+        let Some(target_key) = self.node_keys_to_aid.get_right(target) else {
+            return false;
+        };
+        self.graph.get_edge_attr((*source_key, *target_key)).is_some()
+    }
+
     pub fn node_av_of_aid(&self, aid: &AbstractNodeId) -> Option<&S::NodeAbstract> {
         let node_key = self.node_keys_to_aid.get_right(aid)?;
         self.graph.get_node_attr(*node_key)
@@ -1595,6 +1664,43 @@ impl<S: Semantics> IntermediateState<S> {
             .cloned()
             .ok_or(report!(OperationBuilderError::InternalError("could not find node key")))
     }
+
+    fn as_param_for_shape_query(
+        &self,
+    ) -> (OperationParameter<S>, AbstractOperationArgument) {
+        let param_graph = self.graph.clone();
+
+        let mut all_node_keys = param_graph.node_attr_map.keys().cloned().collect::<Vec<_>>();
+        all_node_keys.sort_unstable(); // sort to ensure deterministic order
+
+        let mut node_keys_to_subst: BiMap<NodeKey, SubstMarker> = BiMap::new();
+        let mut explicit_input_nodes = Vec::new();
+        let mut aid_args = Vec::new();
+        let mut subst_to_aid = HashMap::new();
+        for key in all_node_keys {
+            let subst = SubstMarker::from(format!("{:?}", key));
+            node_keys_to_subst.insert(key, subst);
+            explicit_input_nodes.push(subst);
+            // collect the AID for this key
+            let aid = self.get_aid_from_key(&key).unwrap();
+            aid_args.push(aid);
+            subst_to_aid.insert(subst, aid);
+        }
+
+        let abstract_args = AbstractOperationArgument {
+            selected_input_nodes: aid_args,
+            subst_to_aid,
+        };
+
+        (
+            OperationParameter {
+                explicit_input_nodes,
+                parameter_graph: param_graph,
+                node_keys_to_subst,
+            },
+            abstract_args
+        )
+    }
 }
 
 impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S> {
@@ -1742,7 +1848,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         &self,
         return_nodes: HashMap<AbstractNodeId, (AbstractOutputNodeMarker, S::NodeAbstract)>,
         return_edges: HashMap<(AbstractNodeId, AbstractNodeId), S::EdgeAbstract>,
-    ) -> Result<(AbstractUserDefinedOperationOutput<S>, OperationSignature<S>), OperationBuilderError>
+    ) -> Result<(AbstractUserDefinedOperationOutput, OperationSignature<S>), OperationBuilderError>
     {
         // this struct stores an instruction for user defined operations on *how* to return nodes.
         let mut ud_output = AbstractUserDefinedOperationOutput::new();
@@ -1770,7 +1876,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             }
             ud_output
                 .new_nodes
-                .insert(aid, (output_marker, node_abstract.clone()));
+                .insert(aid, output_marker);
             // Add to signature
             signature
                 .output
@@ -1783,7 +1889,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                 AbstractNodeId::ParameterMarker(s) => Ok(AbstractSignatureNodeId::ExistingNode(s)),
                 AbstractNodeId::DynamicOutputMarker(_, _) | AbstractNodeId::Named(..) => {
                     // we must be returning this node if we want to return an incident edge.
-                    let Some((output_marker, _)) = ud_output.new_nodes.get(aid) else {
+                    let Some(output_marker) = ud_output.new_nodes.get(aid) else {
                         bail!(OperationBuilderError::NotFoundReturnNode(aid.clone()));
                     };
                     Ok(AbstractSignatureNodeId::NewNode(output_marker.clone()))
@@ -2151,38 +2257,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
 
     // TESTING
     fn collect_self_state_to_parameter(&self) -> (OperationParameter<S>, AbstractOperationArgument) {
-        let param_graph = self.current_state.graph.clone();
-
-        let mut all_node_keys = param_graph.node_attr_map.keys().cloned().collect::<Vec<_>>();
-        all_node_keys.sort_unstable(); // sort to ensure deterministic order
-
-        let mut node_keys_to_subst: BiMap<NodeKey, SubstMarker> = BiMap::new();
-        let mut explicit_input_nodes = Vec::new();
-        let mut aid_args = Vec::new();
-        let mut subst_to_aid = HashMap::new();
-        for key in all_node_keys {
-            let subst = SubstMarker::from(format!("{:?}", key));
-            node_keys_to_subst.insert(key, subst);
-            explicit_input_nodes.push(subst);
-            // collect the AID for this key
-            let aid = self.get_current_aid_from_key(key).unwrap();
-            aid_args.push(aid);
-            subst_to_aid.insert(subst, aid);
-        }
-
-        let abstract_args = AbstractOperationArgument {
-            selected_input_nodes: aid_args,
-            subst_to_aid,
-        };
-
-        (
-            OperationParameter {
-                explicit_input_nodes,
-                parameter_graph: param_graph,
-                node_keys_to_subst,
-            },
-            abstract_args
-        )
+        self.current_state.as_param_for_shape_query()
     }
 
     // see _old for a version that only collects the bare minimum for the parameter.

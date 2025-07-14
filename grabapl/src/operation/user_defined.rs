@@ -205,12 +205,12 @@ pub type InstructionWithResultMarker<S> = (Option<AbstractOperationResultMarker>
 //  This requires thinking about how to keep statically defined mappings in check when running the operation concretely.
 //  ==> see big-picture-todos.md for a solution. TL;DR: store implicitly matched context nodes in the form of an explicit mapping from AbstractNodeId to the context nodes.
 
-pub struct AbstractUserDefinedOperationOutput<S: Semantics> {
+pub struct AbstractUserDefinedOperationOutput {
     // TODO: can probably remove S::NodeAbstract here since it's in the signature.
-    pub new_nodes: HashMap<AbstractNodeId, (AbstractOutputNodeMarker, S::NodeAbstract)>,
+    pub new_nodes: HashMap<AbstractNodeId, AbstractOutputNodeMarker>,
 }
 
-impl<S: Semantics> AbstractUserDefinedOperationOutput<S> {
+impl AbstractUserDefinedOperationOutput {
     pub fn new() -> Self {
         AbstractUserDefinedOperationOutput {
             new_nodes: HashMap::new(),
@@ -226,7 +226,7 @@ pub struct UserDefinedOperation<S: Semantics> {
     // TODO: add preprocessing (checking) step to see if the instructions make sense and are well formed wrt which nodes they access statically.
     pub instructions: Vec<InstructionWithResultMarker<S>>,
     // TODO: need to define output changes.
-    pub output_changes: AbstractUserDefinedOperationOutput<S>,
+    pub output_changes: AbstractUserDefinedOperationOutput,
 }
 
 // TODO: use a private runner struct that keeps all the necessary mappings on self for easier methods.
@@ -277,7 +277,7 @@ impl<S: Semantics> UserDefinedOperation<S> {
             .output_changes
             .new_nodes
             .iter()
-            .map(|(aid, (name, _))| Ok((*name, runner.aid_to_node_key(*aid)?)))
+            .map(|(aid, name)| Ok((*name, runner.aid_to_node_key(*aid)?)))
             .collect::<OperationResult<_>>()?;
 
         // TODO: How to define a good output here?
