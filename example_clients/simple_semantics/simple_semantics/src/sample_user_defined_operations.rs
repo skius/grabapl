@@ -248,8 +248,7 @@ pub fn get_count_list_len_user_defined_operation(
         GraphShapeQuery {
             parameter: param,
             expected_graph: expected_g,
-            node_keys_to_shape_idents: HashMap::from([(child, "child".into())]),
-            shape_idents_to_node_keys: HashMap::from([("child".into(), child)]),
+            node_keys_to_shape_idents: BiMap::from([(child, "child".into())]),
         }
     };
 
@@ -332,13 +331,9 @@ pub fn get_insert_bst_user_defined_operation(
                             node_keys_to_subst: BiMap::from([(head, "input".into())]),
                         },
                         expected_graph: expected_g,
-                        node_keys_to_shape_idents: HashMap::from([
+                        node_keys_to_shape_idents: BiMap::from([
                             (left_child, "left".into()),
                             (right_child, "right".into()),
-                        ]),
-                        shape_idents_to_node_keys: HashMap::from([
-                            ("left".into(), left_child),
-                            ("right".into(), right_child),
                         ]),
                     }
                 },
@@ -376,8 +371,7 @@ pub fn get_insert_bst_user_defined_operation(
                                         node_keys_to_subst: BiMap::from([(head, "input".into())]),
                                     },
                                     expected_graph: expected_g,
-                                    node_keys_to_shape_idents: HashMap::from([(child, "child".into())]),
-                                    shape_idents_to_node_keys: HashMap::from([("child".into(), child)]),
+                                    node_keys_to_shape_idents: BiMap::from([(child, "child".into())]),
                                 }
                             },
                             AbstractOperationArgument {  selected_input_nodes: vec![root_node],
@@ -520,13 +514,9 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                         )]),
                                                     },
                                                     expected_graph: expected_g,
-                                                    node_keys_to_shape_idents: HashMap::from([(
+                                                    node_keys_to_shape_idents: BiMap::from([(
                                                         right_child,
                                                         "right".into(),
-                                                    )]),
-                                                    shape_idents_to_node_keys: HashMap::from([(
-                                                        "right".into(),
-                                                        right_child,
                                                     )]),
                                                 }
                                             },
@@ -633,13 +623,9 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                         )]),
                                                     },
                                                     expected_graph: expected_g,
-                                                    node_keys_to_shape_idents: HashMap::from([(
+                                                    node_keys_to_shape_idents: BiMap::from([(
                                                         left_child,
                                                         "left".into(),
-                                                    )]),
-                                                    shape_idents_to_node_keys: HashMap::from([(
-                                                        "left".into(),
-                                                        left_child,
                                                     )]),
                                                 }
                                             },
@@ -778,8 +764,7 @@ pub fn get_node_heights_user_defined_operation(
                 node_keys_to_subst: BiMap::from([(head, "input".into())]),
             },
             expected_graph: expected_g,
-            node_keys_to_shape_idents: HashMap::from([(left_child, "left".into())]),
-            shape_idents_to_node_keys: HashMap::from([("left".into(), left_child)]),
+            node_keys_to_shape_idents: BiMap::from([(left_child, "left".into())]),
         }
     };
     let right_child_query = {
@@ -796,8 +781,7 @@ pub fn get_node_heights_user_defined_operation(
                 node_keys_to_subst: BiMap::from([(head, "input".into())]),
             },
             expected_graph: expected_g,
-            node_keys_to_shape_idents: HashMap::from([(right_child, "right".into())]),
-            shape_idents_to_node_keys: HashMap::from([("right".into(), right_child)]),
+            node_keys_to_shape_idents: BiMap::from([(right_child, "right".into())]),
         }
     };
     let left_child = AbstractNodeId::DynamicOutputMarker("left_child_query".into(), "left".into());

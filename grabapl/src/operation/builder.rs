@@ -120,6 +120,7 @@ pub enum BuilderInstruction<S: Semantics> {
     #[debug("EndQuery")]
     EndQuery,
     #[debug("ExpectShapeNode({_0:?}, ???)")]
+    // TODO: maybe should be renamed to ExpectNewShapeNode?
     ExpectShapeNode(AbstractOutputNodeMarker, S::NodeAbstract),
     #[debug("ExpectShapeNodeChange({_0:?}, ???)")]
     ExpectShapeNodeChange(AbstractNodeId, S::NodeAbstract),
@@ -141,6 +142,7 @@ pub enum BuilderInstruction<S: Semantics> {
     /// Rename a dynamic output marker.
     /// Invariants in the interpreter require that this is never a parameter node. (E.g., since we may want to return it)
     RenameNode(AbstractNodeId, NamedMarker),
+    Finalize
 }
 
 impl<S: Semantics> BuilderInstruction<S> {
@@ -149,7 +151,7 @@ impl<S: Semantics> BuilderInstruction<S> {
     fn can_break_body(&self) -> bool {
         use BuilderInstruction::*;
         match self {
-            EnterTrueBranch | EnterFalseBranch | EndQuery | ReturnNode(..) | ReturnEdge(..) => true,
+            EnterTrueBranch | EnterFalseBranch | EndQuery | ReturnNode(..) | ReturnEdge(..) | Finalize => true,
             _ => false,
         }
     }
@@ -179,6 +181,7 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Build
             ReturnNode(aid, output_marker, node) => ReturnNode(aid.clone(), output_marker.clone(), node.clone()),
             ReturnEdge(src, dst, edge) => ReturnEdge(src.clone(), dst.clone(), edge.clone()),
             RenameNode(old_aid, new_name) => RenameNode(old_aid.clone(), new_name.clone()),
+            Finalize => Finalize,
         }
     }
 }
@@ -257,8 +260,8 @@ pub enum OperationBuilderError {
 }
 
 // type alias to switch between implementations globally
-// pub type OperationBuilder<'a, S> = OperationBuilderInefficient<'a, S>;
-pub type OperationBuilder<'a, S> = stack_based_builder::OperationBuilder2<'a, S>;
+pub type OperationBuilder<'a, S> = OperationBuilderInefficient<'a, S>;
+// pub type OperationBuilder<'a, S> = stack_based_builder::OperationBuilder2<'a, S>;
 
 
 
@@ -1487,6 +1490,20 @@ impl<S: Semantics> IntermediateState<S> {
         Ok(abstract_arg)
     }
 
+    fn interpret_builtin_query(
+        &mut self,
+        query: &S::BuiltinQuery,
+        args: Vec<AbstractNodeId>,
+    ) -> Result<AbstractOperationArgument, OperationBuilderError> {
+        let param = query.parameter();
+        let (subst, abstract_arg) = self
+            .get_substitution(&param, args)?;
+        // now apply the query and store result
+        let mut gws = GraphWithSubstitution::new(&mut self.graph, &subst);
+        query.apply_abstract(&mut gws);
+        Ok(abstract_arg)
+    }
+
     fn handle_abstract_output_changes(
         &mut self,
         marker: AbstractOperationResultMarker,
@@ -1733,9 +1750,6 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
 
         // need to determine validity of return_nodes
         for (aid, (output_marker, node_abstract)) in return_nodes {
-            let Some(key) = self.current_state.node_keys_to_aid.get_right(&aid) else {
-                bail!(OperationBuilderError::NotFoundReturnNode(aid));
-            };
             // make sure type we're deciding to return is a valid supertype
             let inferred_av = self
                 .current_state
@@ -2134,7 +2148,213 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         Ok((ud_instr, interp_instruction))
     }
 
+    // TESTING
+    fn collect_self_state_to_parameter(&self) -> (OperationParameter<S>, AbstractOperationArgument) {
+        let param_graph = self.current_state.graph.clone();
+
+        let mut all_node_keys = param_graph.node_attr_map.keys().cloned().collect::<Vec<_>>();
+        all_node_keys.sort_unstable(); // sort to ensure deterministic order
+
+        let mut node_keys_to_subst: BiMap<NodeKey, SubstMarker> = BiMap::new();
+        let mut explicit_input_nodes = Vec::new();
+        let mut aid_args = Vec::new();
+        let mut subst_to_aid = HashMap::new();
+        for key in all_node_keys {
+            let subst = SubstMarker::from(format!("{:?}", key));
+            node_keys_to_subst.insert(key, subst);
+            explicit_input_nodes.push(subst);
+            // collect the AID for this key
+            let aid = self.get_current_aid_from_key(key).unwrap();
+            aid_args.push(aid);
+            subst_to_aid.insert(subst, aid);
+        }
+
+        let abstract_args = AbstractOperationArgument {
+            selected_input_nodes: aid_args,
+            subst_to_aid,
+        };
+
+        (
+            OperationParameter {
+                explicit_input_nodes,
+                parameter_graph: param_graph,
+                node_keys_to_subst,
+            },
+            abstract_args
+        )
+    }
+
+    // see _old for a version that only collects the bare minimum for the parameter.
+    // this version pretends the current abstract state is the parameter.
+    // TODO: clean this function up with the above assumptions. right now it's just bare-minimum working.
     fn interpret_graph_shape_query(
+        &mut self,
+        is_finished: bool,
+        gsq_op_marker: AbstractOperationResultMarker,
+        gsq_instructions: Vec<GraphShapeQueryInstruction<S>>,
+        query_instructions: IntermediateQueryInstructions<S>,
+    ) -> Result<(UDInstruction<S>, InterpretedInstruction<S>), OperationBuilderError> {
+        let state_before = self.current_state.clone();
+
+        // preparation for false branch
+        let false_branch_state = self.current_state.clone();
+        let initial_false_branch_state = false_branch_state.clone();
+
+        // first pass: collect the initial graph (the parameter)
+        let (param, abstract_args) =
+            self.collect_self_state_to_parameter();
+
+
+        // second pass:
+        // modify to have the expected graph as well as shape ident mappings.
+        // simultaneously, also modify the *current state graph* to prepare it for the true branch.
+        // make a copy before that though, for the false branch.
+
+        let mut expected_graph = param.parameter_graph.clone();
+        let mut node_keys_to_shape_idents: BiMap<NodeKey, ShapeNodeIdentifier> = BiMap::new();
+
+        // let aid_to_node_key = |aid| -> Result<NodeKey, OperationBuilderError> {
+        //     arg_aid_to_node_keys.get_left(&aid)
+        //         .cloned()
+        //         .or_else(|| {
+        //             if let AbstractNodeId::DynamicOutputMarker(orm, node_marker) = aid {
+        //                 if orm == gsq_op_marker {
+        //                     // this is a new node from the graph shape query.
+        //                     let sni: ShapeNodeIdentifier = node_marker.0.into();
+        //                     node_keys_to_shape_idents.get_right(&sni).copied()
+        //                 } else {
+        //                     None
+        //                 }
+        //             } else {
+        //                 None
+        //             }
+        //         })
+        //         .ok_or(OperationBuilderError::NotFoundAid(aid))
+        // };
+
+        // TODO: ugly. fix. needed because the above closure approach does not work due to borrowing issues.
+        macro_rules! aid_to_node_key_hack {
+            ($aid:expr) => {
+                arg_aid_to_node_keys
+                    .get_left(&$aid)
+                    .cloned()
+                    .or_else(|| {
+                        if let AbstractNodeId::DynamicOutputMarker(orm, node_marker) = $aid {
+                            if orm == gsq_op_marker {
+                                // this is a new node from the graph shape query.
+                                let sni: ShapeNodeIdentifier = node_marker.0.into();
+                                node_keys_to_shape_idents.get_right(&sni).copied()
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .ok_or(OperationBuilderError::NotFoundAid($aid))
+            };
+        }
+
+        for instruction in gsq_instructions {
+            match instruction {
+                GraphShapeQueryInstruction::ExpectShapeNode(marker, av) => {
+                    let key = expected_graph.add_node(av.clone());
+                    let shape_node_ident = marker.0.clone().into();
+                    // TODO: insert is panicking and therefore we should return an error instead here.
+                    // TODO: make bimap::insert fallible? return a must_use Option<()>?
+                    node_keys_to_shape_idents.insert(key, shape_node_ident);
+
+                    // now update the state for the true branch.
+                    let state_key = self.current_state.graph.add_node(av);
+                    let aid =
+                        AbstractNodeId::DynamicOutputMarker(gsq_op_marker.clone(), marker.clone());
+                    self.current_state
+                        .node_keys_to_aid
+                        .insert(state_key, aid.clone());
+                    self.current_state
+                        .node_may_originate_from_shape_query
+                        .insert(aid.clone());
+                }
+                GraphShapeQueryInstruction::ExpectShapeNodeChange(aid, av) => {
+                    // set the expected av
+                    let key = self.get_current_key_from_aid(aid.clone())?;
+                    expected_graph.set_node_attr(key, av.clone());
+
+                    // now update the state for the true branch.
+                    let state_key = self
+                        .get_current_key_from_aid(aid)
+                        .change_context(OperationBuilderError::NotFoundAid(aid))?;
+                    self.current_state.graph.set_node_attr(state_key, av);
+                }
+                GraphShapeQueryInstruction::ExpectShapeEdge(src, target, av) => {
+                    let src_key = self.get_current_key_from_aid(src.clone())?;
+                    let target_key = self.get_current_key_from_aid(target.clone())?;
+                    expected_graph.add_edge(src_key, target_key, av.clone());
+
+                    // now update the state for the true branch.
+                    let state_src_key = self
+                        .get_current_key_from_aid(src)
+                        .change_context(OperationBuilderError::ShapeEdgeSourceNotFound)?;
+                    let state_target_key = self
+                        .get_current_key_from_aid(target)
+                        .change_context(OperationBuilderError::ShapeEdgeTargetNotFound)?;
+                    self.current_state
+                        .graph
+                        .add_edge(state_src_key, state_target_key, av);
+                    self.current_state
+                        .edge_may_originate_from_shape_query
+                        .insert((src.clone(), target.clone()));
+                }
+            }
+        }
+
+        let gsq = GraphShapeQuery {
+            parameter: param,
+            expected_graph,
+            node_keys_to_shape_idents,
+        };
+
+        // TODO: need to validate GSQ somewhere.
+        //  Most importantly, that there are no free floating shape nodes.
+        // TODO: do this with under the is_finished flag.
+
+        let initial_true_branch_state = self.current_state.clone();
+
+        let (ud_true_branch, interp_true_branch) =
+            self.interpret_instructions(query_instructions.true_branch)?;
+        // switch back to the other state
+        let after_true_branch_state = mem::replace(&mut self.current_state, false_branch_state);
+        let (ud_false_branch, interp_false_branch) =
+            self.interpret_instructions(query_instructions.false_branch)?;
+        let after_false_branch_state = mem::replace(&mut self.current_state, state_before);
+        // TODO: reconcile the states of both branches. same as in query.
+
+        // current situation: self.current_state is before both branches, and we have the true and false branch states
+        // available to reconcile.
+
+        let merged_state = merge_states(true, &after_true_branch_state, &after_false_branch_state);
+        self.current_state = merged_state;
+
+        let ud_instruction = UDInstruction::ShapeQuery(
+            gsq,
+            abstract_args,
+            QueryInstructions {
+                taken: ud_true_branch,
+                not_taken: ud_false_branch,
+            },
+        );
+
+        let interp_instruction = InterpretedInstruction::Query(InterpretedQueryInstructions {
+            initial_state_true_branch: initial_true_branch_state,
+            initial_state_false_branch: initial_false_branch_state,
+            true_branch: interp_true_branch,
+            false_branch: interp_false_branch,
+        });
+
+        Ok((ud_instruction, interp_instruction))
+    }
+
+    fn interpret_graph_shape_query_old(
         &mut self,
         is_finished: bool,
         gsq_op_marker: AbstractOperationResultMarker,
@@ -2337,13 +2557,10 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             }
         }
 
-        let (node_keys_to_shape_idents, shape_idents_to_node_keys) =
-            node_keys_to_shape_idents.into_inner();
         let gsq = GraphShapeQuery {
             parameter: param,
             expected_graph,
             node_keys_to_shape_idents,
-            shape_idents_to_node_keys,
         };
 
         // TODO: need to validate GSQ somewhere.

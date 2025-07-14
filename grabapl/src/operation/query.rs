@@ -12,6 +12,7 @@ use internment::Intern;
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
 use std::collections::{HashMap, HashSet};
+use crate::util::bimap::BiMap;
 
 pub trait BuiltinQuery {
     type S: Semantics;
@@ -47,8 +48,7 @@ pub struct GraphShapeQuery<S: Semantics> {
     pub expected_graph: AbstractGraph<S>,
     // In the expected graph, these nodes are _new_ nodes that are expected to be created by the operation and that will be returned with a mapping
     // the node keys is the key for the expected_graph.
-    pub node_keys_to_shape_idents: HashMap<NodeKey, ShapeNodeIdentifier>,
-    pub shape_idents_to_node_keys: HashMap<ShapeNodeIdentifier, NodeKey>,
+    pub node_keys_to_shape_idents: BiMap<NodeKey, ShapeNodeIdentifier>,
 }
 
 pub struct ConcreteShapeQueryResult {
@@ -185,7 +185,7 @@ fn get_shape_query_substitution<S: Semantics>(
                     Some((
                         query
                             .node_keys_to_shape_idents
-                            .get(&desired_shape_node_key)?
+                            .get_left(&desired_shape_node_key)?
                             .clone(),
                         dynamic_graph_node_key,
                     ))

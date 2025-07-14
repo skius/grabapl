@@ -1638,7 +1638,7 @@ fn new_builder_test() {
     let res =     builder.consume(BI::ExpectParameterNode("p0".into(), NodeType::Object));
     println!("{:?}", res);
 
-    assert!(false);
+    // assert!(false);
 
 }
 
