@@ -559,6 +559,8 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
             )?
         };
         *self.previous_user_defined_operation.borrow_mut() = partial_user_def_op;
+
+        // in theory we should run it again with the new instruction.
         Ok(())
     }
 }
