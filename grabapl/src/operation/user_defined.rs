@@ -208,11 +208,13 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Instr
             Instruction::ShapeQuery(query, arg, query_instr) => {
                 Instruction::ShapeQuery(query.clone(), arg.clone(), query_instr.clone())
             }
-            Instruction::RenameNode { old, new } => {
-                Instruction::RenameNode { old: *old, new: *new }
-            }
+            Instruction::RenameNode { old, new } => Instruction::RenameNode {
+                old: *old,
+                new: *new,
+            },
         }
-    }}
+    }
+}
 
 #[derive(derive_more::Debug)]
 pub struct QueryInstructions<S: Semantics> {
@@ -231,7 +233,6 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Query
         }
     }
 }
-
 
 pub type InstructionWithResultMarker<S> = (Option<AbstractOperationResultMarker>, Instruction<S>);
 

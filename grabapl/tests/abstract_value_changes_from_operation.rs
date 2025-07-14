@@ -1,7 +1,9 @@
-use grabapl::operation::builder::{stack_based_builder, BuilderOpLike, OperationBuilder};
+use grabapl::operation::builder::{BuilderOpLike, OperationBuilder, stack_based_builder};
 use grabapl::operation::builtin::LibBuiltinOperation;
 use grabapl::operation::query::BuiltinQuery;
-use grabapl::operation::user_defined::{AbstractNodeId, AbstractOperationResultMarker, UserDefinedOperation};
+use grabapl::operation::user_defined::{
+    AbstractNodeId, AbstractOperationResultMarker, UserDefinedOperation,
+};
 use grabapl::operation::{BuiltinOperation, run_from_concrete};
 use grabapl::semantics::ConcreteGraph;
 use grabapl::{OperationContext, OperationId, Semantics, SubstMarker};
@@ -914,15 +916,14 @@ fn recursion_breaks_when_modification_changes_after_use() {
         )
         .unwrap();
     // now, change the abstract value of p0 to String
-    let res = builder
-        .add_operation(
-            BuilderOpLike::Builtin(TestOperation::SetTo {
-                op_typ: NodeType::Object,
-                target_typ: NodeType::String,
-                value: NodeValue::String("Changed".to_string()),
-            }),
-            vec![p0],
-        );
+    let res = builder.add_operation(
+        BuilderOpLike::Builtin(TestOperation::SetTo {
+            op_typ: NodeType::Object,
+            target_typ: NodeType::String,
+            value: NodeValue::String("Changed".to_string()),
+        }),
+        vec![p0],
+    );
     assert!(
         res.is_err(),
         "Expected changing the abstract value of p0 to fail, since it is used in a recursive call after which it is used as an integer"
@@ -1613,59 +1614,33 @@ fn new_builder_test() {
 
     use grabapl::operation::builder::BuilderInstruction as BI;
 
-    builder.consume(BI::ExpectParameterNode("p0".into(), NodeType::Object))
+    builder
+        .consume(BI::ExpectParameterNode("p0".into(), NodeType::Object))
         .unwrap();
 
-    builder.consume(BI::AddNamedOperation("hello".into(),
-        BuilderOpLike::LibBuiltin(LibBuiltinOperation::AddNode {
-            value: NodeValue::String("Hello".to_string()),
-        }),
-        vec![])).unwrap();
+    builder
+        .consume(BI::AddNamedOperation(
+            "hello".into(),
+            BuilderOpLike::LibBuiltin(LibBuiltinOperation::AddNode {
+                value: NodeValue::String("Hello".to_string()),
+            }),
+            vec![],
+        ))
+        .unwrap();
     let show_data = builder.show();
     println!("{:?}", show_data);
 
-
-    builder.consume(BI::RenameNode(AbstractNodeId::dynamic_output("hello", "new"), "renamed".into())).unwrap();
+    builder
+        .consume(BI::RenameNode(
+            AbstractNodeId::dynamic_output("hello", "new"),
+            "renamed".into(),
+        ))
+        .unwrap();
     let show_data = builder.show();
     println!("{:?}", show_data);
 
-
-    let res =     builder.consume(BI::ExpectParameterNode("p0".into(), NodeType::Object));
+    let res = builder.consume(BI::ExpectParameterNode("p0".into(), NodeType::Object));
     println!("{:?}", res);
 
     // assert!(false);
-
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

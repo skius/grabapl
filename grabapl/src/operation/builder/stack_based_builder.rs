@@ -1,29 +1,39 @@
+use crate::operation::builder::{
+    BuilderInstruction, BuilderOpLike, IntermediateInterpreter, IntermediateState,
+    IntermediateStateBuilder, OperationBuilderError, OperationBuilderInefficient,
+    UDInstructionsWithMarker, merge_states,
+};
+use crate::operation::signature::parameter::{AbstractOutputNodeMarker, OperationParameter};
+use crate::operation::signature::parameterbuilder::{
+    OperationParameterBuilder, ParameterBuilderError,
+};
+use crate::operation::user_defined::{
+    AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker,
+    AbstractUserDefinedOperationOutput, Instruction, NamedMarker, QueryInstructions,
+    UserDefinedOperation,
+};
+use crate::{NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
+use derive_more::From;
+use derive_more::with_trait::TryInto;
+use error_stack::{Report, ResultExt, bail, report};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
-use derive_more::From;
-use derive_more::with_trait::TryInto;
-use error_stack::{bail, report, Report, ResultExt};
 use thiserror::Error;
-use crate::{NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
-use crate::operation::builder::{merge_states, BuilderInstruction, BuilderOpLike, IntermediateInterpreter, IntermediateState, IntermediateStateBuilder, OperationBuilderInefficient, OperationBuilderError, UDInstructionsWithMarker};
-use crate::operation::signature::parameter::{AbstractOutputNodeMarker, OperationParameter};
-use crate::operation::signature::parameterbuilder::{OperationParameterBuilder, ParameterBuilderError};
-use crate::operation::user_defined::{AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, AbstractUserDefinedOperationOutput, Instruction, NamedMarker, QueryInstructions, UserDefinedOperation};
 
-use error_stack::Result;
 use crate::operation::query::{GraphShapeQuery, ShapeNodeIdentifier};
-use crate::operation::signature::{AbstractOutputChanges, AbstractSignatureNodeId, OperationSignature};
+use crate::operation::signature::{
+    AbstractOutputChanges, AbstractSignatureNodeId, OperationSignature,
+};
 use crate::semantics::{AbstractGraph, AbstractMatcher};
 use crate::util::bimap::BiMap;
+use error_stack::Result;
 
 macro_rules! bail_unexpected_instruction {
     ($i:expr, $i_opt:expr, $frame:literal) => {
         let err = Err(report!(BuilderError::UnexpectedInstruction))
-            .attach_printable_lazy(|| {
-                format!("Unexpected instruction in {}: {:?}", $frame, $i)
-            });
+            .attach_printable_lazy(|| format!("Unexpected instruction in {}: {:?}", $frame, $i));
         let _ = $i_opt.insert($i);
         return err;
     };
@@ -45,7 +55,9 @@ struct BuildingParameterFrame<S: Semantics> {
     parameter_builder: OperationParameterBuilder<S>,
 }
 
-impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for BuildingParameterFrame<S> {
+impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone
+    for BuildingParameterFrame<S>
+{
     fn clone(&self) -> Self {
         BuildingParameterFrame {
             parameter_builder: self.parameter_builder.clone(),
@@ -72,14 +84,19 @@ impl<S: Semantics> BuildingParameterFrame<S> {
 
         match instruction {
             BI::ExpectParameterNode(marker, av) => {
-                this.parameter_builder.expect_explicit_input_node(marker, av)
+                this.parameter_builder
+                    .expect_explicit_input_node(marker, av)
                     .change_context(BuilderError::ParameterBuildError)?;
             }
             BI::ExpectContextNode(marker, av) => {
-                this.parameter_builder.expect_context_node(marker, av).change_context(BuilderError::ParameterBuildError)?;
+                this.parameter_builder
+                    .expect_context_node(marker, av)
+                    .change_context(BuilderError::ParameterBuildError)?;
             }
             BI::ExpectParameterEdge(src, dst, edge) => {
-                this.parameter_builder.expect_edge(src, dst, edge).change_context(BuilderError::ParameterBuildError)?;
+                this.parameter_builder
+                    .expect_edge(src, dst, edge)
+                    .change_context(BuilderError::ParameterBuildError)?;
             }
             _ => {
                 // The user has decided that they're done building the parameter by sending a different instruction
@@ -87,12 +104,15 @@ impl<S: Semantics> BuildingParameterFrame<S> {
                 let _ = instruction_opt.insert(instruction);
 
                 let this: BuildingParameterFrame<S> = builder.stack.expect_pop();
-                let parameter = this.parameter_builder.build().change_context(BuilderError::ParameterBuildError)?;
+                let parameter = this
+                    .parameter_builder
+                    .build()
+                    .change_context(BuilderError::ParameterBuildError)?;
                 let frame = CollectingInstructionsFrame::from_param(&parameter);
                 builder.data.built.parameter = Some(parameter);
 
                 builder.push_frame(frame);
-            },
+            }
         };
         Ok(())
     }
@@ -103,7 +123,9 @@ struct CollectingInstructionsFrame<S: Semantics> {
     current_state: IntermediateState<S>,
 }
 
-impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for CollectingInstructionsFrame<S> {
+impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone
+    for CollectingInstructionsFrame<S>
+{
     fn clone(&self) -> Self {
         CollectingInstructionsFrame {
             instructions: self.instructions.clone(),
@@ -113,18 +135,14 @@ impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for Colle
 }
 
 impl<S: Semantics> CollectingInstructionsFrame<S> {
-    pub fn from_param(
-        parameter: &OperationParameter<S>,
-    ) -> Self {
+    pub fn from_param(parameter: &OperationParameter<S>) -> Self {
         CollectingInstructionsFrame {
             instructions: vec![],
             current_state: IntermediateState::from_param(parameter),
         }
     }
 
-    pub fn from_state(
-        state: IntermediateState<S>,
-    ) -> Self {
+    pub fn from_state(state: IntermediateState<S>) -> Self {
         CollectingInstructionsFrame {
             instructions: vec![],
             current_state: state,
@@ -186,32 +204,38 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
             BI::RenameNode(old_aid, new_name) => {
                 // don't allow renaming ParameterMarker nodes
                 if let AbstractNodeId::ParameterMarker(_) = old_aid {
-                    bail!(BuilderError::NeedsSpecificVariant("cannot rename parameter"));
+                    bail!(BuilderError::NeedsSpecificVariant(
+                        "cannot rename parameter"
+                    ));
                 }
                 let new_aid = AbstractNodeId::named(new_name);
-                this.current_state.rename_aid(old_aid, new_aid)
+                this.current_state
+                    .rename_aid(old_aid, new_aid)
                     .change_context(BuilderError::OutsideError)?;
 
-                this.instructions.push(
-                    (
-                        None,
-                            Instruction::RenameNode {
-                                old: old_aid,
-                                new: new_aid,
-                            }
-                        )
-                )
+                this.instructions.push((
+                    None,
+                    Instruction::RenameNode {
+                        old: old_aid,
+                        new: new_aid,
+                    },
+                ))
             }
             BI::StartShapeQuery(op_result_marker) => {
                 // we start a new BuildingShapeQueryFrame
                 let initial_state = this.current_state.clone();
-                let shape_query_frame = BuildingShapeQueryFrame::new(op_result_marker, initial_state);
+                let shape_query_frame =
+                    BuildingShapeQueryFrame::new(op_result_marker, initial_state);
                 // push it onto the stack
                 builder.push_frame(shape_query_frame);
             }
             _ => {
-                bail_unexpected_instruction!(instruction, instruction_opt, "CollectingInstructionsFrame");
-            },
+                bail_unexpected_instruction!(
+                    instruction,
+                    instruction_opt,
+                    "CollectingInstructionsFrame"
+                );
+            }
         }
 
         Ok(())
@@ -236,19 +260,20 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
         //  still builds and caches an operation before every call. that might actually be fine, I guess.
         // let self_op_unfinished = UserDefinedOperation::new_noop();
         let self_op_unfinished = &builder_data.partial_self_op;
-        let op = op_like.as_operation(builder_data.op_ctx, &self_op_unfinished)
+        let op = op_like
+            .as_operation(builder_data.op_ctx, &self_op_unfinished)
             .change_context(BuilderError::OutsideError)?;
-        let abstract_arg = self.current_state.interpret_op(builder_data.op_ctx, output_name_forced_marker, op, args)
+        let abstract_arg = self
+            .current_state
+            .interpret_op(builder_data.op_ctx, output_name_forced_marker, op, args)
             .change_context(BuilderError::OutsideError)?;
 
         let op_like_instr = op_like.to_op_like_instruction(builder_data.self_op_id);
 
-        self.instructions.push(
-            (
-                output_name,
-                Instruction::OpLike(op_like_instr, abstract_arg)
-            )
-        );
+        self.instructions.push((
+            output_name,
+            Instruction::OpLike(op_like_instr, abstract_arg),
+        ));
 
         Ok(())
     }
@@ -280,13 +305,17 @@ impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for Query
 }
 
 impl<S: Semantics> QueryFrame<S> {
-    pub fn new(outer_state: &IntermediateState<S>, instruction: BuilderInstruction<S>) -> Result<Self, BuilderError> {
+    pub fn new(
+        outer_state: &IntermediateState<S>,
+        instruction: BuilderInstruction<S>,
+    ) -> Result<Self, BuilderError> {
         use BuilderInstruction as BI;
 
         match instruction {
             BI::StartQuery(query, args) => {
                 let mut before_branches_state = outer_state.clone();
-                let abstract_arg = before_branches_state.interpret_builtin_query(&query, args)
+                let abstract_arg = before_branches_state
+                    .interpret_builtin_query(&query, args)
                     .change_context(BuilderError::OutsideError)?;
 
                 let frame = QueryFrame {
@@ -299,13 +328,9 @@ impl<S: Semantics> QueryFrame<S> {
                 };
 
                 Ok(frame)
-            },
-            _ => {
-                Err(report!(BuilderError::UnexpectedInstruction))
-                    .attach_printable_lazy(|| {
-                        format!("Expected StartQuery, got: {:?}", instruction)
-                    })
-            },
+            }
+            _ => Err(report!(BuilderError::UnexpectedInstruction))
+                .attach_printable_lazy(|| format!("Expected StartQuery, got: {:?}", instruction)),
         }
     }
 
@@ -317,7 +342,11 @@ impl<S: Semantics> QueryFrame<S> {
 
         let this: &mut QueryFrame<S> = builder.stack.expect_mut();
 
-        if let Some(branch) = this.currently_entered_branch && builder.return_stack.top_is::<CollectingInstructionsFrame<S>>() {
+        if let Some(branch) = this.currently_entered_branch
+            && builder
+                .return_stack
+                .top_is::<CollectingInstructionsFrame<S>>()
+        {
             // TODO: is there a situation where this.currently_entered_branch is None but we have a branch frame?
 
             let branch_frame: CollectingInstructionsFrame<S> = builder.return_stack.expect_pop();
@@ -336,19 +365,25 @@ impl<S: Semantics> QueryFrame<S> {
         match instruction {
             BI::EnterTrueBranch => {
                 if this.true_instructions.is_some() {
-                    bail!(BuilderError::NeedsSpecificVariant("true branch already entered"));
+                    bail!(BuilderError::NeedsSpecificVariant(
+                        "true branch already entered"
+                    ));
                 }
                 // We enter the true branch
-                let true_frame = CollectingInstructionsFrame::from_state(this.before_branches_state.clone());
+                let true_frame =
+                    CollectingInstructionsFrame::from_state(this.before_branches_state.clone());
                 this.currently_entered_branch = Some(true);
                 builder.push_frame(true_frame);
             }
             BI::EnterFalseBranch => {
                 if this.false_instructions.is_some() {
-                    bail!(BuilderError::NeedsSpecificVariant("false branch already entered"));
+                    bail!(BuilderError::NeedsSpecificVariant(
+                        "false branch already entered"
+                    ));
                 }
                 // We enter the false branch
-                let false_frame = CollectingInstructionsFrame::from_state(this.before_branches_state.clone());
+                let false_frame =
+                    CollectingInstructionsFrame::from_state(this.before_branches_state.clone());
                 this.currently_entered_branch = Some(false);
                 builder.push_frame(false_frame);
             }
@@ -362,34 +397,41 @@ impl<S: Semantics> QueryFrame<S> {
             }
         }
 
-
         Ok(())
     }
 
-    fn handle_query_end(
-        self,
-        builder: &mut Builder<S>,
-    ) -> Result<(), BuilderError> {
+    fn handle_query_end(self, builder: &mut Builder<S>) -> Result<(), BuilderError> {
         assert!(self.currently_entered_branch.is_none());
 
         // we need to handle everything that happens at the end of a query frame - i.e., merging states
-        let true_branch_state_ref = self.true_instructions.as_ref().map(|cif| &cif.current_state).unwrap_or(&self.before_branches_state);
-        let false_branch_state_ref = self.false_instructions.as_ref().map(|cif| &cif.current_state).unwrap_or(&self.before_branches_state);
+        let true_branch_state_ref = self
+            .true_instructions
+            .as_ref()
+            .map(|cif| &cif.current_state)
+            .unwrap_or(&self.before_branches_state);
+        let false_branch_state_ref = self
+            .false_instructions
+            .as_ref()
+            .map(|cif| &cif.current_state)
+            .unwrap_or(&self.before_branches_state);
         let merged_branch = merge_states(false, true_branch_state_ref, false_branch_state_ref);
 
         let outer_frame: &mut CollectingInstructionsFrame<S> = builder.stack.expect_mut();
         outer_frame.current_state = merged_branch;
         // push ourselves as instruction
         let query_instructions = QueryInstructions {
-            taken: self.true_instructions.map(|cif| cif.instructions).unwrap_or_default(),
-            not_taken: self.false_instructions.map(|cif| cif.instructions).unwrap_or_default(),
+            taken: self
+                .true_instructions
+                .map(|cif| cif.instructions)
+                .unwrap_or_default(),
+            not_taken: self
+                .false_instructions
+                .map(|cif| cif.instructions)
+                .unwrap_or_default(),
         };
         outer_frame.instructions.push((
             None,
-            Instruction::BuiltinQuery(self.query,
-                self.abstract_arg,
-                query_instructions
-            ),
+            Instruction::BuiltinQuery(self.query, self.abstract_arg, query_instructions),
         ));
 
         Ok(())
@@ -453,7 +495,8 @@ impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for Retur
 
 impl<S: Semantics> ReturnFrame<S> {
     pub fn new(data: &BuilderData<S>, cif: CollectingInstructionsFrame<S>) -> Self {
-        let mut signature = OperationSignature::empty_new("some_name", data.built.parameter.clone().unwrap());
+        let mut signature =
+            OperationSignature::empty_new("some_name", data.built.parameter.clone().unwrap());
         populate_signature_changes(&mut signature, &cif.current_state);
 
         ReturnFrame {
@@ -476,18 +519,10 @@ impl<S: Semantics> ReturnFrame<S> {
         let instruction = instruction_opt.take().unwrap();
         match instruction {
             BI::ReturnNode(aid, output_marker, node) => {
-                this.include_return_node(
-                    aid,
-                    output_marker,
-                    node,
-                )?;
+                this.include_return_node(aid, output_marker, node)?;
             }
             BI::ReturnEdge(src, dst, edge) => {
-                this.include_return_edge(
-                    src,
-                    dst,
-                    edge,
-                )?;
+                this.include_return_edge(src, dst, edge)?;
             }
             BI::Finalize => {
                 // nothing for now, just consume.
@@ -497,7 +532,7 @@ impl<S: Semantics> ReturnFrame<S> {
             }
             _ => {
                 bail_unexpected_instruction!(instruction, instruction_opt, "ReturnFrame");
-            },
+            }
         }
 
         Ok(())
@@ -510,28 +545,40 @@ impl<S: Semantics> ReturnFrame<S> {
         av: S::NodeAbstract,
     ) -> Result<(), BuilderError> {
         if let AbstractNodeId::ParameterMarker(_) = aid {
-            bail!(BuilderError::NeedsSpecificVariant("cannot return parameter node"));
+            bail!(BuilderError::NeedsSpecificVariant(
+                "cannot return parameter node"
+            ));
         }
         if !self.last_state().contains_aid(&aid) {
             bail!(BuilderError::NeedsSpecificVariant("aid not found"));
         }
         if self.return_nodes.contains_key(&aid) {
-            bail!(BuilderError::NeedsSpecificVariant("return node already exists"));
+            bail!(BuilderError::NeedsSpecificVariant(
+                "return node already exists"
+            ));
         }
         // if the user wants to return the node as an `av`, `av` must be a supertype of the inferred type
         let inferred_av = self.last_state().node_av_of_aid(&aid).unwrap();
         if !S::NodeMatcher::matches(inferred_av, &av) {
-            bail!(BuilderError::NeedsSpecificVariant("cannot return node with incompatible abstract value"));
+            bail!(BuilderError::NeedsSpecificVariant(
+                "cannot return node with incompatible abstract value"
+            ));
         }
-        if self.last_state().node_may_originate_from_shape_query.contains(&aid) {
-            bail!(BuilderError::NeedsSpecificVariant("cannot return node that originates from a shape query"));
+        if self
+            .last_state()
+            .node_may_originate_from_shape_query
+            .contains(&aid)
+        {
+            bail!(BuilderError::NeedsSpecificVariant(
+                "cannot return node that originates from a shape query"
+            ));
         }
 
         self.abstract_ud_output.new_nodes.insert(aid, output_marker);
-        self.signature.output.new_nodes.insert(
-            output_marker,
-            av.clone(),
-        );
+        self.signature
+            .output
+            .new_nodes
+            .insert(output_marker, av.clone());
         self.return_nodes.insert(aid, (output_marker, av));
         Ok(())
     }
@@ -547,7 +594,9 @@ impl<S: Semantics> ReturnFrame<S> {
             bail!(BuilderError::NeedsSpecificVariant("edge not found"));
         }
         if self.return_edges.contains_key(&(src, dst)) {
-            bail!(BuilderError::NeedsSpecificVariant("return edge already exists"));
+            bail!(BuilderError::NeedsSpecificVariant(
+                "return edge already exists"
+            ));
         }
         if !self.last_state().contains_aid(&src) {
             bail!(BuilderError::NeedsSpecificVariant("src aid not found"));
@@ -558,15 +607,30 @@ impl<S: Semantics> ReturnFrame<S> {
         // if the user wants to return the edge as an `av`, `av` must be a supertype of the inferred type
         let inferred_av = self.last_state().edge_av_of_aid(&src, &dst).unwrap();
         if !S::EdgeMatcher::matches(inferred_av, &av) {
-            bail!(BuilderError::NeedsSpecificVariant("cannot return edge with incompatible abstract value"));
+            bail!(BuilderError::NeedsSpecificVariant(
+                "cannot return edge with incompatible abstract value"
+            ));
         }
-        if self.last_state().edge_may_originate_from_shape_query.contains(&(src, dst)) {
-            bail!(BuilderError::NeedsSpecificVariant("cannot return edge that originates from a shape query"));
+        if self
+            .last_state()
+            .edge_may_originate_from_shape_query
+            .contains(&(src, dst))
+        {
+            bail!(BuilderError::NeedsSpecificVariant(
+                "cannot return edge that originates from a shape query"
+            ));
         }
 
-        let src_sig_id = self.aid_to_sig_id(&src).attach_printable_lazy(|| "cannot use source node in signature")?;
-        let dst_sig_id = self.aid_to_sig_id(&dst).attach_printable_lazy(|| "cannot use destination node in signature")?;
-        self.signature.output.new_edges.insert((src_sig_id, dst_sig_id), av.clone());
+        let src_sig_id = self
+            .aid_to_sig_id(&src)
+            .attach_printable_lazy(|| "cannot use source node in signature")?;
+        let dst_sig_id = self
+            .aid_to_sig_id(&dst)
+            .attach_printable_lazy(|| "cannot use destination node in signature")?;
+        self.signature
+            .output
+            .new_edges
+            .insert((src_sig_id, dst_sig_id), av.clone());
 
         self.return_edges.insert((src, dst), av);
         Ok(())
@@ -606,7 +670,9 @@ struct BuildingShapeQueryFrame<S: Semantics> {
     true_branch_state: IntermediateState<S>,
 }
 
-impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for BuildingShapeQueryFrame<S> {
+impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone
+    for BuildingShapeQueryFrame<S>
+{
     fn clone(&self) -> Self {
         BuildingShapeQueryFrame {
             parameter: self.parameter.clone(),
@@ -620,7 +686,10 @@ impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for Build
 }
 
 impl<S: Semantics> BuildingShapeQueryFrame<S> {
-    pub fn new(query_marker: AbstractOperationResultMarker, initial_state: IntermediateState<S>) -> Self {
+    pub fn new(
+        query_marker: AbstractOperationResultMarker,
+        initial_state: IntermediateState<S>,
+    ) -> Self {
         let true_branch_state = initial_state.clone();
         let (parameter, abstract_arg) = initial_state.as_param_for_shape_query();
         BuildingShapeQueryFrame {
@@ -648,24 +717,24 @@ impl<S: Semantics> BuildingShapeQueryFrame<S> {
                 let sni: ShapeNodeIdentifier = marker.0.into();
                 // return error if we already encountered this key before
                 if this.gsq_node_keys_to_shape_idents.contains_right(&sni) {
-                    bail!(BuilderError::NeedsSpecificVariant("shape node already exists"));
+                    bail!(BuilderError::NeedsSpecificVariant(
+                        "shape node already exists"
+                    ));
                 }
 
                 this.true_branch_state.add_node(aid, av, true);
-                this.gsq_node_keys_to_shape_idents.insert(this.true_branch_state.get_key_from_aid(&aid).unwrap(), sni);
+                this.gsq_node_keys_to_shape_idents
+                    .insert(this.true_branch_state.get_key_from_aid(&aid).unwrap(), sni);
             }
             BI::ExpectShapeNodeChange(aid, new_av) => {
-                this.true_branch_state.set_node_av(aid, new_av)
+                this.true_branch_state
+                    .set_node_av(aid, new_av)
                     .change_context(BuilderError::OutsideError)?;
             }
             BI::ExpectShapeEdge(src, dst, edge) => {
-                this.true_branch_state.add_edge(
-                    src,
-                    dst,
-                    edge,
-                    true,
-                ).change_context(BuilderError::OutsideError)?;
-
+                this.true_branch_state
+                    .add_edge(src, dst, edge, true)
+                    .change_context(BuilderError::OutsideError)?;
             }
             instruction if instruction.can_break_body() => {
                 // Advance to BuiltShapeQueryFrame
@@ -676,14 +745,21 @@ impl<S: Semantics> BuildingShapeQueryFrame<S> {
                 builder.push_frame(built_frame);
             }
             _ => {
-                bail_unexpected_instruction!(instruction, instruction_opt, "BuildingShapeQueryFrame");
-            },
+                bail_unexpected_instruction!(
+                    instruction,
+                    instruction_opt,
+                    "BuildingShapeQueryFrame"
+                );
+            }
         }
 
         Ok(())
     }
 
-    fn into_built_shape_query_frame(self, builder: &mut Builder<S>) -> Result<BuiltShapeQueryFrame<S>, BuilderError> {
+    fn into_built_shape_query_frame(
+        self,
+        builder: &mut Builder<S>,
+    ) -> Result<BuiltShapeQueryFrame<S>, BuilderError> {
         // We build the parameter and the initial state
 
         let query = GraphShapeQuery {
@@ -692,7 +768,13 @@ impl<S: Semantics> BuildingShapeQueryFrame<S> {
             node_keys_to_shape_idents: self.gsq_node_keys_to_shape_idents,
         };
 
-        Ok(BuiltShapeQueryFrame::new(self.query_marker, query, self.abstract_arg, self.initial_state, self.true_branch_state))
+        Ok(BuiltShapeQueryFrame::new(
+            self.query_marker,
+            query,
+            self.abstract_arg,
+            self.initial_state,
+            self.true_branch_state,
+        ))
     }
 }
 
@@ -751,7 +833,11 @@ impl<S: Semantics> BuiltShapeQueryFrame<S> {
 
         let this: &mut BuiltShapeQueryFrame<S> = builder.stack.expect_mut();
 
-        if let Some(branch) = this.currently_entered_branch && builder.return_stack.top_is::<CollectingInstructionsFrame<S>>() {
+        if let Some(branch) = this.currently_entered_branch
+            && builder
+                .return_stack
+                .top_is::<CollectingInstructionsFrame<S>>()
+        {
             // TODO: is there a situation where this.currently_entered_branch is None but we have a branch frame?
 
             let branch_frame: CollectingInstructionsFrame<S> = builder.return_stack.expect_pop();
@@ -768,19 +854,26 @@ impl<S: Semantics> BuiltShapeQueryFrame<S> {
         match instruction {
             BI::EnterTrueBranch => {
                 if this.true_instructions.is_some() {
-                    bail!(BuilderError::NeedsSpecificVariant("true branch already entered"));
+                    bail!(BuilderError::NeedsSpecificVariant(
+                        "true branch already entered"
+                    ));
                 }
                 // We enter the true branch
-                let true_frame = CollectingInstructionsFrame::from_state(this.initial_true_branch_state.clone());
+                let true_frame =
+                    CollectingInstructionsFrame::from_state(this.initial_true_branch_state.clone());
                 this.currently_entered_branch = Some(true);
                 builder.push_frame(true_frame);
             }
             BI::EnterFalseBranch => {
                 if this.false_instructions.is_some() {
-                    bail!(BuilderError::NeedsSpecificVariant("false branch already entered"));
+                    bail!(BuilderError::NeedsSpecificVariant(
+                        "false branch already entered"
+                    ));
                 }
                 // We enter the false branch
-                let false_frame = CollectingInstructionsFrame::from_state(this.initial_false_branch_state.clone());
+                let false_frame = CollectingInstructionsFrame::from_state(
+                    this.initial_false_branch_state.clone(),
+                );
                 this.currently_entered_branch = Some(false);
                 builder.push_frame(false_frame);
             }
@@ -792,40 +885,46 @@ impl<S: Semantics> BuiltShapeQueryFrame<S> {
             }
             _ => {
                 bail_unexpected_instruction!(instruction, instruction_opt, "BuiltShapeQueryFrame");
-            },
+            }
         }
 
         Ok(())
     }
 
-    fn handle_shape_query_end(
-        self,
-        builder: &mut Builder<S>,
-    ) -> Result<(), BuilderError> {
+    fn handle_shape_query_end(self, builder: &mut Builder<S>) -> Result<(), BuilderError> {
         // we need to handle everything that happens at the end of a query frame - i.e., merging states
 
         // TODO: look at this code
 
-        let true_branch_state_ref = self.true_instructions.as_ref().map(|cif| &cif.current_state).unwrap_or(&self.initial_true_branch_state);
-        let false_branch_state_ref = self.false_instructions.as_ref().map(|cif| &cif.current_state).unwrap_or(&self.initial_false_branch_state);
+        let true_branch_state_ref = self
+            .true_instructions
+            .as_ref()
+            .map(|cif| &cif.current_state)
+            .unwrap_or(&self.initial_true_branch_state);
+        let false_branch_state_ref = self
+            .false_instructions
+            .as_ref()
+            .map(|cif| &cif.current_state)
+            .unwrap_or(&self.initial_false_branch_state);
         let merged_branch = merge_states(false, true_branch_state_ref, false_branch_state_ref);
 
         let outer_frame: &mut CollectingInstructionsFrame<S> = builder.stack.expect_mut();
         outer_frame.current_state = merged_branch;
 
         let query_instructions = QueryInstructions {
-            taken: self.true_instructions.map(|cif| cif.instructions).unwrap_or_default(),
-            not_taken: self.false_instructions.map(|cif| cif.instructions).unwrap_or_default(),
+            taken: self
+                .true_instructions
+                .map(|cif| cif.instructions)
+                .unwrap_or_default(),
+            not_taken: self
+                .false_instructions
+                .map(|cif| cif.instructions)
+                .unwrap_or_default(),
         };
         outer_frame.instructions.push((
             Some(self.query_marker),
-            Instruction::ShapeQuery(
-                self.query,
-                self.abstract_arg,
-                query_instructions,
-            )
+            Instruction::ShapeQuery(self.query, self.abstract_arg, query_instructions),
         ));
-
 
         Ok(())
     }
@@ -878,9 +977,7 @@ impl<S: Semantics> FrameStack<S> {
     }
 
     pub fn new_empty() -> Self {
-        FrameStack {
-            frames: vec![],
-        }
+        FrameStack { frames: vec![] }
     }
 
     pub fn push(&mut self, frame: impl Into<Frame<S>>) {
@@ -900,31 +997,35 @@ impl<S: Semantics> FrameStack<S> {
     }
 
     pub fn top_is<'a, F>(&'a self) -> bool
-    where S: 'a,
+    where
+        S: 'a,
         F: 'a,
-          &'a Frame<S>: TryInto<&'a F>
+        &'a Frame<S>: TryInto<&'a F>,
     {
         self.frames.last().map_or(false, |f| f.try_into().is_ok())
     }
 
     pub fn expect_mut<'a, F>(&'a mut self) -> F
-    where S: 'a,
-    &'a mut Frame<S>: TryInto<F>
+    where
+        S: 'a,
+        &'a mut Frame<S>: TryInto<F>,
     {
         let last = self.frames.last_mut().unwrap();
         last.try_into().ok().unwrap()
     }
 
     pub fn expect_ref<'a, F>(&'a self) -> F
-    where S: 'a,
-          &'a Frame<S>: TryInto<F>
+    where
+        S: 'a,
+        &'a Frame<S>: TryInto<F>,
     {
         let last = self.frames.last().unwrap();
         last.try_into().ok().unwrap()
     }
 
     pub fn expect_pop<F>(&mut self) -> F
-    where Frame<S>: TryInto<F>
+    where
+        Frame<S>: TryInto<F>,
     {
         let last = self.frames.pop().unwrap();
         last.try_into().ok().unwrap()
@@ -945,9 +1046,7 @@ impl<S: Semantics> Clone for BuiltData<S> {
 
 impl<S: Semantics> BuiltData<S> {
     pub fn new() -> Self {
-        BuiltData {
-            parameter: None,
-        }
+        BuiltData { parameter: None }
     }
 }
 
@@ -996,7 +1095,6 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for B
     }
 }
 
-
 impl<'a, S: Semantics> Builder<'a, S> {
     pub fn new(op_ctx: &'a OperationContext<S>, self_op_id: OperationId) -> Self {
         Builder {
@@ -1014,9 +1112,7 @@ impl<'a, S: Semantics> Builder<'a, S> {
             Some(Frame::CollectingInstructions(frame)) => {
                 BuilderShowData::CollectingInstructions(&frame.current_state)
             }
-            Some(Frame::Query(frame)) => {
-                BuilderShowData::QueryFrame(&frame.before_branches_state)
-            }
+            Some(Frame::Query(frame)) => BuilderShowData::QueryFrame(&frame.before_branches_state),
             Some(Frame::Return(frame)) => {
                 BuilderShowData::ReturnFrame(&frame.instr_frame.current_state)
             }
@@ -1033,9 +1129,7 @@ impl<'a, S: Semantics> Builder<'a, S> {
                 // TODO: do we ever enter this path even? is BuiltShapeQueryFrame ever not immediately consumed/processed?
                 BuilderShowData::ShapeQueryFrame(&frame.initial_true_branch_state)
             }
-            None => {
-                BuilderShowData::Other("No frame".to_string())
-            }
+            None => BuilderShowData::Other("No frame".to_string()),
         }
     }
 
@@ -1108,7 +1202,6 @@ impl<'a, S: Semantics> Builder<'a, S> {
     fn push_frame(&mut self, frame: impl Into<Frame<S>>) {
         self.stack.push(frame.into());
     }
-
 }
 
 /// If signature contains the operation's parameter, then this function populates the signature's
@@ -1187,8 +1280,7 @@ fn populate_signature_changes<S: Semantics>(
             .insert(*subst, node_abstract.clone());
     }
 
-    for ((source_aid, target_aid), edge_abstract) in &last_state.edge_may_be_written_to
-    {
+    for ((source_aid, target_aid), edge_abstract) in &last_state.edge_may_be_written_to {
         // we care about reporting only subst markers
         let AbstractNodeId::ParameterMarker(source_subst) = source_aid else {
             continue;
@@ -1203,7 +1295,6 @@ fn populate_signature_changes<S: Semantics>(
     }
 }
 
-
 pub enum BuilderShowData<'a, S: Semantics> {
     ParameterBuilder(&'a OperationParameterBuilder<S>),
     CollectingInstructions(&'a IntermediateState<S>),
@@ -1217,7 +1308,16 @@ impl<'a, S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> Debug for Build
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             BuilderShowData::ParameterBuilder(param_builder) => {
-                write!(f, "ParameterBuilder: {:?}", (*param_builder).clone().build().unwrap().parameter_graph.shape_dot())
+                write!(
+                    f,
+                    "ParameterBuilder: {:?}",
+                    (*param_builder)
+                        .clone()
+                        .build()
+                        .unwrap()
+                        .parameter_graph
+                        .shape_dot()
+                )
             }
             BuilderShowData::CollectingInstructions(state) => {
                 write!(f, "CollectingInstructions: {}", state.dot_with_aid())
@@ -1237,7 +1337,6 @@ impl<'a, S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> Debug for Build
         }
     }
 }
-
 
 pub struct OperationBuilder2<'a, S: Semantics> {
     op_ctx: &'a OperationContext<S>,
@@ -1299,10 +1398,10 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         let source_marker = source_marker.into();
         let target_marker = target_marker.into();
         self.push_instruction(BuilderInstruction::ExpectParameterEdge(
-                source_marker,
-                target_marker,
-                edge,
-            ))
+            source_marker,
+            target_marker,
+            edge,
+        ))
     }
 
     pub fn start_query(
@@ -1432,15 +1531,16 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
     // TODO: This should run further post processing checks.
     //  Stuff like Context nodes must be connected, etc.
     // TODO: remove self_op_id since that is actually not used here.
-    pub fn build(
-        &mut self,
-    ) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
+    pub fn build(&mut self) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
         // build on a clone
         let res = self.active.clone().build();
         res.change_context(OperationBuilderError::NewBuilderError)
     }
 
-    fn push_instruction(&mut self, instruction: BuilderInstruction<S>) -> Result<(), OperationBuilderError> {
+    fn push_instruction(
+        &mut self,
+        instruction: BuilderInstruction<S>,
+    ) -> Result<(), OperationBuilderError> {
         let mut new_builder_stage_1 = self.active.clone();
         let res = new_builder_stage_1.consume(instruction.clone());
         if res.is_err() {
@@ -1450,11 +1550,15 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         // we know that running the instruction once did not fail. However, in presence of recursion,
         // it may fail only once a prior recursive call 'sees' the new instruction.
 
-        let new_self_op = new_builder_stage_1.build().change_context(OperationBuilderError::NewBuilderError)?;
-        // now that we have the new self op, let's try the instruction again.
-        let mut new_builder_stage_2 = self.build_builder_from_scratch_with_self_op(new_self_op)
+        let new_self_op = new_builder_stage_1
+            .build()
             .change_context(OperationBuilderError::NewBuilderError)?;
-        new_builder_stage_2.consume(instruction.clone())
+        // now that we have the new self op, let's try the instruction again.
+        let mut new_builder_stage_2 = self
+            .build_builder_from_scratch_with_self_op(new_self_op)
+            .change_context(OperationBuilderError::NewBuilderError)?;
+        new_builder_stage_2
+            .consume(instruction.clone())
             .change_context(OperationBuilderError::NewBuilderError)?;
         // TODO: add test that checks if maybe we change semantics by replaying all instructions with a different self op?
         // at this point we know the building worked, so we can safely update our active builder.
@@ -1477,7 +1581,10 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         // res
     }
 
-    fn build_builder_from_scratch_with_self_op(&self, self_op: UserDefinedOperation<S>) -> Result<Builder<'a, S>, BuilderError> {
+    fn build_builder_from_scratch_with_self_op(
+        &self,
+        self_op: UserDefinedOperation<S>,
+    ) -> Result<Builder<'a, S>, BuilderError> {
         let mut builder = Builder::new(self.op_ctx, self.self_op_id);
         builder.update_partial_self_op(self_op);
         for instruction in &self.instructions {
@@ -1491,7 +1598,8 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         let instrs = std::mem::take(&mut self.instructions);
         self.active = Builder::new(self.op_ctx, self.self_op_id);
         for instruction in instrs {
-            self.push_instruction(instruction).expect("Rebuilding active builder from instructions should not fail");
+            self.push_instruction(instruction)
+                .expect("Rebuilding active builder from instructions should not fail");
         }
     }
 }
@@ -1499,12 +1607,13 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
 impl<
     'a,
     S: Semantics<
-        NodeAbstract: Debug,
-        EdgeAbstract: Debug,
-        BuiltinOperation: Clone,
-        BuiltinQuery: Clone,
-    >,
-> OperationBuilder2<'a, S> {
+            NodeAbstract: Debug,
+            EdgeAbstract: Debug,
+            BuiltinOperation: Clone,
+            BuiltinQuery: Clone,
+        >,
+> OperationBuilder2<'a, S>
+{
     pub fn show_state(&self) -> Result<IntermediateState<S>, OperationBuilderError> {
         let inner = self.active.show();
         match inner {
@@ -1512,23 +1621,14 @@ impl<
                 let param = param_builder.clone().build().unwrap();
                 Ok(IntermediateState::from_param(&param))
             }
-            BuilderShowData::CollectingInstructions(state) => {
-                Ok(state.clone())
-            }
-            BuilderShowData::QueryFrame(state) => {
-                Ok(state.clone())
-            }
-            BuilderShowData::ShapeQueryFrame(state) => {
-                Ok(state.clone())
-            }
-            BuilderShowData::ReturnFrame(state) => {
-                Ok(state.clone())
-            }
-            BuilderShowData::Other(_) => {
-                Err(report!(OperationBuilderError::NewBuilderError)).attach_printable_lazy(||
+            BuilderShowData::CollectingInstructions(state) => Ok(state.clone()),
+            BuilderShowData::QueryFrame(state) => Ok(state.clone()),
+            BuilderShowData::ShapeQueryFrame(state) => Ok(state.clone()),
+            BuilderShowData::ReturnFrame(state) => Ok(state.clone()),
+            BuilderShowData::Other(_) => Err(report!(OperationBuilderError::NewBuilderError))
+                .attach_printable_lazy(|| {
                     format!("Expected CollectingInstructions state, got: {:?}", inner)
-                )
-            }
+                }),
         }
     }
 

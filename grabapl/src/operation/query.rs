@@ -4,6 +4,7 @@ use crate::operation::signature::parameter::{
     GraphWithSubstitution, OperationArgument, OperationParameter, ParameterSubstitution,
 };
 use crate::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics};
+use crate::util::bimap::BiMap;
 use crate::util::log;
 use crate::{NodeKey, SubstMarker, interned_string_newtype};
 use derive_more::From;
@@ -12,7 +13,6 @@ use internment::Intern;
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
 use std::collections::{HashMap, HashSet};
-use crate::util::bimap::BiMap;
 
 pub trait BuiltinQuery {
     type S: Semantics;

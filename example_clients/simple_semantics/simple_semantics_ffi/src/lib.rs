@@ -137,7 +137,9 @@ mod ffi {
     impl<'a> OperationBuilder<'a> {
         // TODO: this is only safe and sound as long as the OpCtx is not edited.
         pub fn create(op_ctx: &'a OpCtx, self_op_id: u32) -> Box<OperationBuilder<'a>> {
-            Box::new(OperationBuilder(RustOperationBuilder::new(&op_ctx.0, self_op_id)))
+            Box::new(OperationBuilder(RustOperationBuilder::new(
+                &op_ctx.0, self_op_id,
+            )))
         }
 
         pub fn expect_parameter_node(

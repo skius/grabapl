@@ -11,7 +11,7 @@ use crate::operation::user_defined::{
     AbstractUserDefinedOperationOutput, NamedMarker, OpLikeInstruction, QueryInstructions,
     UserDefinedOperation,
 };
-use crate::operation::{BuiltinOperation, OperationError, get_substitution, Operation};
+use crate::operation::{BuiltinOperation, Operation, OperationError, get_substitution};
 use crate::semantics::{AbstractGraph, AbstractMatcher};
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
@@ -56,7 +56,11 @@ pub enum BuilderOpLike<S: Semantics> {
 }
 
 impl<S: Semantics> BuilderOpLike<S> {
-    fn as_operation<'a>(&'a self, op_ctx: &'a OperationContext<S>, partial_user_def_op: &'a UserDefinedOperation<S>) -> Result<Operation<'a, S>, OperationBuilderError> {
+    fn as_operation<'a>(
+        &'a self,
+        op_ctx: &'a OperationContext<S>,
+        partial_user_def_op: &'a UserDefinedOperation<S>,
+    ) -> Result<Operation<'a, S>, OperationBuilderError> {
         let op = match self {
             BuilderOpLike::Builtin(op) => Operation::Builtin(op),
             BuilderOpLike::LibBuiltin(op) => Operation::LibBuiltin(op),
@@ -66,17 +70,12 @@ impl<S: Semantics> BuilderOpLike<S> {
                     .ok_or_else(|| OperationBuilderError::NotFoundOperationId(*id))?;
                 op
             }
-            BuilderOpLike::Recurse => {
-                Operation::Custom(partial_user_def_op)
-            }
+            BuilderOpLike::Recurse => Operation::Custom(partial_user_def_op),
         };
         Ok(op)
     }
 
-    fn to_op_like_instruction(
-        self,
-        self_op_id: OperationId,
-    ) -> OpLikeInstruction<S> {
+    fn to_op_like_instruction(self, self_op_id: OperationId) -> OpLikeInstruction<S> {
         match self {
             BuilderOpLike::Builtin(op) => OpLikeInstruction::Builtin(op),
             BuilderOpLike::LibBuiltin(op) => OpLikeInstruction::LibBuiltin(op),
@@ -142,7 +141,7 @@ pub enum BuilderInstruction<S: Semantics> {
     /// Rename a dynamic output marker.
     /// Invariants in the interpreter require that this is never a parameter node. (E.g., since we may want to return it)
     RenameNode(AbstractNodeId, NamedMarker),
-    Finalize
+    Finalize,
 }
 
 impl<S: Semantics> BuilderInstruction<S> {
@@ -151,7 +150,8 @@ impl<S: Semantics> BuilderInstruction<S> {
     fn can_break_body(&self) -> bool {
         use BuilderInstruction::*;
         match self {
-            EnterTrueBranch | EnterFalseBranch | EndQuery | ReturnNode(..) | ReturnEdge(..) | Finalize => true,
+            EnterTrueBranch | EnterFalseBranch | EndQuery | ReturnNode(..) | ReturnEdge(..)
+            | Finalize => true,
             _ => false,
         }
     }
@@ -176,9 +176,13 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Build
             ExpectShapeEdge(source, target, edge) => {
                 ExpectShapeEdge(source.clone(), target.clone(), edge.clone())
             }
-            AddNamedOperation(name, op, args) => AddNamedOperation(name.clone(), op.clone(), args.clone()),
+            AddNamedOperation(name, op, args) => {
+                AddNamedOperation(name.clone(), op.clone(), args.clone())
+            }
             AddOperation(op, args) => AddOperation(op.clone(), args.clone()),
-            ReturnNode(aid, output_marker, node) => ReturnNode(aid.clone(), output_marker.clone(), node.clone()),
+            ReturnNode(aid, output_marker, node) => {
+                ReturnNode(aid.clone(), output_marker.clone(), node.clone())
+            }
             ReturnEdge(src, dst, edge) => ReturnEdge(src.clone(), dst.clone(), edge.clone()),
             RenameNode(old_aid, new_name) => RenameNode(old_aid.clone(), new_name.clone()),
             Finalize => Finalize,
@@ -263,8 +267,6 @@ pub enum OperationBuilderError {
 // pub type OperationBuilder<'a, S> = OperationBuilderInefficient<'a, S>;
 pub type OperationBuilder<'a, S> = stack_based_builder::OperationBuilder2<'a, S>;
 
-
-
 pub struct OperationBuilderInefficient<'a, S: Semantics> {
     op_ctx: &'a OperationContext<S>,
     self_op_id: OperationId,
@@ -273,7 +275,9 @@ pub struct OperationBuilderInefficient<'a, S: Semantics> {
     previous_user_defined_operation: RefCell<UserDefinedOperation<S>>,
 }
 
-impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBuilderInefficient<'a, S> {
+impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>>
+    OperationBuilderInefficient<'a, S>
+{
     pub fn new(op_ctx: &'a OperationContext<S>, self_op_id: OperationId) -> Self {
         Self {
             self_op_id,
@@ -491,9 +495,7 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
 
     // TODO: This should run further post processing checks.
     //  Stuff like Context nodes must be connected, etc.
-    pub fn build(
-        &self,
-    ) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
+    pub fn build(&self) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
         // Here we would typically finalize the operation and return it.
         // For now, we just return Ok to indicate success.
 
@@ -1432,17 +1434,20 @@ impl<S: Semantics> IntermediateState<S> {
         edge_abstract: S::EdgeAbstract,
         from_shape_query: bool,
     ) -> Result<(), OperationBuilderError> {
-        let source_key = self.node_keys_to_aid
+        let source_key = self
+            .node_keys_to_aid
             .get_right(&source)
             .ok_or(OperationBuilderError::NotFoundAid(source))?;
-        let target_key = self.node_keys_to_aid
+        let target_key = self
+            .node_keys_to_aid
             .get_right(&target)
             .ok_or(OperationBuilderError::NotFoundAid(target))?;
 
         self.graph.add_edge(*source_key, *target_key, edge_abstract);
 
         if from_shape_query {
-            self.edge_may_originate_from_shape_query.insert((source, target));
+            self.edge_may_originate_from_shape_query
+                .insert((source, target));
         } else {
             // TODO: might be able to remove the AID.
         }
@@ -1454,7 +1459,8 @@ impl<S: Semantics> IntermediateState<S> {
         aid: AbstractNodeId,
         node_abstract: S::NodeAbstract,
     ) -> Result<(), OperationBuilderError> {
-        let node_key = self.node_keys_to_aid
+        let node_key = self
+            .node_keys_to_aid
             .get_right(&aid)
             .ok_or(OperationBuilderError::NotFoundAid(aid))?;
         self.graph.set_node_attr(*node_key, node_abstract);
@@ -1465,18 +1471,16 @@ impl<S: Semantics> IntermediateState<S> {
         self.node_keys_to_aid.contains_right(aid)
     }
 
-    fn contains_edge(
-        &self,
-        source: &AbstractNodeId,
-        target: &AbstractNodeId,
-    ) -> bool {
+    fn contains_edge(&self, source: &AbstractNodeId, target: &AbstractNodeId) -> bool {
         let Some(source_key) = self.node_keys_to_aid.get_right(source) else {
             return false;
         };
         let Some(target_key) = self.node_keys_to_aid.get_right(target) else {
             return false;
         };
-        self.graph.get_edge_attr((*source_key, *target_key)).is_some()
+        self.graph
+            .get_edge_attr((*source_key, *target_key))
+            .is_some()
     }
 
     pub fn node_av_of_aid(&self, aid: &AbstractNodeId) -> Option<&S::NodeAbstract> {
@@ -1547,16 +1551,13 @@ impl<S: Semantics> IntermediateState<S> {
         args: Vec<AbstractNodeId>,
     ) -> Result<AbstractOperationArgument, OperationBuilderError> {
         let param = op.parameter();
-        let (subst, abstract_arg) = self
-            .get_substitution(&param, args)?;
+        let (subst, abstract_arg) = self.get_substitution(&param, args)?;
 
         // now apply op and store result
         let operation_output = {
             let mut gws = GraphWithSubstitution::new(&mut self.graph, &subst);
             op.apply_abstract(op_ctx, &mut gws)
-                .map_err(|e| {
-                    OperationBuilderError::AbstractApplyOperationError(e)
-                })?
+                .map_err(|e| OperationBuilderError::AbstractApplyOperationError(e))?
         };
         self.handle_abstract_output_changes(marker, operation_output)?;
 
@@ -1569,8 +1570,7 @@ impl<S: Semantics> IntermediateState<S> {
         args: Vec<AbstractNodeId>,
     ) -> Result<AbstractOperationArgument, OperationBuilderError> {
         let param = query.parameter();
-        let (subst, abstract_arg) = self
-            .get_substitution(&param, args)?;
+        let (subst, abstract_arg) = self.get_substitution(&param, args)?;
         // now apply the query and store result
         let mut gws = GraphWithSubstitution::new(&mut self.graph, &subst);
         query.apply_abstract(&mut gws);
@@ -1604,8 +1604,7 @@ impl<S: Semantics> IntermediateState<S> {
             let aid = self
                 .get_aid_from_key(&key)
                 .expect("internal error: changed node not found in mapping");
-            self.node_may_be_written_to
-                .insert(aid, node_abstract);
+            self.node_may_be_written_to.insert(aid, node_abstract);
         }
         for ((source, target), edge_abstract) in operation_output.changed_abstract_values_edges {
             let source_aid = self
@@ -1648,32 +1647,27 @@ impl<S: Semantics> IntermediateState<S> {
         Ok((subst, abstract_arg))
     }
 
-    fn get_key_from_aid(
-        &self,
-        aid: &AbstractNodeId,
-    ) -> Result<NodeKey, OperationBuilderError> {
+    fn get_key_from_aid(&self, aid: &AbstractNodeId) -> Result<NodeKey, OperationBuilderError> {
         self.node_keys_to_aid
             .get_right(aid)
             .cloned()
             .ok_or(report!(OperationBuilderError::NotFoundAid(*aid)))
     }
 
-    fn get_aid_from_key(
-        &self,
-        key: &NodeKey,
-    ) -> Result<AbstractNodeId, OperationBuilderError> {
-        self.node_keys_to_aid
-            .get_left(key)
-            .cloned()
-            .ok_or(report!(OperationBuilderError::InternalError("could not find node key")))
+    fn get_aid_from_key(&self, key: &NodeKey) -> Result<AbstractNodeId, OperationBuilderError> {
+        self.node_keys_to_aid.get_left(key).cloned().ok_or(report!(
+            OperationBuilderError::InternalError("could not find node key")
+        ))
     }
 
-    fn as_param_for_shape_query(
-        &self,
-    ) -> (OperationParameter<S>, AbstractOperationArgument) {
+    fn as_param_for_shape_query(&self) -> (OperationParameter<S>, AbstractOperationArgument) {
         let param_graph = self.graph.clone();
 
-        let mut all_node_keys = param_graph.node_attr_map.keys().cloned().collect::<Vec<_>>();
+        let mut all_node_keys = param_graph
+            .node_attr_map
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
         all_node_keys.sort_unstable(); // sort to ensure deterministic order
 
         let mut node_keys_to_subst: BiMap<NodeKey, SubstMarker> = BiMap::new();
@@ -1701,7 +1695,7 @@ impl<S: Semantics> IntermediateState<S> {
                 parameter_graph: param_graph,
                 node_keys_to_subst,
             },
-            abstract_args
+            abstract_args,
         )
     }
 }
@@ -1877,9 +1871,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                     aid,
                 ));
             }
-            ud_output
-                .new_nodes
-                .insert(aid, output_marker);
+            ud_output.new_nodes.insert(aid, output_marker);
             // Add to signature
             signature
                 .output
@@ -2114,16 +2106,14 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         marker: Option<AbstractOperationResultMarker>,
         oplike: IntermediateOpLike<S>,
     ) -> Result<UDInstruction<S>, OperationBuilderError> {
-
-
-
         match oplike {
             IntermediateOpLike::Builtin(builtin_op, args) => {
                 let op = Operation::Builtin(&builtin_op);
-                let abstract_arg = self.interpret_op(marker, op, args)
-                    .attach_printable_lazy(|| {
-                        format!("Failed to interpret builtin operation: {builtin_op:?}")
-                    })?;
+                let abstract_arg =
+                    self.interpret_op(marker, op, args)
+                        .attach_printable_lazy(|| {
+                            format!("Failed to interpret builtin operation: {builtin_op:?}")
+                        })?;
 
                 Ok(UDInstruction::OpLike(
                     OpLikeInstruction::Builtin(builtin_op),
@@ -2132,10 +2122,11 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             }
             IntermediateOpLike::LibBuiltin(lib_builtin_op, args) => {
                 let op = Operation::LibBuiltin(&lib_builtin_op);
-                let abstract_arg = self.interpret_op(marker, op, args)
-                    .attach_printable_lazy(|| {
-                        format!("Failed to interpret lib builtin operation: {lib_builtin_op:?}")
-                    })?;
+                let abstract_arg =
+                    self.interpret_op(marker, op, args)
+                        .attach_printable_lazy(|| {
+                            format!("Failed to interpret lib builtin operation: {lib_builtin_op:?}")
+                        })?;
 
                 Ok(UDInstruction::OpLike(
                     OpLikeInstruction::LibBuiltin(lib_builtin_op),
@@ -2147,10 +2138,9 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                     .op_ctx
                     .get(id)
                     .ok_or(OperationBuilderError::NotFoundOperationId(id))?;
-                let abstract_arg = self.interpret_op(marker, op, args)
-                    .attach_printable_lazy(|| {
-                        format!("Failed to interpret operation: {id:?}")
-                    })?;
+                let abstract_arg = self
+                    .interpret_op(marker, op, args)
+                    .attach_printable_lazy(|| format!("Failed to interpret operation: {id:?}"))?;
 
                 Ok(UDInstruction::OpLike(
                     OpLikeInstruction::Operation(id),
@@ -2170,10 +2160,9 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                 //  (note: it's also unsound for now, since changes _after_ the recursion call are ignored. -- actually, not quite. see tests)
                 let op = Operation::Custom(&self.partial_self_user_defined_op);
 
-                let abstract_arg = self.interpret_op(marker, op, args)
-                    .attach_printable_lazy(|| {
-                        "Failed to interpret recursive call"
-                    })?;
+                let abstract_arg = self
+                    .interpret_op(marker, op, args)
+                    .attach_printable_lazy(|| "Failed to interpret recursive call")?;
 
                 Ok(UDInstruction::OpLike(
                     OpLikeInstruction::Operation(self.self_op_id),
@@ -2259,7 +2248,9 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
     }
 
     // TESTING
-    fn collect_self_state_to_parameter(&self) -> (OperationParameter<S>, AbstractOperationArgument) {
+    fn collect_self_state_to_parameter(
+        &self,
+    ) -> (OperationParameter<S>, AbstractOperationArgument) {
         self.current_state.as_param_for_shape_query()
     }
 
@@ -2280,9 +2271,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         let initial_false_branch_state = false_branch_state.clone();
 
         // first pass: collect the initial graph (the parameter)
-        let (param, abstract_args) =
-            self.collect_self_state_to_parameter();
-
+        let (param, abstract_args) = self.collect_self_state_to_parameter();
 
         // second pass:
         // modify to have the expected graph as well as shape ident mappings.
@@ -2703,16 +2692,14 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         &self,
         aid: AbstractNodeId,
     ) -> Result<NodeKey, OperationBuilderError> {
-        self.current_state
-            .get_key_from_aid(&aid)
+        self.current_state.get_key_from_aid(&aid)
     }
 
     fn get_current_aid_from_key(
         &self,
         key: NodeKey,
     ) -> Result<AbstractNodeId, OperationBuilderError> {
-        self.current_state
-            .get_aid_from_key(&key)
+        self.current_state.get_aid_from_key(&key)
     }
 }
 
