@@ -1337,6 +1337,7 @@ pub enum QueryPath {
 //  - If we are inside a query, which branches have we not entered yet?
 //  - Are we making a shape/non-shape query?
 
+// TODO: should this be named "AbstractBuilderState"? since it's the state, which is abstract, which is used by the builder.
 pub struct IntermediateState<S: Semantics> {
     pub graph: AbstractGraph<S>,
     pub node_keys_to_aid: BiMap<NodeKey, AbstractNodeId>,
