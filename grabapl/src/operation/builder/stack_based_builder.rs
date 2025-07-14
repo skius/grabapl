@@ -166,12 +166,11 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
             BI::AddNamedOperation(output_name, builder_op_like, args) => {
                 this.handle_operation(&mut builder.data, Some(output_name), builder_op_like, args)?;
             }
-            // We enter a new context
             BI::StartQuery(..) => {
-                let query_frame = QueryFrame::new(&this.current_state, instruction)?;
+                let (query_frame, branches_frame) = QueryFrame::new(&this.current_state, instruction)?;
 
-                // but the new query frame is on top
                 builder.push_frame(query_frame);
+                builder.push_frame(branches_frame);
             }
             // need to handle instructions that change the branch - endquery, entertrue, enterfalse
             instruction if instruction.can_break_body() => {
@@ -279,6 +278,135 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
     }
 }
 
+struct BranchesFrame<S: Semantics> {
+    initial_true_branch_state: IntermediateState<S>,
+    initial_false_branch_state: IntermediateState<S>,
+    currently_entered_branch: Option<bool>, // true for true branch, false for false branch
+    true_branch: Option<CollectingInstructionsFrame<S>>,
+    false_branch: Option<CollectingInstructionsFrame<S>>,
+}
+
+impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for BranchesFrame<S> {
+    fn clone(&self) -> Self {
+        BranchesFrame {
+            initial_true_branch_state: self.initial_true_branch_state.clone(),
+            initial_false_branch_state: self.initial_false_branch_state.clone(),
+            currently_entered_branch: self.currently_entered_branch,
+            true_branch: self.true_branch.clone(),
+            false_branch: self.false_branch.clone(),
+        }
+    }
+}
+
+impl<S: Semantics> BranchesFrame<S> {
+    pub fn new(
+        initial_true_branch_state: IntermediateState<S>,
+        initial_false_branch_state: IntermediateState<S>,
+    ) -> Self {
+        BranchesFrame {
+            initial_true_branch_state,
+            initial_false_branch_state,
+            currently_entered_branch: None,
+            true_branch: None,
+            false_branch: None,
+        }
+    }
+
+    pub fn consume(
+        builder: &mut Builder<S>,
+        instruction_opt: &mut Option<BuilderInstruction<S>>,
+    ) -> Result<(), BuilderError> {
+        use BuilderInstruction as BI;
+
+        let this: &mut BranchesFrame<S> = builder.stack.expect_mut();
+
+        if let Some(branch) = this.currently_entered_branch
+            && builder
+            .return_stack
+            .top_is::<CollectingInstructionsFrame<S>>()
+        {
+            if branch {
+                // We are in the true branch
+                let branch_frame: CollectingInstructionsFrame<S> = builder.return_stack.expect_pop();
+                this.true_branch = Some(branch_frame);
+            } else {
+                // We are in the false branch
+                let branch_frame: CollectingInstructionsFrame<S> = builder.return_stack.expect_pop();
+                this.false_branch = Some(branch_frame);
+            }
+            this.currently_entered_branch = None;
+        }
+
+        let instruction = instruction_opt.take().unwrap();
+
+        match instruction {
+            BI::EnterTrueBranch => {
+                if this.true_branch.is_some() {
+                    bail!(BuilderError::NeedsSpecificVariant(
+                        "true branch already entered"
+                    ));
+                }
+                // We enter the true branch
+                let true_frame =
+                    CollectingInstructionsFrame::from_state(this.initial_true_branch_state.clone());
+                this.currently_entered_branch = Some(true);
+                builder.push_frame(true_frame);
+            }
+            BI::EnterFalseBranch => {
+                if this.false_branch.is_some() {
+                    bail!(BuilderError::NeedsSpecificVariant(
+                        "false branch already entered"
+                    ));
+                }
+                // We enter the false branch
+                let false_frame =
+                    CollectingInstructionsFrame::from_state(this.initial_false_branch_state.clone());
+                this.currently_entered_branch = Some(false);
+                builder.push_frame(false_frame);
+            }
+            BI::EndQuery | BI::Finalize => {
+                // outer frame must handle this
+                let this: BranchesFrame<S> = builder.stack.expect_pop();
+                builder.return_stack.push(this);
+                let _ = instruction_opt.insert(instruction);
+            }
+            _ => {
+                bail_unexpected_instruction!(instruction, instruction_opt, "QueryFrame");
+            }
+        }
+
+        Ok(())
+    }
+
+    fn into_merged_state_and_query_instructions(
+        self, default_true_state: &IntermediateState<S>, default_false_state: &IntermediateState<S>,
+    ) -> Result<(IntermediateState<S>, QueryInstructions<S>), BuilderError> {
+        let true_branch_state_ref = self
+            .true_branch
+            .as_ref()
+            .map(|cif| &cif.current_state)
+            .unwrap_or(default_true_state);
+        let false_branch_state_ref = self
+            .false_branch
+            .as_ref()
+            .map(|cif| &cif.current_state)
+            .unwrap_or(default_false_state);
+        let merged_branch = merge_states(false, true_branch_state_ref, false_branch_state_ref);
+
+        let query_instructions = QueryInstructions {
+            taken: self
+                .true_branch
+                .map(|cif| cif.instructions)
+                .unwrap_or_default(),
+            not_taken: self
+                .false_branch
+                .map(|cif| cif.instructions)
+                .unwrap_or_default(),
+        };
+        Ok((merged_branch, query_instructions))
+    }
+}
+
 // TODO: could have a BranchesFrame that is on top of both QueryFrame and ShapeQueryFrame that exclusively handles
 //  EnterTrue/False,EndQuery, and then pushes itself onto the return_stack, to be handled by the outer frame.
 //  That way we don't have duplicate code for gsq/query frames.
@@ -286,9 +414,6 @@ struct QueryFrame<S: Semantics> {
     query: S::BuiltinQuery,
     abstract_arg: AbstractOperationArgument,
     before_branches_state: IntermediateState<S>,
-    true_instructions: Option<CollectingInstructionsFrame<S>>,
-    false_instructions: Option<CollectingInstructionsFrame<S>>,
-    currently_entered_branch: Option<bool>, // true for true branch, false for false branch
 }
 
 impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for QueryFrame<S> {
@@ -297,9 +422,6 @@ impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for Query
             query: self.query.clone(),
             abstract_arg: self.abstract_arg.clone(),
             before_branches_state: self.before_branches_state.clone(),
-            true_instructions: self.true_instructions.clone(),
-            false_instructions: self.false_instructions.clone(),
-            currently_entered_branch: self.currently_entered_branch,
         }
     }
 }
@@ -308,7 +430,7 @@ impl<S: Semantics> QueryFrame<S> {
     pub fn new(
         outer_state: &IntermediateState<S>,
         instruction: BuilderInstruction<S>,
-    ) -> Result<Self, BuilderError> {
+    ) -> Result<(Self, BranchesFrame<S>), BuilderError> {
         use BuilderInstruction as BI;
 
         match instruction {
@@ -322,12 +444,14 @@ impl<S: Semantics> QueryFrame<S> {
                     query,
                     abstract_arg,
                     before_branches_state,
-                    true_instructions: None,
-                    false_instructions: None,
-                    currently_entered_branch: None,
                 };
 
-                Ok(frame)
+                let mut branches_frame = BranchesFrame::new(
+                    frame.before_branches_state.clone(),
+                    frame.before_branches_state.clone(),
+                );
+
+                Ok((frame, branches_frame))
             }
             _ => Err(report!(BuilderError::UnexpectedInstruction))
                 .attach_printable_lazy(|| format!("Expected StartQuery, got: {:?}", instruction)),
@@ -340,53 +464,9 @@ impl<S: Semantics> QueryFrame<S> {
     ) -> Result<(), BuilderError> {
         use BuilderInstruction as BI;
 
-        let this: &mut QueryFrame<S> = builder.stack.expect_mut();
-
-        if let Some(branch) = this.currently_entered_branch
-            && builder
-                .return_stack
-                .top_is::<CollectingInstructionsFrame<S>>()
-        {
-            // TODO: is there a situation where this.currently_entered_branch is None but we have a branch frame?
-
-            let branch_frame: CollectingInstructionsFrame<S> = builder.return_stack.expect_pop();
-            if branch {
-                this.true_instructions = Some(branch_frame);
-            } else {
-                this.false_instructions = Some(branch_frame);
-            }
-
-            this.currently_entered_branch = None;
-        }
-
-        // We accept: EnterTrue, EnterFalse, and EndQuery.
-
         let instruction = instruction_opt.take().unwrap();
         match instruction {
-            BI::EnterTrueBranch => {
-                if this.true_instructions.is_some() {
-                    bail!(BuilderError::NeedsSpecificVariant(
-                        "true branch already entered"
-                    ));
-                }
-                // We enter the true branch
-                let true_frame =
-                    CollectingInstructionsFrame::from_state(this.before_branches_state.clone());
-                this.currently_entered_branch = Some(true);
-                builder.push_frame(true_frame);
-            }
-            BI::EnterFalseBranch => {
-                if this.false_instructions.is_some() {
-                    bail!(BuilderError::NeedsSpecificVariant(
-                        "false branch already entered"
-                    ));
-                }
-                // We enter the false branch
-                let false_frame =
-                    CollectingInstructionsFrame::from_state(this.before_branches_state.clone());
-                this.currently_entered_branch = Some(false);
-                builder.push_frame(false_frame);
-            }
+            // TODO: handle return node?
             BI::EndQuery | BI::Finalize => {
                 // We finish the query, and give the outer frame all our information.
                 let query_frame: QueryFrame<S> = builder.stack.expect_pop();
@@ -401,34 +481,15 @@ impl<S: Semantics> QueryFrame<S> {
     }
 
     fn handle_query_end(self, builder: &mut Builder<S>) -> Result<(), BuilderError> {
-        assert!(self.currently_entered_branch.is_none());
-
         // we need to handle everything that happens at the end of a query frame - i.e., merging states
-        let true_branch_state_ref = self
-            .true_instructions
-            .as_ref()
-            .map(|cif| &cif.current_state)
-            .unwrap_or(&self.before_branches_state);
-        let false_branch_state_ref = self
-            .false_instructions
-            .as_ref()
-            .map(|cif| &cif.current_state)
-            .unwrap_or(&self.before_branches_state);
-        let merged_branch = merge_states(false, true_branch_state_ref, false_branch_state_ref);
+        let branches_frame: BranchesFrame<S> = builder.return_stack.expect_pop();
+
+        let (merged_branch, query_instructions) =
+            branches_frame.into_merged_state_and_query_instructions(&self.before_branches_state, &self.before_branches_state)?;
 
         let outer_frame: &mut CollectingInstructionsFrame<S> = builder.stack.expect_mut();
         outer_frame.current_state = merged_branch;
         // push ourselves as instruction
-        let query_instructions = QueryInstructions {
-            taken: self
-                .true_instructions
-                .map(|cif| cif.instructions)
-                .unwrap_or_default(),
-            not_taken: self
-                .false_instructions
-                .map(|cif| cif.instructions)
-                .unwrap_or_default(),
-        };
         outer_frame.instructions.push((
             None,
             Instruction::BuiltinQuery(self.query, self.abstract_arg, query_instructions),
@@ -467,6 +528,8 @@ impl<S: Semantics> WrapperReturnFrame<S> {
         let instr_frame: CollectingInstructionsFrame<S> = builder.return_stack.expect_pop();
         let return_frame = ReturnFrame::new(&builder.data, instr_frame);
         builder.stack.push(return_frame);
+
+        // we don't consume the instruction, hence it will be passed to the ReturnFrame.
 
         Ok(())
     }
@@ -740,9 +803,11 @@ impl<S: Semantics> BuildingShapeQueryFrame<S> {
                 // Advance to BuiltShapeQueryFrame
                 // it needs to consume this instruction
                 let _ = instruction_opt.insert(instruction);
+
                 let this: BuildingShapeQueryFrame<S> = builder.stack.expect_pop();
-                let built_frame = this.into_built_shape_query_frame(builder)?;
+                let (built_frame, branches_frame) = this.into_built_shape_query_frame(builder)?;
                 builder.push_frame(built_frame);
+                builder.push_frame(branches_frame);
             }
             _ => {
                 bail_unexpected_instruction!(
@@ -759,8 +824,10 @@ impl<S: Semantics> BuildingShapeQueryFrame<S> {
     fn into_built_shape_query_frame(
         self,
         builder: &mut Builder<S>,
-    ) -> Result<BuiltShapeQueryFrame<S>, BuilderError> {
+    ) -> Result<(BuiltShapeQueryFrame<S>, BranchesFrame<S>), BuilderError> {
         // We build the parameter and the initial state
+
+        // TODO: check validity, i.e., no free floating shape nodes, etc.
 
         let query = GraphShapeQuery {
             parameter: self.parameter,
@@ -768,13 +835,20 @@ impl<S: Semantics> BuildingShapeQueryFrame<S> {
             node_keys_to_shape_idents: self.gsq_node_keys_to_shape_idents,
         };
 
-        Ok(BuiltShapeQueryFrame::new(
+        let built_frame = BuiltShapeQueryFrame::new(
             self.query_marker,
             query,
             self.abstract_arg,
-            self.initial_state,
-            self.true_branch_state,
-        ))
+            self.initial_state.clone(),
+            self.true_branch_state.clone(),
+        );
+
+        let branches_frame = BranchesFrame::new(
+            self.true_branch_state.clone(),
+            self.initial_state.clone(),
+        );
+
+        Ok((built_frame, branches_frame))
     }
 }
 
@@ -785,9 +859,6 @@ struct BuiltShapeQueryFrame<S: Semantics> {
     abstract_arg: AbstractOperationArgument,
     initial_false_branch_state: IntermediateState<S>,
     initial_true_branch_state: IntermediateState<S>,
-    true_instructions: Option<CollectingInstructionsFrame<S>>,
-    false_instructions: Option<CollectingInstructionsFrame<S>>,
-    currently_entered_branch: Option<bool>, // true for true branch, false for false branch
 }
 
 impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for BuiltShapeQueryFrame<S> {
@@ -798,9 +869,6 @@ impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for Built
             abstract_arg: self.abstract_arg.clone(),
             initial_false_branch_state: self.initial_false_branch_state.clone(),
             initial_true_branch_state: self.initial_true_branch_state.clone(),
-            true_instructions: self.true_instructions.clone(),
-            false_instructions: self.false_instructions.clone(),
-            currently_entered_branch: self.currently_entered_branch,
         }
     }
 }
@@ -819,9 +887,6 @@ impl<S: Semantics> BuiltShapeQueryFrame<S> {
             abstract_arg,
             initial_false_branch_state,
             initial_true_branch_state,
-            true_instructions: None,
-            false_instructions: None,
-            currently_entered_branch: None,
         }
     }
 
@@ -831,52 +896,8 @@ impl<S: Semantics> BuiltShapeQueryFrame<S> {
     ) -> Result<(), BuilderError> {
         use BuilderInstruction as BI;
 
-        let this: &mut BuiltShapeQueryFrame<S> = builder.stack.expect_mut();
-
-        if let Some(branch) = this.currently_entered_branch
-            && builder
-                .return_stack
-                .top_is::<CollectingInstructionsFrame<S>>()
-        {
-            // TODO: is there a situation where this.currently_entered_branch is None but we have a branch frame?
-
-            let branch_frame: CollectingInstructionsFrame<S> = builder.return_stack.expect_pop();
-            if branch {
-                this.true_instructions = Some(branch_frame);
-            } else {
-                this.false_instructions = Some(branch_frame);
-            }
-
-            this.currently_entered_branch = None;
-        }
-
         let instruction = instruction_opt.take().unwrap();
         match instruction {
-            BI::EnterTrueBranch => {
-                if this.true_instructions.is_some() {
-                    bail!(BuilderError::NeedsSpecificVariant(
-                        "true branch already entered"
-                    ));
-                }
-                // We enter the true branch
-                let true_frame =
-                    CollectingInstructionsFrame::from_state(this.initial_true_branch_state.clone());
-                this.currently_entered_branch = Some(true);
-                builder.push_frame(true_frame);
-            }
-            BI::EnterFalseBranch => {
-                if this.false_instructions.is_some() {
-                    bail!(BuilderError::NeedsSpecificVariant(
-                        "false branch already entered"
-                    ));
-                }
-                // We enter the false branch
-                let false_frame = CollectingInstructionsFrame::from_state(
-                    this.initial_false_branch_state.clone(),
-                );
-                this.currently_entered_branch = Some(false);
-                builder.push_frame(false_frame);
-            }
             // TODO: handle return node instruction here as well?
             BI::EndQuery | BI::Finalize => {
                 // We finish the query, and give the outer frame all our information.
@@ -894,33 +915,13 @@ impl<S: Semantics> BuiltShapeQueryFrame<S> {
     fn handle_shape_query_end(self, builder: &mut Builder<S>) -> Result<(), BuilderError> {
         // we need to handle everything that happens at the end of a query frame - i.e., merging states
 
-        // TODO: look at this code
+        let branches_frame: BranchesFrame<S> = builder.return_stack.expect_pop();
 
-        let true_branch_state_ref = self
-            .true_instructions
-            .as_ref()
-            .map(|cif| &cif.current_state)
-            .unwrap_or(&self.initial_true_branch_state);
-        let false_branch_state_ref = self
-            .false_instructions
-            .as_ref()
-            .map(|cif| &cif.current_state)
-            .unwrap_or(&self.initial_false_branch_state);
-        let merged_branch = merge_states(false, true_branch_state_ref, false_branch_state_ref);
+        let (merged_branch, query_instructions) =
+            branches_frame.into_merged_state_and_query_instructions(&self.initial_true_branch_state, &self.initial_false_branch_state)?;
 
         let outer_frame: &mut CollectingInstructionsFrame<S> = builder.stack.expect_mut();
         outer_frame.current_state = merged_branch;
-
-        let query_instructions = QueryInstructions {
-            taken: self
-                .true_instructions
-                .map(|cif| cif.instructions)
-                .unwrap_or_default(),
-            not_taken: self
-                .false_instructions
-                .map(|cif| cif.instructions)
-                .unwrap_or_default(),
-        };
         outer_frame.instructions.push((
             Some(self.query_marker),
             Instruction::ShapeQuery(self.query, self.abstract_arg, query_instructions),
@@ -936,6 +937,7 @@ enum Frame<S: Semantics> {
     BuildingParameter(BuildingParameterFrame<S>),
     CollectingInstructions(CollectingInstructionsFrame<S>),
     Query(QueryFrame<S>),
+    Branches(BranchesFrame<S>),
     BuildingShapeQuery(BuildingShapeQueryFrame<S>),
     BuiltShapeQuery(BuiltShapeQueryFrame<S>),
     Return(ReturnFrame<S>),
@@ -948,6 +950,7 @@ impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for Frame
             Frame::BuildingParameter(frame) => Frame::BuildingParameter(frame.clone()),
             Frame::CollectingInstructions(frame) => Frame::CollectingInstructions(frame.clone()),
             Frame::Query(frame) => Frame::Query(frame.clone()),
+            Frame::Branches(frame) => Frame::Branches(frame.clone()),
             Frame::BuildingShapeQuery(frame) => Frame::BuildingShapeQuery(frame.clone()),
             Frame::BuiltShapeQuery(frame) => Frame::BuiltShapeQuery(frame.clone()),
             Frame::Return(frame) => Frame::Return(frame.clone()),
@@ -1113,6 +1116,9 @@ impl<'a, S: Semantics> Builder<'a, S> {
                 BuilderShowData::CollectingInstructions(&frame.current_state)
             }
             Some(Frame::Query(frame)) => BuilderShowData::QueryFrame(&frame.before_branches_state),
+            Some(Frame::Branches(frame)) => {
+                BuilderShowData::Other("BranchesFrame".to_string())
+            }
             Some(Frame::Return(frame)) => {
                 BuilderShowData::ReturnFrame(&frame.instr_frame.current_state)
             }
@@ -1156,6 +1162,9 @@ impl<'a, S: Semantics> Builder<'a, S> {
                 }
                 Frame::Query(..) => {
                     QueryFrame::consume(self, &mut instruction_opt)?;
+                }
+                Frame::Branches(..) => {
+                    BranchesFrame::consume(self, &mut instruction_opt)?;
                 }
                 Frame::Return(..) => {
                     ReturnFrame::consume(self, &mut instruction_opt)?;
