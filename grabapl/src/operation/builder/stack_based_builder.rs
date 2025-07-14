@@ -174,30 +174,12 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
             }
             // need to handle instructions that change the branch - endquery, entertrue, enterfalse
             instruction if instruction.can_break_body() => {
-                // our frame needs to somehow be passed to the query frame that should be one below us.
-                // I guess this is a "push" (vs pull) model, where we now access the query frame below us and push the data?
-                // TODO: make this actually be a result? the expect_...
                 let our_frame: CollectingInstructionsFrame<S> = builder.stack.expect_pop();
 
-                // TODO: actually, we need to be able to push to both query and shape query frames.
-                //  so need to dynamically dispatch here.
-
-                // hmm. Instead of pushing explicitly, what if we had a data_stack where we could push our frame?
-                // then reset the instruction, and the main builder loop would do the dynamic dispatch to the correct frame, which could
-                // then consume from the data stack (conditionally if it expects something).
-
-                // TODO: what to do if below returns an error?
-                //  we would lose the frame and all the instructions in it!
-                //  for this case, solved by having explicit data_stack.
-                // QueryFrame::push_branch(
-                //     builder,
-                //     our_frame,
-                // )?;
-
-                // data_stack is the return_stack
+                // we're done, so push ourselves onto the return stack
                 builder.return_stack.push(our_frame);
 
-                // put instruction back, since we want QueryFrame to take over
+                // put instruction back, since we want the lower frame to take over
                 let _ = instruction_opt.insert(instruction);
             }
             BI::RenameNode(old_aid, new_name) => {
@@ -252,15 +234,8 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
             AbstractOperationResultMarker::Implicit(0)
         });
 
-        // TODO: get an actual recursion op
-        //  hmm. Maybe we could do this by having a running signature (well, AbstractOutputChanges), and OperationParameter?
-        //  that's all that's needed for apply_abstract. And it doesn't require clone on operations!
-        //  buuut the thing were a future change affects us will not work anymore. unless the wrapper (the thing that handles the builder)
-        //  still builds and caches an operation before every call. that might actually be fine, I guess.
-        // let self_op_unfinished = UserDefinedOperation::new_noop();
-        let self_op_unfinished = &builder_data.partial_self_op;
         let op = op_like
-            .as_operation(builder_data.op_ctx, &self_op_unfinished)
+            .as_operation(builder_data.op_ctx, &builder_data.partial_self_op)
             .change_context(BuilderError::OutsideError)?;
         let abstract_arg = self
             .current_state
@@ -446,7 +421,7 @@ impl<S: Semantics> QueryFrame<S> {
                     before_branches_state,
                 };
 
-                let mut branches_frame = BranchesFrame::new(
+                let branches_frame = BranchesFrame::new(
                     frame.before_branches_state.clone(),
                     frame.before_branches_state.clone(),
                 );
@@ -466,7 +441,6 @@ impl<S: Semantics> QueryFrame<S> {
 
         let instruction = instruction_opt.take().unwrap();
         match instruction {
-            // TODO: handle return node?
             BI::EndQuery | BI::Finalize => {
                 // We finish the query, and give the outer frame all our information.
                 let query_frame: QueryFrame<S> = builder.stack.expect_pop();
@@ -898,7 +872,6 @@ impl<S: Semantics> BuiltShapeQueryFrame<S> {
 
         let instruction = instruction_opt.take().unwrap();
         match instruction {
-            // TODO: handle return node instruction here as well?
             BI::EndQuery | BI::Finalize => {
                 // We finish the query, and give the outer frame all our information.
                 let query_frame: BuiltShapeQueryFrame<S> = builder.stack.expect_pop();
