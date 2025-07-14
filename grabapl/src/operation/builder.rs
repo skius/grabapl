@@ -2899,7 +2899,6 @@ fn merge_states<S: Semantics>(
             (None, Some(av_false)) => Some(av_false),
             (None, None) => None,
         };
-        // TODO: above might be unsound. see "may_writes_remember_previous_abstract_value" test
         if let Some(merged_av) = merged_written_av {
             new_state.node_may_be_written_to.insert(aid, merged_av);
         }
@@ -2978,6 +2977,8 @@ fn merge_states<S: Semantics>(
                 // Note: this must be Some, because we have the edge in our merged graph for a fact.
                 // If we were to ignore it *just for edge_may_be_written_to* if the written values could not be merged,
                 // we'd unsoundly skip returning information about potential changes to the edge.
+                // I.e., we expect client semantics to support written-av merges if the branch merge succeeded in the first place.
+                // this should generally be the case.
                 Some(S::join_edges(&av_true, &av_false).expect(
                     "client semantics error: expected to be able to merge written edge attributes",
                 ))

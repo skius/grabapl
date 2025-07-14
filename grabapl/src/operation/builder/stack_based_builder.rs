@@ -83,7 +83,7 @@ impl<S: Semantics> BuildingParameterFrame<S> {
             }
             _ => {
                 // The user has decided that they're done building the parameter by sending a different instruction
-                // restore instruction so we can continue
+                // restore instruction so we can continue with the appropriate frame
                 let _ = instruction_opt.insert(instruction);
 
                 let this: BuildingParameterFrame<S> = builder.stack.expect_pop();

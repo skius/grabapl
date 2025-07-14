@@ -1082,9 +1082,6 @@ fn may_writes_remember_previous_abstract_value() {
     // So, we cannot *overwrite* the current abstract value with the result of a write that only *may* have happened, we need to consider the case that no write happened.
     // The builder itself must also be aware of this and not overapproximate to the point of uselessness.
 
-    // TODO: the builder awareness should come from te Signature::apply_abstract doing the necessary updates, probably
-    //  a builtin op can directly modify the abstract graph and hence knows the ground truth.
-
     let mut op_ctx = OperationContext::<TestSemantics>::new();
 
     let op = {
