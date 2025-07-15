@@ -1,3 +1,4 @@
+use std::any::Any;
 use crate::operation::builder::{
     BuilderInstruction, BuilderOpLike, IntermediateInterpreter, IntermediateState,
     IntermediateStateBuilder, OperationBuilderError, OperationBuilderInefficient,
@@ -31,6 +32,7 @@ use crate::semantics::{AbstractGraph, AbstractMatcher};
 use crate::util::bimap::BiMap;
 use error_stack::Result;
 use crate::operation::OperationContext;
+use crate::util::log;
 
 macro_rules! bail_unexpected_instruction {
     ($i:expr, $i_opt:expr, $frame:literal) => {
@@ -965,7 +967,8 @@ impl<S: Semantics> FrameStack<S> {
         FrameStack { frames: vec![] }
     }
 
-    pub fn push(&mut self, frame: impl Into<Frame<S>>) {
+    pub fn push<T: Into<Frame<S>>>(&mut self, frame: T) {
+        log::trace!("Pushing frame: {:?}", std::any::type_name::<T>());
         self.frames.push(frame.into());
     }
 
@@ -990,6 +993,7 @@ impl<S: Semantics> FrameStack<S> {
         self.frames.last().map_or(false, |f| f.try_into().is_ok())
     }
 
+    #[track_caller]
     pub fn expect_mut<'a, F>(&'a mut self) -> F
     where
         S: 'a,
@@ -999,6 +1003,7 @@ impl<S: Semantics> FrameStack<S> {
         last.try_into().ok().unwrap()
     }
 
+    #[track_caller]
     pub fn expect_ref<'a, F>(&'a self) -> F
     where
         S: 'a,
@@ -1008,6 +1013,7 @@ impl<S: Semantics> FrameStack<S> {
         last.try_into().ok().unwrap()
     }
 
+    #[track_caller]
     pub fn expect_pop<F>(&mut self) -> F
     where
         Frame<S>: TryInto<F>,
@@ -1135,27 +1141,35 @@ impl<'a, S: Semantics> Builder<'a, S> {
             let curr_frame = self.stack.last().unwrap();
             match curr_frame {
                 Frame::BuildingParameter(..) => {
+                    log::trace!("Consuming for BuildingParameterFrame");
                     BuildingParameterFrame::consume(self, &mut instruction_opt)?;
                 }
                 Frame::CollectingInstructions(..) => {
+                    log::trace!("Consuming for CollectingInstructionsFrame");
                     CollectingInstructionsFrame::consume(self, &mut instruction_opt)?;
                 }
                 Frame::Query(..) => {
+                    log::trace!("Consuming for QueryFrame");
                     QueryFrame::consume(self, &mut instruction_opt)?;
                 }
                 Frame::Branches(..) => {
+                    log::trace!("Consuming for BranchesFrame");
                     BranchesFrame::consume(self, &mut instruction_opt)?;
                 }
                 Frame::Return(..) => {
+                    log::trace!("Consuming for ReturnFrame");
                     ReturnFrame::consume(self, &mut instruction_opt)?;
                 }
                 Frame::WrapperReturn(..) => {
+                    log::trace!("Consuming for WrapperReturnFrame");
                     WrapperReturnFrame::consume(self, &mut instruction_opt)?;
                 }
                 Frame::BuildingShapeQuery(..) => {
+                    log::trace!("Consuming for BuildingShapeQueryFrame");
                     BuildingShapeQueryFrame::consume(self, &mut instruction_opt)?;
                 }
                 Frame::BuiltShapeQuery(..) => {
+                    log::trace!("Consuming for BuiltShapeQueryFrame");
                     BuiltShapeQueryFrame::consume(self, &mut instruction_opt)?;
                 }
             }
@@ -1189,7 +1203,7 @@ impl<'a, S: Semantics> Builder<'a, S> {
     }
 
     fn push_frame(&mut self, frame: impl Into<Frame<S>>) {
-        self.stack.push(frame.into());
+        self.stack.push(frame);
     }
 }
 
@@ -1539,9 +1553,29 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         // we know that running the instruction once did not fail. However, in presence of recursion,
         // it may fail only once a prior recursive call 'sees' the new instruction.
 
-        let new_self_op = new_builder_stage_1
+        let new_builder_stage_1_before_build = new_builder_stage_1.clone();
+        let new_self_op = match new_builder_stage_1
             .build()
-            .change_context(OperationBuilderError::NewBuilderError)?;
+            .change_context(OperationBuilderError::NewBuilderError) {
+            Ok(op) => op,
+            Err(e) => {
+                // we failed to _build_. This does not mean the instruction is invalid, but rather that
+                // the instruction is at a partial state that cannot be built yet.
+                // (e.g.: we're building the parameter graph and a context node does not have an edge to a parameter node yet)
+                // TODO: indicate some *warning* to the user here?
+
+                log::info!("Failed to build partial operation, continuing in best-effort. instruction: {:?} error: {:?}",
+                    instruction, e
+                );
+
+                // accept the instruction.
+                // note: must take a clone of the builder, since calling build() changes it.
+                // (TODO: make .build() consuming...)
+                self.active = new_builder_stage_1_before_build;
+                self.instructions.push(instruction);
+                return Ok(());
+            }
+        };
         // now that we have the new self op, let's try the instruction again.
         let mut new_builder_stage_2 = self
             .build_builder_from_scratch_with_self_op(new_self_op)

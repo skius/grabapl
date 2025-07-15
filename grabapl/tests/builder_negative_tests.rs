@@ -3,9 +3,8 @@
 mod util;
 use util::semantics::*;
 use grabapl::prelude::*;
-use test_log::test;
 
-#[test]
+#[test_log::test]
 fn disconnected_context_node_not_allowed() {
     let op_ctx = OperationContext::<TestSemantics>::new();
     let mut builder = OperationBuilder::new(&op_ctx, 0);
