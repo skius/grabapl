@@ -12,7 +12,8 @@ use crate::operation::user_defined::{
     AbstractUserDefinedOperationOutput, Instruction, NamedMarker, QueryInstructions,
     UserDefinedOperation,
 };
-use crate::{NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
+use crate::{NodeKey, Semantics, SubstMarker};
+use crate::prelude::*;
 use derive_more::From;
 use derive_more::with_trait::TryInto;
 use error_stack::{Report, ResultExt, bail, report};
@@ -29,6 +30,7 @@ use crate::operation::signature::{
 use crate::semantics::{AbstractGraph, AbstractMatcher};
 use crate::util::bimap::BiMap;
 use error_stack::Result;
+use crate::operation::OperationContext;
 
 macro_rules! bail_unexpected_instruction {
     ($i:expr, $i_opt:expr, $frame:literal) => {
@@ -107,6 +109,8 @@ impl<S: Semantics> BuildingParameterFrame<S> {
                 let parameter = this
                     .parameter_builder
                     .build()
+                    .change_context(BuilderError::ParameterBuildError)?;
+                parameter.check_validity()
                     .change_context(BuilderError::ParameterBuildError)?;
                 let frame = CollectingInstructionsFrame::from_param(&parameter);
                 builder.data.built.parameter = Some(parameter);

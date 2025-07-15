@@ -14,7 +14,8 @@ use crate::operation::user_defined::{
 use crate::operation::{BuiltinOperation, Operation, OperationError, get_substitution};
 use crate::semantics::{AbstractGraph, AbstractMatcher};
 use crate::util::bimap::BiMap;
-use crate::{Graph, NodeKey, OperationContext, OperationId, Semantics, SubstMarker};
+use crate::{Graph, NodeKey, Semantics, SubstMarker};
+use crate::prelude::*;
 use error_stack::{FutureExt, Result, ResultExt, bail, report};
 use petgraph::dot;
 use petgraph::dot::Dot;
@@ -28,7 +29,7 @@ use std::slice::Iter;
 use thiserror::Error;
 
 pub mod stack_based_builder;
-
+mod programming_by_demonstration;
 /*
 General overview:
 

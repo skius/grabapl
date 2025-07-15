@@ -1,6 +1,7 @@
 use grabapl::Semantics;
 use simple_semantics::SimpleSemantics;
 use wasm_bindgen::prelude::wasm_bindgen;
+use grabapl::graph::dot::DotCollector;
 
 #[wasm_bindgen]
 extern "C" {
@@ -28,6 +29,7 @@ mod ffi {
     use std::str::FromStr;
 
     use super::RustEdgeAbstract;
+    use super::DotCollector as RustDotCollector;
     use grabapl::operation::builder::BuilderOpLike as RustBuilderOpLike;
 
     use grabapl::operation::user_defined::AbstractNodeId as RustAbstractNodeId;
@@ -40,10 +42,10 @@ mod ffi {
     pub struct AbstractGraph(RustAbstractGraph<SimpleSemantics>);
 
     #[diplomat::opaque]
-    pub struct DotCollector(grabapl::DotCollector);
+    pub struct DotCollector(RustDotCollector);
 
     #[diplomat::opaque]
-    pub struct OpCtx(grabapl::OperationContext<SimpleSemantics>);
+    pub struct OpCtx(grabapl::prelude::OperationContext<SimpleSemantics>);
 
     #[diplomat::opaque]
     pub struct OperationBuilder<'a>(RustOperationBuilder<'a, SimpleSemantics>);
@@ -54,7 +56,7 @@ mod ffi {
             console_error_panic_hook::set_once();
             log::error!("test log::error! call");
             let mut operation_ctx =
-                ::grabapl::OperationContext::from_builtins(std::collections::HashMap::from([
+                ::grabapl::prelude::OperationContext::from_builtins(std::collections::HashMap::from([
                     (0, BuiltinOperation::AddNode),
                     (1, BuiltinOperation::AppendChild),
                     (2, BuiltinOperation::IndexCycle),
@@ -122,7 +124,7 @@ mod ffi {
 
     impl DotCollector {
         pub fn create() -> Box<DotCollector> {
-            Box::new(DotCollector(grabapl::DotCollector::new()))
+            Box::new(DotCollector(RustDotCollector::new()))
         }
 
         pub fn collect(&mut self, graph: &ConcreteGraph) {

@@ -1,6 +1,6 @@
 mod util;
 
-use grabapl::OperationContext;
+use grabapl::prelude::*;
 use grabapl::operation::builder::{BuilderOpLike, OperationBuilder};
 use grabapl::operation::builtin::LibBuiltinOperation;
 use grabapl::operation::user_defined::AbstractNodeId;

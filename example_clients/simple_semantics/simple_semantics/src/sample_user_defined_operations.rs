@@ -7,7 +7,7 @@ use grabapl::operation::user_defined::{
     UserDefinedOperation,
 };
 use grabapl::util::bimap::BiMap;
-use grabapl::{OperationContext, OperationId};
+use grabapl::prelude::*;
 use std::collections::HashMap;
 
 fn mk_builtin_instruction(
