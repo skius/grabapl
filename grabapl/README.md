@@ -35,8 +35,9 @@ cargo check --target wasm32-unknown-unknown
 
 
 # Final TODOs I want to do:
-- [ ] Define builder behavior when running a cache-induced build() that errors (see negative_tests comment)
+- [x] Define builder behavior when running a cache-induced build() that errors (see negative_tests comment)
 - [ ] Recursion actually CAN add nodes! Add a test for this (if cond { return 0 } else { return recurse() })
+- [ ] Fix web demo (builder now needs an ID in the beginning)
 - [ ] Forget instruction for shape queries
 - [ ] Temporary nodes
 - [ ] Clean up code

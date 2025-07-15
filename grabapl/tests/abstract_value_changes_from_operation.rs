@@ -1645,3 +1645,62 @@ fn new_builder_test() {
 
     // assert!(false);
 }
+
+
+#[test_log::test]
+fn recursion_return_node() {
+    let op_ctx = OperationContext::<TestSemantics>::new();
+    let mut builder = OperationBuilder::new(&op_ctx, 0);
+    // we're writing a recursive operation that returns a node.
+    builder
+        .expect_parameter_node("p0", NodeType::Integer)
+        .unwrap();
+    let p0 = AbstractNodeId::param("p0");
+    // check if p0 is 200, if so, create a new node with value 100 and return it.
+    // otherwise, recurse on p0. (note this is a nonsense operation)
+    builder
+        .start_query(TestQuery::ValueEqualTo(NodeValue::Integer(200)), vec![p0])
+        .unwrap();
+    builder.enter_true_branch().unwrap();
+    builder
+        .add_named_operation(
+            "op0".into(),
+            BuilderOpLike::LibBuiltin(LibBuiltinOperation::AddNode {
+                value: NodeValue::Integer(100),
+            }),
+            vec![],
+        )
+        .unwrap();
+    let new_node_aid = AbstractNodeId::dynamic_output("op0", "new");
+    // TODO: unfortunate that we need to specify "ret_node" twice as string.
+    // maybe it would be nice to have the rename_node, expect_parameter_node etc ops return an AID?
+    let ret_node_aid = AbstractNodeId::named("ret_node");
+    builder
+        .rename_node(new_node_aid, "ret_node")
+        .unwrap();
+    builder
+        .enter_false_branch()
+        .unwrap();
+    // recurse
+    builder
+        .add_named_operation("recursion".into(), BuilderOpLike::Recurse, vec![p0])
+        .unwrap();
+    let new_node_aid = AbstractNodeId::dynamic_output("recursion", "ret_node");
+    // rename the output node to ret_node
+    builder
+        .rename_node(new_node_aid, "ret_node")
+        .unwrap();
+    builder.end_query().unwrap();
+    // return the ret_node
+    builder.return_node(ret_node_aid, "ret_node".into(), NodeType::Integer).unwrap();
+
+
+    // TODO: make this work.
+    //  Maybe it should be by allowing us to specify expected return nodes somewhere? maybe anywhere?
+    //  and then we make sure we consider those:
+    //  1. when recursing - we need to create the nodes (pretend they exist)
+    //  2. when building - we need to make sure that the return nodes are actually created and returned with the appropriate name and type.
+
+
+
+}
