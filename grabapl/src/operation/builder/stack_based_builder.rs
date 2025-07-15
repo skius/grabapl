@@ -43,6 +43,12 @@ macro_rules! bail_unexpected_instruction {
     };
 }
 
+// TODO: turn this into a struct with a boolean `recoverable`.
+//  That field would indicate whether the error can be recovered from by pushing more instructions or not.
+//  For example, an incomplete parameter graph (i.e., disconnected context nodes) would have that flag set.
+//  Then, in the builder's push_instruction method, we would only "best-effort-continue" if the error is recoverable.
+//  Actually - does that make sense? The frames don't know we're pushing arbitrary "Finalize" instructions
+//  just to get a partial operation. But it might work anyway.
 #[derive(Debug, Error)]
 pub enum BuilderError {
     #[error("Unexpected instruction")]
