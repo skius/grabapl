@@ -43,3 +43,6 @@ cargo check --target wasm32-unknown-unknown
 - [ ] Write READMEs and doc comments! Especially on the operation builder and semantics.
 - [ ] Better errors
 - [ ] Edge orders
+- [ ] Recursion actually CAN add nodes! Add a test for this (if cond { return 0 } else { return recurse() })
+- [ ] In the interval type system, try a function like `foo(x) { if x >= 200 { return 200 } else { return foo(x+1) }`
+  - and then make the builder actually compute a fixed point (keep constructing new stages until no more changes of signature)
