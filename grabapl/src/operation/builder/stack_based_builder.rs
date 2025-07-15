@@ -395,9 +395,6 @@ impl<S: Semantics> BranchesFrame<S> {
     }
 }
 
-// TODO: could have a BranchesFrame that is on top of both QueryFrame and ShapeQueryFrame that exclusively handles
-//  EnterTrue/False,EndQuery, and then pushes itself onto the return_stack, to be handled by the outer frame.
-//  That way we don't have duplicate code for gsq/query frames.
 struct QueryFrame<S: Semantics> {
     query: S::BuiltinQuery,
     abstract_arg: AbstractOperationArgument,
@@ -529,9 +526,8 @@ struct ReturnFrame<S: Semantics> {
     instr_frame: CollectingInstructionsFrame<S>,
     signature: OperationSignature<S>,
     abstract_ud_output: AbstractUserDefinedOperationOutput,
-    // TODO: remove these?
-    return_nodes: HashMap<AbstractNodeId, (AbstractOutputNodeMarker, S::NodeAbstract)>,
-    return_edges: HashMap<(AbstractNodeId, AbstractNodeId), S::EdgeAbstract>,
+    // TODO: only used to check for existence of already returned edges. Do we really need this?
+    return_edges: HashSet<(AbstractNodeId, AbstractNodeId)>,
 }
 
 impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for ReturnFrame<S> {
@@ -540,7 +536,6 @@ impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for Retur
             instr_frame: self.instr_frame.clone(),
             signature: self.signature.clone(),
             abstract_ud_output: self.abstract_ud_output.clone(),
-            return_nodes: self.return_nodes.clone(),
             return_edges: self.return_edges.clone(),
         }
     }
@@ -556,8 +551,7 @@ impl<S: Semantics> ReturnFrame<S> {
             instr_frame: cif,
             signature,
             abstract_ud_output: AbstractUserDefinedOperationOutput::new(),
-            return_nodes: HashMap::new(),
-            return_edges: HashMap::new(),
+            return_edges: HashSet::new(),
         }
     }
 
@@ -591,6 +585,10 @@ impl<S: Semantics> ReturnFrame<S> {
         Ok(())
     }
 
+    fn get_return_node_marker(&self, aid: &AbstractNodeId) -> Option<AbstractOutputNodeMarker> {
+        self.abstract_ud_output.new_nodes.get(aid).copied()
+    }
+
     fn include_return_node(
         &mut self,
         aid: AbstractNodeId,
@@ -605,7 +603,7 @@ impl<S: Semantics> ReturnFrame<S> {
         if !self.last_state().contains_aid(&aid) {
             bail!(BuilderError::NeedsSpecificVariant("aid not found"));
         }
-        if self.return_nodes.contains_key(&aid) {
+        if self.get_return_node_marker(&aid).is_some() {
             bail!(BuilderError::NeedsSpecificVariant(
                 "return node already exists"
             ));
@@ -631,8 +629,7 @@ impl<S: Semantics> ReturnFrame<S> {
         self.signature
             .output
             .new_nodes
-            .insert(output_marker, av.clone());
-        self.return_nodes.insert(aid, (output_marker, av));
+            .insert(output_marker, av);
         Ok(())
     }
 
@@ -642,11 +639,10 @@ impl<S: Semantics> ReturnFrame<S> {
         dst: AbstractNodeId,
         av: S::EdgeAbstract,
     ) -> Result<(), BuilderError> {
-        // TODO: need to check validity here
         if !self.last_state().contains_edge(&src, &dst) {
             bail!(BuilderError::NeedsSpecificVariant("edge not found"));
         }
-        if self.return_edges.contains_key(&(src, dst)) {
+        if self.return_edges.contains(&(src, dst)) {
             bail!(BuilderError::NeedsSpecificVariant(
                 "return edge already exists"
             ));
@@ -683,9 +679,9 @@ impl<S: Semantics> ReturnFrame<S> {
         self.signature
             .output
             .new_edges
-            .insert((src_sig_id, dst_sig_id), av.clone());
+            .insert((src_sig_id, dst_sig_id), av);
 
-        self.return_edges.insert((src, dst), av);
+        self.return_edges.insert((src, dst));
         Ok(())
     }
 
@@ -694,7 +690,7 @@ impl<S: Semantics> ReturnFrame<S> {
             AbstractNodeId::ParameterMarker(s) => Ok(AbstractSignatureNodeId::ExistingNode(s)),
             AbstractNodeId::DynamicOutputMarker(_, _) | AbstractNodeId::Named(..) => {
                 // we must be returning this node if we want to return an incident edge.
-                let Some((output_marker, _)) = self.return_nodes.get(aid) else {
+                let Some(output_marker) = self.get_return_node_marker(aid) else {
                     bail!(BuilderError::NeedsSpecificVariant("node not returned"));
                 };
                 Ok(AbstractSignatureNodeId::NewNode(output_marker.clone()))
@@ -708,8 +704,6 @@ impl<S: Semantics> ReturnFrame<S> {
 }
 
 /// This frame is used to build a shape query, i.e., everything before the first EnterXBranch/EndQuery instruction.
-// TODO: dont need param_builder, since we can just pretend the state from initial_state is the parameter graph.
-//  this also allows us to directly extend the expected_graph with guarantees on having the same node keys.
 struct BuildingShapeQueryFrame<S: Semantics> {
     /// The parameter used to define the input of the GraphShapeQuery
     parameter: OperationParameter<S>,
@@ -1436,6 +1430,7 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
     //  How to specify which shape node? ==> the shape node markers should be unique per path
     // TODO: Shape queries cannot shape-test for abstract values of existing nodes yet!
     // TODO: Also add test for existing edges between existing nodes.
+    // ^ i think all of these are resolved and can be deleted.
     pub fn start_shape_query(
         &mut self,
         op_marker: impl Into<AbstractOperationResultMarker>,
