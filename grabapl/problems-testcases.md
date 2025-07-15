@@ -414,6 +414,21 @@ but instead may see some operations not being called if a shape query cannot mat
 **Regarding forgetting**: Forgotten nodes need to be kept track of during the builder,
 because they are distinctly not *deleted* nodes. In the concrete, forgotten nodes
 need to be removed from the hidden_nodes set _of the self operation_ (but not any outer hidden_nodes set).
+In other words, it does not make sense to hide parameter nodes, since they are by definition part of the outer operation.
+Actually - if we are the topmost operation, then there is no outer set, so we should be able to hide parameter nodes as well.
+
+**Regarding problems with hidden nodes**: A situation where we might want to shape-query a node that is part of an outer operation:
+We're building something related to trees. We go down the tree from the root to leaves, but at each node we may want to do something
+differently depending on whether it is the root or not.
+Sure - it is possible to encode whether or not we're at the root node eg. with a helper operation or via a bool parameter that immediately
+gets set to false, but a more intuitive way would be to be able to shape-query check if a parent node exists.
+*But this is the problem*: Since when eg recursing on a child, we will have a graph like root->child, in other words the root
+node is shape-hidden! and the child would not be able to see the root.
+
+This can be fixed by reducing the restrictions on shape-hidden nodes: if we don't write/delete a shape-queried node, it may
+ignore the hidden-nodes set.
+
+TODO: test this
 
 ## Thoughts about abstract graph changes in terms of function signatures
 Any static changes must be inside some signature.
