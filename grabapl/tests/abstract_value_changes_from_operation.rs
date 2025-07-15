@@ -8,6 +8,7 @@ use grabapl::operation::{BuiltinOperation, run_from_concrete};
 use grabapl::semantics::ConcreteGraph;
 use grabapl::prelude::*;
 use std::collections::{HashMap, HashSet};
+use petgraph::prelude::{GraphMap, StableGraph};
 
 mod util;
 use util::semantics::*;
