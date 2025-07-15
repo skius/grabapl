@@ -38,13 +38,14 @@ cargo check --target wasm32-unknown-unknown
 - [x] Define builder behavior when running a cache-induced build() that errors (see negative_tests comment)
 - [ ] Recursion actually CAN add nodes! Add a test for this (if cond { return 0 } else { return recurse() })
 - [ ] Fix web demo (builder now needs an ID in the beginning)
+- [ ] build operations from Sverrir's studies
 - [ ] Forget instruction for shape queries
+- [ ] Edge orders
 - [ ] Temporary nodes
 - [ ] Clean up code
 - [ ] Finish examples/template
 - [ ] Write READMEs and doc comments! Especially on the operation builder and semantics.
 - [ ] Better errors
-- [ ] Edge orders
 - [ ] In the interval type system, try a function like `foo(x) { if x >= 200 { return 200 } else { return foo(x+1) }`
   - and then make the builder actually compute a fixed point (keep constructing new stages until no more changes of signature)
   - Fixed point can maybe be checked by is_isomorphic for the signature graphs? I.e., use that to implement PartialEq on OperationSignature?
