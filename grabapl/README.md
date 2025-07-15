@@ -32,3 +32,14 @@ cargo check --target wasm32-unknown-unknown
     if it is somehow connected to the existing graph, and if not it is temporary, but since we may not see an edge, this would potentially delete nodes connected in the concrete but not the abstract.
   - However! We could perform this check in the concrete, i.e., collect abstractly determined candidates, then
     check if they are connected to either explicit output nodes or parameter nodes in the concrete graph, if not, then they are temporary and can be removed.
+
+
+# Final TODOs I want to do:
+- [ ] Forget instruction for shape queries
+- [ ] Temporary nodes
+- [ ] Define builder behavior when running a cache-induced build() that errors (see negative_tests comment)
+- [ ] Clean up code
+- [ ] Finish examples/template
+- [ ] Write READMEs and doc comments! Especially on the operation builder and semantics.
+- [ ] Better errors
+- [ ] Edge orders
