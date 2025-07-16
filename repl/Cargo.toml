@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-chumsky = "0.10.1"
+#chumsky = "0.10.1"
+chumsky = "1.0.0-alpha.8"
 grabapl = { path = "../grabapl" }
