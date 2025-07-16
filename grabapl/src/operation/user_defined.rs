@@ -27,6 +27,8 @@ pub enum AbstractOperationResultMarker {
     // NOTE: this may not be created by the user! since this is an unstable index, if the user
     // reorders operations, this marker may suddenly point to a different operation result.
     // Custom markers must always be used for arguments!
+    // TODO: we dont actually need this, since we're fine deleting return nodes from unnamed operations.
+    //  so we can delete the variant.
     #[from(ignore)]
     Implicit(u64),
 }
