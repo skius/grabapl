@@ -1781,7 +1781,7 @@ impl<
             BuilderShowData::ReturnFrame(state) => Ok(state.clone()),
             BuilderShowData::Other(_) => Err(report!(OperationBuilderError::NewBuilderError))
                 .attach_printable_lazy(|| {
-                    format!("Expected CollectingInstructions state, got: {:?}", inner)
+                    format!("Expected to receive data with intermediate state, got: {:?}", inner)
                 }),
         }?;
 
