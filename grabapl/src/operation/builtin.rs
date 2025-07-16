@@ -8,6 +8,8 @@ use crate::{Semantics, SubstMarker};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+// TODO: similarly, create a LibBuiltinQuery.
+
 /// Operations that are available for every semantics.
 #[derive(derive_more::Debug)]
 #[cfg_attr(

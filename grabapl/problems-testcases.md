@@ -528,6 +528,27 @@ could modify the abstract state, which we need to show visually, but that is som
 
 (side node: our process is essentially building the AST and validating it on the fly.)
 
+## Match statements and why they're needed
+If we wanted full interval type system support via abstract interpretation, queries
+would need to be able to modify the abstract type of a node based on which branch we're inside.
+(i.e.: `x: [0, 100]; if x == 100 { x: [100,100] } else { x: [0,99] }`)
+
+That specific example would also be possible with match statements, i.e.:
+```rust
+match x.type {
+    [100,100] => { ... }
+    [0,99] => { ... }
+    _ => { ... } // catch-all
+}
+```
+
+Where we can decide different options for the catch-all: Either the type system provides a 'completeness' check
+that would return true if all possible sub-types/cases are covered for x,
+or,
+we could have a 'unreachable!()' instruction that, just like in rust, returns some form of bottom type, which
+can be coerced into anything.
+More concretely, when merging branches, if a branch contains a unreachable!() instruction,
+we just ignore it for purposes of merging. we pretend the other branch is the only one that's executed.
 
 
 
