@@ -6,7 +6,7 @@ use crate::operation::signature::parameter::{
 };
 use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
 use crate::operation::signature::{
-    AbstractOutputChanges, AbstractSignatureNodeId, OperationSignature,
+    AbstractSignatureNodeId, OperationSignature,
 };
 use crate::operation::user_defined::{
     AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker,
@@ -19,7 +19,7 @@ use crate::operation::{
 use crate::prelude::*;
 use crate::semantics::{AbstractGraph, AbstractMatcher};
 use crate::util::bimap::BiMap;
-use crate::{Graph, NodeKey, Semantics, SubstMarker};
+use crate::{NodeKey, Semantics, SubstMarker};
 use error_stack::{FutureExt, Result, ResultExt, bail, report};
 use petgraph::dot;
 use petgraph::dot::Dot;

@@ -6,7 +6,7 @@ use crate::operation::signature::parameter::{
 use crate::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics};
 use crate::util::bimap::BiMap;
 use crate::util::{InternString, log};
-use crate::{NodeKey, SubstMarker, interned_string_newtype};
+use crate::{NodeKey, interned_string_newtype};
 use derive_more::From;
 use derive_more::with_trait::Into;
 use internment::Intern;

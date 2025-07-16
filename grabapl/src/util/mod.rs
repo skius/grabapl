@@ -1,4 +1,4 @@
-use derive_more::{From, Into};
+use derive_more::From;
 use internment::Intern;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;

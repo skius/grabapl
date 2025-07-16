@@ -1,12 +1,9 @@
 use crate::operation::builder::{
-    BuilderInstruction, BuilderOpLike, IntermediateInterpreter, IntermediateState,
-    IntermediateStateBuilder, OperationBuilderError, OperationBuilderInefficient,
+    BuilderInstruction, BuilderOpLike, IntermediateState, OperationBuilderError,
     UDInstructionsWithMarker, merge_states,
 };
 use crate::operation::signature::parameter::{AbstractOutputNodeMarker, OperationParameter};
-use crate::operation::signature::parameterbuilder::{
-    OperationParameterBuilder, ParameterBuilderError,
-};
+use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
 use crate::operation::user_defined::{
     AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker,
     AbstractUserDefinedOperationOutput, Instruction, NamedMarker, QueryInstructions,
@@ -16,10 +13,8 @@ use crate::prelude::*;
 use crate::{NodeKey, Semantics, SubstMarker};
 use derive_more::From;
 use derive_more::with_trait::TryInto;
-use error_stack::{Report, ResultExt, bail, report};
-use std::any::Any;
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use error_stack::{ResultExt, bail, report};
+use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use thiserror::Error;
@@ -29,7 +24,7 @@ use crate::operation::query::{GraphShapeQuery, ShapeNodeIdentifier};
 use crate::operation::signature::{
     AbstractOutputChanges, AbstractSignatureNodeId, OperationSignature,
 };
-use crate::semantics::{AbstractGraph, AbstractJoin, AbstractMatcher};
+use crate::semantics::{AbstractJoin, AbstractMatcher};
 use crate::util::bimap::BiMap;
 use crate::util::log;
 use error_stack::Result;
@@ -1744,7 +1739,7 @@ impl<
     }
 
     pub fn format_state(&self) -> String {
-        let mut inner = self.active.show();
+        let inner = self.active.show();
         format!("{:?}", inner)
     }
 }

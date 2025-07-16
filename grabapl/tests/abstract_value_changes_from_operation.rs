@@ -2,12 +2,11 @@ use grabapl::operation::builder::{BuilderOpLike, OperationBuilder, stack_based_b
 use grabapl::operation::builtin::LibBuiltinOperation;
 use grabapl::operation::query::BuiltinQuery;
 use grabapl::operation::user_defined::{
-    AbstractNodeId, AbstractOperationResultMarker, UserDefinedOperation,
+    AbstractNodeId, UserDefinedOperation,
 };
 use grabapl::operation::{BuiltinOperation, run_from_concrete};
 use grabapl::prelude::*;
 use grabapl::semantics::ConcreteGraph;
-use petgraph::prelude::{GraphMap, StableGraph};
 use std::collections::{HashMap, HashSet};
 
 mod util;
