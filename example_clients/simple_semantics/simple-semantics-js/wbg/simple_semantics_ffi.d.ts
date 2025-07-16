@@ -42,8 +42,9 @@ export interface InitOutput {
   readonly IntermediateState_destroy: (a: number) => void;
   readonly OpCtx_create: () => number;
   readonly OpCtx_add_custom_operation: (a: number, b: number, c: number) => void;
+  readonly OpCtx_custom_op_to_json: (a: number, b: number, c: number) => void;
   readonly OpCtx_destroy: (a: number) => void;
-  readonly OperationBuilder_create: (a: number) => number;
+  readonly OperationBuilder_create: (a: number, b: number) => number;
   readonly OperationBuilder_expect_parameter_node: (a: number, b: number, c: number, d: number) => void;
   readonly OperationBuilder_expect_context_node: (a: number, b: number, c: number, d: number) => void;
   readonly OperationBuilder_expect_parameter_edge: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
@@ -57,7 +58,7 @@ export interface InitOutput {
   readonly OperationBuilder_add_operation: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => void;
   readonly OperationBuilder_rename_node: (a: number, b: number, c: number, d: number, e: number) => void;
   readonly OperationBuilder_show: (a: number, b: number) => void;
-  readonly OperationBuilder_finalize: (a: number, b: number, c: number) => void;
+  readonly OperationBuilder_finalize: (a: number, b: number) => void;
   readonly OperationBuilder_destroy: (a: number) => void;
   readonly OperationBuilderError_message: (a: number, b: number) => void;
   readonly OperationBuilderError_destroy: (a: number) => void;

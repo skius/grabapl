@@ -968,6 +968,7 @@ name = "simple_semantics"
 version = "0.1.0"
 dependencies = [
  "grabapl",
+ "serde",
 ]
 
 [[package]]
@@ -980,6 +981,8 @@ dependencies = [
  "error-stack",
  "grabapl",
  "log",
+ "serde",
+ "serde_json",
  "simple_semantics",
  "wasm-bindgen",
 ]

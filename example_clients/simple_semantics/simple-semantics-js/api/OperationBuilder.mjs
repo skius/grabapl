@@ -46,12 +46,12 @@ export class OperationBuilder {
     }
 
 
-    static create(opCtx) {
+    static create(opCtx, selfOpId) {
         // This lifetime edge depends on lifetimes 'a
         let aEdges = [opCtx];
 
 
-        const result = wasm.OperationBuilder_create(opCtx.ffiValue);
+        const result = wasm.OperationBuilder_create(opCtx.ffiValue, selfOpId);
 
         try {
             return new OperationBuilder(diplomatRuntime.internalConstructor, result, [], aEdges);
@@ -331,11 +331,11 @@ export class OperationBuilder {
         }
     }
 
-    finalize(opId) {
+    finalize() {
         const diplomatReceive = new diplomatRuntime.DiplomatReceiveBuf(wasm, 5, 4, true);
 
 
-        const result = wasm.OperationBuilder_finalize(diplomatReceive.buffer, this.ffiValue, opId);
+        const result = wasm.OperationBuilder_finalize(diplomatReceive.buffer, this.ffiValue);
 
         try {
             if (!diplomatReceive.resultFlag) {

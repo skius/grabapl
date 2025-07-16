@@ -1,5 +1,6 @@
 use grabapl::Semantics;
 use grabapl::graph::dot::DotCollector;
+use grabapl::prelude::*;
 use simple_semantics::SimpleSemantics;
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -27,6 +28,7 @@ mod ffi {
     use simple_semantics::{BuiltinOperation, BuiltinQuery as RustBuiltinQuery, SimpleSemantics};
     use std::fmt::Write;
     use std::str::FromStr;
+    use super::Operation as RustOperation;
 
     use super::DotCollector as RustDotCollector;
     use super::RustEdgeAbstract;
@@ -75,9 +77,22 @@ mod ffi {
 
         // TODO: dangerous function because it needs a mutable OpCtx while at the same time we store a reference
         //  to OpCtx in the OperationBuilder.
+        //  Could fix by making OpBuilder only store a Rc<RefCell<>>
         pub fn add_custom_operation(&mut self, op_id: u32, operation: &mut UserDefinedOperation) {
             self.0
                 .add_custom_operation(op_id, operation.0.take().unwrap());
+        }
+
+        pub fn custom_op_to_json(&self, op_id: u32, write: &mut DiplomatWrite) {
+            match self.0.get(op_id) {
+                Some(RustOperation::Custom(custom)) => {
+                    let serialized = serde_json::to_string_pretty(custom).unwrap();
+                    write!(write, "{}", serialized).unwrap();
+                }
+                _ => {
+                    log::error!("not a custom operation id {}", op_id);
+                }
+            }
         }
     }
 

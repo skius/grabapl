@@ -19,7 +19,7 @@ export class OperationBuilder {
     constructor();
 
 
-    static create(opCtx: OpCtx): OperationBuilder;
+    static create(opCtx: OpCtx, selfOpId: number): OperationBuilder;
 
     expectParameterNode(marker: string): void;
 
@@ -47,5 +47,5 @@ export class OperationBuilder {
 
     show(): IntermediateState;
 
-    finalize(opId: number): UserDefinedOperation;
+    finalize(): UserDefinedOperation;
 }

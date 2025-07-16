@@ -57,6 +57,20 @@ export class OpCtx {
         }
     }
 
+    customOpToJson(opId) {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.OpCtx_custom_op_to_json(this.ffiValue, opId, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            write.free();
+        }
+    }
+
     constructor(symbol, ptr, selfEdge) {
         return this.#internalConstructor(...arguments)
     }

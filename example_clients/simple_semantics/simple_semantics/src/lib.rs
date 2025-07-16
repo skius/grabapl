@@ -14,10 +14,11 @@ use grabapl::semantics::{
 use std::collections::HashMap;
 use std::convert::Into;
 use std::fmt::Debug;
+use serde::{Deserialize, Serialize};
 
 pub struct SimpleSemantics;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum EdgePattern {
     Wildcard,
     Exact(String),
@@ -71,7 +72,7 @@ impl ConcreteToAbstract for EdgeConcreteToAbstract {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum BuiltinQuery {
     HasChild,
     IsValueGt(i32),
@@ -229,12 +230,14 @@ impl Semantics for SimpleSemantics {
     type BuiltinQuery = BuiltinQuery;
 }
 
+#[derive(Serialize, Deserialize)]
 pub enum BuiltinOperation {
     AddNode,
     AppendChild,
     /// Labels nodes of a three-cycle with 1,2,3, and requires the edge between 3 and 1 to be labelled "cycle"
     /// Only the first node is used as explicit input, the others are inferred.
     IndexCycle,
+    #[serde(skip)]
     SetValue(Box<dyn Fn() -> i32>),
     AddEdge,
     SetEdgeValue(String),

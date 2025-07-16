@@ -14,7 +14,18 @@ export const getOpCtx = () => {
     return opCtx;
 }
 
-let op_builder = OperationBuilder.create(opCtx);
+let opIdInput = document.querySelector("#opb-opId");
+let nextOpId = 1000;
+opIdInput.value = nextOpId;
+
+const getNextOpId = () => {
+    let id = nextOpId;
+    opIdInput.value = nextOpId;
+    nextOpId += 1;
+    return id;
+}
+
+let op_builder = OperationBuilder.create(opCtx, getNextOpId());
 
 const svgContainer = document.querySelector("#opb-svgContainer");
 const infoContainer  = document.querySelector("#opb-info");
@@ -233,6 +244,17 @@ const initCommands = () => {
                 op_builder.addOperation(name, op, args);
             }
         },
+        {
+            "name": "To JSON",
+            "inputs": [],
+            "invoke": () => {
+                let custom_op = op_builder.finalize();
+                let new_op_ctx = OpCtx.create();
+                new_op_ctx.addCustomOperation(1111, custom_op);
+                let json = new_op_ctx.customOpToJson(1111);
+                console.log("Custom operation JSON:\n", json);
+            }
+        },
         // copy paste me
         {
             "name": "Sample",
@@ -306,12 +328,12 @@ const initCommands = () => {
 initCommands();
 
 let finalizeButton = document.querySelector("#opb-btnFinalize");
-let opIdInput = document.querySelector("#opb-opId");
 finalizeButton.addEventListener("click", () => {
+    // TODO: allow user to set the operation id (needs to happen at the beginning)
     let opId = parseInt(opIdInput.value);
     let op;
     try {
-        op = op_builder.finalize(opId);
+        op = op_builder.finalize();
     } catch (e) {
         // get cause of e
         let cause = e.cause ? e.cause : e;
@@ -326,7 +348,7 @@ finalizeButton.addEventListener("click", () => {
     op_builder = null
     opCtx.addCustomOperation(opId, op);
     // recreate
-    op_builder = OperationBuilder.create(opCtx);
+    op_builder = OperationBuilder.create(opCtx, getNextOpId());
     updateState();
 
     console.log(`Finalized operation with id ${opId}`);
