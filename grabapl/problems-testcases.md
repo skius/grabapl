@@ -555,6 +555,10 @@ we just ignore it for purposes of merging. we pretend the other branch is the on
 I profiled the max heap remove operation (algot_examples/task2), and the main pain points were:
 1. get_shape_query substitution, almost 50%
 2. repeated concrete_to_abstract calls, somewhere between 20-30%
+   * Fix: cache the abstract graph of the concrete graph. Whenever the concrete graph
+   * is changed, modify the corresponding abstract graph.
+   * Should be possible with a similar wrapper struct like GraphWithSubstitution.
+   * Whenever we write a node/edge, we just write the concrete_to_abstract version of it.
 
 It was a balanced 2000 node max heap graph, with 2000 remove calls.
 Guessing, but each call should take around log2(heap size) query calls, so in total
