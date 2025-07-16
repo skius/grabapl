@@ -48,6 +48,9 @@ cargo check --target wasm32-unknown-unknown
 - [ ] Serialization for OpBuilder
 - [ ] Serialization for OpCtx
 - [ ] Better errors
+- [ ] bang-call support for operations that return just one value:
+   * take the name of the operation and immediately rename the _single_ output node to that name.
+   * Crash if the operation returns multiple nodes.
 - [kinda x] In the interval type system, try a function like `foo(x) { if x >= 200 { return 200 } else { return foo(x+1) }`
   - and then make the builder actually compute a fixed point (keep constructing new stages until no more changes of signature)
   - Fixed point can maybe be checked by is_isomorphic for the signature graphs? I.e., use that to implement PartialEq on OperationSignature?

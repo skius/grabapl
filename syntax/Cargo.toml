@@ -1,0 +1,9 @@
+[package]
+name = "syntax"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chumsky = "1.0.0-alpha.8"
+ariadne = "0.5.1"
+grabapl = { path = "../grabapl" }
