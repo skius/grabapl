@@ -16,4 +16,6 @@ export class OpCtx {
     addCustomOperation(opId: number, operation: UserDefinedOperation): void;
 
     customOpToJson(opId: number): string;
+
+    customOpToB64(opId: number): string;
 }

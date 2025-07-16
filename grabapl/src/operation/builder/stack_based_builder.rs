@@ -1,7 +1,4 @@
-use crate::operation::builder::{
-    BuilderInstruction, BuilderOpLike, IntermediateState, OperationBuilderError,
-    UDInstructionsWithMarker, merge_states,
-};
+use crate::operation::builder::{BuilderInstruction, BuilderOpLike, IntermediateState, OperationBuilderError, UDInstructionsWithMarker, merge_states, QueryPath};
 use crate::operation::signature::parameter::{AbstractOutputNodeMarker, OperationParameter};
 use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
 use crate::operation::user_defined::{
@@ -1015,6 +1012,38 @@ impl<S: Semantics> FrameStack<S> {
         let last = self.frames.pop().unwrap();
         last.try_into().ok().unwrap()
     }
+
+    fn to_query_path(&self) -> Vec<QueryPath> {
+        let mut path = vec![];
+        for frame in &self.frames {
+            match frame {
+                Frame::Query(query_frame) => {
+                    path.push(QueryPath::Query("<unnamed query>".to_string()));
+                }
+                Frame::Branches(branches_frame) => {
+                    // check which branch we are in
+                    if let Some(entered_branch) = branches_frame.currently_entered_branch {
+                        let segment = if entered_branch {
+                            QueryPath::TrueBranch
+                        } else {
+                            QueryPath::FalseBranch
+                        };
+                        path.push(segment);
+                    } else {
+                        log::info!("branches frame has not entered any branch yet");
+                    }
+                }
+                Frame::BuildingShapeQuery(shape_query_frame) => {
+                    path.push(QueryPath::Query(format!("{:?}", shape_query_frame.query_marker)));
+                }
+                Frame::BuiltShapeQuery(built_shape_query_frame) => {
+                    path.push(QueryPath::Query(format!("{:?}", built_shape_query_frame.query_marker)));
+                }
+                _ => {}
+            }
+        }
+        path
+    }
 }
 
 struct BuiltData<S: Semantics> {
@@ -1131,7 +1160,10 @@ impl<'a, S: Semantics> Builder<'a, S> {
                 BuilderShowData::CollectingInstructions(&frame.current_state)
             }
             Some(Frame::Query(frame)) => BuilderShowData::QueryFrame(&frame.before_branches_state),
-            Some(Frame::Branches(frame)) => BuilderShowData::Other("BranchesFrame".to_string()),
+            Some(Frame::Branches(frame)) => BuilderShowData::BranchesFrame {
+                true_state: &frame.initial_true_branch_state,
+                false_state: &frame.initial_false_branch_state,
+            },
             Some(Frame::Return(frame)) => {
                 BuilderShowData::ReturnFrame(&frame.instr_frame.current_state)
             }
@@ -1357,6 +1389,10 @@ pub enum BuilderShowData<'a, S: Semantics> {
     ParameterBuilder(&'a OperationParameterBuilder<S>),
     CollectingInstructions(&'a IntermediateState<S>),
     QueryFrame(&'a IntermediateState<S>),
+    BranchesFrame{
+        true_state: &'a IntermediateState<S>,
+        false_state: &'a IntermediateState<S>,
+    },
     ShapeQueryFrame(&'a IntermediateState<S>),
     ReturnFrame(&'a IntermediateState<S>),
     Other(String),
@@ -1382,6 +1418,14 @@ impl<'a, S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> Debug for Build
             }
             BuilderShowData::QueryFrame(state) => {
                 write!(f, "QueryFrame: {}", state.dot_with_aid())
+            }
+            BuilderShowData::BranchesFrame { true_state, false_state } => {
+                write!(
+                    f,
+                    "BranchesFrame: True: {}, False: {}",
+                    true_state.dot_with_aid(),
+                    false_state.dot_with_aid()
+                )
             }
             BuilderShowData::ShapeQueryFrame(state) => {
                 write!(f, "ShapeQueryFrame: {}", state.dot_with_aid())
@@ -1722,20 +1766,29 @@ impl<
 {
     pub fn show_state(&self) -> Result<IntermediateState<S>, OperationBuilderError> {
         let inner = self.active.show();
-        match inner {
+        let mut intermediate_state = match inner {
             BuilderShowData::ParameterBuilder(param_builder) => {
                 let param = param_builder.clone().build().unwrap();
                 Ok(IntermediateState::from_param(&param))
             }
             BuilderShowData::CollectingInstructions(state) => Ok(state.clone()),
             BuilderShowData::QueryFrame(state) => Ok(state.clone()),
+            BuilderShowData::BranchesFrame { true_state, false_state } => {
+                // we only take the true state, since we only have a branchesframe on top right after a start_query instruction.
+                Ok(true_state.clone())
+            }
             BuilderShowData::ShapeQueryFrame(state) => Ok(state.clone()),
             BuilderShowData::ReturnFrame(state) => Ok(state.clone()),
             BuilderShowData::Other(_) => Err(report!(OperationBuilderError::NewBuilderError))
                 .attach_printable_lazy(|| {
                     format!("Expected CollectingInstructions state, got: {:?}", inner)
                 }),
-        }
+        }?;
+
+        // TODO: we could improve this now, since we actually have a full, current view of the stack.
+        let query_path = self.active.stack.to_query_path();
+        intermediate_state.query_path = query_path;
+        Ok(intermediate_state)
     }
 
     pub fn format_state(&self) -> String {

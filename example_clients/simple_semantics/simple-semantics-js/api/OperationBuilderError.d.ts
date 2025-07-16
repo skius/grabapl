@@ -11,4 +11,6 @@ export class OperationBuilderError {
 
 
     message(): string;
+
+    toString(): string;
 }

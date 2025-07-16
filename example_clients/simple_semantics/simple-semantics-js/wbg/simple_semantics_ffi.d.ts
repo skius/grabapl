@@ -43,6 +43,7 @@ export interface InitOutput {
   readonly OpCtx_create: () => number;
   readonly OpCtx_add_custom_operation: (a: number, b: number, c: number) => void;
   readonly OpCtx_custom_op_to_json: (a: number, b: number, c: number) => void;
+  readonly OpCtx_custom_op_to_b64: (a: number, b: number, c: number) => void;
   readonly OpCtx_destroy: (a: number) => void;
   readonly OperationBuilder_create: (a: number, b: number) => number;
   readonly OperationBuilder_expect_parameter_node: (a: number, b: number, c: number, d: number) => void;
@@ -66,6 +67,7 @@ export interface InitOutput {
   readonly Runner_run: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
   readonly Runner_destroy: (a: number) => void;
   readonly UserDefinedOperation_destroy: (a: number) => void;
+  readonly OperationBuilderError_to_string: (a: number, b: number) => void;
   readonly diplomat_init: () => void;
   readonly diplomat_simple_write: (a: number, b: number, c: number) => void;
   readonly diplomat_buffer_write_create: (a: number) => number;

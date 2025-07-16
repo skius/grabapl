@@ -3,6 +3,7 @@ use grabapl::graph::dot::DotCollector;
 use grabapl::prelude::*;
 use simple_semantics::SimpleSemantics;
 use wasm_bindgen::prelude::wasm_bindgen;
+use base64::prelude::BASE64_STANDARD;
 
 #[wasm_bindgen]
 extern "C" {
@@ -28,7 +29,9 @@ mod ffi {
     use simple_semantics::{BuiltinOperation, BuiltinQuery as RustBuiltinQuery, SimpleSemantics};
     use std::fmt::Write;
     use std::str::FromStr;
+    use base64::Engine;
     use super::Operation as RustOperation;
+    use super::BASE64_STANDARD;
 
     use super::DotCollector as RustDotCollector;
     use super::RustEdgeAbstract;
@@ -88,6 +91,21 @@ mod ffi {
                 Some(RustOperation::Custom(custom)) => {
                     let serialized = serde_json::to_string_pretty(custom).unwrap();
                     write!(write, "{}", serialized).unwrap();
+                }
+                _ => {
+                    log::error!("not a custom operation id {}", op_id);
+                }
+            }
+        }
+
+        pub fn custom_op_to_b64(&self, op_id: u32, write: &mut DiplomatWrite) {
+            match self.0.get(op_id) {
+                Some(RustOperation::Custom(custom)) => {
+                    // let serialized = postcard::to_allocvec(custom).unwrap();
+                    let serialized = rmp_serde::to_vec(custom).unwrap();
+                    // b64 encode
+                    let b64 = BASE64_STANDARD.encode(serialized);
+                    write!(write, "{}", b64).unwrap();
                 }
                 _ => {
                     log::error!("not a custom operation id {}", op_id);
@@ -286,7 +304,10 @@ mod ffi {
             self.0
                 .show_state()
                 .map(|s| Box::new(IntermediateState(s)))
-                .map_err(|e| Box::new(OperationBuilderError(e)))
+                .map_err(|e| {
+                    // TODO: remove log. should not be necessary...
+                    log::error!("{:?}", e);
+                    Box::new(OperationBuilderError(e))})
         }
 
         pub fn finalize(
@@ -428,6 +449,11 @@ mod ffi {
         pub fn message(&mut self, dw: &mut DiplomatWrite) {
             Report::set_color_mode(error_stack::fmt::ColorMode::None);
             write!(dw, "{:?}", self.0).unwrap();
+        }
+
+        #[diplomat::attr(auto, stringifier)]
+        pub fn to_string(&mut self, dw: &mut DiplomatWrite) {
+            self.message(dw);
         }
     }
 

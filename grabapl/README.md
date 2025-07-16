@@ -45,6 +45,7 @@ cargo check --target wasm32-unknown-unknown
 - [ ] Clean up code
 - [ ] Finish examples/template
 - [ ] Write READMEs and doc comments! Especially on the operation builder and semantics.
+- [ ] Serialization for OpBuilder
 - [ ] Better errors
 - [kinda x] In the interval type system, try a function like `foo(x) { if x >= 200 { return 200 } else { return foo(x+1) }`
   - and then make the builder actually compute a fixed point (keep constructing new stages until no more changes of signature)

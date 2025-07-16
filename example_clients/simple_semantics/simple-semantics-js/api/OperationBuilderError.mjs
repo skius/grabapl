@@ -49,6 +49,20 @@ export class OperationBuilderError {
         }
     }
 
+    toString() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.OperationBuilderError_to_string(this.ffiValue, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            write.free();
+        }
+    }
+
     constructor(symbol, ptr, selfEdge) {
         return this.#internalConstructor(...arguments)
     }

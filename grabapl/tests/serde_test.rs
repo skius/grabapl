@@ -29,6 +29,8 @@ fn serde_test() {
         .unwrap();
     let op = builder.build().unwrap();
 
+    // NOTE: since we have a lot of maps with arbitrary keys, JSON serialization sometimes fails.
+
     let serialized = serde_json::to_string_pretty(&op).unwrap();
     eprintln!("Serialized operation: {}", serialized);
 

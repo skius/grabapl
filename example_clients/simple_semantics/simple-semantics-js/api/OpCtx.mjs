@@ -71,6 +71,20 @@ export class OpCtx {
         }
     }
 
+    customOpToB64(opId) {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.OpCtx_custom_op_to_b64(this.ffiValue, opId, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            write.free();
+        }
+    }
+
     constructor(symbol, ptr, selfEdge) {
         return this.#internalConstructor(...arguments)
     }

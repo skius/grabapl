@@ -255,6 +255,17 @@ const initCommands = () => {
                 console.log("Custom operation JSON:\n", json);
             }
         },
+        {
+            "name": "To Base64",
+            "inputs": [],
+            "invoke": () => {
+                let custom_op = op_builder.finalize();
+                let new_op_ctx = OpCtx.create();
+                new_op_ctx.addCustomOperation(1111, custom_op);
+                let json = new_op_ctx.customOpToB64(1111);
+                console.log("Custom operation Base64:\n", json);
+            }
+        },
         // copy paste me
         {
             "name": "Sample",
