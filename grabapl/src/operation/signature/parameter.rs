@@ -382,10 +382,13 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
             new_nodes.insert(*output_marker, *node_key);
         }
         let mut new_edges = Vec::new();
+        let new_node_or_existing =
+            |node_key: &NodeKey| new_nodes.values().any(|&n| n == *node_key)
+                || self.subst.mapping.values().any(|&n| n == *node_key);
         // only include edges that belong to nodes that are in new_nodes and/or the existing graph
         for (src_key, dst_key) in &self.new_edges {
-            if new_nodes.values().any(|&n| n == *src_key)
-                || new_nodes.values().any(|&n| n == *dst_key)
+            if new_node_or_existing(src_key)
+                || new_node_or_existing(dst_key)
             {
                 new_edges.push((*src_key, *dst_key));
             }

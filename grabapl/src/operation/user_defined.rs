@@ -275,6 +275,8 @@ impl AbstractUserDefinedOperationOutput {
 // TODO: regarding serialization: for stability, there should be a separate _versioned_ struct that gets explicitly created
 //  when calling UserDefinedOperation::serialze() or similar. That way previously stored operations have a better chance of
 //  working with a new version of the library.
+// TODO: also, it is only valid in a specific operation context, since it expects op ids (especially self) to be the same.
+//  so maybe we should support serializing an entire opctx instead?
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
