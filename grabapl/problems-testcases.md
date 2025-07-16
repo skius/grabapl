@@ -551,6 +551,14 @@ More concretely, when merging branches, if a branch contains a unreachable!() in
 we just ignore it for purposes of merging. we pretend the other branch is the only one that's executed.
 
 
+## Profiling results
+I profiled the max heap remove operation (algot_examples/task2), and the main pain points were:
+1. get_shape_query substitution, almost 50%
+2. repeated concrete_to_abstract calls, somewhere between 20-30%
+
+It was a balanced 2000 node max heap graph, with 2000 remove calls.
+Guessing, but each call should take around log2(heap size) query calls, so in total
+around sum(1, 2000, log2(i)) ~ 19000 method calls.
 
 
 

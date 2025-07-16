@@ -227,14 +227,17 @@ fn proptest_max_heap_remove_heap() {
     populate_max_heap_remove_op(&mut op_ctx);
 
     proptest!(
-        // Config::with_cases(10),
-        |(values in proptest::collection::vec(0..5000, 2000..=2000))| {
+        Config::with_cases(10),
+        |(values in proptest::collection::vec(0..5000, 0..=10))| {
+        // |(values in proptest::collection::vec(0..5000, 2000..=2000))| {
             let start = std::time::Instant::now();
             let mut expected_return_order: Vec<i32> = values.clone();
             expected_return_order.sort_unstable_by(|a, b| b.cmp(a)); // sort in descending order
             log_crate::info!("Length: {:?}", values.len());
             // create a max-heap from the values
             let (mut g, sentinel) = mk_heap_from_values(&values);
+
+            // log_crate::info!("Heap created:\n{}", g.dot());
 
             for expected_max_value in expected_return_order {
                 // run the max-heap removal operation
