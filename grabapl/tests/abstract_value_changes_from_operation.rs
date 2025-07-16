@@ -1702,6 +1702,63 @@ fn recursion_return_node() {
     //  1. when recursing - we need to create the nodes (pretend they exist)
     //  2. when building - we need to make sure that the return nodes are actually created and returned with the appropriate name and type.
 
+    let _ = builder.build().unwrap();
 
 
 }
+
+#[test_log::test]
+fn recursion_expect_self_return_node_corner_cases() {
+    let op_ctx = OperationContext::<TestSemantics>::new();
+    let mut builder = OperationBuilder::new(&op_ctx, 0);
+    // we're writing a recursive operation that returns a node.
+    builder
+        .expect_parameter_node("p0", NodeType::Integer)
+        .unwrap();
+    let p0 = AbstractNodeId::param("p0");
+    // recurse on p0
+    builder
+        .add_named_operation("self".into(), BuilderOpLike::Recurse, vec![p0])
+        .unwrap();
+    // expect self output to be an integer
+    builder
+        .expect_self_return_node("ret_node", NodeType::Integer)
+        .unwrap();
+    let ret_node_aid = AbstractNodeId::dynamic_output("self", "ret_node");
+    // Call op that requires integer argument
+    builder.add_operation(
+        BuilderOpLike::Builtin(TestOperation::SetTo {
+            op_typ: NodeType::Integer, // This enforces that the input type is integer
+            target_typ: NodeType::Integer, // no-op
+            value: NodeValue::Integer(42),
+        }),
+        vec![ret_node_aid],
+    ).unwrap();
+
+    // now pull a little prank and expect the return node to actually be String
+    let res = builder.expect_self_return_node("ret_node", NodeType::String);
+    assert!(
+        res.is_err(),
+        "Expected expecting the return node to be String to fail, since it needs to be Integer in a prior instruction"
+    );
+
+
+
+    // build
+    let _ = builder.build().unwrap();
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
