@@ -28,7 +28,7 @@ use crate::operation::query::{GraphShapeQuery, ShapeNodeIdentifier};
 use crate::operation::signature::{
     AbstractOutputChanges, AbstractSignatureNodeId, OperationSignature,
 };
-use crate::semantics::{AbstractGraph, AbstractMatcher};
+use crate::semantics::{AbstractGraph, AbstractJoin, AbstractMatcher};
 use crate::util::bimap::BiMap;
 use error_stack::Result;
 use crate::operation::OperationContext;
@@ -121,7 +121,8 @@ impl<S: Semantics> BuildingParameterFrame<S> {
                 parameter.check_validity()
                     .change_context(BuilderError::ParameterBuildError)?;
                 let frame = CollectingInstructionsFrame::from_param(&parameter);
-                builder.data.built.parameter = Some(parameter);
+                builder.data.built.parameter = Some(parameter.clone());
+                builder.data.expected_self_signature.parameter = parameter.clone();
 
                 builder.push_frame(frame);
             }
@@ -243,7 +244,7 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
         args: Vec<AbstractNodeId>,
     ) -> Result<(), BuilderError> {
         let op = op_like
-            .as_operation(builder_data.op_ctx, &builder_data.partial_self_op)
+            .as_abstract_operation(builder_data.op_ctx, &builder_data.expected_self_signature)
             .change_context(BuilderError::OutsideError)?;
         let abstract_arg = self
             .current_state
@@ -1024,6 +1025,8 @@ impl<S: Semantics> FrameStack<S> {
 }
 
 struct BuiltData<S: Semantics> {
+    // TODO: remove? do we need BuiltData still?
+    //  (parameter is now stored in the expected self sig)
     parameter: Option<OperationParameter<S>>,
 }
 
@@ -1046,6 +1049,9 @@ struct BuilderData<'a, S: Semantics> {
     self_op_id: OperationId,
     built: BuiltData<S>,
     partial_self_op: UserDefinedOperation<S>,
+    /// How we expect our signature to look like
+    /// Includes changes asserted by the user via e.g. SelfReturnNode
+    expected_self_signature: OperationSignature<S>,
 }
 
 impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for BuilderData<'a, S> {
@@ -1055,6 +1061,7 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for B
             built: self.built.clone(),
             self_op_id: self.self_op_id,
             partial_self_op: self.partial_self_op.clone(),
+            expected_self_signature: self.expected_self_signature.clone(),
         }
     }
 }
@@ -1066,7 +1073,25 @@ impl<'a, S: Semantics> BuilderData<'a, S> {
             built: BuiltData::new(),
             self_op_id,
             partial_self_op: UserDefinedOperation::new_noop(),
+            expected_self_signature: OperationSignature::empty_new("some_name", OperationParameter::new_empty()),
         }
+    }
+
+    pub fn consume_global(&mut self, instruction_opt: &mut Option<BuilderInstruction<S>>) -> Result<(), BuilderError> {
+        use BuilderInstruction as BI;
+
+        let instruction = instruction_opt.take().unwrap();
+        match instruction {
+            BI::SelfReturnNode(output_marker, av) => {
+                self.expected_self_signature.output.new_nodes.insert(output_marker, av);
+            }
+            _ => {
+                // do nothing
+                let _ = instruction_opt.insert(instruction);
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -1125,17 +1150,27 @@ impl<'a, S: Semantics> Builder<'a, S> {
         }
     }
 
-    /// Note: Should only be called before issuing recursion instructions.
-    pub fn update_self_op_id(&mut self, self_op_id: OperationId) {
-        self.data.self_op_id = self_op_id;
-    }
 
     pub fn update_partial_self_op(&mut self, partial_self_op: UserDefinedOperation<S>) {
         self.data.partial_self_op = partial_self_op;
     }
 
+    pub fn update_expected_self_output_changes(
+        &mut self,
+        expected_self_output_changes: AbstractOutputChanges<S>,
+    ) {
+        self.data.expected_self_signature.output = expected_self_output_changes;
+    }
+
     pub fn consume(&mut self, instruction: BuilderInstruction<S>) -> Result<(), BuilderError> {
         let mut instruction_opt = Some(instruction);
+
+        // first check if we have a global instruction that needs to be consumed
+        self.data.consume_global(&mut instruction_opt)?;
+        if instruction_opt.is_none() {
+            // if we consumed a global instruction, we don't need to continue
+            return Ok(());
+        }
 
         while instruction_opt.is_some() {
             let curr_frame = self.stack.last().unwrap();
@@ -1176,6 +1211,21 @@ impl<'a, S: Semantics> Builder<'a, S> {
         }
 
         Ok(())
+    }
+
+    /// Builds the current self output changes for purposes of restarting the builder with this new information.
+    fn build_partial_op(mut self) -> Result<AbstractOutputChanges<S>, BuilderError> {
+        // first, keep the expected changes
+        let expected_self_signature = std::mem::replace(&mut self.data.expected_self_signature, OperationSignature::new_noop("some name"));
+        // then, build self as if it was a full op to get the signature
+        let op = self.build()?;
+        // then, add the output changes from the signature
+        // we merge the two
+        let merged_changes = merge_abstract_output_changes(&expected_self_signature.output, &op.signature.output)?;
+
+        // TODO: we should have an assert that the built op's signature has the same parameter as our expected signature.
+
+        Ok(merged_changes)
     }
 
     fn build(mut self) -> Result<UserDefinedOperation<S>, BuilderError> {
@@ -1532,6 +1582,14 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         self.push_instruction(BuilderInstruction::ReturnEdge(src, dst, edge))
     }
 
+    pub fn expect_self_return_node(
+        &mut self,
+        output_marker: impl Into<AbstractOutputNodeMarker>,
+        node: S::NodeAbstract,
+    ) -> Result<(), OperationBuilderError> {
+        self.push_instruction(BuilderInstruction::SelfReturnNode(output_marker.into(), node))
+    }
+
     // TODO: This should run further post processing checks.
     //  Stuff like Context nodes must be connected, etc.
     // TODO: remove self_op_id since that is actually not used here.
@@ -1555,8 +1613,8 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         // it may fail only once a prior recursive call 'sees' the new instruction.
 
         let new_builder_stage_1_before_build = new_builder_stage_1.clone();
-        let new_self_op = match new_builder_stage_1
-            .build()
+        let new_output_changes = match new_builder_stage_1
+            .build_partial_op()
             .change_context(OperationBuilderError::NewBuilderError) {
             Ok(op) => op,
             Err(e) => {
@@ -1579,7 +1637,7 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         };
         // now that we have the new self op, let's try the instruction again.
         let mut new_builder_stage_2 = self
-            .build_builder_from_scratch_with_self_op(new_self_op)
+            .build_builder_from_scratch_with_output_changes(new_output_changes)
             .change_context(OperationBuilderError::NewBuilderError)?;
         new_builder_stage_2
             .consume(instruction.clone())
@@ -1611,6 +1669,19 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
     ) -> Result<Builder<'a, S>, BuilderError> {
         let mut builder = Builder::new(self.op_ctx, self.self_op_id);
         builder.update_partial_self_op(self_op);
+        for instruction in &self.instructions {
+            builder.consume(instruction.clone())?;
+        }
+
+        Ok(builder)
+    }
+
+    fn build_builder_from_scratch_with_output_changes(
+        &self,
+        self_output_changes: AbstractOutputChanges<S>,
+    ) -> Result<Builder<'a, S>, BuilderError> {
+        let mut builder = Builder::new(self.op_ctx, self.self_op_id);
+        builder.update_expected_self_output_changes(self_output_changes);
         for instruction in &self.instructions {
             builder.consume(instruction.clone())?;
         }
@@ -1660,4 +1731,124 @@ impl<
         let mut inner = self.active.show();
         format!("{:?}", inner)
     }
+}
+
+/// Merges two `AbstractOutputChanges`.
+///
+/// The result will be as follows:
+/// - for nodes unique to one of the two, they will be kept in the result unchanged.
+/// - for new nodes or edges in both, they will be kept in the result with the join of the two as the expected AV result.
+/// - for nodes or edges that are changed in both, they will be kept in the result with the join of the two as the expected AV result.
+/// - for nodes or edges that are deleted in at least one, they will be kept in the result as deleted and not as changed.
+// TODO: do the above rules make sense? should one of the two have priority? eg. should we fail if a user expects a return type of Integer but we compute Object?
+fn merge_abstract_output_changes<S: Semantics>(
+    a: &AbstractOutputChanges<S>,
+    b: &AbstractOutputChanges<S>,
+) -> Result<AbstractOutputChanges<S>, BuilderError> {
+    let mut result = AbstractOutputChanges::new();
+    // merge new nodes
+    for (marker, av) in &a.new_nodes {
+        result.new_nodes.insert(*marker, av.clone());
+    }
+    for (marker, av) in &b.new_nodes {
+        if let Some(existing_av) = result.new_nodes.get(marker) {
+            // if the marker already exists, we join the AVs
+            let joined_av = S::NodeJoin::join(existing_av, av).ok_or(BuilderError::NeedsSpecificVariant("Need to be able to join two different return AVs"))?;
+            result.new_nodes.insert(*marker, joined_av);
+        } else {
+            // otherwise, we just insert it
+            result.new_nodes.insert(*marker, av.clone());
+        }
+    }
+    // same for new edges
+    for ((src, dst), av) in &a.new_edges {
+        result.new_edges.insert((*src, *dst), av.clone());
+    }
+    for ((src, dst), av) in &b.new_edges {
+        if let Some(existing_av) = result.new_edges.get(&(*src, *dst)) {
+            // if the edge already exists, we join the AVs
+            let joined_av = S::EdgeJoin::join(existing_av, av).ok_or(BuilderError::NeedsSpecificVariant("Need to be able to join two different return AVs"))?;
+            result.new_edges.insert((*src, *dst), joined_av);
+        } else {
+            // otherwise, we just insert it
+            result.new_edges.insert((*src, *dst), av.clone());
+        }
+    }
+
+    // first handle deleted nodes
+    for marker in &a.maybe_deleted_nodes {
+        result.maybe_deleted_nodes.insert(*marker);
+    }
+    for marker in &b.maybe_deleted_nodes {
+        result.maybe_deleted_nodes.insert(*marker);
+    }
+    // then handle changed nodes
+    for (marker, av) in &a.maybe_changed_nodes {
+        // only if it's not deleted
+        if result.maybe_deleted_nodes.contains(marker) {
+            continue;
+        }
+        result.maybe_changed_nodes.insert(*marker, av.clone());
+    }
+    for (marker, av) in &b.maybe_changed_nodes {
+        // only if it's not deleted
+        if result.maybe_deleted_nodes.contains(marker) {
+            continue;
+        }
+        if let Some(existing_av) = result.maybe_changed_nodes.get(marker) {
+            // if the marker already exists, we join the AVs
+            let joined_av = S::NodeJoin::join(existing_av, av).ok_or(BuilderError::NeedsSpecificVariant("Need to be able to join two different maybe_changed AVs"))?;
+            result.maybe_changed_nodes.insert(*marker, joined_av);
+        } else {
+            // otherwise, we just insert it
+            result.maybe_changed_nodes.insert(*marker, av.clone());
+        }
+    }
+
+    // first handle deleted edges
+    for (src, dst) in &a.maybe_deleted_edges {
+        result.maybe_deleted_edges.insert((*src, *dst));
+    }
+    for (src, dst) in &b.maybe_deleted_edges {
+        result.maybe_deleted_edges.insert((*src, *dst));
+    }
+    // then handle changed edges
+    for ((src, dst), av) in &a.maybe_changed_edges {
+        // only if it's not deleted
+        if result.maybe_deleted_edges.contains(&(*src, *dst)) {
+            continue;
+        }
+        // if one of the two endpoints may be deleted, then the edge may be deleted as well.
+        if result.maybe_deleted_nodes.contains(src) || result.maybe_deleted_nodes.contains(dst) {
+            result.maybe_deleted_edges.insert((*src, *dst));
+            continue;
+        }
+
+        // the edge stays, so we can insert it
+        result.maybe_changed_edges.insert((*src, *dst), av.clone());
+    }
+    for ((src, dst), av) in &b.maybe_changed_edges {
+        // only if it's not deleted
+        if result.maybe_deleted_edges.contains(&(*src, *dst)) {
+            continue;
+        }
+        // if one of the two endpoints may be deleted, then the edge may be deleted as well.
+        if result.maybe_deleted_nodes.contains(src) || result.maybe_deleted_nodes.contains(dst) {
+            result.maybe_deleted_edges.insert((*src, *dst));
+            continue;
+        }
+
+        // the edge stays, so we can insert it
+        if let Some(existing_av) = result.maybe_changed_edges.get(&(*src, *dst)) {
+            // if the edge already exists, we join the AVs
+            let joined_av = S::EdgeJoin::join(existing_av, av).ok_or(BuilderError::NeedsSpecificVariant("Need to be able to join two different maybe_changed AVs"))?;
+            result.maybe_changed_edges.insert((*src, *dst), joined_av);
+        } else {
+            // otherwise, we just insert it
+            result.maybe_changed_edges.insert((*src, *dst), av.clone());
+        }
+    }
+
+
+    Ok(result)
 }

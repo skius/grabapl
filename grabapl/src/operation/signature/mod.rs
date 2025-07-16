@@ -70,14 +70,15 @@ impl<S: Semantics> OperationSignature<S> {
         OperationSignature {
             name: name.into(),
             parameter,
-            output: AbstractOutputChanges {
-                new_nodes: HashMap::new(),
-                new_edges: HashMap::new(),
-                maybe_changed_nodes: HashMap::new(),
-                maybe_changed_edges: HashMap::new(),
-                maybe_deleted_nodes: HashSet::new(),
-                maybe_deleted_edges: HashSet::new(),
-            },
+            output: AbstractOutputChanges::new(),
+        }
+    }
+
+    pub fn new_noop(name: impl Into<String>) -> Self {
+        OperationSignature {
+            name: name.into(),
+            parameter: OperationParameter::new_empty(),
+            output: AbstractOutputChanges::new(),
         }
     }
 }
@@ -123,6 +124,17 @@ impl<S: Semantics> Clone for AbstractOutputChanges<S> {
 }
 
 impl<S: Semantics> AbstractOutputChanges<S> {
+    pub fn new() -> Self {
+        AbstractOutputChanges {
+            new_nodes: HashMap::new(),
+            new_edges: HashMap::new(),
+            maybe_changed_nodes: HashMap::new(),
+            maybe_changed_edges: HashMap::new(),
+            maybe_deleted_nodes: HashSet::new(),
+            maybe_deleted_edges: HashSet::new(),
+        }
+    }
+
     /// Returns `true` if `self` can be used wherever `other` is expected, i.e., `self <: other`.
     pub fn is_subtype_of(&self, other: &Self) -> bool {
         // All new nodes and edges from other must be present in self, with a subtype of their

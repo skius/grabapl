@@ -5,13 +5,13 @@ use crate::operation::signature::parameter::{
     ParameterSubstitution,
 };
 use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
-use crate::operation::signature::{AbstractSignatureNodeId, OperationSignature};
+use crate::operation::signature::{AbstractOutputChanges, AbstractSignatureNodeId, OperationSignature};
 use crate::operation::user_defined::{
     AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker,
     AbstractUserDefinedOperationOutput, NamedMarker, OpLikeInstruction, QueryInstructions,
     UserDefinedOperation,
 };
-use crate::operation::{BuiltinOperation, Operation, OperationError, get_substitution};
+use crate::operation::{BuiltinOperation, Operation, OperationError, get_substitution, OperationResult};
 use crate::semantics::{AbstractGraph, AbstractMatcher};
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, Semantics, SubstMarker};
@@ -49,6 +49,46 @@ This is the same routine that can provide state feedback to the user like:
 The intermediate state returns a graph and a hashmap from nodes and edges to additional metadata, like their abstract node id.
 */
 
+/// An operation that can be applied abstractly
+enum AbstractOperation<'a, S: Semantics> {
+    Op(Operation<'a, S>),
+    Partial(&'a OperationSignature<S>),
+}
+
+impl<'a, S: Semantics> AbstractOperation<'a, S> {
+    fn parameter(
+        &self,
+    ) -> OperationParameter<S> {
+        match self {
+            AbstractOperation::Op(op) => op.parameter(),
+            AbstractOperation::Partial(sig) => {
+                sig.parameter.clone()
+            }
+        }
+    }
+
+    fn apply_abstract(
+        &self,
+        op_ctx: &OperationContext<S>,
+        g: &mut GraphWithSubstitution<AbstractGraph<S>>,
+    ) -> OperationResult<AbstractOperationOutput<S>> {
+        match self {
+            AbstractOperation::Op(op) => op.apply_abstract(op_ctx, g),
+            AbstractOperation::Partial(sig) => {
+                Ok(sig.output.apply_abstract(g))
+            }
+        }
+    }
+
+    // hack to make the Inefficient operation builder still compile without too many changes.
+    // TODO: delete the inefficient operation builder and this method after all TODOs have been moved
+    fn from_operation(
+        op: Operation<'a, S>,
+    ) -> AbstractOperation<'a, S> {
+        AbstractOperation::Op(op)
+    }
+}
+
 pub enum BuilderOpLike<S: Semantics> {
     Builtin(S::BuiltinOperation),
     LibBuiltin(LibBuiltinOperation<S>),
@@ -57,21 +97,21 @@ pub enum BuilderOpLike<S: Semantics> {
 }
 
 impl<S: Semantics> BuilderOpLike<S> {
-    fn as_operation<'a>(
+    fn as_abstract_operation<'a>(
         &'a self,
         op_ctx: &'a OperationContext<S>,
-        partial_user_def_op: &'a UserDefinedOperation<S>,
-    ) -> Result<Operation<'a, S>, OperationBuilderError> {
+        partial_self_signature: &'a OperationSignature<S>,
+    ) -> Result<AbstractOperation<'a, S>, OperationBuilderError> {
         let op = match self {
-            BuilderOpLike::Builtin(op) => Operation::Builtin(op),
-            BuilderOpLike::LibBuiltin(op) => Operation::LibBuiltin(op),
+            BuilderOpLike::Builtin(op) => AbstractOperation::Op(Operation::Builtin(op)),
+            BuilderOpLike::LibBuiltin(op) => AbstractOperation::Op(Operation::LibBuiltin(op)),
             BuilderOpLike::FromOperationId(id) => {
                 let op = op_ctx
                     .get(*id)
                     .ok_or_else(|| OperationBuilderError::NotFoundOperationId(*id))?;
-                op
+                AbstractOperation::Op(op)
             }
-            BuilderOpLike::Recurse => Operation::Custom(partial_user_def_op),
+            BuilderOpLike::Recurse => AbstractOperation::Partial(partial_self_signature),
         };
         Ok(op)
     }
@@ -143,6 +183,9 @@ pub enum BuilderInstruction<S: Semantics> {
     /// Invariants in the interpreter require that this is never a parameter node. (E.g., since we may want to return it)
     RenameNode(AbstractNodeId, NamedMarker),
     Finalize,
+    /// Asserts that the current operation will return a node with the given abstract value and name.
+    #[debug("SelfReturnNode({_0:?}, ???)")]
+    SelfReturnNode(AbstractOutputNodeMarker, S::NodeAbstract)
 }
 
 impl<S: Semantics> BuilderInstruction<S> {
@@ -187,6 +230,7 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Build
             ReturnEdge(src, dst, edge) => ReturnEdge(src.clone(), dst.clone(), edge.clone()),
             RenameNode(old_aid, new_name) => RenameNode(old_aid.clone(), new_name.clone()),
             Finalize => Finalize,
+            SelfReturnNode(marker, node) => SelfReturnNode(marker.clone(), node.clone()),
         }
     }
 }
@@ -1548,7 +1592,7 @@ impl<S: Semantics> IntermediateState<S> {
         &mut self,
         op_ctx: &OperationContext<S>,
         marker: Option<AbstractOperationResultMarker>,
-        op: Operation<S>,
+        op: AbstractOperation<S>,
         args: Vec<AbstractNodeId>,
     ) -> Result<AbstractOperationArgument, OperationBuilderError> {
         let param = op.parameter();
@@ -2182,7 +2226,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         args: Vec<AbstractNodeId>,
     ) -> Result<AbstractOperationArgument, OperationBuilderError> {
         self.current_state
-            .interpret_op(&self.op_ctx, marker, op, args)
+            .interpret_op(&self.op_ctx, marker, AbstractOperation::from_operation(op), args)
     }
 
     fn interpret_builtin_query(

@@ -1686,6 +1686,7 @@ fn recursion_return_node() {
         .add_named_operation("recursion".into(), BuilderOpLike::Recurse, vec![p0])
         .unwrap();
     let new_node_aid = AbstractNodeId::dynamic_output("recursion", "ret_node");
+    builder.expect_self_return_node("ret_node", NodeType::Integer).unwrap();
     // rename the output node to ret_node
     builder
         .rename_node(new_node_aid, "ret_node")
