@@ -1,9 +1,9 @@
 mod util;
 
-use grabapl::prelude::*;
 use grabapl::operation::builder::{BuilderOpLike, OperationBuilder};
 use grabapl::operation::builtin::LibBuiltinOperation;
 use grabapl::operation::user_defined::AbstractNodeId;
+use grabapl::prelude::*;
 use util::interval_semantics::*;
 
 #[test_log::test]

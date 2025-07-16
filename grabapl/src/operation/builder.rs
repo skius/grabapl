@@ -5,17 +5,21 @@ use crate::operation::signature::parameter::{
     ParameterSubstitution,
 };
 use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
-use crate::operation::signature::{AbstractOutputChanges, AbstractSignatureNodeId, OperationSignature};
+use crate::operation::signature::{
+    AbstractOutputChanges, AbstractSignatureNodeId, OperationSignature,
+};
 use crate::operation::user_defined::{
     AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker,
     AbstractUserDefinedOperationOutput, NamedMarker, OpLikeInstruction, QueryInstructions,
     UserDefinedOperation,
 };
-use crate::operation::{BuiltinOperation, Operation, OperationError, get_substitution, OperationResult};
+use crate::operation::{
+    BuiltinOperation, Operation, OperationError, OperationResult, get_substitution,
+};
+use crate::prelude::*;
 use crate::semantics::{AbstractGraph, AbstractMatcher};
 use crate::util::bimap::BiMap;
 use crate::{Graph, NodeKey, Semantics, SubstMarker};
-use crate::prelude::*;
 use error_stack::{FutureExt, Result, ResultExt, bail, report};
 use petgraph::dot;
 use petgraph::dot::Dot;
@@ -28,8 +32,8 @@ use std::mem;
 use std::slice::Iter;
 use thiserror::Error;
 
-pub mod stack_based_builder;
 mod programming_by_demonstration;
+pub mod stack_based_builder;
 /*
 General overview:
 
@@ -56,14 +60,10 @@ enum AbstractOperation<'a, S: Semantics> {
 }
 
 impl<'a, S: Semantics> AbstractOperation<'a, S> {
-    fn parameter(
-        &self,
-    ) -> OperationParameter<S> {
+    fn parameter(&self) -> OperationParameter<S> {
         match self {
             AbstractOperation::Op(op) => op.parameter(),
-            AbstractOperation::Partial(sig) => {
-                sig.parameter.clone()
-            }
+            AbstractOperation::Partial(sig) => sig.parameter.clone(),
         }
     }
 
@@ -74,17 +74,13 @@ impl<'a, S: Semantics> AbstractOperation<'a, S> {
     ) -> OperationResult<AbstractOperationOutput<S>> {
         match self {
             AbstractOperation::Op(op) => op.apply_abstract(op_ctx, g),
-            AbstractOperation::Partial(sig) => {
-                Ok(sig.output.apply_abstract(g))
-            }
+            AbstractOperation::Partial(sig) => Ok(sig.output.apply_abstract(g)),
         }
     }
 
     // hack to make the Inefficient operation builder still compile without too many changes.
     // TODO: delete the inefficient operation builder and this method after all TODOs have been moved
-    fn from_operation(
-        op: Operation<'a, S>,
-    ) -> AbstractOperation<'a, S> {
+    fn from_operation(op: Operation<'a, S>) -> AbstractOperation<'a, S> {
         AbstractOperation::Op(op)
     }
 }
@@ -185,7 +181,7 @@ pub enum BuilderInstruction<S: Semantics> {
     Finalize,
     /// Asserts that the current operation will return a node with the given abstract value and name.
     #[debug("SelfReturnNode({_0:?}, ???)")]
-    SelfReturnNode(AbstractOutputNodeMarker, S::NodeAbstract)
+    SelfReturnNode(AbstractOutputNodeMarker, S::NodeAbstract),
 }
 
 impl<S: Semantics> BuilderInstruction<S> {
@@ -2225,8 +2221,12 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         op: Operation<S>,
         args: Vec<AbstractNodeId>,
     ) -> Result<AbstractOperationArgument, OperationBuilderError> {
-        self.current_state
-            .interpret_op(&self.op_ctx, marker, AbstractOperation::from_operation(op), args)
+        self.current_state.interpret_op(
+            &self.op_ctx,
+            marker,
+            AbstractOperation::from_operation(op),
+            args,
+        )
     }
 
     fn interpret_builtin_query(

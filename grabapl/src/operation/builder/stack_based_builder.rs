@@ -1,4 +1,3 @@
-use std::any::Any;
 use crate::operation::builder::{
     BuilderInstruction, BuilderOpLike, IntermediateInterpreter, IntermediateState,
     IntermediateStateBuilder, OperationBuilderError, OperationBuilderInefficient,
@@ -13,26 +12,27 @@ use crate::operation::user_defined::{
     AbstractUserDefinedOperationOutput, Instruction, NamedMarker, QueryInstructions,
     UserDefinedOperation,
 };
-use crate::{NodeKey, Semantics, SubstMarker};
 use crate::prelude::*;
+use crate::{NodeKey, Semantics, SubstMarker};
 use derive_more::From;
 use derive_more::with_trait::TryInto;
 use error_stack::{Report, ResultExt, bail, report};
+use std::any::Any;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use thiserror::Error;
 
+use crate::operation::OperationContext;
 use crate::operation::query::{GraphShapeQuery, ShapeNodeIdentifier};
 use crate::operation::signature::{
     AbstractOutputChanges, AbstractSignatureNodeId, OperationSignature,
 };
 use crate::semantics::{AbstractGraph, AbstractJoin, AbstractMatcher};
 use crate::util::bimap::BiMap;
-use error_stack::Result;
-use crate::operation::OperationContext;
 use crate::util::log;
+use error_stack::Result;
 
 macro_rules! bail_unexpected_instruction {
     ($i:expr, $i_opt:expr, $frame:literal) => {
@@ -118,7 +118,8 @@ impl<S: Semantics> BuildingParameterFrame<S> {
                     .parameter_builder
                     .build()
                     .change_context(BuilderError::ParameterBuildError)?;
-                parameter.check_validity()
+                parameter
+                    .check_validity()
                     .change_context(BuilderError::ParameterBuildError)?;
                 let frame = CollectingInstructionsFrame::from_param(&parameter);
                 builder.data.built.parameter = Some(parameter.clone());
@@ -627,10 +628,7 @@ impl<S: Semantics> ReturnFrame<S> {
         }
 
         self.abstract_ud_output.new_nodes.insert(aid, output_marker);
-        self.signature
-            .output
-            .new_nodes
-            .insert(output_marker, av);
+        self.signature.output.new_nodes.insert(output_marker, av);
         Ok(())
     }
 
@@ -1073,17 +1071,26 @@ impl<'a, S: Semantics> BuilderData<'a, S> {
             built: BuiltData::new(),
             self_op_id,
             partial_self_op: UserDefinedOperation::new_noop(),
-            expected_self_signature: OperationSignature::empty_new("some_name", OperationParameter::new_empty()),
+            expected_self_signature: OperationSignature::empty_new(
+                "some_name",
+                OperationParameter::new_empty(),
+            ),
         }
     }
 
-    pub fn consume_global(&mut self, instruction_opt: &mut Option<BuilderInstruction<S>>) -> Result<(), BuilderError> {
+    pub fn consume_global(
+        &mut self,
+        instruction_opt: &mut Option<BuilderInstruction<S>>,
+    ) -> Result<(), BuilderError> {
         use BuilderInstruction as BI;
 
         let instruction = instruction_opt.take().unwrap();
         match instruction {
             BI::SelfReturnNode(output_marker, av) => {
-                self.expected_self_signature.output.new_nodes.insert(output_marker, av);
+                self.expected_self_signature
+                    .output
+                    .new_nodes
+                    .insert(output_marker, av);
             }
             _ => {
                 // do nothing
@@ -1150,7 +1157,6 @@ impl<'a, S: Semantics> Builder<'a, S> {
         }
     }
 
-
     pub fn update_partial_self_op(&mut self, partial_self_op: UserDefinedOperation<S>) {
         self.data.partial_self_op = partial_self_op;
     }
@@ -1216,12 +1222,16 @@ impl<'a, S: Semantics> Builder<'a, S> {
     /// Builds the current self output changes for purposes of restarting the builder with this new information.
     fn build_partial_op(mut self) -> Result<AbstractOutputChanges<S>, BuilderError> {
         // first, keep the expected changes
-        let expected_self_signature = std::mem::replace(&mut self.data.expected_self_signature, OperationSignature::new_noop("some name"));
+        let expected_self_signature = std::mem::replace(
+            &mut self.data.expected_self_signature,
+            OperationSignature::new_noop("some name"),
+        );
         // then, build self as if it was a full op to get the signature
         let op = self.build()?;
         // then, add the output changes from the signature
         // we merge the two
-        let merged_changes = merge_abstract_output_changes(&expected_self_signature.output, &op.signature.output)?;
+        let merged_changes =
+            merge_abstract_output_changes(&expected_self_signature.output, &op.signature.output)?;
 
         // TODO: we should have an assert that the built op's signature has the same parameter as our expected signature.
 
@@ -1587,7 +1597,10 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         output_marker: impl Into<AbstractOutputNodeMarker>,
         node: S::NodeAbstract,
     ) -> Result<(), OperationBuilderError> {
-        self.push_instruction(BuilderInstruction::SelfReturnNode(output_marker.into(), node))
+        self.push_instruction(BuilderInstruction::SelfReturnNode(
+            output_marker.into(),
+            node,
+        ))
     }
 
     // TODO: This should run further post processing checks.
@@ -1615,7 +1628,8 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         let new_builder_stage_1_before_build = new_builder_stage_1.clone();
         let new_output_changes = match new_builder_stage_1
             .build_partial_op()
-            .change_context(OperationBuilderError::NewBuilderError) {
+            .change_context(OperationBuilderError::NewBuilderError)
+        {
             Ok(op) => op,
             Err(e) => {
                 // we failed to _build_. This does not mean the instruction is invalid, but rather that
@@ -1623,8 +1637,10 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
                 // (e.g.: we're building the parameter graph and a context node does not have an edge to a parameter node yet)
                 // TODO: indicate some *warning* to the user here?
 
-                log::info!("Failed to build partial operation, continuing in best-effort. instruction: {:?} error: {:?}",
-                    instruction, e
+                log::info!(
+                    "Failed to build partial operation, continuing in best-effort. instruction: {:?} error: {:?}",
+                    instruction,
+                    e
                 );
 
                 // accept the instruction.
@@ -1753,7 +1769,10 @@ fn merge_abstract_output_changes<S: Semantics>(
     for (marker, av) in &b.new_nodes {
         if let Some(existing_av) = result.new_nodes.get(marker) {
             // if the marker already exists, we join the AVs
-            let joined_av = S::NodeJoin::join(existing_av, av).ok_or(BuilderError::NeedsSpecificVariant("Need to be able to join two different return AVs"))?;
+            let joined_av =
+                S::NodeJoin::join(existing_av, av).ok_or(BuilderError::NeedsSpecificVariant(
+                    "Need to be able to join two different return AVs",
+                ))?;
             result.new_nodes.insert(*marker, joined_av);
         } else {
             // otherwise, we just insert it
@@ -1767,7 +1786,10 @@ fn merge_abstract_output_changes<S: Semantics>(
     for ((src, dst), av) in &b.new_edges {
         if let Some(existing_av) = result.new_edges.get(&(*src, *dst)) {
             // if the edge already exists, we join the AVs
-            let joined_av = S::EdgeJoin::join(existing_av, av).ok_or(BuilderError::NeedsSpecificVariant("Need to be able to join two different return AVs"))?;
+            let joined_av =
+                S::EdgeJoin::join(existing_av, av).ok_or(BuilderError::NeedsSpecificVariant(
+                    "Need to be able to join two different return AVs",
+                ))?;
             result.new_edges.insert((*src, *dst), joined_av);
         } else {
             // otherwise, we just insert it
@@ -1797,7 +1819,10 @@ fn merge_abstract_output_changes<S: Semantics>(
         }
         if let Some(existing_av) = result.maybe_changed_nodes.get(marker) {
             // if the marker already exists, we join the AVs
-            let joined_av = S::NodeJoin::join(existing_av, av).ok_or(BuilderError::NeedsSpecificVariant("Need to be able to join two different maybe_changed AVs"))?;
+            let joined_av =
+                S::NodeJoin::join(existing_av, av).ok_or(BuilderError::NeedsSpecificVariant(
+                    "Need to be able to join two different maybe_changed AVs",
+                ))?;
             result.maybe_changed_nodes.insert(*marker, joined_av);
         } else {
             // otherwise, we just insert it
@@ -1841,14 +1866,16 @@ fn merge_abstract_output_changes<S: Semantics>(
         // the edge stays, so we can insert it
         if let Some(existing_av) = result.maybe_changed_edges.get(&(*src, *dst)) {
             // if the edge already exists, we join the AVs
-            let joined_av = S::EdgeJoin::join(existing_av, av).ok_or(BuilderError::NeedsSpecificVariant("Need to be able to join two different maybe_changed AVs"))?;
+            let joined_av =
+                S::EdgeJoin::join(existing_av, av).ok_or(BuilderError::NeedsSpecificVariant(
+                    "Need to be able to join two different maybe_changed AVs",
+                ))?;
             result.maybe_changed_edges.insert((*src, *dst), joined_av);
         } else {
             // otherwise, we just insert it
             result.maybe_changed_edges.insert((*src, *dst), av.clone());
         }
     }
-
 
     Ok(result)
 }

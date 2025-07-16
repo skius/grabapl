@@ -3,6 +3,7 @@ use grabapl::operation::run_from_concrete;
 use grabapl::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
 use grabapl::prelude::*;
 
+use grabapl::graph::dot::DotCollector;
 use simple_semantics::sample_user_defined_operations::{
     get_count_list_len_user_defined_operation, get_insert_bst_user_defined_operation,
     get_labeled_edges_insert_bst_user_defined_operation, get_mk_n_to_0_list_user_defined_operation,
@@ -10,7 +11,6 @@ use simple_semantics::sample_user_defined_operations::{
 };
 use simple_semantics::{BuiltinOperation, BuiltinQuery, EdgePattern, SimpleSemantics};
 use std::collections::HashMap;
-use grabapl::graph::dot::DotCollector;
 
 fn insert_bst_builder_test(
     op_ctx: &OperationContext<SimpleSemantics>,

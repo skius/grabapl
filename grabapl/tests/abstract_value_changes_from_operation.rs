@@ -5,10 +5,10 @@ use grabapl::operation::user_defined::{
     AbstractNodeId, AbstractOperationResultMarker, UserDefinedOperation,
 };
 use grabapl::operation::{BuiltinOperation, run_from_concrete};
-use grabapl::semantics::ConcreteGraph;
 use grabapl::prelude::*;
-use std::collections::{HashMap, HashSet};
+use grabapl::semantics::ConcreteGraph;
 use petgraph::prelude::{GraphMap, StableGraph};
+use std::collections::{HashMap, HashSet};
 
 mod util;
 use util::semantics::*;
@@ -1646,7 +1646,6 @@ fn new_builder_test() {
     // assert!(false);
 }
 
-
 #[test_log::test]
 fn recursion_return_node() {
     let op_ctx = OperationContext::<TestSemantics>::new();
@@ -1675,26 +1674,23 @@ fn recursion_return_node() {
     // TODO: unfortunate that we need to specify "ret_node" twice as string.
     // maybe it would be nice to have the rename_node, expect_parameter_node etc ops return an AID?
     let ret_node_aid = AbstractNodeId::named("ret_node");
-    builder
-        .rename_node(new_node_aid, "ret_node")
-        .unwrap();
-    builder
-        .enter_false_branch()
-        .unwrap();
+    builder.rename_node(new_node_aid, "ret_node").unwrap();
+    builder.enter_false_branch().unwrap();
     // recurse
     builder
         .add_named_operation("recursion".into(), BuilderOpLike::Recurse, vec![p0])
         .unwrap();
     let new_node_aid = AbstractNodeId::dynamic_output("recursion", "ret_node");
-    builder.expect_self_return_node("ret_node", NodeType::Integer).unwrap();
-    // rename the output node to ret_node
     builder
-        .rename_node(new_node_aid, "ret_node")
+        .expect_self_return_node("ret_node", NodeType::Integer)
         .unwrap();
+    // rename the output node to ret_node
+    builder.rename_node(new_node_aid, "ret_node").unwrap();
     builder.end_query().unwrap();
     // return the ret_node
-    builder.return_node(ret_node_aid, "ret_node".into(), NodeType::Integer).unwrap();
-
+    builder
+        .return_node(ret_node_aid, "ret_node".into(), NodeType::Integer)
+        .unwrap();
 
     // TODO: make this work.
     //  Maybe it should be by allowing us to specify expected return nodes somewhere? maybe anywhere?
@@ -1703,8 +1699,6 @@ fn recursion_return_node() {
     //  2. when building - we need to make sure that the return nodes are actually created and returned with the appropriate name and type.
 
     let _ = builder.build().unwrap();
-
-
 }
 
 #[test_log::test]
@@ -1726,14 +1720,16 @@ fn recursion_expect_self_return_node_corner_cases() {
         .unwrap();
     let ret_node_aid = AbstractNodeId::dynamic_output("self", "ret_node");
     // Call op that requires integer argument
-    builder.add_operation(
-        BuilderOpLike::Builtin(TestOperation::SetTo {
-            op_typ: NodeType::Integer, // This enforces that the input type is integer
-            target_typ: NodeType::Integer, // no-op
-            value: NodeValue::Integer(42),
-        }),
-        vec![ret_node_aid],
-    ).unwrap();
+    builder
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::SetTo {
+                op_typ: NodeType::Integer, // This enforces that the input type is integer
+                target_typ: NodeType::Integer, // no-op
+                value: NodeValue::Integer(42),
+            }),
+            vec![ret_node_aid],
+        )
+        .unwrap();
 
     // now pull a little prank and expect the return node to actually be String
     let res = builder.expect_self_return_node("ret_node", NodeType::String);
@@ -1742,23 +1738,6 @@ fn recursion_expect_self_return_node_corner_cases() {
         "Expected expecting the return node to be String to fail, since it needs to be Integer in a prior instruction"
     );
 
-
-
     // build
     let _ = builder.build().unwrap();
-
-
 }
-
-
-
-
-
-
-
-
-
-
-
-
-

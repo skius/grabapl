@@ -1,7 +1,7 @@
 use grabapl::Semantics;
+use grabapl::graph::dot::DotCollector;
 use simple_semantics::SimpleSemantics;
 use wasm_bindgen::prelude::wasm_bindgen;
-use grabapl::graph::dot::DotCollector;
 
 #[wasm_bindgen]
 extern "C" {
@@ -28,8 +28,8 @@ mod ffi {
     use std::fmt::Write;
     use std::str::FromStr;
 
-    use super::RustEdgeAbstract;
     use super::DotCollector as RustDotCollector;
+    use super::RustEdgeAbstract;
     use grabapl::operation::builder::BuilderOpLike as RustBuilderOpLike;
 
     use grabapl::operation::user_defined::AbstractNodeId as RustAbstractNodeId;
@@ -55,8 +55,8 @@ mod ffi {
             // TODO: define an init function that calls this
             console_error_panic_hook::set_once();
             log::error!("test log::error! call");
-            let mut operation_ctx =
-                ::grabapl::prelude::OperationContext::from_builtins(std::collections::HashMap::from([
+            let mut operation_ctx = ::grabapl::prelude::OperationContext::from_builtins(
+                std::collections::HashMap::from([
                     (0, BuiltinOperation::AddNode),
                     (1, BuiltinOperation::AppendChild),
                     (2, BuiltinOperation::IndexCycle),
@@ -66,7 +66,8 @@ mod ffi {
                             prompt("Set value:").parse().unwrap()
                         })),
                     ),
-                ]));
+                ]),
+            );
             operation_ctx.add_custom_operation(5, simple_semantics::sample_user_defined_operations::get_labeled_edges_insert_bst_user_defined_operation(&operation_ctx, 5));
             operation_ctx.add_builtin_operation(6, BuiltinOperation::DeleteNode);
             Box::new(OpCtx(operation_ctx))

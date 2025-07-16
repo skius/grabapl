@@ -1,8 +1,8 @@
 //! This test module includes tests for the operation builder that test error conditions
 
 mod util;
-use util::semantics::*;
 use grabapl::prelude::*;
+use util::semantics::*;
 
 #[test_log::test]
 fn disconnected_context_node_not_allowed() {
@@ -10,10 +10,14 @@ fn disconnected_context_node_not_allowed() {
     let mut builder = OperationBuilder::new(&op_ctx, 0);
 
     // Expect a parameter node
-    builder.expect_parameter_node("p0", NodeType::String).unwrap();
+    builder
+        .expect_parameter_node("p0", NodeType::String)
+        .unwrap();
     let p0 = AbstractNodeId::param("p0");
     // Expect the disconnected context node
-    builder.expect_context_node("context", NodeType::Object).unwrap();
+    builder
+        .expect_context_node("context", NodeType::Object)
+        .unwrap();
 
     // Attempt to add an operation with a disconnected context node
     let res = builder.add_operation(
@@ -40,5 +44,8 @@ fn disconnected_context_node_not_allowed() {
     // TODO: add ^ (consideration of not having false negatives) to msc thesis report notes
 
     // Assert that the operation fails due to the disconnected context node
-    assert!(res.is_err(), "Expected error when proceeding with a disconnected context node");
+    assert!(
+        res.is_err(),
+        "Expected error when proceeding with a disconnected context node"
+    );
 }

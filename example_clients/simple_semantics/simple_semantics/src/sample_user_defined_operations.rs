@@ -6,8 +6,8 @@ use grabapl::operation::user_defined::{
     AbstractNodeId, AbstractOperationArgument, Instruction, OpLikeInstruction, QueryInstructions,
     UserDefinedOperation,
 };
-use grabapl::util::bimap::BiMap;
 use grabapl::prelude::*;
+use grabapl::util::bimap::BiMap;
 use std::collections::HashMap;
 
 fn mk_builtin_instruction(

@@ -33,24 +33,25 @@ interned_string_newtype!(SubstMarker);
 // TODO: What if two separate connected components overlap in the substitution? this leads to 'node references' to some degree.
 // Probably only really bad if the 'shape' of that node changes while another reference to it expects something else. eg deleting the node or changing its type
 
-
 pub mod prelude {
-    pub use crate::semantics::{Semantics, AbstractGraph, ConcreteGraph};
-    pub use crate::graph::{Graph, NodeKey};
-    pub use crate::operation::{OperationContext, OperationId, Operation, BuiltinOperation, run_from_concrete};
-    pub use crate::operation::signature::{OperationSignature};
-    pub use crate::operation::signature::parameter::{OperationParameter, GraphWithSubstitution};
-    pub use crate::operation::signature::parameterbuilder::{OperationParameterBuilder};
-    pub use crate::operation::builder::{BuilderOpLike, OperationBuilder};
-    pub use crate::operation::user_defined::{UserDefinedOperation, AbstractNodeId};
-    pub use crate::operation::builtin::{LibBuiltinOperation};
     pub use super::SubstMarker;
+    pub use crate::graph::{Graph, NodeKey};
+    pub use crate::operation::builder::{BuilderOpLike, OperationBuilder};
+    pub use crate::operation::builtin::LibBuiltinOperation;
+    pub use crate::operation::signature::OperationSignature;
+    pub use crate::operation::signature::parameter::{GraphWithSubstitution, OperationParameter};
+    pub use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
+    pub use crate::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
+    pub use crate::operation::{
+        BuiltinOperation, Operation, OperationContext, OperationId, run_from_concrete,
+    };
+    pub use crate::semantics::{AbstractGraph, ConcreteGraph, Semantics};
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::graph::dot::DotCollector;
     use super::*;
+    use crate::graph::dot::DotCollector;
     // #[test]
     // this is an old test with old test matching behavior.
     fn child_order() {

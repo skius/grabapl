@@ -9,12 +9,10 @@ use crate::operation::{
     OperationError, OperationResult, run_builtin_operation, run_lib_builtin_operation,
     run_operation,
 };
+use crate::prelude::*;
 use crate::semantics::{AbstractGraph, ConcreteGraph};
 use crate::util::{InternString, log};
-use crate::{
-    NodeKey, Semantics, SubstMarker, interned_string_newtype,
-};
-use crate::prelude::*;
+use crate::{NodeKey, Semantics, SubstMarker, interned_string_newtype};
 use derive_more::with_trait::From;
 use internment::Intern;
 use serde::{Deserialize, Serialize};
