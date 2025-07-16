@@ -1178,7 +1178,7 @@ impl<'a, S: Semantics> Builder<'a, S> {
         Ok(())
     }
 
-    fn build(&mut self) -> Result<UserDefinedOperation<S>, BuilderError> {
+    fn build(mut self) -> Result<UserDefinedOperation<S>, BuilderError> {
         // this is a bit of a hack. it just works because all nested frames right now can be ended with Finalize.
         while self.stack.frames.len() > 1 {
             self.consume(BuilderInstruction::Finalize)?;
