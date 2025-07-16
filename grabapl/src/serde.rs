@@ -8,7 +8,9 @@ pub(crate) trait SemanticsSerde:
         BuiltinOperation: Serialize + DeserializeOwned,
         NodeAbstract: Serialize + DeserializeOwned,
         NodeConcrete: Serialize + DeserializeOwned,
-        EdgeAbstract: Serialize + DeserializeOwned,
+        // note: 'static is needed since serde_json_any_key::any_key_map has the wrong bounds.
+        // PR or fork could remove the 'static requirement.
+        EdgeAbstract: Serialize + DeserializeOwned + 'static,
         EdgeConcrete: Serialize + DeserializeOwned,
     >
 {
@@ -20,7 +22,7 @@ impl<
             BuiltinOperation: Serialize + DeserializeOwned,
             NodeAbstract: Serialize + DeserializeOwned,
             NodeConcrete: Serialize + DeserializeOwned,
-            EdgeAbstract: Serialize + DeserializeOwned,
+            EdgeAbstract: Serialize + DeserializeOwned + 'static,
             EdgeConcrete: Serialize + DeserializeOwned,
         >,
 > SemanticsSerde for S

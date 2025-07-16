@@ -15,6 +15,7 @@ internment = "0.8.6"
 log_crate = { version = "0.4", optional = true, package = "log" }
 error-stack = "0.5.0"
 serde = { version = "1.0", features = ["derive", "std"], optional = true }
+serde_json_any_key = { version = "2.0.0", optional = true }
 
 [dev-dependencies]
 criterion = "0.5.1"
@@ -26,7 +27,7 @@ serde_json = "1.0"
 [features]
 default = ["log", "serde"]
 log = ["dep:log_crate"]
-serde = ["dep:serde"]
+serde = ["dep:serde", "dep:serde_json_any_key"]
 
 [[bench]]
 name = "isomorphism_find_single_node"

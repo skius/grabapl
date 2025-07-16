@@ -94,10 +94,12 @@ pub struct AbstractOutputChanges<S: Semantics> {
     /// New nodes that are guaranteed to be created with a value of the given type.
     pub new_nodes: HashMap<AbstractOutputNodeMarker, S::NodeAbstract>,
     /// New edges that are guaranteed to be created with a value of the given type.
+    #[serde(with = "serde_json_any_key::any_key_map")]
     pub new_edges: HashMap<AbstractSignatureEdgeId, S::EdgeAbstract>,
     /// Pre-existing nodes that may have been modified to be of the given type.
     pub maybe_changed_nodes: HashMap<SubstMarker, S::NodeAbstract>,
     /// Pre-existing edges that may have been modified to be of the given type.
+    #[serde(with = "serde_json_any_key::any_key_map")]
     pub maybe_changed_edges: HashMap<ParameterEdgeId, S::EdgeAbstract>,
     // TODO: think about also having "must_changed_nodes" and "must_changed_edges" here,
     //  which would be useful for:

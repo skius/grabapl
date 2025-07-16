@@ -260,6 +260,7 @@ pub type InstructionWithResultMarker<S> = (Option<AbstractOperationResultMarker>
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct AbstractUserDefinedOperationOutput {
+    #[serde(with = "serde_json_any_key::any_key_map")]
     pub new_nodes: HashMap<AbstractNodeId, AbstractOutputNodeMarker>,
 }
 
