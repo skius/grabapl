@@ -5,9 +5,7 @@ use crate::operation::signature::parameter::{
     ParameterSubstitution,
 };
 use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
-use crate::operation::signature::{
-    AbstractSignatureNodeId, OperationSignature,
-};
+use crate::operation::signature::{AbstractSignatureNodeId, OperationSignature};
 use crate::operation::user_defined::{
     AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker,
     AbstractUserDefinedOperationOutput, NamedMarker, OpLikeInstruction, QueryInstructions,

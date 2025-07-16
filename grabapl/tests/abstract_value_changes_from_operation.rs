@@ -1,9 +1,7 @@
 use grabapl::operation::builder::{BuilderOpLike, OperationBuilder, stack_based_builder};
 use grabapl::operation::builtin::LibBuiltinOperation;
 use grabapl::operation::query::BuiltinQuery;
-use grabapl::operation::user_defined::{
-    AbstractNodeId, UserDefinedOperation,
-};
+use grabapl::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
 use grabapl::operation::{BuiltinOperation, run_from_concrete};
 use grabapl::prelude::*;
 use grabapl::semantics::ConcreteGraph;

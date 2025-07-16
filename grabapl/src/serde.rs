@@ -1,6 +1,6 @@
 use crate::Semantics;
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 pub(crate) trait SemanticsSerde:
     Semantics<
