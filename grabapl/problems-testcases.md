@@ -505,6 +505,29 @@ What should the semantics of the bool result node be?
 * If not, keep the bool node around, so we can do bool operations?
 
 
+## Operation Builder brainstorming and future work
+Concepts that are at odds:
+1. It tries to give a representation of the current abstract state of the operation after each instruction.
+   * That is useful/necessary for the visual programming paradigm.
+   * However, it means there must be some "meaningful" state after each instruction.
+2. It tries to ensure after every instruction, it is "more or less" valid.
+   * "More or **less**": it's fine if the parameter graph has disconnected context nodes.
+   * "**More** or less": it is not fine if the new instruction tries to call an operation for which the argument does not match.
+
+The main problem that arises with this is that the user must take care to add instructions in the right order,
+such that every partial state is valid.
+To some degree this makes sense, since visually we want to have sensible state to show.
+However, it might be a bit restrictive.
+
+If we followed a compiler paradigm more closely, we could have the following process:
+1. Build an AST from messages. This should happen more or less syntactically.
+2. Type-check/abstractly interpret the AST to get rich information.
+
+The problem with that is that in step 1 we don't really have meaningful visual state. Calling an operation
+could modify the abstract state, which we need to show visually, but that is something _semantic_.
+
+(side node: our process is essentially building the AST and validating it on the fly.)
+
 
 
 
