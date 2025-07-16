@@ -1582,6 +1582,7 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         self.push_instruction(BuilderInstruction::AddNamedOperation(name, op, args))
     }
 
+    // TODO: for ergonomics, could take an impl Into<BuilderOpLike<S>> and blanket impl that for all S::BuiltinOperation etc.
     pub fn add_operation(
         &mut self,
         op: BuilderOpLike<S>,

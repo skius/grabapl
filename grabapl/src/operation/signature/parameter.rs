@@ -258,6 +258,9 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
             .and_then(|node_key| self.graph.get_node_attr(node_key))
     }
 
+    // TODO: in general these functions are a bit awkward (set_edge_value too), since they return
+    //  an optional. If the optional is None, it means the node/edge does not exist, and no value was set.
+    //  Can we communicate this better?
     pub fn set_node_value(
         &mut self,
         marker: impl Into<NodeMarker>,

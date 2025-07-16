@@ -163,6 +163,7 @@ pub enum TestOperation {
     DeleteNode,
     DeleteEdge,
     AddInteger(i32),
+    AModBToC,
 }
 
 impl BuiltinOperation for TestOperation {
@@ -260,6 +261,17 @@ impl BuiltinOperation for TestOperation {
                     .expect_explicit_input_node("target", NodeType::Integer)
                     .unwrap();
             }
+            TestOperation::AModBToC => {
+                param_builder
+                    .expect_explicit_input_node("a", NodeType::Integer)
+                    .unwrap();
+                param_builder
+                    .expect_explicit_input_node("b", NodeType::Integer)
+                    .unwrap();
+                param_builder
+                    .expect_explicit_input_node("c", NodeType::Integer)
+                    .unwrap();
+            }
         }
         param_builder.build().unwrap()
     }
@@ -346,6 +358,9 @@ impl BuiltinOperation for TestOperation {
                     .unwrap();
             }
             TestOperation::AddInteger(i) => {
+                // no abstract changes
+            }
+            TestOperation::AModBToC => {
                 // no abstract changes
             }
         }
@@ -435,6 +450,24 @@ impl BuiltinOperation for TestOperation {
                 };
                 let value = NodeValue::Integer(*i + *old_value);
                 g.set_node_value(SubstMarker::from("target"), value)
+                    .unwrap();
+            }
+            TestOperation::AModBToC => {
+                // Compute a % b and store it in c.
+                let a = g.get_node_value(SubstMarker::from("a")).unwrap();
+                let b = g.get_node_value(SubstMarker::from("b")).unwrap();
+                let c = g.get_node_value(SubstMarker::from("c")).unwrap();
+                let NodeValue::Integer(a_val) = a else {
+                    panic!("expected an integer node value for AModBToC operation - type unsoundness");
+                };
+                let NodeValue::Integer(b_val) = b else {
+                    panic!("expected an integer node value for AModBToC operation - type unsoundness");
+                };
+                let NodeValue::Integer(c_val) = c else {
+                    panic!("expected an integer node value for AModBToC operation - type unsoundness");
+                };
+                let result = a_val % b_val;
+                g.set_node_value(SubstMarker::from("c"), NodeValue::Integer(result))
                     .unwrap();
             }
         }
