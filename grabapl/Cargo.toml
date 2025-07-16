@@ -40,7 +40,3 @@ harness = false
 [[example]]
 name = "isomorphisms_partial"
 path = "examples/isomorphisms_partial.rs"
-
-[[test]]
-name = "algot-examples"
-path = "tests/algot_examples/main.rs"

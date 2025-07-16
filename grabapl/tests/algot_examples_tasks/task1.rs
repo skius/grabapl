@@ -2,7 +2,12 @@ use proptest::proptest;
 use grabapl::prelude::*;
 use super::semantics::*;
 
-/// Returns an operation that solves "Task 1" from the OSF tasks.
+/// Returns an operation that solves "Task 1" from the OSF tasks:
+///
+/// Greatest Common Divisor
+/// The function f should return the greatest common divisor of a and b.
+/// Reminder: The GCD of two numbers a and b is the greatest number c that divides both a and b.
+/// For example, the GCD of 12 and 8 is 4.
 fn get_gcd_op(self_op_id: OperationId) -> UserDefinedOperation<TestSemantics> {
     let op_ctx = OperationContext::<TestSemantics>::new();
     let mut builder = OperationBuilder::new(&op_ctx, self_op_id);
