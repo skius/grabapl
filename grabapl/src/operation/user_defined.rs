@@ -257,16 +257,9 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Query
 
 pub type InstructionWithResultMarker<S> = (Option<AbstractOperationResultMarker>, Instruction<S>);
 
-// TODO: We probably want each instruction to statically know which nodes it uses in a call. We need this because
-//  we want the parameter matching to happen statically, so we know for a fact which nodes get modified. And we're not surprised
-//  if the concrete graph has more edges and thus the called operation matches differently.
-//  This requires thinking about how to keep statically defined mappings in check when running the operation concretely.
-//  ==> see big-picture-todos.md for a solution. TL;DR: store implicitly matched context nodes in the form of an explicit mapping from AbstractNodeId to the context nodes.
-
 #[derive(Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct AbstractUserDefinedOperationOutput {
-    // TODO: can probably remove S::NodeAbstract here since it's in the signature.
     pub new_nodes: HashMap<AbstractNodeId, AbstractOutputNodeMarker>,
 }
 
@@ -279,6 +272,9 @@ impl AbstractUserDefinedOperationOutput {
 }
 
 // A 'custom'/user-defined operation
+// TODO: regarding serialization: for stability, there should be a separate _versioned_ struct that gets explicitly created
+//  when calling UserDefinedOperation::serialze() or similar. That way previously stored operations have a better chance of
+//  working with a new version of the library.
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
@@ -304,8 +300,6 @@ impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for UserD
         }
     }
 }
-
-// TODO: use a private runner struct that keeps all the necessary mappings on self for easier methods.
 
 impl<S: Semantics> UserDefinedOperation<S> {
     pub fn new_noop() -> Self {
