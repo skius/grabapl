@@ -1,7 +1,7 @@
 use chumsky::prelude::*;
 
 //================================================================================
-// Abstract Syntax Tree (AST) - (No changes)
+// Abstract Syntax Tree (AST)
 //================================================================================
 
 #[derive(Debug, Clone)]
@@ -37,19 +37,17 @@ type ParserInput<'a> = &'a str;
 type ParserError<'a> = extra::Err<Simple<'a, char>>;
 
 pub fn parser<'a>() -> impl Parser<'a, ParserInput<'a>, Program, ParserError<'a>> {
-    // FIX: Define a robust padding/comment parser.
-    // This parser is for a SINGLE instance of whitespace or a comment.
-    // It will FAIL if it's not at whitespace or a comment start.
-    // This is crucial for preventing non-consuming loops when used with .repeated().
+    // A robust padding parser that avoids non-consuming loops.
     let comment = {
         let single_line = just("//").then(any().and_is(just('\n').not()).repeated()).ignored();
         let multi_line = just("/*").then(any().and_is(just("*/").not()).repeated()).then(just("*/")).ignored();
+        // The parser for a single unit of padding. It fails if no padding is present.
         single_line.or(multi_line).or(text::whitespace().ignored()).boxed()
     };
-    // A parser for any amount of padding
+    // The parser for any amount of padding.
     let padding = comment.repeated().ignored();
 
-    // Helper to apply padding to tokens
+    // A helper for creating a token parser that is padded on both sides.
     fn token<'a, P: Clone + Parser<'a, ParserInput<'a>, T, ParserError<'a>>, T>(p: P) -> impl Parser<'a, ParserInput<'a>, T, ParserError<'a>> + Clone {
         let comment = {
             let single_line = just("//").then(any().and_is(just('\n').not()).repeated()).ignored();
@@ -79,8 +77,7 @@ pub fn parser<'a>() -> impl Parser<'a, ParserInput<'a>, Program, ParserError<'a>
         .collect::<Vec<_>>()
         .delimited_by(token(just('(')), token(just(')')));
 
-    let call = ident
-        .clone()
+    let call = ident.clone()
         .then(ident.clone().delimited_by(token(just('[')), token(just(']'))).or_not())
         .then(args)
         .map(|((func, op), args): ((&str, Option<&str>), Vec<Expr>)| match op {
@@ -149,8 +146,6 @@ pub fn parser<'a>() -> impl Parser<'a, ParserInput<'a>, Program, ParserError<'a>
 
     let expr_stmt = expr.clone().then_ignore(token(just(';'))).map(Statement::Expr);
 
-    // FIX: This definition is now safe because the sub-parsers handle padding correctly
-    // and this parser no longer has its own problematic padding.
     statement.define(choice((let_stmt, if_stmt, return_stmt, expr_stmt)));
 
     let typed_param = ident.clone().then_ignore(token(just(':'))).then(ident.clone())
@@ -170,9 +165,13 @@ pub fn parser<'a>() -> impl Parser<'a, ParserInput<'a>, Program, ParserError<'a>
             body,
         });
 
-    let program = func_def.repeated().at_least(1).collect::<Vec<_>>().then_ignore(padding.clone()).then_ignore(end()).map(Program);
+    let program = func_def.repeated().at_least(1).collect::<Vec<_>>()
+        .then_ignore(padding.clone()) // Handles trailing comments/whitespace
+        .then_ignore(end())
+        .map(Program);
 
-    program
+    // The top-level parser is padded to handle leading comments/whitespace.
+    padding.ignore_then(program)
 }
 
 fn main() {
