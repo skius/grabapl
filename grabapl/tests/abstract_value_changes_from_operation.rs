@@ -1735,6 +1735,15 @@ fn recursion_expect_self_return_node_corner_cases() {
         "Expected expecting the return node to be String to fail, since it needs to be Integer in a prior instruction"
     );
 
-    // build
+    // build without returning
+    let res = builder.build();
+    assert!(
+        res.is_err(),
+        "Expected building the operation to fail, since we expect a return node that is not created"
+    );
+    // now actually return the node
+    builder
+        .return_node(ret_node_aid, "ret_node".into(), NodeType::Integer)
+        .unwrap();
     let _ = builder.build().unwrap();
 }

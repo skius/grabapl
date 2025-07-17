@@ -94,13 +94,13 @@ pub trait Semantics {
     type NodeConcrete: Clone;
     /// An operation can define patterns for nodes using this type.
     /// PL analogy: types.
-    type NodeAbstract: Clone;
+    type NodeAbstract: Clone + PartialEq;
     /// A data graph's edges contain values of this type.
     /// PL analogy: values.
     type EdgeConcrete: Clone;
     /// An operation can define patterns for edges using this type.
     /// PL analogy: types.
-    type EdgeAbstract: Clone;
+    type EdgeAbstract: Clone + PartialEq;
     /// The specific matching process for nodes.
     type NodeMatcher: AbstractMatcher<Abstract = Self::NodeAbstract>;
     /// The specific matching process for edges.

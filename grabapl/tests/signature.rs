@@ -5,7 +5,7 @@ use util::semantics::*;
 #[test_log::test]
 fn self_return_nodes_are_respected() {
     // if the user asserts that they will return some node under some type, then they must return that node before building.
-    
+
     let op_ctx = OperationContext::<TestSemantics>::new();
     let mut builder = OperationBuilder::new(&op_ctx, 0);
     builder.expect_self_return_node("ret1", NodeType::Object).unwrap();
@@ -25,8 +25,17 @@ fn self_return_nodes_are_respected() {
         }),
         vec![],
     ).unwrap();
+    builder.add_named_operation(
+        "ret2".into(),
+        BuilderOpLike::LibBuiltin(LibBuiltinOperation::AddNode {
+            value: NodeValue::String("hello".to_string()),
+        }),
+        vec![],
+    ).unwrap();
     let ret1 = AbstractNodeId::dynamic_output("ret1", "new");
-    // returning it as integer does not work, since the self return expected object
+    let ret2 = AbstractNodeId::dynamic_output("ret2", "new");
+
+    // returning first node as integer does not work, since the self return expected object
     let res = builder.return_node(ret1, "ret1".into(), NodeType::Integer);
     assert!(
         res.is_err(),
@@ -43,15 +52,8 @@ fn self_return_nodes_are_respected() {
         res.is_err(),
         "Expected error when building without returning the second expected node"
     );
-    // now create and return the second node
-    builder.add_named_operation(
-        "ret2".into(),
-        BuilderOpLike::LibBuiltin(LibBuiltinOperation::AddNode {
-            value: NodeValue::String("hello".to_string()),
-        }),
-        vec![],
-    ).unwrap();
-    let ret2 = AbstractNodeId::dynamic_output("ret2", "new");
+
+    // returning the second node as object works
     builder.return_node(ret2, "ret2".into(), NodeType::Object).unwrap();
     // now building should work
     let res = builder.build();

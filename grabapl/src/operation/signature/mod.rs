@@ -53,6 +53,14 @@ pub struct OperationSignature<S: Semantics> {
     pub output: AbstractOutputChanges<S>,
 }
 
+impl<S: Semantics> PartialEq for OperationSignature<S> {
+    fn eq(&self, other: &Self) -> bool {
+        (self.name == other.name || true) // todo: define if equality is a requirement for names
+            && self.parameter == other.parameter
+            && self.output.is_subtype_of(&other.output)
+    }
+}
+
 impl<S: Semantics> Clone for OperationSignature<S> {
     fn clone(&self) -> Self {
         OperationSignature {

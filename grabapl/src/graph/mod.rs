@@ -17,6 +17,12 @@ pub struct NodeAttribute<NodeAttr> {
     // Additional attributes can be added here
 }
 
+impl<NodeAttr: PartialEq> PartialEq for NodeAttribute<NodeAttr> {
+    fn eq(&self, other: &Self) -> bool {
+        self.node_attr == other.node_attr
+    }
+}
+
 impl<NodeAttr> NodeAttribute<NodeAttr> {
     pub fn new(node_attr: NodeAttr) -> Self {
         NodeAttribute { node_attr }
@@ -32,6 +38,14 @@ pub struct EdgeAttribute<EdgeAttr> {
     source_out_order: EdgeOrder,
     /// The order of the edge as an incoming edge to the target node
     target_in_order: EdgeOrder,
+}
+
+impl<EdgeAttr: PartialEq> PartialEq for EdgeAttribute<EdgeAttr> {
+    fn eq(&self, other: &Self) -> bool {
+        self.edge_attr == other.edge_attr
+            && self.source_out_order == other.source_out_order
+            && self.target_in_order == other.target_in_order
+    }
 }
 
 impl<EdgeAttr> EdgeAttribute<EdgeAttr> {
@@ -317,6 +331,20 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
         } else {
             None
         }
+    }
+}
+
+impl<NA: PartialEq, EA: PartialEq> Graph<NA, EA> {
+    pub fn semantically_matches_with_same_keys(&self, other: &Self) -> bool {
+        if self.node_attr_map != other.node_attr_map {
+            return false;
+        }
+
+        petgraph::algo::is_isomorphic_matching(&self.graph, &other.graph, |a, b| {
+            *a == *b
+        }, |a, b| {
+            a == b
+        })
     }
 }
 

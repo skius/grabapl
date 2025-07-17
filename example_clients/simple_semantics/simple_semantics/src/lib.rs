@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 
 pub struct SimpleSemantics;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum EdgePattern {
     Wildcard,
     Exact(String),

@@ -561,6 +561,7 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>>
         //  e.g., validate parameter once the parameter definition phase is over OR the function needs to be built.
         // check if the parameter is valid:
         user_def_op
+            .signature
             .parameter
             .check_validity()
             .change_context(OperationBuilderError::InvalidParameter)?;
@@ -1876,7 +1877,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         let (ud_output, signature) = self.determine_signature(return_nodes, return_edges)?;
 
         Ok(UserDefinedOperation {
-            parameter: self.op_param.clone(),
+            // parameter: self.op_param.clone(),
             instructions: ud_instructions,
             output_changes: ud_output,
             signature,

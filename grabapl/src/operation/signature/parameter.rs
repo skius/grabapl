@@ -38,6 +38,15 @@ pub struct OperationParameter<S: Semantics> {
     pub node_keys_to_subst: BiMap<NodeKey, SubstMarker>,
 }
 
+impl<S: Semantics> PartialEq for OperationParameter<S> {
+    fn eq(&self, other: &Self) -> bool {
+        // TODO: we could lift the requirement of "with_same_keys" if we remapped based on SubstMarker.
+        self.explicit_input_nodes == other.explicit_input_nodes
+            && self.parameter_graph.semantically_matches_with_same_keys(&other.parameter_graph)
+            && self.node_keys_to_subst == other.node_keys_to_subst
+    }
+}
+
 impl<S: Semantics> Clone for OperationParameter<S> {
     fn clone(&self) -> Self {
         OperationParameter {

@@ -284,8 +284,6 @@ impl AbstractUserDefinedOperationOutput {
     serde(bound = "S: crate::serde::SemanticsSerde")
 )]
 pub struct UserDefinedOperation<S: Semantics> {
-    // TODO: can we remove parameter and just use the one from signature?
-    pub parameter: OperationParameter<S>,
     // cached signature. there is definitely some duplicated information here.
     pub signature: OperationSignature<S>,
     // TODO: add preprocessing (checking) step to see if the instructions make sense and are well formed wrt which nodes they access statically.
@@ -297,7 +295,6 @@ pub struct UserDefinedOperation<S: Semantics> {
 impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for UserDefinedOperation<S> {
     fn clone(&self) -> Self {
         UserDefinedOperation {
-            parameter: self.parameter.clone(),
             signature: self.signature.clone(),
             instructions: self.instructions.clone(),
             output_changes: self.output_changes.clone(),
@@ -307,23 +304,21 @@ impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone for UserD
 
 impl<S: Semantics> UserDefinedOperation<S> {
     pub fn new_noop() -> Self {
-        let parameter = OperationParameter::new_empty();
-        let signature = OperationSignature::empty_new("noop", parameter.clone());
+        let signature = OperationSignature::new_noop("noop");
         UserDefinedOperation {
-            parameter,
             signature,
             instructions: Vec::new(),
             output_changes: AbstractUserDefinedOperationOutput::new(),
         }
     }
 
+    // TODO: is it fine to not require output changes here?
     pub fn new(
         parameter: OperationParameter<S>,
         instructions: Vec<InstructionWithResultMarker<S>>,
     ) -> Self {
         let signature = OperationSignature::empty_new("some_name", parameter.clone());
         UserDefinedOperation {
-            parameter,
             signature,
             instructions,
             output_changes: AbstractUserDefinedOperationOutput::new(),

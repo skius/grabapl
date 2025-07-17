@@ -560,10 +560,10 @@ impl<S: Semantics> ReturnFrame<S> {
         let instruction = instruction_opt.take().unwrap();
         match instruction {
             BI::ReturnNode(aid, output_marker, node) => {
-                this.include_return_node(aid, output_marker, node)?;
+                this.include_return_node(aid, output_marker, node, &builder.data)?;
             }
             BI::ReturnEdge(src, dst, edge) => {
-                this.include_return_edge(src, dst, edge)?;
+                this.include_return_edge(src, dst, edge, &builder.data)?;
             }
             BI::Finalize => {
                 // nothing for now, just consume.
@@ -588,6 +588,7 @@ impl<S: Semantics> ReturnFrame<S> {
         aid: AbstractNodeId,
         output_marker: AbstractOutputNodeMarker,
         av: S::NodeAbstract,
+        data: &BuilderData<S>,
     ) -> Result<(), BuilderError> {
         if let AbstractNodeId::ParameterMarker(_) = aid {
             bail!(BuilderError::NeedsSpecificVariant(
@@ -602,6 +603,15 @@ impl<S: Semantics> ReturnFrame<S> {
                 "return node already exists"
             ));
         }
+        // if we have already asserted that we return a node with this marker, it must be the same type.
+        if let Some(expected_av) = data.expected_self_signature.output.new_nodes.get(&output_marker) {
+            if expected_av != &av {
+                bail!(BuilderError::NeedsSpecificVariant(
+                    "trying to return node with type different from expected return type"
+                ));
+            }
+        }
+
         // if the user wants to return the node as an `av`, `av` must be a supertype of the inferred type
         let inferred_av = self.last_state().node_av_of_aid(&aid).unwrap();
         if !S::NodeMatcher::matches(inferred_av, &av) {
@@ -629,6 +639,7 @@ impl<S: Semantics> ReturnFrame<S> {
         src: AbstractNodeId,
         dst: AbstractNodeId,
         av: S::EdgeAbstract,
+        data: &BuilderData<S>,
     ) -> Result<(), BuilderError> {
         if !self.last_state().contains_edge(&src, &dst) {
             bail!(BuilderError::NeedsSpecificVariant("edge not found"));
@@ -644,6 +655,28 @@ impl<S: Semantics> ReturnFrame<S> {
         if !self.last_state().contains_aid(&dst) {
             bail!(BuilderError::NeedsSpecificVariant("dst aid not found"));
         }
+
+        let src_sig_id = self
+            .aid_to_sig_id(&src)
+            .attach_printable_lazy(|| "cannot use source node in signature")?;
+        let dst_sig_id = self
+            .aid_to_sig_id(&dst)
+            .attach_printable_lazy(|| "cannot use destination node in signature")?;
+
+        // if we have already asserted that we return an edge with this src and dst, it must be the same type.
+        if let Some(expected_av) = data
+            .expected_self_signature
+            .output
+            .new_edges
+            .get(&(src_sig_id, dst_sig_id))
+        {
+            if expected_av != &av {
+                bail!(BuilderError::NeedsSpecificVariant(
+                    "trying to return edge with type different from expected return type"
+                ));
+            }
+        }
+
         // if the user wants to return the edge as an `av`, `av` must be a supertype of the inferred type
         let inferred_av = self.last_state().edge_av_of_aid(&src, &dst).unwrap();
         if !S::EdgeMatcher::matches(inferred_av, &av) {
@@ -661,12 +694,6 @@ impl<S: Semantics> ReturnFrame<S> {
             ));
         }
 
-        let src_sig_id = self
-            .aid_to_sig_id(&src)
-            .attach_printable_lazy(|| "cannot use source node in signature")?;
-        let dst_sig_id = self
-            .aid_to_sig_id(&dst)
-            .attach_printable_lazy(|| "cannot use destination node in signature")?;
         self.signature
             .output
             .new_edges
@@ -1267,11 +1294,17 @@ impl<'a, S: Semantics> Builder<'a, S> {
     }
 
     fn build(mut self) -> Result<UserDefinedOperation<S>, BuilderError> {
+        // first, keep the expected changes. these are not needed in build_unvalidated.
+        // (ugly - should split the struct)
+        let expected_signature = std::mem::replace(
+            &mut self.data.expected_self_signature,
+            OperationSignature::new_noop("some name"),
+        );
         let op = self.build_unvalidated()?;
         // validate the operation against the expected self signature
-        // if op.signature != self.data.expected_self_signature {
-        //     bail!(BuilderError::NeedsSpecificVariant("operation signature does not match expected signature"));
-        // }
+        if op.signature.output.new_nodes != expected_signature.output.new_nodes {
+            bail!(BuilderError::NeedsSpecificVariant("operation signature does not match expected signature"));
+        }
 
         Ok(op)
     }
@@ -1295,7 +1328,7 @@ impl<'a, S: Semantics> Builder<'a, S> {
         let signature = ret_frame.signature;
 
         Ok(UserDefinedOperation {
-            parameter: self.data.built.parameter.unwrap(),
+            // parameter: self.data.built.parameter.unwrap(),
             signature,
             instructions: instr_frame.instructions,
             output_changes,
@@ -1830,12 +1863,19 @@ fn merge_abstract_output_changes<S: Semantics>(
     }
     for (marker, av) in &b.new_nodes {
         if let Some(existing_av) = result.new_nodes.get(marker) {
-            // if the marker already exists, we join the AVs
-            let joined_av =
-                S::NodeJoin::join(existing_av, av).ok_or(BuilderError::NeedsSpecificVariant(
-                    "Need to be able to join two different return AVs",
-                ))?;
-            result.new_nodes.insert(*marker, joined_av);
+            // // if the marker already exists, we join the AVs
+            // let joined_av =
+            //     S::NodeJoin::join(existing_av, av).ok_or(BuilderError::NeedsSpecificVariant(
+            //         "Need to be able to join two different return AVs",
+            //     ))?;
+            // result.new_nodes.insert(*marker, joined_av);
+
+            // if the marker already eixsts, it must be the same.
+            if existing_av != av {
+                bail!(BuilderError::NeedsSpecificVariant(
+                    "Mismatch in expected and actual returned nodes",
+                ));
+            }
         } else {
             // otherwise, we just insert it
             result.new_nodes.insert(*marker, av.clone());
@@ -1847,12 +1887,19 @@ fn merge_abstract_output_changes<S: Semantics>(
     }
     for ((src, dst), av) in &b.new_edges {
         if let Some(existing_av) = result.new_edges.get(&(*src, *dst)) {
-            // if the edge already exists, we join the AVs
-            let joined_av =
-                S::EdgeJoin::join(existing_av, av).ok_or(BuilderError::NeedsSpecificVariant(
-                    "Need to be able to join two different return AVs",
-                ))?;
-            result.new_edges.insert((*src, *dst), joined_av);
+            // // if the edge already exists, we join the AVs
+            // let joined_av =
+            //     S::EdgeJoin::join(existing_av, av).ok_or(BuilderError::NeedsSpecificVariant(
+            //         "Need to be able to join two different return AVs",
+            //     ))?;
+            // result.new_edges.insert((*src, *dst), joined_av);
+
+            // if the edge already exists, it must be the same.
+            if existing_av != av {
+                bail!(BuilderError::NeedsSpecificVariant(
+                    "Mismatch in expected and actual returned edges",
+                ));
+            }
         } else {
             // otherwise, we just insert it
             result.new_edges.insert((*src, *dst), av.clone());

@@ -106,7 +106,7 @@ impl<'a, S: Semantics> Operation<'a, S> {
         match self {
             Operation::Builtin(op) => op.parameter(),
             Operation::LibBuiltin(op) => op.parameter(),
-            Operation::Custom(op) => op.parameter.clone(),
+            Operation::Custom(op) => op.signature.parameter.clone(),
         }
     }
 
@@ -298,7 +298,7 @@ pub fn run_from_concrete<S: Semantics>(
             get_substitution(&abstract_g, &param, selected_inputs)?
         }
         Operation::Custom(custom) => {
-            let param = &custom.parameter;
+            let param = &custom.signature.parameter;
             get_substitution(&abstract_g, param, selected_inputs)?
         }
     };
