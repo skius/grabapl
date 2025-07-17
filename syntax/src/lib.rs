@@ -431,9 +431,26 @@ where
 
     let block = todo();
 
-    let fn_return_signature = todo();
 
-    let fn_implicit_params = todo();
+
+
+    let spanned_fn_implicit_edge_param = ident_str
+        .then_ignore(just(Token::Arrow))
+        .then(ident_str)
+        .then_ignore(just(Token::Ctrl(':')))
+        .then(CS::get_edge_type_parser().map_with(|s, e| (s, e.span())))
+        .map_with(
+            |(((src, src_span), (dst, dst_span)), (edge_type, edge_type_span)), overall_span| {
+                (
+                    FnImplicitParam::Edge(FnEdgeParam {
+                        src: (src, src_span),
+                        dst: (dst, dst_span),
+                        edge_type: (edge_type, edge_type_span),
+                    }),
+                    overall_span.span(),
+                )
+            },
+        );
 
     let spanned_fn_explicit_param = ident_str
         .then_ignore(just(Token::Ctrl(':')))
@@ -449,6 +466,27 @@ where
                 )
             },
         );
+
+    let spanned_fn_implicit_param = spanned_fn_explicit_param.clone().map(|(explicit_param, span)| {
+            (FnImplicitParam::Node(explicit_param), span)
+        }).or(spanned_fn_implicit_edge_param);
+
+    let fn_implicit_params = spanned_fn_implicit_param
+        .separated_by(just(Token::Ctrl(',')))
+        .allow_trailing()
+        .collect::<Vec<_>>();
+
+    let fn_return_signature = fn_implicit_params.clone();
+
+    let optional_fn_return_signature = (
+        just(Token::Arrow)
+        .ignore_then(just(Token::Ctrl('(')))
+        .ignore_then(fn_return_signature)
+        .then_ignore(just(Token::Ctrl(')'))))
+    .or_not()
+    .map(|opt| opt.unwrap_or_default());
+
+
 
     let fn_explicit_params = spanned_fn_explicit_param
         .separated_by(just(Token::Ctrl(',')))
@@ -467,10 +505,7 @@ where
         .then(fn_explicit_params)
         .then_ignore(just(Token::Ctrl(')')))
         .then(optional_fn_implicit_param)
-        .then_ignore(just(Token::Arrow))
-        .then_ignore(just(Token::Ctrl('(')))
-        .then(fn_return_signature)
-        .then_ignore(just(Token::Ctrl(')')))
+        .then(optional_fn_return_signature)
         .then_ignore(just(Token::Ctrl('{')))
         .then(block.map_with(|block, e| (block, e.span())))
         .then_ignore(just(Token::Ctrl('}')))
