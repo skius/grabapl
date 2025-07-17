@@ -3,11 +3,12 @@ pub mod minirust;
 use std::fmt;
 use std::fmt::Debug;
 use chumsky::{input::ValueInput, prelude::*};
+use chumsky::input::MapExtra;
 
-pub trait CustomSyntax: Clone + Debug {
+pub trait CustomSyntax: Clone + Debug + 'static  {
     type ArgType: Clone + fmt::Debug + Default;
 
-    fn get_arg_parser<'src>() -> impl Parser<'src, &'src str, Self::ArgType, extra::Err<Rich<'src, char, Span>>>;
+    fn get_arg_parser<'src>() -> impl Parser<'src, &'src str, Self::ArgType, extra::Err<Rich<'src, char, Span>>> + Clone;
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -16,18 +17,15 @@ pub struct MyCustomSyntax;
 impl CustomSyntax for MyCustomSyntax {
     type ArgType = Vec<String>;
 
-    fn get_arg_parser<'src>() -> impl Parser<'src, &'src str, Self::ArgType, extra::Err<Rich<'src, char, Span>>> {
-        // consume [, then a comma separated list of strings, then ]
-        just('[')
-            .ignore_then(
-                any::<&'src str, extra::Err<Rich<'src, char, Span>>>()
-                    .filter(|c| *c != ']' && *c != ',')
-                    .repeated()
-                    .to_slice()
-                    .separated_by(just(','))
-                    .collect(),
-            )
-            .then_ignore(just(']'))
+    fn get_arg_parser<'src>() -> impl Parser<'src, &'src str, Self::ArgType, extra::Err<Rich<'src, char, Span>>> + Clone {
+        // a comma separated list of strings
+
+        any::<&'src str, extra::Err<Rich<'src, char, Span>>>()
+            .filter(|c| *c != ']' && *c != ',')
+            .repeated()
+            .to_slice()
+            .separated_by(just(','))
+            .collect()
             .map(|args: Vec<&'src str>| args.into_iter().map(String::from).collect())
             .padded()
     }
@@ -35,7 +33,7 @@ impl CustomSyntax for MyCustomSyntax {
 
 // A few type definitions to be used by our parsers below
 pub type Span = SimpleSpan;
-pub type Spanned<T> = (T, crate::minirust::Span);
+pub type Spanned<T> = (T, Span);
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token<'src> {
@@ -112,9 +110,11 @@ pub fn lexer<'src>(
         .filter(|c| *c != '[' && *c != ']')
         .repeated()
         .to_slice()
+        .delimited_by(just('['), just(']'))
         .map(Token::ClientProvided);
 
     // A single token can be one of the above
+    // (client_provided needs to be before ctrl, since ctrl has the same prefix)
     let token = num.or(client_provided_arg).or(arrow).or(ctrl).or(ident);
 
     let comment = just("//")
@@ -131,11 +131,18 @@ pub fn lexer<'src>(
         .collect()
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum MacroArgs<CS: CustomSyntax> {
+    Custom(CS::ArgType),
+    Lib(Vec<String>),
+}
+
 #[derive(Debug)]
 pub enum Expr<'src, CS: CustomSyntax> {
     FnCall {
         name: Spanned<&'src str>,
-        args: Spanned<CS::ArgType>,
+        macro_args: Spanned<MacroArgs<CS>>,
+        args: Vec<Spanned<&'src str>>,
     }
 }
 
@@ -148,27 +155,62 @@ where
 {
     let ident = select! {
         Token::Ident(ident) => ident,
-    }.labelled("identifier");
+    }.labelled("identifier")
+        .map_with(|ident, e| (ident, e.span()));
+
+    let ident_list = ident
+        .separated_by(just(Token::Ctrl(',')))
+        .allow_trailing()
+        .collect()
+        .labelled("identifier list");
 
     let client_provided = select! {
         Token::ClientProvided(arg) => arg,
-    }.labelled("client provided argument");
+    }.labelled("client provided argument")
+        .map_with(|arg, e| (arg, e.span()));
+
+    let lib_macro_args = any::<&'src str, extra::Err<Rich<'src, char, Span>>>()
+        .filter(|c| *c != ']' && *c != ',')
+        .repeated()
+        .to_slice()
+        .separated_by(just(','))
+        .collect()
+        .map(|args: Vec<&'src str>| args.into_iter().map(String::from).collect())
+        .map(MacroArgs::Lib)
+        .padded();
+
+    let macro_arg_parser =
+        lib_macro_args.or(
+        CS::get_arg_parser()
+        .map(MacroArgs::Custom)
+        .padded());
 
     // A parser for function calls
     let fn_call = ident
         .then(client_provided)
         // .map_with(|(name, args), e| Expr::FnCall {
-        .try_map_with(|(name, args_src), e| {
+        .try_map(move |((name, n_span), (args_src, args_src_span)), _overall_span| {
+            // parse with lib_macro_args or macro_arg_parser
+
+
             // parse args_src with CS::get_arg_parser()
-            let args = CS::get_arg_parser()
+            let args = macro_arg_parser
                 .parse(args_src)
-                .into_result().map_err(|_| {
-                    Rich::custom(e.span(), format!("Failed to parse arguments: {}", args_src))
+                .into_result().map_err(|errs| {
+                    Rich::custom(args_src_span, format!("Failed to parse arguments: {}, errs: {:?}", args_src, errs))
             })?;
-            Ok(Expr::FnCall {
-                name: (name, e.span()),
-                args: (args, e.span()),
-            })
+            Ok((name, n_span, args, args_src_span))
+        })
+        .then_ignore(just(Token::Ctrl('(')))
+        .then(ident_list)
+        .then_ignore(just(Token::Ctrl(')')))
+        .map(|((name, n_span, args, args_src_span), args_list)| {
+            // Create the expression
+            Expr::FnCall {
+                name: (name, n_span),
+                macro_args: (args, args_src_span),
+                args: args_list,
+            }
         });
 
     // The main parser that returns the expression
