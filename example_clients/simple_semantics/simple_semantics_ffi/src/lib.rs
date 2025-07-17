@@ -59,6 +59,7 @@ mod ffi {
         pub fn create() -> Box<OpCtx> {
             // TODO: define an init function that calls this
             console_error_panic_hook::set_once();
+            Report::set_color_mode(error_stack::fmt::ColorMode::None);
             log::error!("test log::error! call");
             let mut operation_ctx = ::grabapl::prelude::OperationContext::from_builtins(
                 std::collections::HashMap::from([

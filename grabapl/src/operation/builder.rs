@@ -1790,7 +1790,9 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
                     let dbg_attr_format = format!("{:?}", av);
                     let dbg_attr_replaced = dbg_attr_format.escape_debug();
 
-                    format!("label = \"{aid_replaced}|{dbg_attr_replaced}\"")
+                    // format!("label = \"{aid_replaced}|{dbg_attr_replaced}\"")
+                    // format!("label = \"{dbg_attr_replaced}\", xlabel = \"{aid_replaced}\"")
+                    format!("shape=Mrecord, label = \"{aid_replaced}|{dbg_attr_replaced}\"")
                 }
             )
         )
