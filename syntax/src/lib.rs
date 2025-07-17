@@ -57,10 +57,10 @@ impl CustomSyntax for MyCustomSyntax {
 
     fn get_node_type_parser<'src>() -> impl Parser<'src, &'src str, Self::AbstractNodeType, extra::Err<Rich<'src, char, Span>>> + Clone {
         // a struct with fields
-        let field_parser = ascii_ident_fixed()
+        let field_parser = text::ascii::ident()
             .padded()
             .then_ignore(just(':'))
-            .then(ascii_ident_fixed())
+            .then(text::ascii::ident())
             .padded()
             .map(|(name, typ): (&str, &str)| MyCustomStructField {
                 name: name.to_string(),
@@ -73,62 +73,20 @@ impl CustomSyntax for MyCustomSyntax {
             .collect::<Vec<_>>()
             .map(|fields| MyCustomStruct { fields });
 
-        let record_syntax = ascii_ident_fixed().then(
+        let record_syntax = text::ascii::ident().then(
             fields.delimited_by(just('{'), just('}'))
         ).map(|(name, my_custom_struct)| {
             my_custom_struct
         });
 
         record_syntax
-            .or(ascii_ident_fixed().map(|typ: &str| MyCustomStruct { fields: vec![MyCustomStructField {
+            .or(text::ascii::ident().map(|typ: &str| MyCustomStruct { fields: vec![MyCustomStructField {
                 name: "<unnamed>>".to_string(),
                 typ: typ.to_string(),
             }] }))
 
         // any().map(|_| unreachable!())
     }
-}
-
-pub fn ascii_ident_fixed<'src, I, E>() -> impl Parser<'src, I, <I as SliceInput<'src>>::Slice, E> + Copy
-where
-    I: StrInput<'src>,
-    I::Token: Char + 'src,
-    E: ParserExtra<'src, I>,
-    E::Error: LabelError<'src, I, TextExpected<'src, I>>,
-{
-    any()
-        .try_map(|c: I::Token, span| {
-            if c.to_ascii()
-                .map(|i| i.is_ascii_alphabetic() || i == b'_')
-                .unwrap_or(false)
-            {
-                Ok(c)
-            } else {
-                Err(LabelError::expected_found(
-                    [TextExpected::IdentifierPart],
-                    Some(MaybeRef::Val(c)),
-                    span,
-                ))
-            }
-        })
-        .then(
-            any()
-                .try_map(|c: I::Token, span| {
-                    if c.to_ascii()
-                        .map_or(false, |i| i.is_ascii_alphanumeric() || i == b'_')
-                    {
-                        Ok(())
-                    } else {
-                        Err(LabelError::expected_found(
-                            [TextExpected::IdentifierPart],
-                            Some(MaybeRef::Val(c)),
-                            span,
-                        ))
-                    }
-                })
-                .repeated(),
-        )
-        .to_slice()
 }
 
 // A few type definitions to be used by our parsers below
@@ -375,6 +333,19 @@ where
                 node_type: (node_type, node_type_span),
             }, overall_span.span()))
         });
+        // .try_map(|((name, n_span), (node_type_src, node_type_span)), overall_span| {
+        //     // parse with CS::get_node_type_parser()
+        //     let node_type = CS::get_node_type_parser()
+        //         .parse(node_type_src)
+        //         .into_result().map_err(|errs| {
+        //         Rich::custom(node_type_span, format!("Failed to parse node type: {}, errs: {:?}", node_type_src, errs))
+        //     })?;
+        //     // unreachable!();
+        //     Ok((FnParam {
+        //         name: (name, n_span),
+        //         node_type: (node_type, node_type_span),
+        //     }, overall_span))
+        // });
 
     let fn_param_list_parser = fn_param_parser
         .separated_by(just(Token::Ctrl(',')))

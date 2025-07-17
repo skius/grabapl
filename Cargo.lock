@@ -166,6 +166,20 @@ checksum = "9555578bc9e57714c812a1f84e4fc5b4d21fcb063490c624de019f7464c91268"
 
 [[package]]
 name = "chumsky"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14377e276b2c8300513dff55ba4cc4142b44e5d6de6d00eb5b2307d650bb4ec1"
+dependencies = [
+ "hashbrown",
+ "regex-automata 0.3.9",
+ "serde",
+ "stacker",
+ "unicode-ident",
+ "unicode-segmentation",
+]
+
+[[package]]
+name = "chumsky"
 version = "1.0.0-alpha.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e82d74e6c83060ec269fe9e0d408d6de4a1645d525f9a0bbbb841ba4efd91ac"
@@ -963,7 +977,7 @@ name = "repl"
 version = "0.1.0"
 dependencies = [
  "ariadne",
- "chumsky",
+ "chumsky 1.0.0-alpha.8",
  "grabapl",
 ]
 
@@ -1199,7 +1213,7 @@ name = "syntax"
 version = "0.1.0"
 dependencies = [
  "ariadne",
- "chumsky",
+ "chumsky 0.10.1",
  "grabapl",
 ]
 
