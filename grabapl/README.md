@@ -39,6 +39,7 @@ cargo check --target wasm32-unknown-unknown
 - [x] Recursion actually CAN add nodes! Add a test for this (if cond { return 0 } else { return recurse() })
 - [x] Fix web demo (builder now needs an ID in the beginning)
 - [ ] build operations from Sverrir's studies
+- [ ] Include telegram messages
 - [ ] Forget instruction for shape queries
 - [ ] Edge orders
 - [ ] Temporary nodes
