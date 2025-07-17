@@ -20,6 +20,10 @@ impl AbstractMatcher for NodeMatcher {
     type Abstract = NodeType;
 
     fn matches(argument: &Self::Abstract, parameter: &Self::Abstract) -> bool {
+        if argument == &NodeType::Separate || parameter == &NodeType::Separate {
+            // if either is Separate, they can only match themselves.
+            return argument == parameter;
+        }
         match (argument, parameter) {
             (_, NodeType::Object) => true,
             _ => argument == parameter,
@@ -47,8 +51,11 @@ impl AbstractJoin for NodeJoiner {
     fn join(a: &Self::Abstract, b: &Self::Abstract) -> Option<Self::Abstract> {
         if a == b {
             Some(a.clone())
-        } else {
+        } else if a != &NodeType::Separate && b != &NodeType::Separate {
             Some(NodeType::Object)
+        } else {
+            // Separate have no join.
+            None
         }
     }
 }
@@ -96,6 +103,8 @@ pub enum NodeType {
     /// Top type.
     #[default]
     Object,
+    /// Not joinable with any of the other.
+    Separate,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

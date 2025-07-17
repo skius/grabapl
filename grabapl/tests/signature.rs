@@ -1,4 +1,6 @@
 mod util;
+
+use std::collections::{HashMap, HashSet};
 use grabapl::prelude::*;
 use util::semantics::*;
 
@@ -62,4 +64,61 @@ fn self_return_nodes_are_respected() {
         "Expected successful build after returning all expected nodes"
     );
 
+}
+
+
+#[test_log::test]
+fn invisible_node_not_deleted() {
+    // if a parameter node receives un-joinable types in two branches, then the merge
+    // cannot display that node.
+    // in such a state, it is unclear what should happen.
+    // Note for practical purposes: since this is confusing, a semantics should probably not allow
+    // writing incompatible node types. i.e., if int and string are unjoinable, then a p: int should not
+    // be allowed to be set to a string value.
+
+
+    let op_ctx = OperationContext::<TestSemantics>::new();
+    let mut builder = OperationBuilder::new(&op_ctx, 0);
+    // expect a parameter node
+    builder
+        .expect_parameter_node("p0", NodeType::String)
+        .unwrap();
+    let p0 = AbstractNodeId::param("p0");
+    // start a query and in true branch set the node to NodeType::Separate
+    builder.start_query(TestQuery::ValueEqualTo(NodeValue::String("hello".to_string())), vec![p0]).unwrap();
+    builder.enter_true_branch().unwrap();
+    builder
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::SetTo {
+                op_typ: NodeType::String,
+                target_typ: NodeType::Separate,
+                value: NodeValue::String("hello".to_string()), // Separate has no clear values, let's just pick String.
+            }),
+            vec![p0],
+        )
+        .unwrap();
+    builder.end_query().unwrap();
+    // check the state
+    let state = builder.show_state().unwrap();
+    let aids: HashSet<AbstractNodeId> = state.node_keys_to_aid.right_values().copied().collect();
+    assert_eq!(aids, HashSet::new(), "state should not have any visible AIDs, found aids: {:?}", aids);
+
+    // check the signature
+    let op = builder.build().unwrap();
+    let sig = op.signature;
+    assert_eq!(HashSet::from([SubstMarker::from("p0")]), sig.output.maybe_deleted_nodes,
+        "signature should have p0 as deleted node, but found: {:?}", sig.output.maybe_deleted_nodes);
+    // Note: this might be surprising. we did not delete p0 after all!
+    // but for all intents and purposes, p0 is not visible in the output of the operation.
+
+    // See initial TODO for more information:
+    // TODO: write test to make sure we don't accidentally tell a caller we deleted a node or edge
+    //  when merging states where two nodes cannot be merged!
+    //  For example, type system without Top type, param p: Int, if cond { p = Int } else { p = String } // now we don't see p anymore.
+    //  Make sure that this operation does not tell the caller that we deleted p!
+    //  Actually !!! What do we do in this case? Does it make semantic sense to just pretend we deleted p?
+    //  Since we cannot display the type and thus the node, since there is no join.
+    //  However, this necessitates that we don't unconditionally delete nodes in the concrete,
+    //  for which the signature says that it is `maybe_deleted`. ==> just add a test to document it a bit.
+    // (we did this^)
 }

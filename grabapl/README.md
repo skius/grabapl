@@ -42,6 +42,7 @@ cargo check --target wasm32-unknown-unknown
 - [ ] Include telegram messages
 - [ ] Forget instruction for shape queries
 - [ ] Edge orders
+- [ ] "is callable" function to determine which operations of operation context can be called!
 - [ ] Temporary nodes
 - [ ] Clean up code
 - [ ] Finish examples/template
