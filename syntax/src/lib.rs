@@ -429,7 +429,69 @@ where
     }
     .map_with(|ident, e| (ident, e.span()));
 
-    let block = todo();
+
+
+    let fn_call_expr = ident_str
+        .then_ignore(just(Token::Ctrl('(')))
+        .then(
+            ident_str
+                .separated_by(just(Token::Ctrl(',')))
+                .allow_trailing()
+                .collect::<Vec<_>>(),
+        )
+        .then_ignore(just(Token::Ctrl(')')))
+        .map_with(|((name, name_span), args), e| {
+            (
+                FnCallExpr {
+                    name: (name, name_span),
+                    macro_args: (MacroArgs::<CS>::Lib(vec![]), e.span()),
+                    args,
+                },
+                e.span(),
+            )
+        });
+
+    let fn_call_stmt = fn_call_expr.clone()
+        .then_ignore(just(Token::Ctrl(';')))
+        .map_with(|spanned_call, e| (Statement::FnCall(spanned_call), e.span()))
+        .labelled("function call statement");
+
+    let let_or_let_bang = select! {
+        Token::Let => false,
+        Token::LetBang => true,
+    };
+
+    let let_stmt = let_or_let_bang
+        .then(ident_str)
+        .then_ignore(just(Token::Ctrl('=')))
+        .then(fn_call_expr)
+        .then_ignore(just(Token::Ctrl(';')))
+        .map_with(
+            |((bang, (name, name_span)), (call, call_span)), e| {
+                (
+                    LetStmt {
+                        bang,
+                        ident: (name, name_span),
+                        call: (call, call_span),
+                    },
+                    e.span(),
+                )
+            },
+        )
+        .map(Statement::Let)
+        .map_with(|let_stmt, e| (let_stmt, e.span()))
+        .labelled("let statement");
+
+
+    let stmt = let_stmt
+        .or(fn_call_stmt)
+        .labelled("statement");
+
+    let block = stmt
+        .repeated()
+        .collect()
+        .map(|stmts| Block { statements: stmts })
+        .labelled("block");
 
 
 
