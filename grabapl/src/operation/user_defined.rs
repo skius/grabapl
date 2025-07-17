@@ -284,6 +284,7 @@ impl AbstractUserDefinedOperationOutput {
     serde(bound = "S: crate::serde::SemanticsSerde")
 )]
 pub struct UserDefinedOperation<S: Semantics> {
+    // TODO: can we remove parameter and just use the one from signature?
     pub parameter: OperationParameter<S>,
     // cached signature. there is definitely some duplicated information here.
     pub signature: OperationSignature<S>,

@@ -1254,7 +1254,8 @@ impl<'a, S: Semantics> Builder<'a, S> {
             OperationSignature::new_noop("some name"),
         );
         // then, build self as if it was a full op to get the signature
-        let op = self.build()?;
+        // we need to build unvalidated, since we loosen the restriction of returning all expected return nodes on purpose.
+        let op = self.build_unvalidated()?;
         // then, add the output changes from the signature
         // we merge the two
         let merged_changes =
@@ -1266,7 +1267,19 @@ impl<'a, S: Semantics> Builder<'a, S> {
     }
 
     fn build(mut self) -> Result<UserDefinedOperation<S>, BuilderError> {
+        let op = self.build_unvalidated()?;
+        // validate the operation against the expected self signature
+        // if op.signature != self.data.expected_self_signature {
+        //     bail!(BuilderError::NeedsSpecificVariant("operation signature does not match expected signature"));
+        // }
+
+        Ok(op)
+    }
+
+    /// Builds the current operation but does not perform any final validity checks.
+    fn build_unvalidated(mut self) -> Result<UserDefinedOperation<S>, BuilderError> {
         // this is a bit of a hack. it just works because all nested frames right now can be ended with Finalize.
+        // we can 'define' the Finalize message to be just that, though.
         while self.stack.frames.len() > 1 {
             self.consume(BuilderInstruction::Finalize)?;
         }
@@ -1281,12 +1294,12 @@ impl<'a, S: Semantics> Builder<'a, S> {
         let output_changes = ret_frame.abstract_ud_output;
         let signature = ret_frame.signature;
 
-        let mut user_def_op = UserDefinedOperation::new_noop();
-        user_def_op.instructions = instr_frame.instructions;
-        user_def_op.parameter = self.data.built.parameter.clone().unwrap();
-        user_def_op.output_changes = output_changes;
-        user_def_op.signature = signature;
-        Ok(user_def_op)
+        Ok(UserDefinedOperation {
+            parameter: self.data.built.parameter.unwrap(),
+            signature,
+            instructions: instr_frame.instructions,
+            output_changes,
+        })
     }
 
     fn push_frame(&mut self, frame: impl Into<Frame<S>>) {

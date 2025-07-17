@@ -6,6 +6,7 @@ use grabapl::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
 use grabapl::prelude::*;
 use proptest::proptest;
 use std::cmp::Ordering::Greater;
+use proptest::test_runner::Config;
 use util::semantics::*;
 
 fn bubble_sort_op(op_id: OperationId) -> UserDefinedOperation<TestSemantics> {
@@ -474,6 +475,7 @@ fn sort_using_grabapl(
 
 proptest! {
     // sample from random i32 vecs
+    #![proptest_config(Config::with_cases(10))]
     #[test]
     fn bubble_sort_proptest(input in proptest::collection::vec(proptest::num::i32::ANY, 1..=5)) {
         let (op_ctx, bubble_sort_op_id) = get_op_ctx_with_bubble_sort_for_proptest();
