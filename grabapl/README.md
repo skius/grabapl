@@ -56,3 +56,4 @@ cargo check --target wasm32-unknown-unknown
   - and then make the builder actually compute a fixed point (keep constructing new stages until no more changes of signature)
   - Fixed point can maybe be checked by is_isomorphic for the signature graphs? I.e., use that to implement PartialEq on OperationSignature?
 - [ ] textual language
+- [ ] structs in types example semantics?
