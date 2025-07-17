@@ -58,10 +58,16 @@ pub enum MyCustomType {
     Custom(MyCustomStruct),
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum EdgeType {
+    Exact(String),
+    Wildcard,
+}
+
 impl CustomSyntax for MyCustomSyntax {
     type MacroArgType = Vec<String>;
     type AbstractNodeType = MyCustomType;
-    type AbstractEdgeType = MyCustomType;
+    type AbstractEdgeType = EdgeType;
 
     fn get_macro_arg_parser<'src>()
     -> impl Parser<'src, &'src str, Self::MacroArgType, extra::Err<Rich<'src, char, Span>>> + Clone
@@ -138,8 +144,24 @@ impl CustomSyntax for MyCustomSyntax {
     >()
     -> impl Parser<'tokens, I, Self::AbstractEdgeType, extra::Err<Rich<'tokens, Token<'src>, Span>>>
     + Clone {
-        // TODO: change to string?
-        Self::get_node_type_parser()
+        // * is Wildcard
+        // "string" is Exact
+        let wildcard = just(Token::Ctrl('*'))
+            .to(EdgeType::Wildcard)
+            .labelled("wildcard edge type");
+
+        // TODO: oh. for string we need actual lexer support.
+        let ident = select! {
+            Token::Ident(ident) => ident,
+        };
+
+        let exact = just(Token::Ctrl('"'))
+            .ignore_then(ident)
+            .then_ignore(just(Token::Ctrl('"')))
+            .map(|s: &'src str| EdgeType::Exact(s.to_string()))
+            .labelled("exact edge type");
+
+        wildcard.or(exact)
     }
 }
 
@@ -200,7 +222,7 @@ pub fn lexer<'src>()
         .map(Token::Num);
 
     // A parser for control characters (delimiters, semicolons, etc.)
-    let ctrl = one_of("()[]{};,?:").map(Token::Ctrl);
+    let ctrl = one_of("()[]{};,?:*=/<>\"'").map(Token::Ctrl);
 
     let arrow = just("->").to(Token::Arrow);
 
@@ -429,73 +451,6 @@ where
     }
     .map_with(|ident, e| (ident, e.span()));
 
-
-
-    let fn_call_expr = ident_str
-        .then_ignore(just(Token::Ctrl('(')))
-        .then(
-            ident_str
-                .separated_by(just(Token::Ctrl(',')))
-                .allow_trailing()
-                .collect::<Vec<_>>(),
-        )
-        .then_ignore(just(Token::Ctrl(')')))
-        .map_with(|((name, name_span), args), e| {
-            (
-                FnCallExpr {
-                    name: (name, name_span),
-                    macro_args: (MacroArgs::<CS>::Lib(vec![]), e.span()),
-                    args,
-                },
-                e.span(),
-            )
-        });
-
-    let fn_call_stmt = fn_call_expr.clone()
-        .then_ignore(just(Token::Ctrl(';')))
-        .map_with(|spanned_call, e| (Statement::FnCall(spanned_call), e.span()))
-        .labelled("function call statement");
-
-    let let_or_let_bang = select! {
-        Token::Let => false,
-        Token::LetBang => true,
-    };
-
-    let let_stmt = let_or_let_bang
-        .then(ident_str)
-        .then_ignore(just(Token::Ctrl('=')))
-        .then(fn_call_expr)
-        .then_ignore(just(Token::Ctrl(';')))
-        .map_with(
-            |((bang, (name, name_span)), (call, call_span)), e| {
-                (
-                    LetStmt {
-                        bang,
-                        ident: (name, name_span),
-                        call: (call, call_span),
-                    },
-                    e.span(),
-                )
-            },
-        )
-        .map(Statement::Let)
-        .map_with(|let_stmt, e| (let_stmt, e.span()))
-        .labelled("let statement");
-
-
-    let stmt = let_stmt
-        .or(fn_call_stmt)
-        .labelled("statement");
-
-    let block = stmt
-        .repeated()
-        .collect()
-        .map(|stmts| Block { statements: stmts })
-        .labelled("block");
-
-
-
-
     let spanned_fn_implicit_edge_param = ident_str
         .then_ignore(just(Token::Arrow))
         .then(ident_str)
@@ -530,13 +485,126 @@ where
         );
 
     let spanned_fn_implicit_param = spanned_fn_explicit_param.clone().map(|(explicit_param, span)| {
-            (FnImplicitParam::Node(explicit_param), span)
-        }).or(spanned_fn_implicit_edge_param);
+        (FnImplicitParam::Node(explicit_param), span)
+    }).or(spanned_fn_implicit_edge_param);
 
     let fn_implicit_params = spanned_fn_implicit_param
         .separated_by(just(Token::Ctrl(',')))
         .allow_trailing()
         .collect::<Vec<_>>();
+
+    let block = recursive(|block| {
+
+        let macro_args_str = select! {
+            Token::MacroArgs(arg) => arg,
+        };
+
+        let lib_macro_args = any::<&'src str, extra::Err<Rich<'src, char, Span>>>()
+            .filter(|c| *c != ']' && *c != ',')
+            .repeated()
+            .to_slice()
+            .separated_by(just(','))
+            .collect()
+            .map(|args: Vec<&'src str>| args.into_iter().map(String::from).collect())
+            .map(MacroArgs::<CS>::Lib)
+            .padded();
+
+        let tok_lib_macro_args = macro_args_str
+            .try_map_with(move |src, e| {
+                // parse with lib_macro_args
+                lib_macro_args
+                    .parse(src)
+                    .into_result()
+                    .map_err(|errs| Rich::custom(e.span(), format!("Failed to parse macro args: {}, errs: {:?}", src, errs)))
+            });
+
+        let fn_call_expr = ident_str
+            .then(tok_lib_macro_args.map_with(|args, e| (args, e.span())))
+            .then_ignore(just(Token::Ctrl('(')))
+            .then(
+                ident_str
+                    .separated_by(just(Token::Ctrl(',')))
+                    .allow_trailing()
+                    .collect::<Vec<_>>(),
+            )
+            .then_ignore(just(Token::Ctrl(')')))
+            .map_with(|((spanned_name, spanned_macro_args), args), e| {
+                (
+                    FnCallExpr {
+                        name: spanned_name,
+                        macro_args: spanned_macro_args,
+                        args,
+                    },
+                    e.span(),
+                )
+            });
+
+        let if_cond_shape = just(Token::Shape)
+            .ignore_then(just(Token::Ctrl('[')))
+            .ignore_then(fn_implicit_params.clone())
+            .then_ignore(just(Token::Ctrl(']')))
+            .map_with(|args, e| {
+                (
+                    ShapeQueryParams { params: args },
+                    e.span(),
+                )
+            })
+            .map(IfCond::Shape);
+
+        let if_cond_query = fn_call_expr.clone()
+            .map(|spanned_call| IfCond::Query(spanned_call));
+
+        let if_cond = if_cond_shape.or(if_cond_query);
+
+        // TODO: continue with entire if else statements.
+
+
+        let fn_call_stmt = fn_call_expr.clone()
+            .then_ignore(just(Token::Ctrl(';')))
+            .map_with(|spanned_call, e| (Statement::FnCall(spanned_call), e.span()))
+            .labelled("function call statement");
+
+        let let_or_let_bang = select! {
+            Token::Let => false,
+            Token::LetBang => true,
+        };
+
+        let let_stmt = let_or_let_bang
+            .then(ident_str)
+            .then_ignore(just(Token::Ctrl('=')))
+            .then(fn_call_expr)
+            .then_ignore(just(Token::Ctrl(';')))
+            .map_with(
+                |((bang, (name, name_span)), (call, call_span)), e| {
+                    (
+                        LetStmt {
+                            bang,
+                            ident: (name, name_span),
+                            call: (call, call_span),
+                        },
+                        e.span(),
+                    )
+                },
+            )
+            .map(Statement::Let)
+            .map_with(|let_stmt, e| (let_stmt, e.span()))
+            .labelled("let statement");
+
+
+        let stmt = let_stmt
+            .or(fn_call_stmt)
+            .labelled("statement");
+
+        let block_many_stmts = stmt
+            .repeated()
+            .collect()
+            .map(|stmts| Block { statements: stmts })
+            .labelled("block");
+
+        block_many_stmts
+    });
+
+
 
     let fn_return_signature = fn_implicit_params.clone();
 

@@ -44,7 +44,7 @@ fn max_heap_remove_helper(root: Integer, max_value: Integer) {
         root -> child: Wildcard
     ] {
         // we have one child, recurse on it
-        let! temp_max = add_node(int(-1));
+        let! temp_max = add_node[-1]();
         max_heap_remove_helper(child, temp_max);
         copy_value_from_to(temp_max, root);
         remove_node(temp_max);
