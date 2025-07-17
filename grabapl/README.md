@@ -58,3 +58,4 @@ cargo check --target wasm32-unknown-unknown
   - Fixed point can maybe be checked by is_isomorphic for the signature graphs? I.e., use that to implement PartialEq on OperationSignature?
 - [ ] textual language
 - [ ] structs in types example semantics?
+- [ ] Lift restriction of not being able to return edges from shape queries. They cannot be aliased, and returning edges from there is actually useful! (eg, add_edge_if_not_exists)

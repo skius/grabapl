@@ -1,5 +1,6 @@
 pub mod minirust;
 
+use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
 use chumsky::{input::ValueInput, prelude::*};
@@ -10,16 +11,17 @@ use chumsky::text::{Char, TextExpected};
 use chumsky::util::MaybeRef;
 
 pub trait CustomSyntax: Clone + Debug + 'static  {
-    type MacroArgType: Clone + fmt::Debug + Default;
+    type MacroArgType: Clone + fmt::Debug + Default + PartialEq;
 
-    type AbstractNodeType: Clone + Debug;
-    type AbstractEdgeType: Clone + Debug;
+    type AbstractNodeType: Clone + Debug + PartialEq;
+    type AbstractEdgeType: Clone + Debug + PartialEq;
 
     /// May not parse ].
     fn get_macro_arg_parser<'src>() -> impl Parser<'src, &'src str, Self::MacroArgType, extra::Err<Rich<'src, char, Span>>> + Clone;
 
-    // May not parse ), and only matched brackets.
     fn get_node_type_parser<'src: 'tokens, 'tokens, I: ValueInput<'tokens, Token = Token<'src>, Span = Span>>() -> impl Parser<'tokens, I, Self::AbstractNodeType, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone;
+    fn get_edge_type_parser<'src: 'tokens, 'tokens, I: ValueInput<'tokens, Token = Token<'src>, Span = Span>>() -> impl Parser<'tokens, I, Self::AbstractEdgeType, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone;
+
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -107,6 +109,11 @@ impl CustomSyntax for MyCustomSyntax {
 
             entire_struct.or(primitive_type)
         })
+    }
+
+    fn get_edge_type_parser<'src: 'tokens, 'tokens, I: ValueInput<'tokens, Token=Token<'src>, Span=Span>>() -> impl Parser<'tokens, I, Self::AbstractEdgeType, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone {
+        // TODO: change to string?
+        Self::get_node_type_parser()
     }
 }
 
@@ -264,6 +271,9 @@ pub fn lexer<'src>(
         .collect()
 }
 
+// TODO: we cannot really have this. Since both lib and custom might be able to parse the entire macro syntax,
+//  this distinction needs to happen afterwards.
+//  I suppose we could delay lib parsing and just store the tokens that are parsed into CS::MacroArgType for later consumption?
 #[derive(Clone, Debug, PartialEq)]
 pub enum MacroArgs<CS: CustomSyntax> {
     Custom(CS::MacroArgType),
@@ -271,33 +281,205 @@ pub enum MacroArgs<CS: CustomSyntax> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct FnParam<'src, CS: CustomSyntax> {
+pub struct FnCallExpr<'src, CS: CustomSyntax> {
     pub name: Spanned<&'src str>,
-    pub node_type: Spanned<CS::AbstractNodeType>,
+    pub macro_args: Spanned<MacroArgs<CS>>,
+    pub args: Vec<Spanned<&'src str>>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Expr<'src, CS: CustomSyntax> {
     FnCall {
         name: Spanned<&'src str>,
         macro_args: Spanned<MacroArgs<CS>>,
         // just for testing
-        args: Vec<Spanned<FnParam<'src, CS>>>,
+        args: Vec<Spanned<FnNodeParam<'src, CS>>>,
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct LetStmt<'src, CS: CustomSyntax> {
+    pub bang: bool,
+    pub ident: Spanned<&'src str>,
+    pub call: Spanned<FnCallExpr<'src, CS>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ShapeQueryParams<'src, CS: CustomSyntax> {
+    pub params: Vec<Spanned<FnImplicitParam<'src, CS>>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum IfCond<'src, CS: CustomSyntax> {
+    Query(Spanned<FnCallExpr<'src, CS>>),
+    Shape(Spanned<ShapeQueryParams<'src, CS>>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct IfStmt<'src, CS: CustomSyntax> {
+    pub cond: IfCond<'src, CS>,
+    pub then_block: Spanned<Block<'src, CS>>,
+    // if it doesn't exist, take empty span at the end of then_block
+    pub else_block: Spanned<Block<'src, CS>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ReturnStmtMapping<'src, CS: CustomSyntax> {
+    Node {
+        /// The name of the output marker
+        ret_name: Spanned<&'src str>,
+        /// The node to return
+        ident: Spanned<&'src str>,
+    },
+    Edge {
+        src: Spanned<&'src str>,
+        dst: Spanned<&'src str>,
+        edge_type: Spanned<CS::AbstractEdgeType>,
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ReturnStmt<'src, CS: CustomSyntax> {
+    pub mapping: Vec<Spanned<FnImplicitParam<'src, CS>>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Statement<'src, CS: CustomSyntax> {
+    Let(Spanned<LetStmt<'src, CS>>),
+    FnCall(Spanned<FnCallExpr<'src, CS>>),
+    If(Spanned<IfStmt<'src, CS>>),
+    Return(Spanned<ReturnStmt<'src, CS>>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Block<'src, CS: CustomSyntax> {
+    pub statements: Vec<Spanned<Statement<'src, CS>>>,
+}
+#[derive(Clone, Debug, PartialEq)]
+pub struct FnNodeParam<'src, CS: CustomSyntax> {
+    pub name: Spanned<&'src str>,
+    pub node_type: Spanned<CS::AbstractNodeType>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FnEdgeParam<'src, CS: CustomSyntax> {
+    pub src: Spanned<&'src str>,
+    pub dst: Spanned<&'src str>,
+    pub edge_type: Spanned<CS::AbstractEdgeType>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum FnImplicitParam<'src, CS: CustomSyntax> {
+    Node(FnNodeParam<'src, CS>),
+    Edge(FnEdgeParam<'src, CS>),
+}
 
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct FnDef<'src, CS: CustomSyntax> {
-    pub args: Vec<Spanned<&'src str>>,
-    pub body: Spanned<Expr<'src, CS>>,
+    pub name: Spanned<&'src str>,
+    pub explicit_params: Vec<Spanned<FnNodeParam<'src, CS>>>,
+    pub implicit_params: Vec<Spanned<FnImplicitParam<'src, CS>>>,
+    pub return_signature: Vec<Spanned<FnImplicitParam<'src, CS>>>,
+    pub body: Spanned<Block<'src, CS>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Program<'src, CS: CustomSyntax> {
+    pub functions: HashMap<&'src str, Spanned<FnDef<'src, CS>>>,
+}
+
+
+pub fn program_parser<'tokens, 'src: 'tokens, I, CS: CustomSyntax>(
+) -> impl Parser<'tokens, I, Spanned<Program<'src, CS>>, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone
+where
+    I: ValueInput<'tokens, Token = Token<'src>, Span = Span> + SliceInput<'tokens, Token = Token<'src>, Span = Span, Slice = &'tokens [Spanned<Token<'src>>]>,
+{
+    let ident_str = select! {
+        Token::Ident(ident) => ident,
+    }.map_with(|ident, e| (ident, e.span()));
+
+
+    let block = todo();
+
+    let fn_return_signature = todo();
+
+    let fn_implicit_params = todo();
+
+
+    let spanned_fn_explicit_param = ident_str
+        .then_ignore(just(Token::Ctrl(':')))
+        .then(CS::get_node_type_parser().map_with(|s, e| (s, e.span())))
+        .map_with(|((name, n_span), (node_type, node_type_span)), overall_span| {
+            (FnNodeParam {
+                name: (name, n_span),
+                node_type: (node_type, node_type_span),
+            }, overall_span.span())
+        });
+
+    let fn_explicit_params = spanned_fn_explicit_param
+        .separated_by(just(Token::Ctrl(',')))
+        .allow_trailing()
+        .collect::<Vec<_>>();
+
+    let optional_fn_implicit_param = (just(Token::Ctrl('['))
+                                              .ignore_then(
+                                                  fn_implicit_params
+                                              )
+        .then_ignore(
+            just(Token::Ctrl(']'))
+        )).or_not().map(|opt| {
+        opt.unwrap_or_default()
+    });
+
+    let fn_def = just(Token::Fn)
+        .ignore_then(ident_str)
+        .then_ignore(just(Token::Ctrl('(')))
+        .then(
+            fn_explicit_params
+        )
+        .then_ignore(just(Token::Ctrl(')')))
+        .then(
+            optional_fn_implicit_param
+        )
+        .then_ignore(just(Token::Arrow))
+        .then_ignore(just(Token::Ctrl('(')))
+        .then(
+            fn_return_signature
+        )
+        .then_ignore(just(Token::Ctrl(')')))
+        .then_ignore(just(Token::Ctrl('{')))
+        .then(block.map_with(|block, e| (block, e.span())))
+        .then_ignore(just(Token::Ctrl('}')))
+        .map(|((((spanned_name, explicit_params), implicit_params), return_signature), spanned_body)| FnDef {
+            name: spanned_name,
+            explicit_params,
+            implicit_params,
+            return_signature,
+            body: spanned_body,
+        });
+
+    let program = fn_def
+        .map_with(|fn_def, e| (fn_def, e.span()))
+        .repeated()
+        .collect::<Vec<_>>()
+        .map_with(|functions_with_span, e| {
+            let mut funcs_map = HashMap::new();
+            for (func, func_span) in functions_with_span {
+                funcs_map.insert(func.name.0, (func, func_span));
+            }
+            (Program { functions: funcs_map }, e.span())
+        })
+        .labelled("program");
+
+    program
 }
 
 
 pub fn first_parser<'tokens, 'src: 'tokens, I, CS: CustomSyntax>(
 ) -> impl Parser<'tokens, I, Spanned<Expr<'src, CS>>, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone
 where
-    I: ValueInput<'tokens, Token = Token<'src>, Span = Span>,
+    I: ValueInput<'tokens, Token = Token<'src>, Span = Span> + SliceInput<'tokens, Token = Token<'src>, Span = Span, Slice = &'tokens [Spanned<Token<'src>>]>,
 {
     let ident = select! {
         Token::Ident(ident) => ident,
@@ -327,33 +509,33 @@ where
 
     let macro_arg_parser =
         lib_macro_args.or(
-        CS::get_macro_arg_parser()
-        .map(MacroArgs::Custom)
-        .padded());
+            CS::get_macro_arg_parser()
+                .map(MacroArgs::Custom)
+                .padded());
 
     // ident : NodeType
     let fn_param_parser = ident
         .then_ignore(just(Token::Ctrl(':')))
         .then(CS::get_node_type_parser().map_with(|s, e| (s, e.span())))
         .try_map_with(|((name, n_span), (node_type, node_type_span)), overall_span| {
-            Ok((FnParam {
+            Ok((FnNodeParam {
                 name: (name, n_span),
                 node_type: (node_type, node_type_span),
             }, overall_span.span()))
         });
-        // .try_map(|((name, n_span), (node_type_src, node_type_span)), overall_span| {
-        //     // parse with CS::get_node_type_parser()
-        //     let node_type = CS::get_node_type_parser()
-        //         .parse(node_type_src)
-        //         .into_result().map_err(|errs| {
-        //         Rich::custom(node_type_span, format!("Failed to parse node type: {}, errs: {:?}", node_type_src, errs))
-        //     })?;
-        //     // unreachable!();
-        //     Ok((FnParam {
-        //         name: (name, n_span),
-        //         node_type: (node_type, node_type_span),
-        //     }, overall_span))
-        // });
+    // .try_map(|((name, n_span), (node_type_src, node_type_span)), overall_span| {
+    //     // parse with CS::get_node_type_parser()
+    //     let node_type = CS::get_node_type_parser()
+    //         .parse(node_type_src)
+    //         .into_result().map_err(|errs| {
+    //         Rich::custom(node_type_span, format!("Failed to parse node type: {}, errs: {:?}", node_type_src, errs))
+    //     })?;
+    //     // unreachable!();
+    //     Ok((FnParam {
+    //         name: (name, n_span),
+    //         node_type: (node_type, node_type_span),
+    //     }, overall_span))
+    // });
 
     let fn_param_list_parser = fn_param_parser
         .separated_by(just(Token::Ctrl(',')))
@@ -373,7 +555,7 @@ where
             let args = macro_arg_parser
                 .parse(args_src)
                 .into_result().map_err(|errs| {
-                    Rich::custom(args_src_span, format!("Failed to parse arguments: {}, errs: {:?}", args_src, errs))
+                Rich::custom(args_src_span, format!("Failed to parse arguments: {}, errs: {:?}", args_src, errs))
             })?;
             Ok((name, n_span, args, args_src_span))
         })
@@ -393,4 +575,3 @@ where
     fn_call
         .map_with(|expr, e| (expr, e.span()))
 }
-

@@ -22,7 +22,7 @@ fn main() {
     println!("Tokens: {tokens:?}");
 
     let parse_errs = if let Some(tokens) = &tokens {
-        let (ast, parse_errs) = first_parser::<_, MyCustomSyntax>()
+        let (ast, parse_errs) = program_parser::<_, MyCustomSyntax>()
             .map_with(|ast, e| (ast, e.span()))
             .parse(
                 tokens

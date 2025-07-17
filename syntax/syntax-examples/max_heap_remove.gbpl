@@ -61,3 +61,16 @@ fn max_heap_remove_helper(root: Integer, max_value: Integer) {
 fn takes_context_nodes(child: Integer, ?parent: Object, child -> parent: "child") {
 
 }
+
+// actually, maybe this?
+// since this way we have a match of (arg1, arg2) to (param1, param2) for explicitly passed params,
+// and [ ] for implicitly matched graphs, like with `if shape`.
+fn takes_context_nodes(child: Integer) [
+    parent: Object,
+    child -> parent: "child"
+] -> (
+    new_node: Integer,
+    child -> new_node: "grandchild"
+) {
+
+}
