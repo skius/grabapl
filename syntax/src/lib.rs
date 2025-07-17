@@ -3,21 +3,46 @@ pub mod minirust;
 use std::fmt;
 use std::fmt::Debug;
 use chumsky::{input::ValueInput, prelude::*};
-use chumsky::input::MapExtra;
+use chumsky::error::LabelError;
+use chumsky::extra::ParserExtra;
+use chumsky::input::{MapExtra, SliceInput, StrInput};
+use chumsky::text::{Char, TextExpected};
+use chumsky::util::MaybeRef;
 
 pub trait CustomSyntax: Clone + Debug + 'static  {
-    type ArgType: Clone + fmt::Debug + Default;
+    type MacroArgType: Clone + fmt::Debug + Default;
 
-    fn get_arg_parser<'src>() -> impl Parser<'src, &'src str, Self::ArgType, extra::Err<Rich<'src, char, Span>>> + Clone;
+    type AbstractNodeType: Clone + Debug;
+    type AbstractEdgeType: Clone + Debug;
+
+    /// May not parse ].
+    fn get_macro_arg_parser<'src>() -> impl Parser<'src, &'src str, Self::MacroArgType, extra::Err<Rich<'src, char, Span>>> + Clone;
+
+    // May not parse ), and only matched brackets.
+    fn get_node_type_parser<'src>() -> impl Parser<'src, &'src str, Self::AbstractNodeType, extra::Err<Rich<'src, char, Span>>> + Clone;
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MyCustomSyntax;
 
-impl CustomSyntax for MyCustomSyntax {
-    type ArgType = Vec<String>;
+// TODO: borrow?
+#[derive(Clone, Debug, PartialEq)]
+pub struct MyCustomStructField {
+    pub name: String,
+    pub typ: String,
+}
 
-    fn get_arg_parser<'src>() -> impl Parser<'src, &'src str, Self::ArgType, extra::Err<Rich<'src, char, Span>>> + Clone {
+#[derive(Clone, Debug, PartialEq)]
+pub struct MyCustomStruct {
+    pub fields: Vec<MyCustomStructField>,
+}
+
+impl CustomSyntax for MyCustomSyntax {
+    type MacroArgType = Vec<String>;
+    type AbstractNodeType = MyCustomStruct;
+    type AbstractEdgeType = MyCustomStruct;
+
+    fn get_macro_arg_parser<'src>() -> impl Parser<'src, &'src str, Self::MacroArgType, extra::Err<Rich<'src, char, Span>>> + Clone {
         // a comma separated list of strings
 
         any::<&'src str, extra::Err<Rich<'src, char, Span>>>()
@@ -29,6 +54,81 @@ impl CustomSyntax for MyCustomSyntax {
             .map(|args: Vec<&'src str>| args.into_iter().map(String::from).collect())
             .padded()
     }
+
+    fn get_node_type_parser<'src>() -> impl Parser<'src, &'src str, Self::AbstractNodeType, extra::Err<Rich<'src, char, Span>>> + Clone {
+        // a struct with fields
+        let field_parser = ascii_ident_fixed()
+            .padded()
+            .then_ignore(just(':'))
+            .then(ascii_ident_fixed())
+            .padded()
+            .map(|(name, typ): (&str, &str)| MyCustomStructField {
+                name: name.to_string(),
+                typ: typ.to_string(),
+            });
+
+        let fields = field_parser
+            .separated_by(just(','))
+            .allow_trailing()
+            .collect::<Vec<_>>()
+            .map(|fields| MyCustomStruct { fields });
+
+        let record_syntax = ascii_ident_fixed().then(
+            fields.delimited_by(just('{'), just('}'))
+        ).map(|(name, my_custom_struct)| {
+            my_custom_struct
+        });
+
+        record_syntax
+            .or(ascii_ident_fixed().map(|typ: &str| MyCustomStruct { fields: vec![MyCustomStructField {
+                name: "<unnamed>>".to_string(),
+                typ: typ.to_string(),
+            }] }))
+
+        // any().map(|_| unreachable!())
+    }
+}
+
+pub fn ascii_ident_fixed<'src, I, E>() -> impl Parser<'src, I, <I as SliceInput<'src>>::Slice, E> + Copy
+where
+    I: StrInput<'src>,
+    I::Token: Char + 'src,
+    E: ParserExtra<'src, I>,
+    E::Error: LabelError<'src, I, TextExpected<'src, I>>,
+{
+    any()
+        .try_map(|c: I::Token, span| {
+            if c.to_ascii()
+                .map(|i| i.is_ascii_alphabetic() || i == b'_')
+                .unwrap_or(false)
+            {
+                Ok(c)
+            } else {
+                Err(LabelError::expected_found(
+                    [TextExpected::IdentifierPart],
+                    Some(MaybeRef::Val(c)),
+                    span,
+                ))
+            }
+        })
+        .then(
+            any()
+                .try_map(|c: I::Token, span| {
+                    if c.to_ascii()
+                        .map_or(false, |i| i.is_ascii_alphanumeric() || i == b'_')
+                    {
+                        Ok(())
+                    } else {
+                        Err(LabelError::expected_found(
+                            [TextExpected::IdentifierPart],
+                            Some(MaybeRef::Val(c)),
+                            span,
+                        ))
+                    }
+                })
+                .repeated(),
+        )
+        .to_slice()
 }
 
 // A few type definitions to be used by our parsers below
@@ -51,7 +151,8 @@ pub enum Token<'src> {
     If,
     Else,
     Shape,
-    ClientProvided(&'src str),
+    MacroArgs(&'src str),
+    NodeType(&'src str),
 }
 
 impl fmt::Display for Token<'_> {
@@ -70,7 +171,8 @@ impl fmt::Display for Token<'_> {
             Token::If => write!(f, "if"),
             Token::Else => write!(f, "else"),
             Token::Shape => write!(f, "shape"),
-            Token::ClientProvided(s) => write!(f, "{}", s),
+            Token::MacroArgs(s) => write!(f, "[{}]", s),
+            Token::NodeType(s) => write!(f, "{}", s),
         }
     }
 }
@@ -88,7 +190,7 @@ pub fn lexer<'src>(
 
 
     // A parser for control characters (delimiters, semicolons, etc.)
-    let ctrl = one_of("()[]{};,?").map(Token::Ctrl);
+    let ctrl = one_of("()[]{};,?:").map(Token::Ctrl);
 
     let arrow = just("->").to(Token::Arrow);
 
@@ -105,17 +207,69 @@ pub fn lexer<'src>(
         _ => Token::Ident(ident),
     });
 
+    // node type parser.
+    // node type returns a src that can then be parsed by a client provided parser.
+    // it is the entire string slice until the next ',', but it skips over matched parentheses.
+    // eg, it should parse "{ x , b } , bla"'s prefix "{ x , b }".
+    // or "(,,,())" is fine as well.
+
+    // unfortunately, below clashes with 'ident' parser.
+    // let inner = recursive(|inner| {
+    //     let mut matched_square = inner.clone()
+    //         .repeated()
+    //         .delimited_by(just('['), just(']'))
+    //         .to_slice()
+    //         ;
+    //     let mut matched_paren = inner.clone()
+    //         .repeated()
+    //         .delimited_by(just('('), just(')'))
+    //         .to_slice()
+    //         ;
+    //     let mut matched_brace = inner.clone()
+    //         .repeated()
+    //         .delimited_by(just('{'), just('}'))
+    //         .to_slice()
+    //         ;
+    //     let mut matched_angle = inner.clone()
+    //         .repeated()
+    //         .delimited_by(just('<'), just('>'))
+    //         .to_slice()
+    //         ;
+    //
+    //     let inner_content = none_of("()[]{}<>").repeated().at_least(1).to_slice()
+    //         .or(matched_square)
+    //         .or(matched_paren)
+    //         .or(matched_brace)
+    //         .or(matched_angle);
+    //     inner_content
+    //
+    //     // just('[').repeated().delimited_by(just('['), just(']')).or(just('b').repeated())
+    // });
+    //
+    // // let mut inner = Recursive::declare();
+    //
+    //
+    // // inner.define(inner_content.to_slice());
+    //
+    // let node_type_src = inner.repeated().at_least(1).to_slice().map(Token::NodeType);
+
+    let node_type_src = just('`').ignore_then(none_of("`")
+        .repeated()
+        .to_slice())
+        .then_ignore(just('`'))
+        .map(Token::NodeType);
+
     // '[', any text except '[', ']', then ']'. eg: [arg1, arg2, arg3]
-    let client_provided_arg = any::<&'src str, extra::Err<Rich<'src, char, Span>>>()
+    let macro_args = any::<&'src str, extra::Err<Rich<'src, char, Span>>>()
         .filter(|c| *c != '[' && *c != ']')
         .repeated()
         .to_slice()
         .delimited_by(just('['), just(']'))
-        .map(Token::ClientProvided);
+        .map(Token::MacroArgs);
 
     // A single token can be one of the above
-    // (client_provided needs to be before ctrl, since ctrl has the same prefix)
-    let token = num.or(client_provided_arg).or(arrow).or(ctrl).or(ident);
+    // (macro_args needs to be before ctrl, since ctrl has the same prefix)
+    let token = num.or(macro_args).or(arrow).or(ctrl).or(ident).or(node_type_src);
 
     let comment = just("//")
         .then(any().and_is(just('\n').not()).repeated())
@@ -133,8 +287,14 @@ pub fn lexer<'src>(
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum MacroArgs<CS: CustomSyntax> {
-    Custom(CS::ArgType),
+    Custom(CS::MacroArgType),
     Lib(Vec<String>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FnParam<'src, CS: CustomSyntax> {
+    pub name: Spanned<&'src str>,
+    pub node_type: Spanned<CS::AbstractNodeType>,
 }
 
 #[derive(Debug)]
@@ -142,10 +302,17 @@ pub enum Expr<'src, CS: CustomSyntax> {
     FnCall {
         name: Spanned<&'src str>,
         macro_args: Spanned<MacroArgs<CS>>,
-        args: Vec<Spanned<&'src str>>,
+        // just for testing
+        args: Vec<Spanned<FnParam<'src, CS>>>,
     }
 }
 
+
+
+pub struct FnDef<'src, CS: CustomSyntax> {
+    pub args: Vec<Spanned<&'src str>>,
+    pub body: Spanned<Expr<'src, CS>>,
+}
 
 
 pub fn first_parser<'tokens, 'src: 'tokens, I, CS: CustomSyntax>(
@@ -158,14 +325,14 @@ where
     }.labelled("identifier")
         .map_with(|ident, e| (ident, e.span()));
 
-    let ident_list = ident
-        .separated_by(just(Token::Ctrl(',')))
-        .allow_trailing()
-        .collect()
-        .labelled("identifier list");
+    // let ident_list = ident
+    //     .separated_by(just(Token::Ctrl(',')))
+    //     .allow_trailing()
+    //     .collect()
+    //     .labelled("identifier list");
 
-    let client_provided = select! {
-        Token::ClientProvided(arg) => arg,
+    let macro_args = select! {
+        Token::MacroArgs(arg) => arg,
     }.labelled("client provided argument")
         .map_with(|arg, e| (arg, e.span()));
 
@@ -181,13 +348,43 @@ where
 
     let macro_arg_parser =
         lib_macro_args.or(
-        CS::get_arg_parser()
+        CS::get_macro_arg_parser()
         .map(MacroArgs::Custom)
         .padded());
 
+    let node_type_src = select! {
+        Token::NodeType(src) => src,
+        Token::Ident(ident) => ident, // hack, since we allow simple idents to be valid as well.
+    }.labelled("node type")
+        .map_with(|src, e| (src, e.span()));
+
+    // ident : NodeType
+    let fn_param_parser = ident
+        .then_ignore(just(Token::Ctrl(':')))
+        .then(node_type_src)
+        .try_map_with(|((name, n_span), (node_type_src, node_type_span)), overall_span| {
+            // parse with CS::get_node_type_parser()
+            let node_type = CS::get_node_type_parser()
+                .parse(node_type_src)
+                .into_result().map_err(|errs| {
+                    Rich::custom(node_type_span, format!("Failed to parse node type: {}, errs: {:?}", node_type_src, errs))
+            })?;
+            // unreachable!();
+            Ok((FnParam {
+                name: (name, n_span),
+                node_type: (node_type, node_type_span),
+            }, overall_span.span()))
+        });
+
+    let fn_param_list_parser = fn_param_parser
+        .separated_by(just(Token::Ctrl(',')))
+        .allow_trailing()
+        .collect::<Vec<_>>()
+        .labelled("function parameters");
+
     // A parser for function calls
     let fn_call = ident
-        .then(client_provided)
+        .then(macro_args)
         // .map_with(|(name, args), e| Expr::FnCall {
         .try_map(move |((name, n_span), (args_src, args_src_span)), _overall_span| {
             // parse with lib_macro_args or macro_arg_parser
@@ -202,7 +399,7 @@ where
             Ok((name, n_span, args, args_src_span))
         })
         .then_ignore(just(Token::Ctrl('(')))
-        .then(ident_list)
+        .then(fn_param_list_parser)
         .then_ignore(just(Token::Ctrl(')')))
         .map(|((name, n_span, args, args_src_span), args_list)| {
             // Create the expression

@@ -10,8 +10,12 @@ use std::{collections::HashMap, env, fmt, fs};
 use syntax::*;
 
 fn main() {
+    // println!("{:?}", ascii_ident_fixed::<&str, extra::Err<Rich<char>>>().map(|x: &str| x).parse("field1").unwrap());
+
     let filename = env::args().nth(1).expect("Expected file argument");
     let src = fs::read_to_string(&filename).expect("Failed to read file");
+
+    println!("Source: {src}");
 
     let (tokens, mut errs) = lexer().parse(src.as_str()).into_output_errors();
 
