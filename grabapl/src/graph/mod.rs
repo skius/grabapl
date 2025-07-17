@@ -340,11 +340,12 @@ impl<NA: PartialEq, EA: PartialEq> Graph<NA, EA> {
             return false;
         }
 
-        petgraph::algo::is_isomorphic_matching(&self.graph, &other.graph, |a, b| {
-            *a == *b
-        }, |a, b| {
-            a == b
-        })
+        petgraph::algo::is_isomorphic_matching(
+            &self.graph,
+            &other.graph,
+            |a, b| *a == *b,
+            |a, b| a == b,
+        )
     }
 }
 

@@ -1,4 +1,7 @@
-use crate::operation::builder::{BuilderInstruction, BuilderOpLike, IntermediateState, OperationBuilderError, UDInstructionsWithMarker, merge_states, QueryPath};
+use crate::operation::builder::{
+    BuilderInstruction, BuilderOpLike, IntermediateState, OperationBuilderError, QueryPath,
+    UDInstructionsWithMarker, merge_states,
+};
 use crate::operation::signature::parameter::{AbstractOutputNodeMarker, OperationParameter};
 use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
 use crate::operation::user_defined::{
@@ -604,7 +607,12 @@ impl<S: Semantics> ReturnFrame<S> {
             ));
         }
         // if we have already asserted that we return a node with this marker, it must be the same type.
-        if let Some(expected_av) = data.expected_self_signature.output.new_nodes.get(&output_marker) {
+        if let Some(expected_av) = data
+            .expected_self_signature
+            .output
+            .new_nodes
+            .get(&output_marker)
+        {
             if expected_av != &av {
                 bail!(BuilderError::NeedsSpecificVariant(
                     "trying to return node with type different from expected return type"
@@ -1061,10 +1069,16 @@ impl<S: Semantics> FrameStack<S> {
                     }
                 }
                 Frame::BuildingShapeQuery(shape_query_frame) => {
-                    path.push(QueryPath::Query(format!("{:?}", shape_query_frame.query_marker)));
+                    path.push(QueryPath::Query(format!(
+                        "{:?}",
+                        shape_query_frame.query_marker
+                    )));
                 }
                 Frame::BuiltShapeQuery(built_shape_query_frame) => {
-                    path.push(QueryPath::Query(format!("{:?}", built_shape_query_frame.query_marker)));
+                    path.push(QueryPath::Query(format!(
+                        "{:?}",
+                        built_shape_query_frame.query_marker
+                    )));
                 }
                 _ => {}
             }
@@ -1303,7 +1317,9 @@ impl<'a, S: Semantics> Builder<'a, S> {
         let op = self.build_unvalidated()?;
         // validate the operation against the expected self signature
         if op.signature.output.new_nodes != expected_signature.output.new_nodes {
-            bail!(BuilderError::NeedsSpecificVariant("operation signature does not match expected signature"));
+            bail!(BuilderError::NeedsSpecificVariant(
+                "operation signature does not match expected signature"
+            ));
         }
 
         Ok(op)
@@ -1435,7 +1451,7 @@ pub enum BuilderShowData<'a, S: Semantics> {
     ParameterBuilder(&'a OperationParameterBuilder<S>),
     CollectingInstructions(&'a IntermediateState<S>),
     QueryFrame(&'a IntermediateState<S>),
-    BranchesFrame{
+    BranchesFrame {
         true_state: &'a IntermediateState<S>,
         false_state: &'a IntermediateState<S>,
     },
@@ -1465,7 +1481,10 @@ impl<'a, S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> Debug for Build
             BuilderShowData::QueryFrame(state) => {
                 write!(f, "QueryFrame: {}", state.dot_with_aid())
             }
-            BuilderShowData::BranchesFrame { true_state, false_state } => {
+            BuilderShowData::BranchesFrame {
+                true_state,
+                false_state,
+            } => {
                 write!(
                     f,
                     "BranchesFrame: True: {}, False: {}",
@@ -1820,7 +1839,10 @@ impl<
             }
             BuilderShowData::CollectingInstructions(state) => Ok(state.clone()),
             BuilderShowData::QueryFrame(state) => Ok(state.clone()),
-            BuilderShowData::BranchesFrame { true_state, false_state } => {
+            BuilderShowData::BranchesFrame {
+                true_state,
+                false_state,
+            } => {
                 // we only take the true state, since we only have a branchesframe on top right after a start_query instruction.
                 Ok(true_state.clone())
             }
@@ -1828,7 +1850,10 @@ impl<
             BuilderShowData::ReturnFrame(state) => Ok(state.clone()),
             BuilderShowData::Other(_) => Err(report!(OperationBuilderError::NewBuilderError))
                 .attach_printable_lazy(|| {
-                    format!("Expected to receive data with intermediate state, got: {:?}", inner)
+                    format!(
+                        "Expected to receive data with intermediate state, got: {:?}",
+                        inner
+                    )
                 }),
         }?;
 

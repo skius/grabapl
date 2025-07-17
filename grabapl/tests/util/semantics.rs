@@ -467,13 +467,19 @@ impl BuiltinOperation for TestOperation {
                 let b = g.get_node_value(SubstMarker::from("b")).unwrap();
                 let c = g.get_node_value(SubstMarker::from("c")).unwrap();
                 let NodeValue::Integer(a_val) = a else {
-                    panic!("expected an integer node value for AModBToC operation - type unsoundness");
+                    panic!(
+                        "expected an integer node value for AModBToC operation - type unsoundness"
+                    );
                 };
                 let NodeValue::Integer(b_val) = b else {
-                    panic!("expected an integer node value for AModBToC operation - type unsoundness");
+                    panic!(
+                        "expected an integer node value for AModBToC operation - type unsoundness"
+                    );
                 };
                 let NodeValue::Integer(c_val) = c else {
-                    panic!("expected an integer node value for AModBToC operation - type unsoundness");
+                    panic!(
+                        "expected an integer node value for AModBToC operation - type unsoundness"
+                    );
                 };
                 let result = a_val % b_val;
                 g.set_node_value(SubstMarker::from("c"), NodeValue::Integer(result))

@@ -1,6 +1,6 @@
-use proptest::proptest;
-use grabapl::prelude::*;
 use super::semantics::*;
+use grabapl::prelude::*;
+use proptest::proptest;
 
 /// Returns an operation that solves "Task 1" from the OSF tasks:
 ///
@@ -27,7 +27,9 @@ fn get_gcd_op(self_op_id: OperationId) -> UserDefinedOperation<TestSemantics> {
     let ret = AbstractNodeId::param("ret");
 
     // implement GCD
-    builder.start_query(TestQuery::ValueEqualTo(NodeValue::Integer(0)), vec![b]).unwrap();
+    builder
+        .start_query(TestQuery::ValueEqualTo(NodeValue::Integer(0)), vec![b])
+        .unwrap();
     builder.enter_true_branch().unwrap();
     builder
         .add_operation(
@@ -37,13 +39,15 @@ fn get_gcd_op(self_op_id: OperationId) -> UserDefinedOperation<TestSemantics> {
         .unwrap();
     builder.enter_false_branch().unwrap();
     // create a temp node for the result of a % b
-    builder.add_named_operation(
-        "temp".into(),
-        BuilderOpLike::LibBuiltin(LibBuiltinOperation::AddNode {
-            value: NodeValue::Integer(0),
-        }),
-        vec![],
-    ).unwrap();
+    builder
+        .add_named_operation(
+            "temp".into(),
+            BuilderOpLike::LibBuiltin(LibBuiltinOperation::AddNode {
+                value: NodeValue::Integer(0),
+            }),
+            vec![],
+        )
+        .unwrap();
     let temp = AbstractNodeId::dynamic_output("temp", "new");
     // add the operation to compute a % b
     builder
@@ -76,21 +80,14 @@ fn get_gcd_op(self_op_id: OperationId) -> UserDefinedOperation<TestSemantics> {
         .unwrap();
     // and recurse on a,b
     builder
-        .add_operation(
-            BuilderOpLike::Recurse,
-            vec![a, b, ret],
-        )
+        .add_operation(BuilderOpLike::Recurse, vec![a, b, ret])
         .unwrap();
 
     builder.build().unwrap()
 }
 
 fn gcd(a: i32, b: i32) -> i32 {
-    if b == 0 {
-        a
-    } else {
-        gcd(b, a % b)
-    }
+    if b == 0 { a } else { gcd(b, a % b) }
 }
 
 #[test_log::test]
@@ -114,5 +111,4 @@ fn proptest_gcd() {
         let ret_value = ret_value.unwrap();
         assert_eq!(ret_value, &NodeValue::Integer(expected_gcd), "Expected GCD of {} and {} to be {}, but got {:?}", a, b, expected_gcd, ret_value);
     });
-
 }

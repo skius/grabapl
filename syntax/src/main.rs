@@ -3,7 +3,7 @@
 //! Run it with the following command:
 //! cargo run --features="label" --example nano_rust -- examples/sample.nrs
 
-use ariadne::{sources, Color, Label, Report, ReportKind};
+use ariadne::{Color, Label, Report, ReportKind, sources};
 use chumsky::{input::ValueInput, prelude::*};
 use std::{collections::HashMap, env, fmt, fs};
 

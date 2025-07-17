@@ -45,8 +45,8 @@ impl fmt::Display for Token<'_> {
     }
 }
 
-pub fn lexer<'src>(
-) -> impl Parser<'src, &'src str, Vec<Spanned<Token<'src>>>, extra::Err<Rich<'src, char, Span>>> {
+pub fn lexer<'src>()
+-> impl Parser<'src, &'src str, Vec<Spanned<Token<'src>>>, extra::Err<Rich<'src, char, Span>>> {
     // A parser for numbers
     let num = text::int(10)
         .then(just('.').then(text::digits(10)).or_not())
@@ -177,8 +177,8 @@ pub struct Func<'src> {
     pub body: Spanned<Expr<'src>>,
 }
 
-pub fn expr_parser<'tokens, 'src: 'tokens, I>(
-) -> impl Parser<'tokens, I, Spanned<Expr<'src>>, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone
+pub fn expr_parser<'tokens, 'src: 'tokens, I>()
+-> impl Parser<'tokens, I, Spanned<Expr<'src>>, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone
 where
     I: ValueInput<'tokens, Token = Token<'src>, Span = Span>,
 {
@@ -190,7 +190,7 @@ where
                 Token::Num(n) => Expr::Value(Value::Num(n)),
                 Token::Str(s) => Expr::Value(Value::Str(s)),
             }
-                .labelled("value");
+            .labelled("value");
 
             let ident = select! { Token::Ident(ident) => ident }.labelled("identifier");
 
@@ -364,7 +364,7 @@ where
                     Token::Ctrl(')'),
                     Token::Ctrl(']'),
                 ])
-                    .ignored(),
+                .ignored(),
             ))
             .foldl_with(
                 just(Token::Ctrl(';')).ignore_then(expr.or_not()).repeated(),
@@ -385,12 +385,9 @@ where
     })
 }
 
-pub fn funcs_parser<'tokens, 'src: 'tokens, I>() -> impl Parser<
-    'tokens,
-    I,
-    HashMap<&'src str, Func<'src>>,
-    extra::Err<Rich<'tokens, Token<'src>, Span>>,
-> + Clone
+pub fn funcs_parser<'tokens, 'src: 'tokens, I>()
+-> impl Parser<'tokens, I, HashMap<&'src str, Func<'src>>, extra::Err<Rich<'tokens, Token<'src>, Span>>>
++ Clone
 where
     I: ValueInput<'tokens, Token = Token<'src>, Span = Span>,
 {
@@ -511,7 +508,11 @@ pub fn eval_expr<'src>(
                     let mut stack = if f.args.len() != args.0.len() {
                         return Err(Error {
                             span: expr.1,
-                            msg: format!("'{}' called with wrong number of arguments (expected {name}, found {})", f.args.len(), args.0.len()),
+                            msg: format!(
+                                "'{}' called with wrong number of arguments (expected {name}, found {})",
+                                f.args.len(),
+                                args.0.len()
+                            ),
                         });
                     } else {
                         f.args
@@ -526,7 +527,7 @@ pub fn eval_expr<'src>(
                     return Err(Error {
                         span: func.1,
                         msg: format!("'{f:?}' is not callable"),
-                    })
+                    });
                 }
             }
         }
@@ -539,7 +540,7 @@ pub fn eval_expr<'src>(
                     return Err(Error {
                         span: cond.1,
                         msg: format!("Conditions must be booleans, found '{c:?}'"),
-                    })
+                    });
                 }
             }
         }

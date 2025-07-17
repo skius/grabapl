@@ -1,9 +1,9 @@
+use base64::prelude::BASE64_STANDARD;
 use grabapl::Semantics;
 use grabapl::graph::dot::DotCollector;
 use grabapl::prelude::*;
 use simple_semantics::SimpleSemantics;
 use wasm_bindgen::prelude::wasm_bindgen;
-use base64::prelude::BASE64_STANDARD;
 
 #[wasm_bindgen]
 extern "C" {
@@ -17,8 +17,11 @@ type RustEdgeConcrete = <SimpleSemantics as Semantics>::EdgeConcrete;
 
 #[diplomat::bridge]
 mod ffi {
+    use super::BASE64_STANDARD;
+    use super::Operation as RustOperation;
     use super::prompt;
     use ::grabapl::Semantics;
+    use base64::Engine;
     use error_stack::Report;
     use grabapl::operation::builder::{
         OperationBuilder as RustOperationBuilder,
@@ -29,9 +32,6 @@ mod ffi {
     use simple_semantics::{BuiltinOperation, BuiltinQuery as RustBuiltinQuery, SimpleSemantics};
     use std::fmt::Write;
     use std::str::FromStr;
-    use base64::Engine;
-    use super::Operation as RustOperation;
-    use super::BASE64_STANDARD;
 
     use super::DotCollector as RustDotCollector;
     use super::RustEdgeAbstract;
@@ -308,7 +308,8 @@ mod ffi {
                 .map_err(|e| {
                     // TODO: remove log. should not be necessary...
                     log::error!("{:?}", e);
-                    Box::new(OperationBuilderError(e))})
+                    Box::new(OperationBuilderError(e))
+                })
         }
 
         pub fn finalize(

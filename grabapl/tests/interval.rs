@@ -54,7 +54,9 @@ fn recursion_fixed_point() {
         .unwrap();
     let p0 = AbstractNodeId::param("p0");
     // now we check if p0 is 100, if not, we add 1 to it and repeat
-    builder.start_query(TestQuery::ValueEqualTo(NodeValue(100)), vec![p0]).unwrap();
+    builder
+        .start_query(TestQuery::ValueEqualTo(NodeValue(100)), vec![p0])
+        .unwrap();
     builder.enter_false_branch().unwrap();
     builder
         .add_operation(
@@ -66,17 +68,11 @@ fn recursion_fixed_point() {
     // AH! this causes a problem. Add1 turns our [0,100] into a [1,101] interval, and the
     // query does not actually give us a new type in true vs false branch. if it gave us [0,99], then it would be fine.
     builder
-        .add_operation(
-            BuilderOpLike::Recurse,
-            vec![p0],
-        )
+        .add_operation(BuilderOpLike::Recurse, vec![p0])
         .unwrap();
     builder.enter_true_branch().unwrap();
     // if p0 is 100, we do nothing
 
     let op = builder.build().unwrap();
     println!("Built operation: {:#?}", op.signature.output);
-
-
-
 }

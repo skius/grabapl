@@ -11,10 +11,10 @@ use grabapl::semantics::{
     AbstractGraph, AbstractMatcher, AnyMatcher, ConcreteGraph, ConcreteToAbstract, MatchJoiner,
     Semantics,
 };
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::Into;
 use std::fmt::Debug;
-use serde::{Deserialize, Serialize};
 
 pub struct SimpleSemantics;
 

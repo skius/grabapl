@@ -5,8 +5,8 @@ use grabapl::operation::run_from_concrete;
 use grabapl::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
 use grabapl::prelude::*;
 use proptest::proptest;
-use std::cmp::Ordering::Greater;
 use proptest::test_runner::Config;
+use std::cmp::Ordering::Greater;
 use util::semantics::*;
 
 fn bubble_sort_op(op_id: OperationId) -> UserDefinedOperation<TestSemantics> {

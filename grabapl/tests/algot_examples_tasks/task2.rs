@@ -1,12 +1,12 @@
-use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashSet};
-use proptest::proptest;
-use proptest::test_runner::Config;
+use super::semantics::*;
 use grabapl::graph::GraphTrait;
 use grabapl::operation::builder::stack_based_builder::OperationBuilder2;
 use grabapl::operation::signature::parameter::AbstractOutputNodeMarker;
 use grabapl::prelude::*;
-use super::semantics::*;
+use proptest::proptest;
+use proptest::test_runner::Config;
+use std::cmp::Ordering;
+use std::collections::{BinaryHeap, HashSet};
 
 const MAX_HEAP_REMOVE_ID: OperationId = 0;
 const MAX_HEAP_REMOVE_HELPER_ID: OperationId = 1;
@@ -30,8 +30,6 @@ fn populate_max_heap_remove_op(op_ctx: &mut OperationContext<TestSemantics>) {
     // otherwise it calls the helper operation which takes the root of the current heap and the
     // out-param for the max value.
 
-
-
     let mut builder = OperationBuilder::new(&op_ctx, MAX_HEAP_REMOVE_ID);
     builder
         .expect_parameter_node("sentinel", NodeType::Object)
@@ -50,19 +48,28 @@ fn populate_max_heap_remove_op(op_ctx: &mut OperationContext<TestSemantics>) {
     let max_value = AbstractNodeId::dynamic_output("max_value", "new");
     // check if the heap is empty
     builder.start_shape_query("q").unwrap();
-    builder.expect_shape_node("root".into(), NodeType::Integer).unwrap();
+    builder
+        .expect_shape_node("root".into(), NodeType::Integer)
+        .unwrap();
     let root_aid = AbstractNodeId::dynamic_output("q", "root");
-    builder.expect_shape_edge(sentinel, root_aid, EdgeType::Wildcard).unwrap();
+    builder
+        .expect_shape_edge(sentinel, root_aid, EdgeType::Wildcard)
+        .unwrap();
     builder.enter_false_branch().unwrap();
     // if we don't have a child, return -1.
     // this is the value we already have
     builder.enter_true_branch().unwrap();
     // we have a child.
-    builder.add_operation(BuilderOpLike::FromOperationId(MAX_HEAP_REMOVE_HELPER_ID), vec![root_aid, max_value]).unwrap();
+    builder
+        .add_operation(
+            BuilderOpLike::FromOperationId(MAX_HEAP_REMOVE_HELPER_ID),
+            vec![root_aid, max_value],
+        )
+        .unwrap();
     builder.end_query().unwrap();
-    builder.return_node(max_value, "max_value".into(), NodeType::Integer).unwrap();
-
-
+    builder
+        .return_node(max_value, "max_value".into(), NodeType::Integer)
+        .unwrap();
 
     let op = builder.build().unwrap();
     op_ctx.add_custom_operation(MAX_HEAP_REMOVE_ID, op);
@@ -70,12 +77,21 @@ fn populate_max_heap_remove_op(op_ctx: &mut OperationContext<TestSemantics>) {
 
 fn populate_max_heap_remove_helper_op(op_ctx: &mut OperationContext<TestSemantics>) {
     let mut builder = OperationBuilder::new(&op_ctx, MAX_HEAP_REMOVE_HELPER_ID);
-    builder.expect_parameter_node("root", NodeType::Integer).unwrap();
+    builder
+        .expect_parameter_node("root", NodeType::Integer)
+        .unwrap();
     let root = AbstractNodeId::param("root");
-    builder.expect_parameter_node("max_value", NodeType::Integer).unwrap();
+    builder
+        .expect_parameter_node("max_value", NodeType::Integer)
+        .unwrap();
     let max_value = AbstractNodeId::param("max_value");
     // we return value of the root node.
-    builder.add_operation(BuilderOpLike::Builtin(TestOperation::CopyValueFromTo), vec![root, max_value]).unwrap();
+    builder
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::CopyValueFromTo),
+            vec![root, max_value],
+        )
+        .unwrap();
     // now, to remove the node and restore the heap condition,
     // we check the following cases:
     // if root has two children, recurse on the larger child, get the max value from there, copy that to root.
@@ -83,15 +99,28 @@ fn populate_max_heap_remove_helper_op(op_ctx: &mut OperationContext<TestSemantic
     // if the root has no children, we can delete root.
 
     builder.start_shape_query("q").unwrap();
-    builder.expect_shape_node("left".into(), NodeType::Integer).unwrap();
+    builder
+        .expect_shape_node("left".into(), NodeType::Integer)
+        .unwrap();
     let left_aid = AbstractNodeId::dynamic_output("q", "left");
-    builder.expect_shape_edge(root, left_aid, EdgeType::Wildcard).unwrap();
-    builder.expect_shape_node("right".into(), NodeType::Integer).unwrap();
+    builder
+        .expect_shape_edge(root, left_aid, EdgeType::Wildcard)
+        .unwrap();
+    builder
+        .expect_shape_node("right".into(), NodeType::Integer)
+        .unwrap();
     let right_aid = AbstractNodeId::dynamic_output("q", "right");
-    builder.expect_shape_edge(root, right_aid, EdgeType::Wildcard).unwrap();
+    builder
+        .expect_shape_edge(root, right_aid, EdgeType::Wildcard)
+        .unwrap();
     builder.enter_true_branch().unwrap();
     // we have two children. Check which is larger
-    builder.start_query(TestQuery::CmpFstSnd(Ordering::Greater.into()), vec![left_aid, right_aid]).unwrap();
+    builder
+        .start_query(
+            TestQuery::CmpFstSnd(Ordering::Greater.into()),
+            vec![left_aid, right_aid],
+        )
+        .unwrap();
     builder.enter_true_branch().unwrap();
     // if left > right, recurse on left
     // get a new result node for the max value
@@ -106,13 +135,20 @@ fn populate_max_heap_remove_helper_op(op_ctx: &mut OperationContext<TestSemantic
         )
         .unwrap();
     let temp_max = AbstractNodeId::dynamic_output("temp_max", "new");
-    builder.add_operation(BuilderOpLike::Recurse, vec![left_aid, temp_max]).unwrap();
-    builder.add_operation(BuilderOpLike::Builtin(TestOperation::CopyValueFromTo), vec![temp_max, root]).unwrap();
+    builder
+        .add_operation(BuilderOpLike::Recurse, vec![left_aid, temp_max])
+        .unwrap();
+    builder
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::CopyValueFromTo),
+            vec![temp_max, root],
+        )
+        .unwrap();
     // and delete the temp node
     builder
         .add_operation(
             BuilderOpLike::LibBuiltin(LibBuiltinOperation::RemoveNode {
-                param: NodeType::Object
+                param: NodeType::Object,
             }),
             vec![temp_max],
         )
@@ -130,13 +166,20 @@ fn populate_max_heap_remove_helper_op(op_ctx: &mut OperationContext<TestSemantic
         )
         .unwrap();
     let temp_max = AbstractNodeId::dynamic_output("temp_max", "new");
-    builder.add_operation(BuilderOpLike::Recurse, vec![right_aid, temp_max]).unwrap();
-    builder.add_operation(BuilderOpLike::Builtin(TestOperation::CopyValueFromTo), vec![temp_max, root]).unwrap();
+    builder
+        .add_operation(BuilderOpLike::Recurse, vec![right_aid, temp_max])
+        .unwrap();
+    builder
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::CopyValueFromTo),
+            vec![temp_max, root],
+        )
+        .unwrap();
     // and delete the temp node
     builder
         .add_operation(
             BuilderOpLike::LibBuiltin(LibBuiltinOperation::RemoveNode {
-                param: NodeType::Object
+                param: NodeType::Object,
             }),
             vec![temp_max],
         )
@@ -145,9 +188,13 @@ fn populate_max_heap_remove_helper_op(op_ctx: &mut OperationContext<TestSemantic
     builder.enter_false_branch().unwrap();
     // If we don't have two children, check if we have one child.
     builder.start_shape_query("q").unwrap();
-    builder.expect_shape_node("child".into(), NodeType::Integer).unwrap();
+    builder
+        .expect_shape_node("child".into(), NodeType::Integer)
+        .unwrap();
     let child_aid = AbstractNodeId::dynamic_output("q", "child");
-    builder.expect_shape_edge(root, child_aid, EdgeType::Wildcard).unwrap();
+    builder
+        .expect_shape_edge(root, child_aid, EdgeType::Wildcard)
+        .unwrap();
     builder.enter_true_branch().unwrap();
     // we have one child, recurse on it
     // TODO: make temp node
@@ -161,13 +208,20 @@ fn populate_max_heap_remove_helper_op(op_ctx: &mut OperationContext<TestSemantic
         )
         .unwrap();
     let temp_max = AbstractNodeId::dynamic_output("temp_max", "new");
-    builder.add_operation(BuilderOpLike::Recurse, vec![child_aid, temp_max]).unwrap();
-    builder.add_operation(BuilderOpLike::Builtin(TestOperation::CopyValueFromTo), vec![temp_max, root]).unwrap();
+    builder
+        .add_operation(BuilderOpLike::Recurse, vec![child_aid, temp_max])
+        .unwrap();
+    builder
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::CopyValueFromTo),
+            vec![temp_max, root],
+        )
+        .unwrap();
     // and delete the temp node
     builder
         .add_operation(
             BuilderOpLike::LibBuiltin(LibBuiltinOperation::RemoveNode {
-                param: NodeType::Object
+                param: NodeType::Object,
             }),
             vec![temp_max],
         )
@@ -177,7 +231,7 @@ fn populate_max_heap_remove_helper_op(op_ctx: &mut OperationContext<TestSemantic
     builder
         .add_operation(
             BuilderOpLike::LibBuiltin(LibBuiltinOperation::RemoveNode {
-                param: NodeType::Object
+                param: NodeType::Object,
             }),
             vec![root],
         )
@@ -188,7 +242,6 @@ fn populate_max_heap_remove_helper_op(op_ctx: &mut OperationContext<TestSemantic
     let op = builder.build().unwrap();
     op_ctx.add_custom_operation(MAX_HEAP_REMOVE_HELPER_ID, op);
 }
-
 
 /// Creates a max-heap from a set of integer values and returns the sentinel node key.
 fn mk_heap_from_values(values: &[i32]) -> (ConcreteGraph<TestSemantics>, NodeKey) {
@@ -208,7 +261,12 @@ fn mk_heap_from_values(values: &[i32]) -> (ConcreteGraph<TestSemantics>, NodeKey
             let NodeValue::Integer(parent_val) = g.get_node_attr(parent_node).unwrap() else {
                 unreachable!();
             };
-            assert!(parent_val >= val, "Max heap property violated: parent value {} is not greater than or equal to child value {}", parent_val, val);
+            assert!(
+                parent_val >= val,
+                "Max heap property violated: parent value {} is not greater than or equal to child value {}",
+                parent_val,
+                val
+            );
             g.add_edge(parent_node, node, "blah".to_string());
         }
     }
@@ -226,7 +284,10 @@ fn proptest_max_heap_remove_heap() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();
     populate_max_heap_remove_op(&mut op_ctx);
 
-    eprintln!("serialized_op_ctx:\n{}", serde_json::to_string_pretty(&op_ctx).unwrap());
+    eprintln!(
+        "serialized_op_ctx:\n{}",
+        serde_json::to_string_pretty(&op_ctx).unwrap()
+    );
 
     proptest!(
         Config::with_cases(10),
@@ -266,7 +327,6 @@ fn proptest_max_heap_remove_heap() {
         }
     );
 }
-
 
 /*
 Playing around with some invented syntax for the two operations:
