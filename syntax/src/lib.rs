@@ -19,7 +19,7 @@ pub trait CustomSyntax: Clone + Debug + 'static  {
     fn get_macro_arg_parser<'src>() -> impl Parser<'src, &'src str, Self::MacroArgType, extra::Err<Rich<'src, char, Span>>> + Clone;
 
     // May not parse ), and only matched brackets.
-    fn get_node_type_parser<'src>() -> impl Parser<'src, &'src str, Self::AbstractNodeType, extra::Err<Rich<'src, char, Span>>> + Clone;
+    fn get_node_type_parser<'src: 'tokens, 'tokens, I: ValueInput<'tokens, Token = Token<'src>, Span = Span>>() -> impl Parser<'tokens, I, Self::AbstractNodeType, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone;
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -29,18 +29,25 @@ pub struct MyCustomSyntax;
 #[derive(Clone, Debug, PartialEq)]
 pub struct MyCustomStructField {
     pub name: String,
-    pub typ: String,
+    pub typ: MyCustomType,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MyCustomStruct {
+    pub name: String,
     pub fields: Vec<MyCustomStructField>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum MyCustomType {
+    Primitive(String),
+    Custom(MyCustomStruct),
 }
 
 impl CustomSyntax for MyCustomSyntax {
     type MacroArgType = Vec<String>;
-    type AbstractNodeType = MyCustomStruct;
-    type AbstractEdgeType = MyCustomStruct;
+    type AbstractNodeType = MyCustomType;
+    type AbstractEdgeType = MyCustomType;
 
     fn get_macro_arg_parser<'src>() -> impl Parser<'src, &'src str, Self::MacroArgType, extra::Err<Rich<'src, char, Span>>> + Clone {
         // a comma separated list of strings
@@ -55,37 +62,51 @@ impl CustomSyntax for MyCustomSyntax {
             .padded()
     }
 
-    fn get_node_type_parser<'src>() -> impl Parser<'src, &'src str, Self::AbstractNodeType, extra::Err<Rich<'src, char, Span>>> + Clone {
-        // a struct with fields
-        let field_parser = text::ascii::ident()
-            .padded()
-            .then_ignore(just(':'))
-            .then(text::ascii::ident())
-            .padded()
-            .map(|(name, typ): (&str, &str)| MyCustomStructField {
-                name: name.to_string(),
-                typ: typ.to_string(),
-            });
+    fn get_node_type_parser<'src: 'tokens, 'tokens, I: ValueInput<'tokens, Token = Token<'src>, Span = Span>>() -> impl Parser<'tokens, I, Self::AbstractNodeType, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone {
+        recursive(|my_typ| {
+            let field_name = select! {
+                Token::Ident(name) => name,
+            }.labelled("field name");
 
-        let fields = field_parser
-            .separated_by(just(','))
-            .allow_trailing()
-            .collect::<Vec<_>>()
-            .map(|fields| MyCustomStruct { fields });
+            let primitive_type = select! {
+                Token::Ident(primitive_name) => primitive_name,
+            }.map(|name: &str| MyCustomType::Primitive(name.to_string()));
 
-        let record_syntax = text::ascii::ident().then(
-            fields.delimited_by(just('{'), just('}'))
-        ).map(|(name, my_custom_struct)| {
-            my_custom_struct
-        });
+            let field_type = my_typ
+                .labelled("field type");
 
-        record_syntax
-            .or(text::ascii::ident().map(|typ: &str| MyCustomStruct { fields: vec![MyCustomStructField {
-                name: "<unnamed>>".to_string(),
-                typ: typ.to_string(),
-            }] }))
+            let field = field_name
+                .then_ignore(just(Token::Ctrl(':')))
+                .then(field_type)
+                .map(|(name, typ)| {
+                    MyCustomStructField {
+                        name: name.to_string(),
+                        typ,
+                    }
+                });
+            let fields = field
+                .separated_by(just(Token::Ctrl(',')))
+                .allow_trailing()
+                .collect::<Vec<_>>()
+                .labelled("fields");
 
-        // any().map(|_| unreachable!())
+            let struct_name = select! {
+                Token::Ident(name) => name,
+            }
+            .labelled("struct name");
+
+            let entire_struct = struct_name
+                .then_ignore(just(Token::Ctrl('{')))
+                .then(fields)
+                .then_ignore(just(Token::Ctrl('}')))
+                .map(|(name, fields)|
+                    MyCustomType::Custom(MyCustomStruct {
+                    name: name.to_string(),
+                    fields,
+                }));
+
+            entire_struct.or(primitive_type)
+        })
     }
 }
 
@@ -110,7 +131,7 @@ pub enum Token<'src> {
     Else,
     Shape,
     MacroArgs(&'src str),
-    NodeType(&'src str),
+    // NodeType(&'src str),
 }
 
 impl fmt::Display for Token<'_> {
@@ -130,7 +151,7 @@ impl fmt::Display for Token<'_> {
             Token::Else => write!(f, "else"),
             Token::Shape => write!(f, "shape"),
             Token::MacroArgs(s) => write!(f, "[{}]", s),
-            Token::NodeType(s) => write!(f, "{}", s),
+            // Token::NodeType(s) => write!(f, "{}", s),
         }
     }
 }
@@ -211,11 +232,11 @@ pub fn lexer<'src>(
     //
     // let node_type_src = inner.repeated().at_least(1).to_slice().map(Token::NodeType);
 
-    let node_type_src = just('`').ignore_then(none_of("`")
-        .repeated()
-        .to_slice())
-        .then_ignore(just('`'))
-        .map(Token::NodeType);
+    // let node_type_src = just('`').ignore_then(none_of("`")
+    //     .repeated()
+    //     .to_slice())
+    //     .then_ignore(just('`'))
+    //     .map(Token::NodeType);
 
     // '[', any text except '[', ']', then ']'. eg: [arg1, arg2, arg3]
     let macro_args = any::<&'src str, extra::Err<Rich<'src, char, Span>>>()
@@ -227,7 +248,7 @@ pub fn lexer<'src>(
 
     // A single token can be one of the above
     // (macro_args needs to be before ctrl, since ctrl has the same prefix)
-    let token = num.or(macro_args).or(arrow).or(ctrl).or(ident).or(node_type_src);
+    let token = num.or(macro_args).or(arrow).or(ctrl).or(ident); //.or(node_type_src);
 
     let comment = just("//")
         .then(any().and_is(just('\n').not()).repeated())
@@ -310,24 +331,11 @@ where
         .map(MacroArgs::Custom)
         .padded());
 
-    let node_type_src = select! {
-        Token::NodeType(src) => src,
-        Token::Ident(ident) => ident, // hack, since we allow simple idents to be valid as well.
-    }.labelled("node type")
-        .map_with(|src, e| (src, e.span()));
-
     // ident : NodeType
     let fn_param_parser = ident
         .then_ignore(just(Token::Ctrl(':')))
-        .then(node_type_src)
-        .try_map_with(|((name, n_span), (node_type_src, node_type_span)), overall_span| {
-            // parse with CS::get_node_type_parser()
-            let node_type = CS::get_node_type_parser()
-                .parse(node_type_src)
-                .into_result().map_err(|errs| {
-                    Rich::custom(node_type_span, format!("Failed to parse node type: {}, errs: {:?}", node_type_src, errs))
-            })?;
-            // unreachable!();
+        .then(CS::get_node_type_parser().map_with(|s, e| (s, e.span())))
+        .try_map_with(|((name, n_span), (node_type, node_type_span)), overall_span| {
             Ok((FnParam {
                 name: (name, n_span),
                 node_type: (node_type, node_type_span),

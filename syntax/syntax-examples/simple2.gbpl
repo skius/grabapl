@@ -1,1 +1,1 @@
-hello[world,a,me,>](p: `Object{field1:test 2}`, x: Test)
+hello[world,a,me,>](p: Object { field1: test }, x: Test {}, bla: tru)
