@@ -10,3 +10,7 @@ grabapl = { path = "../grabapl" }
 serde = { version = "1.0", features = ["derive"] }
 derive_more = { version = "0.99", features = ["from"] }
 serde_json = "1.0"
+
+[dev-dependencies]
+proptest = "1.6.0"
+test-log = "0.2"

@@ -1235,8 +1235,10 @@ dependencies = [
  "chumsky 0.10.1",
  "derive_more 0.99.20",
  "grabapl",
+ "proptest",
  "serde",
  "serde_json",
+ "test-log",
 ]
 
 [[package]]
