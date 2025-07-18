@@ -458,16 +458,15 @@ where
     }
     .map_with(|ident, e| (ident, e.span()));
 
-    let spanned_output_node_id = ident_str.then_ignore(just(Token::Ctrl('.'))).then(ident_str)
+    let spanned_output_node_id = ident_str
+        .then_ignore(just(Token::Ctrl('.')))
+        .then(ident_str)
         .map_with(|(spanned_op, spanned_node), e| {
             (NodeId::Output(spanned_op, spanned_node), e.span())
         });
 
-    let spanned_node_id = spanned_output_node_id
-        .or(ident_str
-            .map(|(name, span)| {
-                (NodeId::Single(name), span)
-            }));
+    let spanned_node_id =
+        spanned_output_node_id.or(ident_str.map(|(name, span)| (NodeId::Single(name), span)));
 
     let spanned_fn_implicit_edge_param = ident_str
         .then_ignore(just(Token::Arrow))
@@ -502,9 +501,10 @@ where
             },
         );
 
-    let spanned_fn_implicit_param = spanned_fn_explicit_param.clone().map(|(explicit_param, span)| {
-        (FnImplicitParam::Node(explicit_param), span)
-    }).or(spanned_fn_implicit_edge_param);
+    let spanned_fn_implicit_param = spanned_fn_explicit_param
+        .clone()
+        .map(|(explicit_param, span)| (FnImplicitParam::Node(explicit_param), span))
+        .or(spanned_fn_implicit_edge_param);
 
     let fn_implicit_params = spanned_fn_implicit_param
         .separated_by(just(Token::Ctrl(',')))
@@ -512,7 +512,6 @@ where
         .collect::<Vec<_>>();
 
     let block = recursive(|block| {
-
         let macro_args_str = select! {
             Token::MacroArgs(arg) => arg,
         };
@@ -527,20 +526,26 @@ where
             .map(MacroArgs::<CS>::Lib)
             .padded();
 
-        let tok_lib_macro_args = macro_args_str
-            .try_map_with(move |src, e| {
-                // parse with lib_macro_args
-                lib_macro_args
-                    .parse(src)
-                    .into_result()
-                    .map_err(|errs| Rich::custom(e.span(), format!("Failed to parse macro args: {}, errs: {:?}", src, errs)))
-            });
+        let tok_lib_macro_args = macro_args_str.try_map_with(move |src, e| {
+            // parse with lib_macro_args
+            lib_macro_args.parse(src).into_result().map_err(|errs| {
+                Rich::custom(
+                    e.span(),
+                    format!("Failed to parse macro args: {}, errs: {:?}", src, errs),
+                )
+            })
+        });
 
         let fn_call_expr = ident_str
-            .then(tok_lib_macro_args.map_with(|args, e| (args, e.span())).or_not())
+            .then(
+                tok_lib_macro_args
+                    .map_with(|args, e| (args, e.span()))
+                    .or_not(),
+            )
             .then_ignore(just(Token::Ctrl('(')))
             .then(
-                spanned_node_id.clone()
+                spanned_node_id
+                    .clone()
                     .separated_by(just(Token::Ctrl(',')))
                     .allow_trailing()
                     .collect::<Vec<_>>(),
@@ -561,45 +566,35 @@ where
             .ignore_then(just(Token::Ctrl('[')))
             .ignore_then(fn_implicit_params.clone())
             .then_ignore(just(Token::Ctrl(']')))
-            .map_with(|args, e| {
-                (
-                    ShapeQueryParams { params: args },
-                    e.span(),
-                )
-            })
+            .map_with(|args, e| (ShapeQueryParams { params: args }, e.span()))
             .map(IfCond::Shape);
 
-        let if_cond_query = fn_call_expr.clone()
+        let if_cond_query = fn_call_expr
+            .clone()
             .map(|spanned_call| IfCond::Query(spanned_call));
 
         let if_cond = if_cond_shape.or(if_cond_query);
 
-        let if_stmt = recursive(|if_stmt|{
-            let spanned_block_wrapped_stmts = block.clone()
+        let if_stmt = recursive(|if_stmt| {
+            let spanned_block_wrapped_stmts = block
+                .clone()
                 .delimited_by(just(Token::Ctrl('{')), just(Token::Ctrl('}')))
                 .map_with(|block, e| (block, e.span()))
                 .labelled("block");
 
-            let if_stmt_as_block = if_stmt.clone()
-                .map_with(|if_stmt, e| {
-                    Block {
-                        statements: vec![(if_stmt, e.span())],
-                    }
-                });
+            let if_stmt_as_block = if_stmt.clone().map_with(|if_stmt, e| Block {
+                statements: vec![(if_stmt, e.span())],
+            });
 
-            let spanned_block_if_or_wrapped_stmts = spanned_block_wrapped_stmts.clone()
+            let spanned_block_if_or_wrapped_stmts = spanned_block_wrapped_stmts
+                .clone()
                 .or(if_stmt_as_block.map_with(|if_stmt, e| (if_stmt, e.span())));
-
 
             let optional_else_part = just(Token::Else)
                 .ignore_then(spanned_block_if_or_wrapped_stmts)
                 .or_not()
-                .map_with(|opt, e| {
-                    opt.unwrap_or((Block { statements: vec![] }, e.span()))
-                })
+                .map_with(|opt, e| opt.unwrap_or((Block { statements: vec![] }, e.span())))
                 .labelled("else");
-
-
 
             let if_stmt = just(Token::If)
                 .ignore_then(if_cond)
@@ -607,21 +602,18 @@ where
                 .then(block.clone().map_with(|block, e| (block, e.span())))
                 .then_ignore(just(Token::Ctrl('}')))
                 .then(optional_else_part)
-                .map_with(
-                    |((cond, spanned_then_block), spanned_else_block), e| {
-                        (
-                            IfStmt {
-                                cond,
-                                then_block: spanned_then_block,
-                                else_block: spanned_else_block,
-                            },
-                            e.span(),
-                        )
-                    },
-                )
+                .map_with(|((cond, spanned_then_block), spanned_else_block), e| {
+                    (
+                        IfStmt {
+                            cond,
+                            then_block: spanned_then_block,
+                            else_block: spanned_else_block,
+                        },
+                        e.span(),
+                    )
+                })
                 .map(Statement::If)
                 .labelled("if statement");
-
 
             // TODO: continue with entire if else statements.
             if_stmt
@@ -631,8 +623,8 @@ where
             .map_with(|if_stmt, e| (if_stmt, e.span()))
             .labelled("if statement");
 
-
-        let fn_call_stmt = fn_call_expr.clone()
+        let fn_call_stmt = fn_call_expr
+            .clone()
             .then_ignore(just(Token::Ctrl(';')))
             .map_with(|spanned_call, e| (Statement::FnCall(spanned_call), e.span()))
             .labelled("function call statement");
@@ -647,22 +639,19 @@ where
             .then_ignore(just(Token::Ctrl('=')))
             .then(fn_call_expr)
             .then_ignore(just(Token::Ctrl(';')))
-            .map_with(
-                |((bang, (name, name_span)), (call, call_span)), e| {
-                    (
-                        LetStmt {
-                            bang,
-                            ident: (name, name_span),
-                            call: (call, call_span),
-                        },
-                        e.span(),
-                    )
-                },
-            )
+            .map_with(|((bang, (name, name_span)), (call, call_span)), e| {
+                (
+                    LetStmt {
+                        bang,
+                        ident: (name, name_span),
+                        call: (call, call_span),
+                    },
+                    e.span(),
+                )
+            })
             .map(Statement::Let)
             .map_with(|let_stmt, e| (let_stmt, e.span()))
             .labelled("let statement");
-
 
         let spanned_return_node_mapping = ident_str
             .then_ignore(just(Token::Ctrl(':')))
@@ -677,7 +666,8 @@ where
                 )
             });
 
-        let spanned_return_edge_mapping = spanned_node_id.clone()
+        let spanned_return_edge_mapping = spanned_node_id
+            .clone()
             .then_ignore(just(Token::Arrow))
             .then(spanned_node_id.clone())
             .then_ignore(just(Token::Ctrl(':')))
@@ -715,7 +705,6 @@ where
             .or(spanned_return_stmt)
             .labelled("statement");
 
-
         let block_many_stmts = spanned_stmt
             .repeated()
             .collect()
@@ -725,19 +714,14 @@ where
         block_many_stmts
     });
 
-
-
     let fn_return_signature = fn_implicit_params.clone();
 
-    let optional_fn_return_signature = (
-        just(Token::Arrow)
+    let optional_fn_return_signature = (just(Token::Arrow)
         .ignore_then(just(Token::Ctrl('(')))
         .ignore_then(fn_return_signature)
         .then_ignore(just(Token::Ctrl(')'))))
     .or_not()
     .map(|opt| opt.unwrap_or_default());
-
-
 
     let fn_explicit_params = spanned_fn_explicit_param
         .separated_by(just(Token::Ctrl(',')))
