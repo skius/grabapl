@@ -1,10 +1,10 @@
 fn max_heap_remove(sentinel: Object) -> (max_value: Integer) {
     // ! syntax: take the single return value of the operation and bind to it.
     // alternative is let map = add_node(...); and then map.new is the returned node.
-    let! max_value = add_node[-1]();
+    let! max_value = add_node`-1`();
     if shape [
         root: Integer,
-        sentinel -> root: Wildcard
+        sentinel -> root: *
     ] {
         // if we have a root, we can proceed
         max_heap_remove_helper(root, max_value);
@@ -20,31 +20,31 @@ fn max_heap_remove_helper(root: Integer, max_value: Integer) {
     copy_value_from_to(root, max_value);
     if shape [
         left: Integer,
-        root -> left: Wildcard,
+        root -> left: *,
         right: Integer,
-        root -> right: Wildcard
+        root -> right: *
     ] {
         // we have two children, check which is larger
         // method[] syntax: pass arguments to builtin operations
-        if cmp_fst_snd[>](left, right) {
+        if cmp_fst_snd`>`(left, right) {
             // left is larger, recurse on left
-            let! temp_max = add_node[-1]();
+            let! temp_max = add_node`-1`();
             max_heap_remove_helper(left, temp_max);
             copy_value_from_to(temp_max, root);
             remove_node(temp_max);
         } else {
             // right is larger or equal, recurse on right
-            let! temp_max = add_node[-1]();
+            let! temp_max = add_node`-1`();
             max_heap_remove_helper(right, temp_max);
             copy_value_from_to(temp_max, root);
             remove_node(temp_max);
         }
     } else if shape [
         child: Integer,
-        root -> child: Wildcard
+        root -> child: *
     ] {
         // we have one child, recurse on it
-        let! temp_max = add_node[-1]();
+        let! temp_max = add_node`-1`();
         max_heap_remove_helper(child, temp_max);
         copy_value_from_to(temp_max, root);
         remove_node(temp_max);
@@ -58,9 +58,9 @@ fn max_heap_remove_helper(root: Integer, max_value: Integer) {
 // some more syntax:
 
 // ?ident marks a node as a context node that will implicitly be matched.
-fn takes_context_nodes(child: Integer, ?parent: Object, child -> parent: "child") {
-
-}
+//fn takes_context_nodes(child: Integer, ?parent: Object, child -> parent: "child") {
+//
+//}
 
 // actually, maybe this?
 // since this way we have a match of (arg1, arg2) to (param1, param2) for explicitly passed params,
@@ -72,5 +72,6 @@ fn takes_context_nodes(child: Integer) [
     new_node: Integer,
     child -> new_node: "grandchild"
 ) {
-
+    let map = add_node();
+    return (new_node: map.new);
 }

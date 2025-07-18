@@ -16,7 +16,6 @@ pub trait CustomSyntax: Clone + Debug + 'static {
     type AbstractNodeType: Clone + Debug + PartialEq;
     type AbstractEdgeType: Clone + Debug + PartialEq;
 
-    /// May not parse ].
     fn get_macro_arg_parser<'src>()
     -> impl Parser<'src, &'src str, Self::MacroArgType, extra::Err<Rich<'src, char, Span>>> + Clone;
 
@@ -180,6 +179,7 @@ pub enum Token<'src> {
     Ctrl(char),
     Ident(&'src str),
     Fn,
+    Return,
     Let,
     LetBang,
     If,
@@ -200,12 +200,13 @@ impl fmt::Display for Token<'_> {
             Token::Ctrl(c) => write!(f, "{}", c),
             Token::Ident(i) => write!(f, "{}", i),
             Token::Fn => write!(f, "fn"),
+            Token::Return => write!(f, "return"),
             Token::Let => write!(f, "let"),
             Token::LetBang => write!(f, "let!"),
             Token::If => write!(f, "if"),
             Token::Else => write!(f, "else"),
             Token::Shape => write!(f, "shape"),
-            Token::MacroArgs(s) => write!(f, "[{}]", s),
+            Token::MacroArgs(s) => write!(f, "`{}`", s),
             // Token::NodeType(s) => write!(f, "{}", s),
         }
     }
@@ -222,16 +223,18 @@ pub fn lexer<'src>()
         .map(Token::Num);
 
     // A parser for control characters (delimiters, semicolons, etc.)
-    let ctrl = one_of("()[]{};,?:*=/<>\"'").map(Token::Ctrl);
+    let ctrl = one_of("()[]{};,?:*=/<>\"'.").map(Token::Ctrl);
 
     let arrow = just("->").to(Token::Arrow);
+
+    let let_bang = just("let!").to(Token::LetBang);
 
     // A parser for identifiers and keywords
     let ident = text::ascii::ident().map(|ident: &str| match ident {
         "fn" => Token::Fn,
-        "let!" => Token::LetBang,
         "let" => Token::Let,
         "if" => Token::If,
+        "return" => Token::Return,
         "else" => Token::Else,
         "shape" => Token::Shape,
         "true" => Token::Bool(true),
@@ -291,17 +294,15 @@ pub fn lexer<'src>()
     //     .then_ignore(just('`'))
     //     .map(Token::NodeType);
 
-    // '[', any text except '[', ']', then ']'. eg: [arg1, arg2, arg3]
-    let macro_args = any::<&'src str, extra::Err<Rich<'src, char, Span>>>()
-        .filter(|c| *c != '[' && *c != ']')
+    let macro_args = none_of("`")
         .repeated()
         .to_slice()
-        .delimited_by(just('['), just(']'))
+        .delimited_by(just('`'), just('`'))
         .map(Token::MacroArgs);
 
     // A single token can be one of the above
     // (macro_args needs to be before ctrl, since ctrl has the same prefix)
-    let token = num.or(macro_args).or(arrow).or(ctrl).or(ident); //.or(node_type_src);
+    let token = let_bang.or(num).or(macro_args).or(arrow).or(ctrl).or(ident); //.or(node_type_src);
 
     let comment = just("//")
         .then(any().and_is(just('\n').not()).repeated())
@@ -329,8 +330,8 @@ pub enum MacroArgs<CS: CustomSyntax> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct FnCallExpr<'src, CS: CustomSyntax> {
     pub name: Spanned<&'src str>,
-    pub macro_args: Spanned<MacroArgs<CS>>,
-    pub args: Vec<Spanned<&'src str>>,
+    pub macro_args: Option<Spanned<MacroArgs<CS>>>,
+    pub args: Vec<Spanned<NodeId<'src>>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -370,23 +371,29 @@ pub struct IfStmt<'src, CS: CustomSyntax> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub enum NodeId<'src> {
+    Single(&'src str),
+    Output(Spanned<&'src str>, Spanned<&'src str>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum ReturnStmtMapping<'src, CS: CustomSyntax> {
     Node {
         /// The name of the output marker
         ret_name: Spanned<&'src str>,
         /// The node to return
-        ident: Spanned<&'src str>,
+        node: Spanned<NodeId<'src>>,
     },
     Edge {
-        src: Spanned<&'src str>,
-        dst: Spanned<&'src str>,
+        src: Spanned<NodeId<'src>>,
+        dst: Spanned<NodeId<'src>>,
         edge_type: Spanned<CS::AbstractEdgeType>,
     },
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ReturnStmt<'src, CS: CustomSyntax> {
-    pub mapping: Vec<Spanned<FnImplicitParam<'src, CS>>>,
+    pub mapping: Vec<Spanned<ReturnStmtMapping<'src, CS>>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -450,6 +457,17 @@ where
         Token::Ident(ident) => ident,
     }
     .map_with(|ident, e| (ident, e.span()));
+
+    let spanned_output_node_id = ident_str.then_ignore(just(Token::Ctrl('.'))).then(ident_str)
+        .map_with(|(spanned_op, spanned_node), e| {
+            (NodeId::Output(spanned_op, spanned_node), e.span())
+        });
+
+    let spanned_node_id = spanned_output_node_id
+        .or(ident_str
+            .map(|(name, span)| {
+                (NodeId::Single(name), span)
+            }));
 
     let spanned_fn_implicit_edge_param = ident_str
         .then_ignore(just(Token::Arrow))
@@ -519,10 +537,10 @@ where
             });
 
         let fn_call_expr = ident_str
-            .then(tok_lib_macro_args.map_with(|args, e| (args, e.span())))
+            .then(tok_lib_macro_args.map_with(|args, e| (args, e.span())).or_not())
             .then_ignore(just(Token::Ctrl('(')))
             .then(
-                ident_str
+                spanned_node_id.clone()
                     .separated_by(just(Token::Ctrl(',')))
                     .allow_trailing()
                     .collect::<Vec<_>>(),
@@ -556,7 +574,62 @@ where
 
         let if_cond = if_cond_shape.or(if_cond_query);
 
-        // TODO: continue with entire if else statements.
+        let if_stmt = recursive(|if_stmt|{
+            let spanned_block_wrapped_stmts = block.clone()
+                .delimited_by(just(Token::Ctrl('{')), just(Token::Ctrl('}')))
+                .map_with(|block, e| (block, e.span()))
+                .labelled("block");
+
+            let if_stmt_as_block = if_stmt.clone()
+                .map_with(|if_stmt, e| {
+                    Block {
+                        statements: vec![(if_stmt, e.span())],
+                    }
+                });
+
+            let spanned_block_if_or_wrapped_stmts = spanned_block_wrapped_stmts.clone()
+                .or(if_stmt_as_block.map_with(|if_stmt, e| (if_stmt, e.span())));
+
+
+            let optional_else_part = just(Token::Else)
+                .ignore_then(spanned_block_if_or_wrapped_stmts)
+                .or_not()
+                .map_with(|opt, e| {
+                    opt.unwrap_or((Block { statements: vec![] }, e.span()))
+                })
+                .labelled("else");
+
+
+
+            let if_stmt = just(Token::If)
+                .ignore_then(if_cond)
+                .then_ignore(just(Token::Ctrl('{')))
+                .then(block.clone().map_with(|block, e| (block, e.span())))
+                .then_ignore(just(Token::Ctrl('}')))
+                .then(optional_else_part)
+                .map_with(
+                    |((cond, spanned_then_block), spanned_else_block), e| {
+                        (
+                            IfStmt {
+                                cond,
+                                then_block: spanned_then_block,
+                                else_block: spanned_else_block,
+                            },
+                            e.span(),
+                        )
+                    },
+                )
+                .map(Statement::If)
+                .labelled("if statement");
+
+
+            // TODO: continue with entire if else statements.
+            if_stmt
+        });
+
+        let spanned_if_stmt = if_stmt
+            .map_with(|if_stmt, e| (if_stmt, e.span()))
+            .labelled("if statement");
 
 
         let fn_call_stmt = fn_call_expr.clone()
@@ -591,11 +664,59 @@ where
             .labelled("let statement");
 
 
-        let stmt = let_stmt
+        let spanned_return_node_mapping = ident_str
+            .then_ignore(just(Token::Ctrl(':')))
+            .then(spanned_node_id.clone())
+            .map_with(|(ret_name, node_id), e| {
+                (
+                    ReturnStmtMapping::Node {
+                        ret_name,
+                        node: node_id,
+                    },
+                    e.span(),
+                )
+            });
+
+        let spanned_return_edge_mapping = spanned_node_id.clone()
+            .then_ignore(just(Token::Arrow))
+            .then(spanned_node_id.clone())
+            .then_ignore(just(Token::Ctrl(':')))
+            .then(CS::get_edge_type_parser().map_with(|s, e| (s, e.span())))
+            .map_with(|((src, dst), edge_typ), e| {
+                (
+                    ReturnStmtMapping::Edge {
+                        src,
+                        dst,
+                        edge_type: edge_typ,
+                    },
+                    e.span(),
+                )
+            });
+
+        let spanned_return_mappings = spanned_return_node_mapping
+            .or(spanned_return_edge_mapping)
+            .repeated()
+            .at_least(1)
+            .collect::<Vec<_>>();
+
+        let spanned_return_stmt = just(Token::Return)
+            .ignore_then(just(Token::Ctrl('(')))
+            .ignore_then(spanned_return_mappings)
+            .then_ignore(just(Token::Ctrl(')')))
+            .then_ignore(just(Token::Ctrl(';')))
+            .map_with(|mappings, e| (ReturnStmt { mapping: mappings }, e.span()))
+            .map(Statement::Return)
+            .map_with(|return_stmt, e| (return_stmt, e.span()))
+            .labelled("return statement");
+
+        let spanned_stmt = let_stmt
             .or(fn_call_stmt)
+            .or(spanned_if_stmt)
+            .or(spanned_return_stmt)
             .labelled("statement");
 
-        let block_many_stmts = stmt
+
+        let block_many_stmts = spanned_stmt
             .repeated()
             .collect()
             .map(|stmts| Block { statements: stmts })
