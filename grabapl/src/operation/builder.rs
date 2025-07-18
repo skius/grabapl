@@ -266,6 +266,8 @@ pub enum OperationBuilderError {
     AbstractApplyOperationErrorWithId(OperationId, OperationError),
     #[error("Could not abstractly apply operation due to: {0}")]
     AbstractApplyOperationError(OperationError),
+    #[error("Could not abstractly apply operation")]
+    AbstractApplyOperationError2,
     #[error("Superfluous instruction {0}")]
     SuperfluousInstruction(String),
     #[error("Already selected to return node {0:?}")]
@@ -1632,7 +1634,7 @@ impl<S: Semantics> IntermediateState<S> {
         let operation_output = {
             let mut gws = GraphWithSubstitution::new(&mut self.graph, &subst);
             op.apply_abstract(op_ctx, &mut gws)
-                .map_err(|e| OperationBuilderError::AbstractApplyOperationError(e))?
+                .change_context(OperationBuilderError::AbstractApplyOperationError2)?
         };
         let new_aids = self.handle_abstract_output_changes(marker, operation_output)?;
 

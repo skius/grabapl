@@ -18,6 +18,7 @@ use internment::Intern;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
+use error_stack::{bail, report, FutureExt, ResultExt};
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
@@ -140,7 +141,7 @@ impl AbstractOperationArgument {
         param: &OperationParameter<impl Semantics>,
     ) -> OperationResult<Self> {
         if param.explicit_input_nodes.len() != selected_nodes.len() {
-            return Err(OperationError::InvalidOperationArgumentCount {
+            bail!(OperationError::InvalidOperationArgumentCount {
                 expected: param.explicit_input_nodes.len(),
                 actual: selected_nodes.len(),
             });
@@ -347,7 +348,8 @@ impl<S: Semantics> UserDefinedOperation<S> {
             .new_nodes
             .iter()
             .map(|(aid, name)| Ok((*name, runner.aid_to_node_key(*aid)?)))
-            .collect::<OperationResult<_>>()?;
+            .collect::<OperationResult<_>>()
+            .attach_printable_lazy(|| "error while building output map")?;
 
         // TODO: How to define a good output here?
         //  probably should be part of the UserDefinedOperation struct. AbstractNodeId should be used, and then we get the actual node key based on what's happening.
@@ -457,9 +459,12 @@ impl<'a, S: Semantics> Runner<'a, S> {
                 }
                 Instruction::RenameNode { old, new } => {
                     let Some(key) = self.abstract_to_concrete.remove(old) else {
-                        return Err(OperationError::UnknownAID(*old));
+                        return Err(report!(OperationError::UnknownAID(*old)))
+                            .attach_printable_lazy(|| {
+                                format!("Cannot rename node {old:#?} to {new:#?}, since it is not in the mapping: {:#?}", self.abstract_to_concrete)
+                            });
                     };
-                    self.abstract_to_concrete.insert(*old, key);
+                    self.abstract_to_concrete.insert(*new, key);
                 }
             }
         }
@@ -488,7 +493,7 @@ impl<'a, S: Semantics> Runner<'a, S> {
                 .mapping
                 .get(&subst_marker)
                 .copied()
-                .ok_or(OperationError::UnknownParameterMarker(subst_marker)),
+                .ok_or(report!(OperationError::UnknownParameterMarker(subst_marker))),
             AbstractNodeId::DynamicOutputMarker(..) | AbstractNodeId::Named(..) => {
                 let key = self
                     .abstract_to_concrete
@@ -514,7 +519,8 @@ impl<'a, S: Semantics> Runner<'a, S> {
         let selected_keys: Vec<NodeKey> = arg
             .selected_input_nodes
             .iter()
-            .map(|arg| self.aid_to_node_key(*arg))
+            .map(|arg| self.aid_to_node_key(*arg)
+                .attach_printable_lazy(|| "while converting abstract selected input nodes to concrete keys"))
             .collect::<OperationResult<_>>()?;
 
         let new_subst = ParameterSubstitution::new(
@@ -523,7 +529,8 @@ impl<'a, S: Semantics> Runner<'a, S> {
                 .map(|(subst_marker, abstract_node_id)| {
                     Ok((
                         subst_marker.clone(),
-                        self.aid_to_node_key(abstract_node_id.clone())?,
+                        self.aid_to_node_key(abstract_node_id.clone())
+                            .attach_printable_lazy(|| format!("while trying to map abstract subtitution for marker {subst_marker:?}"))?,
                     ))
                 })
                 .collect::<OperationResult<_>>()?,

@@ -23,6 +23,7 @@ use signature::parameter::{
 };
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
+use error_stack::ResultExt;
 use thiserror::Error;
 
 pub trait BuiltinOperation: Debug {
@@ -291,15 +292,18 @@ pub fn run_from_concrete<S: Semantics>(
     {
         Operation::LibBuiltin(lib_builtin) => {
             let param = lib_builtin.parameter();
-            get_substitution(&abstract_g, &param, selected_inputs)?
+            get_substitution(&abstract_g, &param, selected_inputs)
+                .change_context(OperationError::ArgumentDoesNotMatchParameter)?
         }
         Operation::Builtin(builtin) => {
             let param = builtin.parameter();
-            get_substitution(&abstract_g, &param, selected_inputs)?
+            get_substitution(&abstract_g, &param, selected_inputs)
+                .change_context(OperationError::ArgumentDoesNotMatchParameter)?
         }
         Operation::Custom(custom) => {
             let param = &custom.signature.parameter;
-            get_substitution(&abstract_g, param, selected_inputs)?
+            get_substitution(&abstract_g, param, selected_inputs)
+                .change_context(OperationError::ArgumentDoesNotMatchParameter)?
         }
     };
     // then run the operation
@@ -312,7 +316,7 @@ pub fn run_from_concrete<S: Semantics>(
     run_operation(g, op_ctx, op, arg)
 }
 
-pub type OperationResult<T> = std::result::Result<T, OperationError>;
+pub type OperationResult<T> = error_stack::Result<T, OperationError>;
 
 // TODO: add specific source operation id or similar to the error
 #[derive(Error, Debug, Clone)]

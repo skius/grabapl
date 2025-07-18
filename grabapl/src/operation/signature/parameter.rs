@@ -10,6 +10,7 @@ use petgraph::visit::UndirectedAdaptor;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
+use error_stack::bail;
 use thiserror::Error;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
 // renamed.
@@ -118,7 +119,7 @@ impl ParameterSubstitution {
         param: &OperationParameter<impl Semantics>,
     ) -> OperationResult<Self> {
         if param.explicit_input_nodes.len() != selected_nodes.len() {
-            return Err(OperationError::InvalidOperationArgumentCount {
+            bail!(OperationError::InvalidOperationArgumentCount {
                 expected: param.explicit_input_nodes.len(),
                 actual: selected_nodes.len(),
             });
