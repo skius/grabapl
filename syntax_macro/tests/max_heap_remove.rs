@@ -1,0 +1,99 @@
+use syntax_macro::grabapl_source;
+
+#[test]
+fn max_heap_remove_parse() {
+    let (op_ctx, fn_map) = grabapl_source!{
+        fn max_heap_remove(sentinel: Object) -> (max_value: Integer) {
+            // ! syntax: take the single return value of the operation and bind to it.
+            // alternative is let map = add_node(...); and then map.new is the returned node.
+            let! max_value = add_node%int,-1%();
+            if shape [
+                root: Integer,
+                sentinel -> root: *
+            ] {
+                // if we have a root, we can proceed
+                max_heap_remove_helper(root, max_value);
+            } else {
+                // do nothing
+            }
+            return (max_value: max_value);
+        }
+
+
+        fn max_heap_remove_helper(root: Integer, max_value: Integer) {
+            // return the value of the root node
+            copy_value_from_to(root, max_value);
+            if shape [
+                left: Integer,
+                root -> left: *,
+                right: Integer,
+                root -> right: *
+            ] {
+                // we have two children, check which is larger
+                // method[] syntax: pass arguments to builtin operations
+                if cmp_fst_snd%>%(left, right) {
+                    // left is larger, recurse on left
+                    let! temp_max = add_node%int,-1%();
+                    max_heap_remove_helper(left, temp_max);
+                    copy_value_from_to(temp_max, root);
+                    remove_node(temp_max);
+                } else {
+                    // right is larger or equal, recurse on right
+                    let! temp_max = add_node%int,-1%();
+                    max_heap_remove_helper(right, temp_max);
+                    copy_value_from_to(temp_max, root);
+                    remove_node(temp_max);
+                }
+            } else if shape [
+                child: Integer,
+                root -> child: *
+            ] {
+                // we have one child, recurse on it
+                let! temp_max = add_node%int,-1%();
+                max_heap_remove_helper(child, temp_max);
+                copy_value_from_to(temp_max, root);
+                remove_node(temp_max);
+            } else {
+                // no children, we can delete the root node
+                remove_node(root);
+            }
+        }
+
+        // some more syntax:
+
+        // ?ident marks a node as a context node that will implicitly be matched.
+        //fn takes_context_nodes(child: Integer, ?parent: Object, child -> parent: "child") {
+        //
+        //}
+
+        // actually, maybe this?
+        // since this way we have a match of (arg1, arg2) to (param1, param2) for explicitly passed params,
+        // and [ ] for implicitly matched graphs, like with %if shape%.
+        fn takes_context_nodes(child: Integer) [
+            parent: Object,
+            child -> parent: "child"
+        ] -> (
+            new_node: Integer,
+            // child -> new_node: "grandchild"
+        ) {
+            let map = add_node%object,1%();
+            let some_int_node = add_node%int,2%();
+            let! some_other_int_node = add_node%int,3%();
+
+            if shape [
+              some_node: Integer,
+              child -> some_node: "child2",
+              map.new: Integer,
+            ] {
+                node_to_ret <- map.new;
+            } else if shape []  {
+                node_to_ret <- some_int_node.new;
+            } else if cmp_fst_snd%<%(parent, child) {
+                node_to_ret <- some_int_node.new;
+            } else {
+                node_to_ret <- some_other_int_node;
+            }
+            return (new_node: node_to_ret);
+        }
+    };
+}

@@ -11,6 +11,10 @@ use chumsky::{input::ValueInput, prelude::*};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
+use ariadne::{sources, Color, Label, Report, ReportKind};
+use grabapl::prelude::{OperationContext, OperationId};
+use crate::interpreter::interpret;
+use crate::semantics::TestSemantics;
 
 pub trait CustomSyntax: Clone + Debug + 'static {
     type MacroArgType: Clone + fmt::Debug + Default + PartialEq;
@@ -175,6 +179,7 @@ pub enum Token<'src> {
     // do we want these?
     Bool(bool),
     Num(i32),
+    // TODO: readd str token.
     // Str(&'src str),
     // Op(&'src str),
     Arrow,
@@ -304,11 +309,18 @@ pub fn lexer<'src>()
         .delimited_by(just('`'), just('`'))
         .map(Token::MacroArgs);
 
+    let macro_args_opt2 = none_of("%")
+        .repeated()
+        .to_slice()
+        .delimited_by(just('%'), just('%'))
+        .map(Token::MacroArgs);
+
     // A single token can be one of the above
     // (macro_args needs to be before ctrl, since ctrl has the same prefix)
     let token = let_bang
         .or(num)
         .or(macro_args)
+        .or(macro_args_opt2)
         .or(arrow)
         .or(rev_arrow)
         .or(ctrl)
@@ -880,4 +892,78 @@ where
         .labelled("program");
 
     program
+}
+
+
+// TODO: rework this function. terrible.
+pub fn parse_to_op_ctx_and_map<'src>(src: &'src str) -> (OperationContext<TestSemantics>, HashMap<&'src str, OperationId>) {
+    let (tokens, mut errs) = lexer().parse(src).into_output_errors();
+
+    // println!("Tokens: {tokens:?}");
+
+    let parse_errs = if let Some(tokens) = &tokens {
+        let (ast, parse_errs) = program_parser::<_, MyCustomSyntax>()
+            .map_with(|ast, e| (ast, e.span()))
+            .parse(
+                tokens
+                    .as_slice()
+                    .map((src.len()..src.len()).into(), |(t, s)| (t, s)),
+            )
+            .into_output_errors();
+
+        if let Some((program, file_span)) = ast.filter(|_| errs.len() + parse_errs.len() == 0) {
+            // println!("Parsed: {program:#?}");
+            // println!("interpreting...");
+
+            let (op_ctx, fns_to_ids) = interpret::<TestSemantics>(program);
+
+            return (op_ctx, fns_to_ids);
+
+            // let json = serde_json::to_string_pretty(&op_ctx)
+            //     .expect("Failed to serialize operation context to JSON");
+            // println!("Operation Context: {json}");
+            // println!("Function IDs: {fns_to_ids:#?}");
+
+
+
+
+
+
+
+        }
+
+        parse_errs
+    } else {
+        Vec::new()
+    };
+
+    let filename = "input".to_string();
+
+    errs.into_iter()
+        .map(|e| e.map_token(|c| c.to_string()))
+        .chain(
+            parse_errs
+                .into_iter()
+                .map(|e| e.map_token(|tok| tok.to_string())),
+        )
+        .for_each(|e| {
+            Report::build(ReportKind::Error, (filename.clone(), e.span().into_range()))
+                .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte))
+                .with_message(e.to_string())
+                .with_label(
+                    Label::new((filename.clone(), e.span().into_range()))
+                        .with_message(e.reason().to_string())
+                        .with_color(Color::Red),
+                )
+                .with_labels(e.contexts().map(|(label, span)| {
+                    Label::new((filename.clone(), span.into_range()))
+                        .with_message(format!("while parsing this {label}"))
+                        .with_color(Color::Yellow)
+                }))
+                .finish()
+                .eprint(sources([(filename.clone(), src.clone())]))
+                .unwrap()
+        });
+
+    panic!("Failed to parse the input source code (see stderr for details)");
 }
