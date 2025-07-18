@@ -52,7 +52,7 @@ fn proptest_max_heap_remove() {
     let file_path = "syntax-examples/max_heap_remove.gbpl";
     let src = std::fs::read_to_string(file_path).unwrap();
 
-    let (op_ctx, fn_map) = syntax::parse_to_op_ctx_and_map(&src);
+    let (op_ctx, fn_map) = syntax::parse_to_op_ctx_and_map::<TestSemantics>(&src);
     let max_heap_remove_id = fn_map.get("max_heap_remove").copied().unwrap();
 
     // eprintln!(

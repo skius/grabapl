@@ -13,7 +13,7 @@ use std::fmt;
 use std::fmt::Debug;
 use ariadne::{sources, Color, Label, Report, ReportKind};
 use grabapl::prelude::{OperationContext, OperationId};
-use crate::interpreter::interpret;
+use crate::interpreter::{interpret, SemanticsWithCustomSyntax};
 use crate::semantics::TestSemantics;
 
 pub trait CustomSyntax: Clone + Debug + 'static {
@@ -897,13 +897,13 @@ where
 
 // TODO: rework this function. terrible.
 // TODO: should take a S: SemanticsWithCustomSyntax as parameter.
-pub fn parse_to_op_ctx_and_map<'src>(src: &'src str) -> (OperationContext<TestSemantics>, HashMap<&'src str, OperationId>) {
+pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(src: &'src str) -> (OperationContext<S>, HashMap<&'src str, OperationId>) {
     let (tokens, mut errs) = lexer().parse(src).into_output_errors();
 
     // println!("Tokens: {tokens:?}");
 
     let parse_errs = if let Some(tokens) = &tokens {
-        let (ast, parse_errs) = program_parser::<_, MyCustomSyntax>()
+        let (ast, parse_errs) = program_parser::<_, S::CS>()
             .map_with(|ast, e| (ast, e.span()))
             .parse(
                 tokens
@@ -913,24 +913,9 @@ pub fn parse_to_op_ctx_and_map<'src>(src: &'src str) -> (OperationContext<TestSe
             .into_output_errors();
 
         if let Some((program, file_span)) = ast.filter(|_| errs.len() + parse_errs.len() == 0) {
-            // println!("Parsed: {program:#?}");
-            // println!("interpreting...");
-
-            let (op_ctx, fns_to_ids) = interpret::<TestSemantics>(program);
+            let (op_ctx, fns_to_ids) = interpret::<S>(program);
 
             return (op_ctx, fns_to_ids);
-
-            // let json = serde_json::to_string_pretty(&op_ctx)
-            //     .expect("Failed to serialize operation context to JSON");
-            // println!("Operation Context: {json}");
-            // println!("Function IDs: {fns_to_ids:#?}");
-
-
-
-
-
-
-
         }
 
         parse_errs
@@ -973,5 +958,5 @@ pub fn parse_to_op_ctx_and_map<'src>(src: &'src str) -> (OperationContext<TestSe
 /// but will compile-error if the syntax is invalid.
 #[macro_export]
 macro_rules! grabapl_parse {
-    ($($t:tt)*) => {syntax::parse_to_op_ctx_and_map(stringify!($($t)*))};
+    ($semantics:ty, $($t:tt)*) => {syntax::parse_to_op_ctx_and_map::<$semantics>(stringify!($($t)*))};
 }
