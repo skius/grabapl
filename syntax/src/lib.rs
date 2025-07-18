@@ -1,6 +1,6 @@
+pub mod interpreter;
 pub mod minirust;
 pub mod semantics;
-pub mod interpreter;
 
 use chumsky::error::LabelError;
 use chumsky::extra::ParserExtra;
@@ -304,7 +304,12 @@ pub fn lexer<'src>()
 
     // A single token can be one of the above
     // (macro_args needs to be before ctrl, since ctrl has the same prefix)
-    let token = let_bang.or(num).or(macro_args).or(arrow).or(ctrl).or(ident)
+    let token = let_bang
+        .or(num)
+        .or(macro_args)
+        .or(arrow)
+        .or(ctrl)
+        .or(ident)
         .boxed(); //.or(node_type_src);
 
     let comment = just("//")
@@ -469,9 +474,9 @@ where
         })
         .boxed();
 
-    let spanned_node_id =
-        spanned_output_node_id.or(ident_str.map(|(name, span)| (NodeId::Single(name), span)))
-            .boxed();
+    let spanned_node_id = spanned_output_node_id
+        .or(ident_str.map(|(name, span)| (NodeId::Single(name), span)))
+        .boxed();
 
     let spanned_fn_implicit_edge_param = ident_str
         .then_ignore(just(Token::Arrow))
@@ -737,7 +742,7 @@ where
         .then_ignore(just(Token::Ctrl(')'))))
     .or_not()
     .map(|opt| opt.unwrap_or_default())
-        .boxed();
+    .boxed();
 
     let fn_explicit_params = spanned_fn_explicit_param
         .separated_by(just(Token::Ctrl(',')))
@@ -749,7 +754,7 @@ where
         .then_ignore(just(Token::Ctrl(']'))))
     .or_not()
     .map(|opt| opt.unwrap_or_default())
-        .boxed();
+    .boxed();
 
     let fn_def = just(Token::Fn)
         .ignore_then(ident_str)

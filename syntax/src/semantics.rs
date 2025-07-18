@@ -1,3 +1,5 @@
+use crate::interpreter::SemanticsWithCustomSyntax;
+use crate::{CustomSyntax, MacroArgs, MyCustomSyntax, MyCustomType};
 use derive_more::From;
 use grabapl::operation::BuiltinOperation;
 use grabapl::operation::query::{BuiltinQuery, ConcreteQueryOutput};
@@ -12,49 +14,51 @@ use grabapl::{Semantics, SubstMarker};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::Deref;
-use crate::interpreter::{SemanticsWithCustomSyntax};
-use crate::{CustomSyntax, MacroArgs, MyCustomSyntax, MyCustomType};
 
 pub struct TestSemantics;
 
 impl SemanticsWithCustomSyntax for TestSemantics {
     type CS = MyCustomSyntax;
 
-    fn find_builtin_op(name: &str, args: Option<MacroArgs<Self::CS>>) -> Option<Self::BuiltinOperation> {
+    fn find_builtin_op(
+        name: &str,
+        args: Option<MacroArgs<Self::CS>>,
+    ) -> Option<Self::BuiltinOperation> {
         todo!()
     }
 
-    fn find_builtin_query(name: &str, args: Option<MacroArgs<Self::CS>>) -> Option<Self::BuiltinQuery> {
+    fn find_builtin_query(
+        name: &str,
+        args: Option<MacroArgs<Self::CS>>,
+    ) -> Option<Self::BuiltinQuery> {
         todo!()
     }
 
-    fn convert_node_type(x: <<Self as SemanticsWithCustomSyntax>::CS as CustomSyntax>::AbstractNodeType) -> Self::NodeAbstract {
+    fn convert_node_type(
+        x: <<Self as SemanticsWithCustomSyntax>::CS as CustomSyntax>::AbstractNodeType,
+    ) -> Self::NodeAbstract {
         match x {
-            MyCustomType::Primitive(name) => {
-                match name.to_lowercase().as_str() {
-                    "string" => NodeType::String,
-                    "integer" => NodeType::Integer,
-                    "object" => NodeType::Object,
-                    "separate" => NodeType::Separate,
-                    _ => {
-                        panic!("unsupported node type: {name}");
-                    }
+            MyCustomType::Primitive(name) => match name.to_lowercase().as_str() {
+                "string" => NodeType::String,
+                "integer" => NodeType::Integer,
+                "object" => NodeType::Object,
+                "separate" => NodeType::Separate,
+                _ => {
+                    panic!("unsupported node type: {name}");
                 }
-            }
+            },
             MyCustomType::Custom(_) => {
                 panic!("unsupported")
             }
         }
     }
 
-    fn convert_edge_type(x: <<Self as SemanticsWithCustomSyntax>::CS as CustomSyntax>::AbstractEdgeType) -> Self::EdgeAbstract {
+    fn convert_edge_type(
+        x: <<Self as SemanticsWithCustomSyntax>::CS as CustomSyntax>::AbstractEdgeType,
+    ) -> Self::EdgeAbstract {
         match x {
-            super::EdgeType::Exact(s) => {
-                EdgeType::Exact(s)
-            }
-            super::EdgeType::Wildcard => {
-                EdgeType::Wildcard
-            }
+            super::EdgeType::Exact(s) => EdgeType::Exact(s),
+            super::EdgeType::Wildcard => EdgeType::Wildcard,
         }
     }
 }
@@ -139,8 +143,7 @@ impl ConcreteToAbstract for EdgeConcreteToAbstract {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum NodeType {
     String,
     Integer,
@@ -151,8 +154,7 @@ pub enum NodeType {
     Separate,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NodeValue {
     String(String),
     Integer(i32),
@@ -178,15 +180,13 @@ impl NodeValue {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EdgeType {
     Wildcard,
     Exact(String),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TestOperation {
     NoOp,
     SetTo {
@@ -359,7 +359,7 @@ impl BuiltinOperation for TestOperation {
                     SubstMarker::from("dst"),
                     target_typ.clone(),
                 )
-                    .unwrap();
+                .unwrap();
             }
             TestOperation::AddEdge {
                 node_typ,
@@ -447,7 +447,7 @@ impl BuiltinOperation for TestOperation {
                     SubstMarker::from("dst"),
                     value.clone(),
                 )
-                    .unwrap();
+                .unwrap();
             }
             TestOperation::AddEdge {
                 node_typ,
@@ -545,8 +545,7 @@ impl Deref for MyOrdering {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TestQuery {
     ValuesEqual,
     ValueEqualTo(NodeValue),
