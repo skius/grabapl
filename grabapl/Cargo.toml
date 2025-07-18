@@ -23,6 +23,8 @@ proptest = "1.6.0"
 rand = "0.9.1"
 test-log = "0.2"
 serde_json = "1.0"
+syntax = { path = "../syntax" }
+chumsky = "0.10.1"
 
 [features]
 default = ["log", "serde"]

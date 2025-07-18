@@ -522,6 +522,7 @@ dependencies = [
 name = "grabapl"
 version = "0.1.0"
 dependencies = [
+ "chumsky 0.10.1",
  "criterion",
  "derive_more 2.0.1",
  "error-stack",
@@ -533,6 +534,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_json_any_key",
+ "syntax",
  "test-log",
  "thiserror",
 ]

@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use derive_more::From;
 use grabapl::operation::BuiltinOperation;
 use grabapl::operation::query::{BuiltinQuery, ConcreteQueryOutput};
@@ -12,8 +13,145 @@ use grabapl::{Semantics, SubstMarker};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::Deref;
+use chumsky::prelude::*;
+use syntax::{CustomSyntax, MacroArgs, MyCustomSyntax, MyCustomType, Span, Token};
+use syntax::interpreter::SemanticsWithCustomSyntax;
 
 pub struct TestSemantics;
+
+
+fn add_node_args_parser<'src>()
+    -> impl Parser<'src, &'src str, (NodeType, NodeValue), extra::Err<Rich<'src, char, Span>>> {
+    any().repeated().to_slice().try_map_with(|src, e| {
+        let toks = syntax::lexer().parse(src).into_result()
+            .map_err(|errs| {
+                Rich::custom(
+                    e.span(),
+                    format!("Failed to parse arguments: {}, errs: {:?}", src, errs),
+                )
+            })?;
+
+        let node_typ_parser = MyCustomSyntax::get_node_type_parser()
+            .map(|custom_typ| {
+                TestSemantics::convert_node_type(custom_typ)
+            });
+        // let node_value_parser = select! {
+        //     Token::Num(num) => NodeValue::Integer(num),
+        // };
+
+        let num_parser = select! {
+            Token::Num(num) => num,
+        };
+
+        let node_value_parser = just(Token::Ctrl('-')).or_not()
+            .then(num_parser)
+            .map(|(sign, num)| {
+                if sign.is_some() {
+                    NodeValue::Integer(-num)
+                } else {
+                    NodeValue::Integer(num)
+                }
+            });
+
+        let tuple_parser = node_typ_parser
+            .then_ignore(just(Token::Ctrl(',')))
+            .then(node_value_parser)
+            .map(|(node_type, value)| (node_type, value));
+
+        let toks_input = toks
+            .as_slice()
+            .map((src.len()..src.len()).into(), |(t, s)| (t, s));
+
+        tuple_parser.parse(toks_input).into_result().map_err(|errs| {
+            Rich::custom(
+                e.span(),
+                format!("Failed to parse arguments: {}, errs: {:?}", src, errs),
+            )
+        })
+    })
+}
+
+impl SemanticsWithCustomSyntax for TestSemantics {
+    type CS = MyCustomSyntax;
+
+    fn find_builtin_op(
+        name: &str,
+        args: Option<MacroArgs>,
+    ) -> Option<Self::BuiltinOperation> {
+        match name.to_lowercase().as_str() {
+            "add_node" => {
+                let args = args?;
+                let args_src = args.0;
+                // must parse node_type, value parser
+                let (node_type, node_value) = add_node_args_parser()
+                    .parse(args_src)
+                    .into_result()
+                    .ok()?;
+
+                Some(TestOperation::AddNode {
+                    node_type,
+                    value: node_value,
+                })
+            }
+            "remove_node" => {
+                Some(TestOperation::DeleteNode)
+            }
+            "copy_value_from_to" => {
+                Some(TestOperation::CopyValueFromTo)
+            }
+            _ => None,
+        }
+    }
+
+    fn find_builtin_query(
+        name: &str,
+        args: Option<MacroArgs>,
+    ) -> Option<Self::BuiltinQuery> {
+        match name.to_lowercase().as_str() {
+            "cmp_fst_snd" => {
+                let args = args?;
+                let args_src = args.0;
+                // must parse ordering
+                let cmp = match args_src {
+                    ">" => Ordering::Greater.into(),
+                    "<" => Ordering::Less.into(),
+                    "=" => Ordering::Equal.into(),
+                    _ => return None,
+                };
+                Some(TestQuery::CmpFstSnd(cmp))
+            },
+            _ => None,
+        }
+    }
+
+    fn convert_node_type(
+        x: <<Self as SemanticsWithCustomSyntax>::CS as CustomSyntax>::AbstractNodeType,
+    ) -> Self::NodeAbstract {
+        match x {
+            MyCustomType::Primitive(name) => match name.to_lowercase().as_str() {
+                "string" => NodeType::String,
+                "integer" | "int" => NodeType::Integer,
+                "object" => NodeType::Object,
+                "separate" => NodeType::Separate,
+                _ => {
+                    panic!("unsupported node type: {name}");
+                }
+            },
+            MyCustomType::Custom(_) => {
+                panic!("unsupported")
+            }
+        }
+    }
+
+    fn convert_edge_type(
+        x: <<Self as SemanticsWithCustomSyntax>::CS as CustomSyntax>::AbstractEdgeType,
+    ) -> Self::EdgeAbstract {
+        match x {
+            syntax::EdgeType::Exact(s) => EdgeType::Exact(s),
+            syntax::EdgeType::Wildcard => EdgeType::Wildcard,
+        }
+    }
+}
 
 pub struct NodeMatcher;
 impl AbstractMatcher for NodeMatcher {

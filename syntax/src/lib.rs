@@ -345,7 +345,7 @@ pub fn lexer<'src>()
 //  this distinction needs to happen afterwards.
 //  I suppose we could delay lib parsing and just store the tokens that are parsed into CS::MacroArgType for later consumption?
 #[derive(Clone, Debug, PartialEq)]
-pub struct MacroArgs<'src> (&'src str);
+pub struct MacroArgs<'src>(pub &'src str);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FnCallExpr<'src> {
