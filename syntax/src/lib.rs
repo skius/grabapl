@@ -968,3 +968,10 @@ pub fn parse_to_op_ctx_and_map<'src>(src: &'src str) -> (OperationContext<TestSe
 
     panic!("Failed to parse the input source code (see stderr for details)");
 }
+
+/// Compared to the syntax_macro, this will only parse at runtime. The syntax_macro will parse at runtime as well,
+/// but will compile-error if the syntax is invalid.
+#[macro_export]
+macro_rules! grabapl_parse {
+    ($($t:tt)*) => {syntax::parse_to_op_ctx_and_map(stringify!($($t)*))};
+}
