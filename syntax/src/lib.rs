@@ -896,6 +896,7 @@ where
 
 
 // TODO: rework this function. terrible.
+// TODO: should take a S: SemanticsWithCustomSyntax as parameter.
 pub fn parse_to_op_ctx_and_map<'src>(src: &'src str) -> (OperationContext<TestSemantics>, HashMap<&'src str, OperationId>) {
     let (tokens, mut errs) = lexer().parse(src).into_output_errors();
 
