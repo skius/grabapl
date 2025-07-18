@@ -1,4 +1,6 @@
 pub mod minirust;
+pub mod semantics;
+pub mod interpreter;
 
 use chumsky::error::LabelError;
 use chumsky::extra::ParserExtra;
@@ -302,7 +304,8 @@ pub fn lexer<'src>()
 
     // A single token can be one of the above
     // (macro_args needs to be before ctrl, since ctrl has the same prefix)
-    let token = let_bang.or(num).or(macro_args).or(arrow).or(ctrl).or(ident); //.or(node_type_src);
+    let token = let_bang.or(num).or(macro_args).or(arrow).or(ctrl).or(ident)
+        .boxed(); //.or(node_type_src);
 
     let comment = just("//")
         .then(any().and_is(just('\n').not()).repeated())
@@ -463,10 +466,12 @@ where
         .then(ident_str)
         .map_with(|(spanned_op, spanned_node), e| {
             (NodeId::Output(spanned_op, spanned_node), e.span())
-        });
+        })
+        .boxed();
 
     let spanned_node_id =
-        spanned_output_node_id.or(ident_str.map(|(name, span)| (NodeId::Single(name), span)));
+        spanned_output_node_id.or(ident_str.map(|(name, span)| (NodeId::Single(name), span)))
+            .boxed();
 
     let spanned_fn_implicit_edge_param = ident_str
         .then_ignore(just(Token::Arrow))
@@ -484,7 +489,8 @@ where
                     overall_span.span(),
                 )
             },
-        );
+        )
+        .boxed();
 
     let spanned_fn_explicit_param = ident_str
         .then_ignore(just(Token::Ctrl(':')))
@@ -499,12 +505,14 @@ where
                     overall_span.span(),
                 )
             },
-        );
+        )
+        .boxed();
 
     let spanned_fn_implicit_param = spanned_fn_explicit_param
         .clone()
         .map(|(explicit_param, span)| (FnImplicitParam::Node(explicit_param), span))
-        .or(spanned_fn_implicit_edge_param);
+        .or(spanned_fn_implicit_edge_param)
+        .boxed();
 
     let fn_implicit_params = spanned_fn_implicit_param
         .separated_by(just(Token::Ctrl(',')))
@@ -560,7 +568,8 @@ where
                     },
                     e.span(),
                 )
-            });
+            })
+            .boxed();
 
         let if_cond_shape = just(Token::Shape)
             .ignore_then(just(Token::Ctrl('[')))
@@ -588,13 +597,15 @@ where
 
             let spanned_block_if_or_wrapped_stmts = spanned_block_wrapped_stmts
                 .clone()
-                .or(if_stmt_as_block.map_with(|if_stmt, e| (if_stmt, e.span())));
+                .or(if_stmt_as_block.map_with(|if_stmt, e| (if_stmt, e.span())))
+                .boxed();
 
             let optional_else_part = just(Token::Else)
                 .ignore_then(spanned_block_if_or_wrapped_stmts)
                 .or_not()
                 .map_with(|opt, e| opt.unwrap_or((Block { statements: vec![] }, e.span())))
-                .labelled("else");
+                .labelled("else")
+                .boxed();
 
             let if_stmt = just(Token::If)
                 .ignore_then(if_cond)
@@ -613,7 +624,8 @@ where
                     )
                 })
                 .map(Statement::If)
-                .labelled("if statement");
+                .labelled("if statement")
+                .boxed();
 
             // TODO: continue with entire if else statements.
             if_stmt
@@ -687,7 +699,8 @@ where
             .or(spanned_return_edge_mapping)
             .repeated()
             .at_least(1)
-            .collect::<Vec<_>>();
+            .collect::<Vec<_>>()
+            .boxed();
 
         let spanned_return_stmt = just(Token::Return)
             .ignore_then(just(Token::Ctrl('(')))
@@ -703,13 +716,15 @@ where
             .or(fn_call_stmt)
             .or(spanned_if_stmt)
             .or(spanned_return_stmt)
-            .labelled("statement");
+            .labelled("statement")
+            .boxed();
 
         let block_many_stmts = spanned_stmt
             .repeated()
             .collect()
             .map(|stmts| Block { statements: stmts })
-            .labelled("block");
+            .labelled("block")
+            .boxed();
 
         block_many_stmts
     });
@@ -721,7 +736,8 @@ where
         .ignore_then(fn_return_signature)
         .then_ignore(just(Token::Ctrl(')'))))
     .or_not()
-    .map(|opt| opt.unwrap_or_default());
+    .map(|opt| opt.unwrap_or_default())
+        .boxed();
 
     let fn_explicit_params = spanned_fn_explicit_param
         .separated_by(just(Token::Ctrl(',')))
@@ -732,7 +748,8 @@ where
         .ignore_then(fn_implicit_params)
         .then_ignore(just(Token::Ctrl(']'))))
     .or_not()
-    .map(|opt| opt.unwrap_or_default());
+    .map(|opt| opt.unwrap_or_default())
+        .boxed();
 
     let fn_def = just(Token::Fn)
         .ignore_then(ident_str)
@@ -776,118 +793,4 @@ where
         .labelled("program");
 
     program
-}
-
-pub fn first_parser<'tokens, 'src: 'tokens, I, CS: CustomSyntax>()
--> impl Parser<'tokens, I, Spanned<Expr<'src, CS>>, extra::Err<Rich<'tokens, Token<'src>, Span>>> + Clone
-where
-    I: ValueInput<'tokens, Token = Token<'src>, Span = Span>
-        + SliceInput<
-            'tokens,
-            Token = Token<'src>,
-            Span = Span,
-            Slice = &'tokens [Spanned<Token<'src>>],
-        >,
-{
-    let ident = select! {
-        Token::Ident(ident) => ident,
-    }
-    .labelled("identifier")
-    .map_with(|ident, e| (ident, e.span()));
-
-    // let ident_list = ident
-    //     .separated_by(just(Token::Ctrl(',')))
-    //     .allow_trailing()
-    //     .collect()
-    //     .labelled("identifier list");
-
-    let macro_args = select! {
-        Token::MacroArgs(arg) => arg,
-    }
-    .labelled("client provided argument")
-    .map_with(|arg, e| (arg, e.span()));
-
-    let lib_macro_args = any::<&'src str, extra::Err<Rich<'src, char, Span>>>()
-        .filter(|c| *c != ']' && *c != ',')
-        .repeated()
-        .to_slice()
-        .separated_by(just(','))
-        .collect()
-        .map(|args: Vec<&'src str>| args.into_iter().map(String::from).collect())
-        .map(MacroArgs::Lib)
-        .padded();
-
-    let macro_arg_parser =
-        lib_macro_args.or(CS::get_macro_arg_parser().map(MacroArgs::Custom).padded());
-
-    // ident : NodeType
-    let fn_param_parser = ident
-        .then_ignore(just(Token::Ctrl(':')))
-        .then(CS::get_node_type_parser().map_with(|s, e| (s, e.span())))
-        .try_map_with(
-            |((name, n_span), (node_type, node_type_span)), overall_span| {
-                Ok((
-                    FnNodeParam {
-                        name: (name, n_span),
-                        node_type: (node_type, node_type_span),
-                    },
-                    overall_span.span(),
-                ))
-            },
-        );
-    // .try_map(|((name, n_span), (node_type_src, node_type_span)), overall_span| {
-    //     // parse with CS::get_node_type_parser()
-    //     let node_type = CS::get_node_type_parser()
-    //         .parse(node_type_src)
-    //         .into_result().map_err(|errs| {
-    //         Rich::custom(node_type_span, format!("Failed to parse node type: {}, errs: {:?}", node_type_src, errs))
-    //     })?;
-    //     // unreachable!();
-    //     Ok((FnParam {
-    //         name: (name, n_span),
-    //         node_type: (node_type, node_type_span),
-    //     }, overall_span))
-    // });
-
-    let fn_param_list_parser = fn_param_parser
-        .separated_by(just(Token::Ctrl(',')))
-        .allow_trailing()
-        .collect::<Vec<_>>()
-        .labelled("function parameters");
-
-    // A parser for function calls
-    let fn_call = ident
-        .then(macro_args)
-        // .map_with(|(name, args), e| Expr::FnCall {
-        .try_map(
-            move |((name, n_span), (args_src, args_src_span)), _overall_span| {
-                // parse with lib_macro_args or macro_arg_parser
-
-                // parse args_src with CS::get_arg_parser()
-                let args = macro_arg_parser
-                    .parse(args_src)
-                    .into_result()
-                    .map_err(|errs| {
-                        Rich::custom(
-                            args_src_span,
-                            format!("Failed to parse arguments: {}, errs: {:?}", args_src, errs),
-                        )
-                    })?;
-                Ok((name, n_span, args, args_src_span))
-            },
-        )
-        .then_ignore(just(Token::Ctrl('(')))
-        .then(fn_param_list_parser)
-        .then_ignore(just(Token::Ctrl(')')))
-        .map(|((name, n_span, args, args_src_span), args_list)| {
-            // Create the expression
-            Expr::FnCall {
-                name: (name, n_span),
-                macro_args: (args, args_src_span),
-                args: args_list,
-            }
-        });
-
-    // The main parser that returns the expression
-    fn_call.map_with(|expr, e| (expr, e.span()))
 }

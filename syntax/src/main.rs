@@ -31,8 +31,8 @@ fn main() {
             )
             .into_output_errors();
 
-        if let Some((funcs, file_span)) = ast.filter(|_| errs.len() + parse_errs.len() == 0) {
-            println!("Parsed: {funcs:?}");
+        if let Some((program, file_span)) = ast.filter(|_| errs.len() + parse_errs.len() == 0) {
+            println!("Parsed: {program:#?}");
         }
 
         parse_errs
