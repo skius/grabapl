@@ -1,5 +1,5 @@
 use crate::interpreter::SemanticsWithCustomSyntax;
-use crate::{CustomSyntax, MacroArgs, MyCustomSyntax, MyCustomType};
+use crate::{CustomSyntax, MacroArgs, MyCustomSyntax, MyCustomType, Span, Token};
 use derive_more::From;
 use grabapl::operation::BuiltinOperation;
 use grabapl::operation::query::{BuiltinQuery, ConcreteQueryOutput};
@@ -14,22 +14,100 @@ use grabapl::{Semantics, SubstMarker};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::Deref;
+use chumsky::{extra, select, Parser};
+use chumsky::error::Rich;
+use chumsky::prelude::{*};
 
 pub struct TestSemantics;
+
+fn add_node_args_parser<'src>()
+-> impl Parser<'src, &'src str, (NodeType, NodeValue), extra::Err<Rich<'src, char, Span>>> {
+    any().repeated().to_slice().try_map_with(|src, e| {
+        let toks = crate::lexer().parse(src).into_result()
+            .map_err(|errs| {
+                Rich::custom(
+                    e.span(),
+                    format!("Failed to parse arguments: {}, errs: {:?}", src, errs),
+                )
+            })?;
+
+        let node_typ_parser = MyCustomSyntax::get_node_type_parser()
+            .try_map(|custom_typ, span| {
+               match custom_typ {
+                   MyCustomType::Primitive(prim) => {
+                          let node_type = match prim.to_lowercase().as_str() {
+                            "string" => NodeType::String,
+                            "integer" => NodeType::Integer,
+                            "object" => NodeType::Object,
+                            "separate" => NodeType::Separate,
+                            _ => {
+                                 return Err(Rich::custom(
+                                      span,
+                                      format!("Unsupported node type: {}", prim),
+                                 ));
+                            }
+                          };
+                          Ok(node_type)
+                   }
+                   _ => {
+                          Err(Rich::custom(
+                            span,
+                            format!("Unsupported custom node type: {:?}", custom_typ),
+                          ))
+                   }
+               }
+            });
+        let node_value_parser = select! {
+            Token::Num(num) => NodeValue::Integer(num),
+        };
+
+        let tuple_parser = node_typ_parser
+            .then_ignore(just(Token::Ctrl(',')))
+            .then(node_value_parser)
+            .map(|(node_type, value)| (node_type, value));
+
+        let toks_input = toks
+            .as_slice()
+            .map((src.len()..src.len()).into(), |(t, s)| (t, s));
+
+        tuple_parser.parse(toks_input).into_result().map_err(|errs| {
+            Rich::custom(
+                e.span(),
+                format!("Failed to parse arguments: {}, errs: {:?}", src, errs),
+            )
+        })
+    })
+}
 
 impl SemanticsWithCustomSyntax for TestSemantics {
     type CS = MyCustomSyntax;
 
     fn find_builtin_op(
         name: &str,
-        args: Option<MacroArgs<Self::CS>>,
+        args: Option<MacroArgs>,
     ) -> Option<Self::BuiltinOperation> {
-        todo!()
+        match name.to_lowercase().as_str() {
+            "add_node" => {
+                let args = args?;
+                let args_src = args.0;
+                // must parse node_type, value parser
+                let (node_type, node_value) = add_node_args_parser()
+                    .parse(args_src)
+                    .into_result()
+                    .ok()?;
+
+                Some(TestOperation::AddNode {
+                    node_type,
+                    value: node_value,
+                })
+            }
+            _ => None,
+        }
     }
 
     fn find_builtin_query(
         name: &str,
-        args: Option<MacroArgs<Self::CS>>,
+        args: Option<MacroArgs>,
     ) -> Option<Self::BuiltinQuery> {
         todo!()
     }

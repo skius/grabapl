@@ -174,7 +174,7 @@ pub type Spanned<T> = (T, Span);
 pub enum Token<'src> {
     // do we want these?
     Bool(bool),
-    Num(f64),
+    Num(i32),
     // Str(&'src str),
     // Op(&'src str),
     Arrow,
@@ -218,7 +218,6 @@ pub fn lexer<'src>()
 -> impl Parser<'src, &'src str, Vec<Spanned<Token<'src>>>, extra::Err<Rich<'src, char, Span>>> {
     // A parser for numbers
     let num = text::int(10)
-        .then(just('.').then(text::digits(10)).or_not())
         .to_slice()
         .from_str()
         .unwrapped()
@@ -330,33 +329,20 @@ pub fn lexer<'src>()
 //  this distinction needs to happen afterwards.
 //  I suppose we could delay lib parsing and just store the tokens that are parsed into CS::MacroArgType for later consumption?
 #[derive(Clone, Debug, PartialEq)]
-pub enum MacroArgs<CS: CustomSyntax> {
-    Custom(CS::MacroArgType),
-    Lib(Vec<String>),
-}
+pub struct MacroArgs<'src> (&'src str);
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct FnCallExpr<'src, CS: CustomSyntax> {
+pub struct FnCallExpr<'src> {
     pub name: Spanned<&'src str>,
-    pub macro_args: Option<Spanned<MacroArgs<CS>>>,
+    pub macro_args: Option<Spanned<MacroArgs<'src>>>,
     pub args: Vec<Spanned<NodeId<'src>>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Expr<'src, CS: CustomSyntax> {
-    FnCall {
-        name: Spanned<&'src str>,
-        macro_args: Spanned<MacroArgs<CS>>,
-        // just for testing
-        args: Vec<Spanned<FnNodeParam<'src, CS>>>,
-    },
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct LetStmt<'src, CS: CustomSyntax> {
+pub struct LetStmt<'src> {
     pub bang: bool,
     pub ident: Spanned<&'src str>,
-    pub call: Spanned<FnCallExpr<'src, CS>>,
+    pub call: Spanned<FnCallExpr<'src>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -366,7 +352,7 @@ pub struct ShapeQueryParams<'src, CS: CustomSyntax> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum IfCond<'src, CS: CustomSyntax> {
-    Query(Spanned<FnCallExpr<'src, CS>>),
+    Query(Spanned<FnCallExpr<'src>>),
     Shape(Spanned<ShapeQueryParams<'src, CS>>),
 }
 
@@ -406,8 +392,8 @@ pub struct ReturnStmt<'src, CS: CustomSyntax> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Statement<'src, CS: CustomSyntax> {
-    Let(Spanned<LetStmt<'src, CS>>),
-    FnCall(Spanned<FnCallExpr<'src, CS>>),
+    Let(Spanned<LetStmt<'src>>),
+    FnCall(Spanned<FnCallExpr<'src>>),
     If(Spanned<IfStmt<'src, CS>>),
     Return(Spanned<ReturnStmt<'src, CS>>),
 }
@@ -529,30 +515,14 @@ where
             Token::MacroArgs(arg) => arg,
         };
 
-        let lib_macro_args = any::<&'src str, extra::Err<Rich<'src, char, Span>>>()
-            .filter(|c| *c != ']' && *c != ',')
-            .repeated()
-            .to_slice()
-            .separated_by(just(','))
-            .collect()
-            .map(|args: Vec<&'src str>| args.into_iter().map(String::from).collect())
-            .map(MacroArgs::<CS>::Lib)
-            .padded();
-
-        let tok_lib_macro_args = macro_args_str.try_map_with(move |src, e| {
-            // parse with lib_macro_args
-            lib_macro_args.parse(src).into_result().map_err(|errs| {
-                Rich::custom(
-                    e.span(),
-                    format!("Failed to parse macro args: {}, errs: {:?}", src, errs),
-                )
-            })
-        });
+        let spanned_macro_args = macro_args_str
+            .map_with(|src, e| (MacroArgs(src), e.span()))
+            .labelled("macro args")
+            .boxed();
 
         let fn_call_expr = ident_str
             .then(
-                tok_lib_macro_args
-                    .map_with(|args, e| (args, e.span()))
+                spanned_macro_args
                     .or_not(),
             )
             .then_ignore(just(Token::Ctrl('(')))

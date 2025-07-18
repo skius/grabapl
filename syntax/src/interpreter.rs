@@ -6,12 +6,12 @@ pub trait SemanticsWithCustomSyntax: Semantics {
 
     fn find_builtin_op(
         name: &str,
-        args: Option<MacroArgs<Self::CS>>,
+        args: Option<MacroArgs>,
     ) -> Option<Self::BuiltinOperation>;
 
     fn find_builtin_query(
         name: &str,
-        args: Option<MacroArgs<Self::CS>>,
+        args: Option<MacroArgs>,
     ) -> Option<Self::BuiltinQuery>;
 
     fn convert_node_type(
