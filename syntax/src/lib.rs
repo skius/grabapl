@@ -346,29 +346,59 @@ pub struct LetStmt<'src> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct ShapeNodeParam<'src, CS: CustomSyntax> {
+    pub name: Spanned<NodeId<'src>>,
+    pub node_type: Spanned<CS::AbstractNodeType>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ShapeEdgeParam<'src, CS: CustomSyntax> {
+    pub src: Spanned<NodeId<'src>>,
+    pub dst: Spanned<NodeId<'src>>,
+    pub edge_type: Spanned<CS::AbstractEdgeType>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ShapeQueryParam<'src, CS: CustomSyntax> {
+    Node(ShapeNodeParam<'src, CS>),
+    Edge(ShapeEdgeParam<'src, CS>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct ShapeQueryParams<'src, CS: CustomSyntax> {
-    pub params: Vec<Spanned<FnImplicitParam<'src, CS>>>,
+    pub params: Vec<Spanned<ShapeQueryParam<'src, CS>>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum IfCond<'src, CS: CustomSyntax> {
     // TODO: Spanned<> should be moved out and into IfStmt::cond
-    Query(Spanned<FnCallExpr<'src>>),
-    Shape(Spanned<ShapeQueryParams<'src, CS>>),
+    Query(FnCallExpr<'src>),
+    Shape(ShapeQueryParams<'src, CS>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct IfStmt<'src, CS: CustomSyntax> {
-    pub cond: IfCond<'src, CS>,
+    pub cond: Spanned<IfCond<'src, CS>>,
     pub then_block: Spanned<Block<'src, CS>>,
     // if it doesn't exist, take empty span at the end of then_block
     pub else_block: Spanned<Block<'src, CS>>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Copy)]
 pub enum NodeId<'src> {
     Single(&'src str),
     Output(Spanned<&'src str>, Spanned<&'src str>),
+}
+
+impl<'src> NodeId<'src> {
+    pub fn must_single(&self) -> &'src str {
+        match self {
+            NodeId::Single(name) => name,
+            _ => {
+                panic!("NodeId must be a single node, but was: {:?}", self);
+            }
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -513,6 +543,54 @@ where
         .allow_trailing()
         .collect::<Vec<_>>();
 
+    let shape_node_param = spanned_node_id.clone()
+        .then_ignore(just(Token::Ctrl(':')))
+        .then(CS::get_node_type_parser().map_with(|s, e| (s, e.span())))
+        .map(|((name, name_span), (node_type, node_type_span))| {
+            (
+                ShapeNodeParam {
+                    name: (name, name_span),
+                    node_type: (node_type, node_type_span),
+                }
+            )
+        })
+        .boxed();
+
+    let shape_edge_param = spanned_node_id.clone()
+        .then_ignore(just(Token::Arrow))
+        .then(spanned_node_id.clone())
+        .then_ignore(just(Token::Ctrl(':')))
+        .then(CS::get_edge_type_parser().map_with(|s, e| (s, e.span())))
+        .map(
+            |(((src, src_span), (dst, dst_span)), (edge_type, edge_type_span))| {
+                (
+                    ShapeEdgeParam {
+                        src: (src, src_span),
+                        dst: (dst, dst_span),
+                        edge_type: (edge_type, edge_type_span),
+                    }
+                )
+            },
+        )
+        .boxed();
+
+    let spanned_shape_param = shape_node_param.map(|(node_param)| {
+        ShapeQueryParam::Node(node_param)
+    }).or(
+        shape_edge_param.map(|(edge_param)| {
+            ShapeQueryParam::Edge(edge_param)
+        }),
+    )
+        .map_with(|s, e| (s, e.span()))
+        .boxed();
+
+    let shape_params = spanned_shape_param
+        .separated_by(just(Token::Ctrl(',')))
+        .allow_trailing()
+        .collect::<Vec<_>>()
+        .map(|params| (ShapeQueryParams { params } ))
+        .boxed();
+
     let block = recursive(|block| {
         let macro_args_str = select! {
             Token::MacroArgs(arg) => arg,
@@ -549,18 +627,21 @@ where
             })
             .boxed();
 
+
+
         let if_cond_shape = just(Token::Shape)
             .ignore_then(just(Token::Ctrl('[')))
-            .ignore_then(fn_implicit_params.clone())
+            .ignore_then(shape_params.clone())
             .then_ignore(just(Token::Ctrl(']')))
-            .map_with(|args, e| (ShapeQueryParams { params: args }, e.span()))
             .map(IfCond::Shape);
 
         let if_cond_query = fn_call_expr
             .clone()
-            .map(|spanned_call| IfCond::Query(spanned_call));
+            .map(|spanned_call| IfCond::Query(spanned_call.0));
 
-        let if_cond = if_cond_shape.or(if_cond_query);
+        let spanned_if_cond = if_cond_shape.or(if_cond_query).map_with(|c, e| (c, e.span()))
+            .labelled("if condition")
+            .boxed();
 
         let if_stmt = recursive(|if_stmt| {
             let spanned_block_wrapped_stmts = block
@@ -586,7 +667,7 @@ where
                 .boxed();
 
             let if_stmt = just(Token::If)
-                .ignore_then(if_cond)
+                .ignore_then(spanned_if_cond)
                 .then_ignore(just(Token::Ctrl('{')))
                 .then(block.clone().map_with(|block, e| (block, e.span())))
                 .then_ignore(just(Token::Ctrl('}')))

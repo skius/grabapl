@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::{Block, CustomSyntax, FnCallExpr, FnDef, FnImplicitParam, FnNodeParam, IfCond, IfStmt, LetStmt, MacroArgs, NodeId, Program, ReturnStmt, ReturnStmtMapping, ShapeQueryParams, Spanned, Statement};
+use crate::{Block, CustomSyntax, FnCallExpr, FnDef, FnImplicitParam, FnNodeParam, IfCond, IfStmt, LetStmt, MacroArgs, NodeId, Program, ReturnStmt, ReturnStmtMapping, ShapeQueryParam, ShapeQueryParams, Spanned, Statement};
 use grabapl::prelude::*;
 use crate::minirust::Expr;
 
@@ -179,10 +179,10 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         self.builder.end_query().unwrap();
     }
 
-    fn interpret_if_cond_and_start(&mut self, cond: IfCond<'src, S::CS>) {
+    fn interpret_if_cond_and_start(&mut self, (cond, _): Spanned<IfCond<'src, S::CS>>) {
         // starts either a builtin query or a shape query
         match cond {
-            IfCond::Query((fn_call, _)) => {
+            IfCond::Query(fn_call) => {
                 let query = self.query_name_to_builtin_query(fn_call.name.0, fn_call.macro_args);
                 let args = fn_call.args.into_iter().map(|(arg, _)| {
                     self.node_id_to_aid(arg).unwrap()
@@ -196,7 +196,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
 
     }
 
-    fn interpret_and_start_shape_query(&mut self, (shape_query_params, _): Spanned<ShapeQueryParams<'src, S::CS>>) {
+    fn interpret_and_start_shape_query(&mut self, shape_query_params: ShapeQueryParams<'src, S::CS>) {
         // need to invent a marker.
         let marker = self.get_new_shape_query_marker();
         let marker = marker.as_str();
@@ -204,23 +204,36 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         // then interpret the shape query parameters
         for (param, _) in shape_query_params.params {
             match param {
-                FnImplicitParam::Node(node_param) => {
-                    let name = node_param.name.0;
+                ShapeQueryParam::Node(node_param) => {
+                    let node_id = node_param.name.0;
                     let param_type = S::convert_node_type(node_param.node_type.0);
-                    let aid = AbstractNodeId::dynamic_output(marker, name);
-                    self.builder.expect_shape_node(name.into(), param_type).unwrap();
-                    self.single_node_aids.insert(name, aid);
+
+                    // we differentiate between an existing node, in which case we issue an expected value change,
+                    // or a new one, in which case it must be a single.
+
+                    // TODO: since we are scoping the identifiers here,
+                    //  we need to enter a new scope and reset a scope when entering if/else branches. (i guess in interpret_block?)
+                    //  since we should *not* expect a value change for a node defined in a distinct scope.
+
+                    if let Some(aid) = self.node_id_to_aid(node_id) {
+                        // issue an expected value change
+                        self.builder.expect_shape_node_change(aid, param_type).unwrap();
+                    } else {
+                        // must be a new node
+                        let name = node_id.must_single();
+                        let aid = AbstractNodeId::dynamic_output(marker, name);
+                        self.builder.expect_shape_node(name.into(), param_type).unwrap();
+                        self.single_node_aids.insert(name, aid);
+                    }
                 }
-                FnImplicitParam::Edge(edge_param) => {
+                ShapeQueryParam::Edge(edge_param) => {
                     let src = edge_param.src.0;
                     let dst = edge_param.dst.0;
 
-                    let src_aid = self.single_node_aids.get(src)
-                        .copied()
-                        .unwrap_or_else(|| AbstractNodeId::dynamic_output(marker, src));
-                    let dst_aid = self.single_node_aids.get(dst)
-                        .copied()
-                        .unwrap_or_else(|| AbstractNodeId::dynamic_output(marker, dst));
+                    let src_aid = self.node_id_to_aid(src)
+                        .unwrap_or_else(|| AbstractNodeId::dynamic_output(marker, src.must_single()));
+                    let dst_aid = self.node_id_to_aid(dst)
+                        .unwrap_or_else(|| AbstractNodeId::dynamic_output(marker, dst.must_single()));
 
                     let typ = S::convert_edge_type(edge_param.edge_type.0);
                     self.builder.expect_shape_edge(src_aid, dst_aid, typ).unwrap();

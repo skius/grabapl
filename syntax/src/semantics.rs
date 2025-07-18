@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use crate::interpreter::SemanticsWithCustomSyntax;
 use crate::{CustomSyntax, MacroArgs, MyCustomSyntax, MyCustomType, Span, Token};
 use derive_more::From;
@@ -87,7 +88,21 @@ impl SemanticsWithCustomSyntax for TestSemantics {
         name: &str,
         args: Option<MacroArgs>,
     ) -> Option<Self::BuiltinQuery> {
-        todo!()
+        match name.to_lowercase().as_str() {
+            "cmp_fst_snd" => {
+                let args = args?;
+                let args_src = args.0;
+                // must parse ordering
+                let cmp = match args_src {
+                    ">" => Ordering::Greater.into(),
+                    "<" => Ordering::Less.into(),
+                    "=" => Ordering::Equal.into(),
+                    _ => return None,
+                };
+                Some(TestQuery::CmpFstSnd(cmp))
+            },
+            _ => None,
+        }
     }
 
     fn convert_node_type(
