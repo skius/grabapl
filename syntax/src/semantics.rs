@@ -36,9 +36,23 @@ fn add_node_args_parser<'src>()
             .map(|custom_typ| {
                TestSemantics::convert_node_type(custom_typ)
             });
-        let node_value_parser = select! {
-            Token::Num(num) => NodeValue::Integer(num),
+        // let node_value_parser = select! {
+        //     Token::Num(num) => NodeValue::Integer(num),
+        // };
+
+        let num_parser = select! {
+            Token::Num(num) => num,
         };
+
+        let node_value_parser = just(Token::Ctrl('-')).or_not()
+            .then(num_parser)
+            .map(|(sign, num)| {
+                if sign.is_some() {
+                    NodeValue::Integer(-num)
+                } else {
+                    NodeValue::Integer(num)
+                }
+            });
 
         let tuple_parser = node_typ_parser
             .then_ignore(just(Token::Ctrl(',')))
@@ -79,6 +93,12 @@ impl SemanticsWithCustomSyntax for TestSemantics {
                     node_type,
                     value: node_value,
                 })
+            }
+            "remove_node" => {
+                Some(TestOperation::DeleteNode)
+            }
+            "copy_value_from_to" => {
+                Some(TestOperation::CopyValueFromTo)
             }
             _ => None,
         }

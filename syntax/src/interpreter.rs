@@ -60,7 +60,7 @@ impl<'src, S: SemanticsWithCustomSyntax> Interpreter<'src, S> {
 
         let mut builder = OperationBuilder::new(&self.built_op_ctx, self_op_id);
 
-        let mut interpreter = FnInterpreter::new(&mut builder, &self.fns_to_op_ids);
+        let mut interpreter = FnInterpreter::new(&mut builder, &self.fns_to_op_ids, fn_def.0.name.0);
         interpreter.interpret_fn_def(fn_def);
 
         builder.build().unwrap()
@@ -69,6 +69,7 @@ impl<'src, S: SemanticsWithCustomSyntax> Interpreter<'src, S> {
 
 struct FnInterpreter<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> {
     builder: &'a mut OperationBuilder<'op_ctx, S>,
+    self_name: &'src str,
     fn_names_to_op_ids: &'a HashMap<&'src str, u32>,
     single_node_aids: HashMap<&'src str, AbstractNodeId>,
     return_marker_to_av: HashMap<&'src str, S::NodeAbstract>,
@@ -78,9 +79,11 @@ struct FnInterpreter<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> {
 impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'op_ctx, S> {
     fn new(builder: &'a mut OperationBuilder<'op_ctx, S>,
         fn_names_to_op_ids: &'a HashMap<&'src str, u32>,
+           self_name: &'src str,
     ) -> Self {
         Self {
             builder,
+            self_name,
             fn_names_to_op_ids,
             single_node_aids: HashMap::new(),
             return_marker_to_av: HashMap::new(),
@@ -281,6 +284,8 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
     }
 
     fn op_name_to_op_like(&self, op_name: &str, args: Option<Spanned<MacroArgs>>) -> BuilderOpLike<S> {
+        // TODO: do we want to enforce consumption of a Some(macro_args)?
+
 
         let args = args.map(|(args, _)| args);
 
@@ -292,9 +297,14 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             return BuilderOpLike::Builtin(op);
         }
 
+        if op_name == self.self_name {
+            // if the operation name is the same as the function name, we must be recursing
+            return BuilderOpLike::Recurse;
+        }
+
         // otherwise must be a user defined operation
         let op_id = self.fn_names_to_op_ids.get(op_name)
-            .expect("Operation name not found in function definitions");
+            .expect(&format!("Operation name {op_name} not found in function definitions"));
 
         BuilderOpLike::FromOperationId(*op_id)
     }

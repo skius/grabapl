@@ -226,7 +226,7 @@ pub fn lexer<'src>()
         .map(Token::Num);
 
     // A parser for control characters (delimiters, semicolons, etc.)
-    let ctrl = one_of("()[]{};,?:*=/<>\"'.").map(Token::Ctrl);
+    let ctrl = one_of("-()[]{};,?:*=/<>\"'.").map(Token::Ctrl);
 
     let arrow = just("->").to(Token::Arrow);
     let rev_arrow = just("<-").to(Token::RevArrow);
