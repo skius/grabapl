@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::{Block, CustomSyntax, FnCallExpr, FnDef, FnImplicitParam, FnNodeParam, LetStmt, MacroArgs, NodeId, Program, ReturnStmt, ReturnStmtMapping, Spanned, Statement};
+use crate::{Block, CustomSyntax, FnCallExpr, FnDef, FnImplicitParam, FnNodeParam, IfCond, IfStmt, LetStmt, MacroArgs, NodeId, Program, ReturnStmt, ReturnStmtMapping, ShapeQueryParams, Spanned, Statement};
 use grabapl::prelude::*;
 use crate::minirust::Expr;
 
@@ -72,6 +72,7 @@ struct FnInterpreter<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> {
     fn_names_to_op_ids: &'a HashMap<&'src str, u32>,
     single_node_aids: HashMap<&'src str, AbstractNodeId>,
     return_marker_to_av: HashMap<&'src str, S::NodeAbstract>,
+    shape_query_counter: u64,
 }
 
 impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'op_ctx, S> {
@@ -83,6 +84,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             fn_names_to_op_ids,
             single_node_aids: HashMap::new(),
             return_marker_to_av: HashMap::new(),
+            shape_query_counter: 0,
         }
     }
 
@@ -155,11 +157,82 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                 let (op_like, args) = self.call_expr_to_op_like(fn_call);
                 self.interpret_op_like(None, op_like, args);
             }
-            Statement::If(if_stmt) => {}
+            Statement::If(if_stmt) => {
+                self.interpret_if_stmt(if_stmt);
+            }
             Statement::Return(return_stmt) => {
                 self.interpret_return(return_stmt);
             }
         }
+    }
+
+    fn interpret_if_stmt(&mut self, (if_stmt, _): Spanned<IfStmt<'src, S::CS>>) {
+        // start the branchable query (shape or builtin)
+        self.interpret_if_cond_and_start(if_stmt.cond);
+
+        self.builder.enter_true_branch().unwrap();
+        // interpret the true branch
+        self.interpret_block(if_stmt.then_block);
+        self.builder.enter_false_branch().unwrap();
+        // interpret the false branch
+        self.interpret_block(if_stmt.else_block);
+        self.builder.end_query().unwrap();
+    }
+
+    fn interpret_if_cond_and_start(&mut self, cond: IfCond<'src, S::CS>) {
+        // starts either a builtin query or a shape query
+        match cond {
+            IfCond::Query((fn_call, _)) => {
+                let query = self.query_name_to_builtin_query(fn_call.name.0, fn_call.macro_args);
+                let args = fn_call.args.into_iter().map(|(arg, _)| {
+                    self.node_id_to_aid(arg).unwrap()
+                }).collect::<Vec<_>>();
+                self.builder.start_query(query, args).unwrap();
+            }
+            IfCond::Shape(shape_query_params) => {
+                self.interpret_and_start_shape_query(shape_query_params);
+            }
+        }
+
+    }
+
+    fn interpret_and_start_shape_query(&mut self, (shape_query_params, _): Spanned<ShapeQueryParams<'src, S::CS>>) {
+        // need to invent a marker.
+        let marker = self.get_new_shape_query_marker();
+        let marker = marker.as_str();
+        self.builder.start_shape_query(marker).unwrap();
+        // then interpret the shape query parameters
+        for (param, _) in shape_query_params.params {
+            match param {
+                FnImplicitParam::Node(node_param) => {
+                    let name = node_param.name.0;
+                    let param_type = S::convert_node_type(node_param.node_type.0);
+                    let aid = AbstractNodeId::dynamic_output(marker, name);
+                    self.builder.expect_shape_node(name.into(), param_type).unwrap();
+                    self.single_node_aids.insert(name, aid);
+                }
+                FnImplicitParam::Edge(edge_param) => {
+                    let src = edge_param.src.0;
+                    let dst = edge_param.dst.0;
+
+                    let src_aid = self.single_node_aids.get(src)
+                        .copied()
+                        .unwrap_or_else(|| AbstractNodeId::dynamic_output(marker, src));
+                    let dst_aid = self.single_node_aids.get(dst)
+                        .copied()
+                        .unwrap_or_else(|| AbstractNodeId::dynamic_output(marker, dst));
+
+                    let typ = S::convert_edge_type(edge_param.edge_type.0);
+                    self.builder.expect_shape_edge(src_aid, dst_aid, typ).unwrap();
+                }
+            }
+        }
+    }
+
+    fn get_new_shape_query_marker(&mut self) -> String {
+        let marker = format!("shape_query_{}", self.shape_query_counter);
+        self.shape_query_counter += 1;
+        marker
     }
 
     fn interpret_let_stmt(&mut self, (let_stmt, _): Spanned<LetStmt<'src>>) {
@@ -171,6 +244,11 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
 
             self.interpret_op_like(Some(op_name), op_like, args);
         }
+    }
+
+    fn query_name_to_builtin_query(&self, query_name: &str, args: Option<Spanned<MacroArgs>>) -> S::BuiltinQuery {
+        let args = args.map(|(args, _)| args);
+        S::find_builtin_query(query_name, args).expect("Query name not found in builtins")
     }
 
     fn op_name_to_op_like(&self, op_name: &str, args: Option<Spanned<MacroArgs>>) -> BuilderOpLike<S> {
@@ -203,7 +281,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
     fn call_expr_to_op_like(&mut self, (call_expr, _): Spanned<FnCallExpr<'src>>) -> (BuilderOpLike<S>, Vec<AbstractNodeId>) {
 
         let args = call_expr.args.into_iter().map(|(arg, _)| {
-            self.node_id_to_aid(arg)
+            self.node_id_to_aid(arg).unwrap()
         }).collect();
 
         let op_name = call_expr.name.0;
@@ -218,7 +296,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         for (mapping, _) in return_stmt.mapping {
             match mapping {
                 ReturnStmtMapping::Node { ret_name, node } => {
-                    let aid = self.node_id_to_aid(node.0);
+                    let aid = self.node_id_to_aid(node.0).unwrap();
                     let ret_name = ret_name.0;
                     let ret_ty = self.return_marker_to_av.get(ret_name).expect("Return marker not found");
                     self.builder.return_node(aid, ret_name.into(), ret_ty.clone()).unwrap();
@@ -230,11 +308,11 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         }
     }
 
-    fn node_id_to_aid(&self, node_id: NodeId) -> AbstractNodeId {
+    fn node_id_to_aid(&self, node_id: NodeId) -> Option<AbstractNodeId> {
         match node_id {
-            NodeId::Single(name) => {self.single_node_aids[&name]}
+            NodeId::Single(name) => self.single_node_aids.get(name).copied(),
             NodeId::Output((op_name, _), (node_name, _)) => {
-                AbstractNodeId::dynamic_output(op_name, node_name)
+                Some(AbstractNodeId::dynamic_output(op_name, node_name))
             }
         }
     }

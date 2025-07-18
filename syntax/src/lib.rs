@@ -352,6 +352,7 @@ pub struct ShapeQueryParams<'src, CS: CustomSyntax> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum IfCond<'src, CS: CustomSyntax> {
+    // TODO: Spanned<> should be moved out and into IfStmt::cond
     Query(Spanned<FnCallExpr<'src>>),
     Shape(Spanned<ShapeQueryParams<'src, CS>>),
 }

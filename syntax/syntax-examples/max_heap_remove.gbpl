@@ -16,6 +16,14 @@ fn takes_context_nodes(child: Integer) [
     new_node: Integer,
     // child -> new_node: "grandchild"
 ) {
+    // TODO: src/dst need to be node_id
+    if shape [
+      some_node: Integer,
+      child -> some_node: "child2"
+    ] {
+        // TODO: how to access some_node
+
+    }
     let map = add_node`Integer,1`();
     return (new_node: map.new);
 }
