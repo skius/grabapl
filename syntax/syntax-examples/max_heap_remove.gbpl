@@ -18,6 +18,7 @@ fn takes_context_nodes(child: Integer) [
 ) {
     let map = add_node`object,1`();
     let some_int_node = add_node`int,2`();
+    let! some_other_int_node = add_node`int,3`();
 
     if shape [
       some_node: Integer,
@@ -30,7 +31,7 @@ fn takes_context_nodes(child: Integer) [
     } else if cmp_fst_snd`<`(parent, child) {
         node_to_ret <- some_int_node.new;
     } else {
-        node_to_ret <- some_int_node.new;
+        node_to_ret <- some_other_int_node;
     }
     return (new_node: node_to_ret);
 }

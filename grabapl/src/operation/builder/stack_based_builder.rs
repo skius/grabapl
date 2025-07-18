@@ -175,6 +175,25 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
             BI::AddNamedOperation(output_name, builder_op_like, args) => {
                 this.handle_operation(&mut builder.data, Some(output_name), builder_op_like, args)?;
             }
+            BI::AddBangOperation(node_name, builder_op_like, args) => {
+                let temp_op_marker = this.current_state.get_next_op_result_marker();
+
+                let created_aids = this.handle_operation(
+                    &mut builder.data,
+                    Some(temp_op_marker.clone()),
+                    builder_op_like,
+                    args,
+                )?;
+
+                if created_aids.len() != 1 {
+                    bail!(BuilderError::NeedsSpecificVariant(
+                        "bang operations must create exactly one node"
+                    ));
+                }
+                // now rename as well
+                let old_aid = created_aids[0].clone();
+                let _ = instruction_opt.insert(BuilderInstruction::RenameNode(old_aid, node_name));
+            }
             BI::StartQuery(..) => {
                 let (query_frame, branches_frame) =
                     QueryFrame::new(&this.current_state, instruction)?;
@@ -232,17 +251,18 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
         Ok(())
     }
 
+    /// Returns the new AIDs
     pub fn handle_operation(
         &mut self,
         builder_data: &mut BuilderData<S>,
         output_name: Option<AbstractOperationResultMarker>,
         op_like: BuilderOpLike<S>,
         args: Vec<AbstractNodeId>,
-    ) -> Result<(), BuilderError> {
+    ) -> Result<Vec<AbstractNodeId>, BuilderError> {
         let op = op_like
             .as_abstract_operation(builder_data.op_ctx, &builder_data.expected_self_signature)
             .change_context(BuilderError::OutsideError)?;
-        let abstract_arg = self
+        let (abstract_arg, new_aids) = self
             .current_state
             .interpret_op(builder_data.op_ctx, output_name, op, args)
             .change_context(BuilderError::OutsideError)?;
@@ -254,7 +274,7 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
             Instruction::OpLike(op_like_instr, abstract_arg),
         ));
 
-        Ok(())
+        Ok(new_aids)
     }
 }
 
@@ -1643,8 +1663,20 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         op: BuilderOpLike<S>,
         args: Vec<AbstractNodeId>,
     ) -> Result<(), OperationBuilderError> {
-        // TODO
         self.push_instruction(BuilderInstruction::AddNamedOperation(name, op, args))
+    }
+
+    pub fn add_bang_operation(
+        &mut self,
+        name: impl Into<NamedMarker>,
+        op: BuilderOpLike<S>,
+        args: Vec<AbstractNodeId>,
+    ) -> Result<(), OperationBuilderError> {
+        self.push_instruction(BuilderInstruction::AddBangOperation(
+            name.into(),
+            op,
+            args,
+        ))
     }
 
     // TODO: for ergonomics, could take an impl Into<BuilderOpLike<S>> and blanket impl that for all S::BuiltinOperation etc.
@@ -1653,7 +1685,6 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         op: BuilderOpLike<S>,
         args: Vec<AbstractNodeId>,
     ) -> Result<(), OperationBuilderError> {
-        // todo!()
         self.push_instruction(BuilderInstruction::AddOperation(op, args))
     }
 

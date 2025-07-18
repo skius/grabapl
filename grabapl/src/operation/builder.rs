@@ -166,6 +166,14 @@ pub enum BuilderInstruction<S: Semantics> {
         BuilderOpLike<S>,
         Vec<AbstractNodeId>,
     ),
+    // the same as AddNamedOperation, but without enforces the output to have a single node, and uses that node
+    // to create a AbstractNodeId::named node to bind to it.
+    #[debug("AddBangOperation({_0:?}, ???, args: {_2:?})")]
+    AddBangOperation(
+        NamedMarker,
+        BuilderOpLike<S>,
+        Vec<AbstractNodeId>,
+    ),
     #[debug("AddOperation(???, args: {_1:?})")]
     AddOperation(BuilderOpLike<S>, Vec<AbstractNodeId>),
     #[debug("ReturnNode({_0:?}, {_1:?}, ???)")]
@@ -216,6 +224,9 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Build
             }
             AddNamedOperation(name, op, args) => {
                 AddNamedOperation(name.clone(), op.clone(), args.clone())
+            }
+            AddBangOperation(name, op, args) => {
+                AddBangOperation(name.clone(), op.clone(), args.clone())
             }
             AddOperation(op, args) => AddOperation(op.clone(), args.clone()),
             ReturnNode(aid, output_marker, node) => {
@@ -473,6 +484,18 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>>
         // TODO
         self.instructions
             .push(BuilderInstruction::AddNamedOperation(name, op, args));
+        self.check_instructions_or_rollback()
+    }
+
+    pub fn add_bang_operation(
+        &mut self,
+        name: impl Into<NamedMarker>,
+        op: BuilderOpLike<S>,
+        args: Vec<AbstractNodeId>,
+    ) -> Result<(), OperationBuilderError> {
+        // TODO
+        self.instructions
+            .push(BuilderInstruction::AddBangOperation(name.into(), op, args));
         self.check_instructions_or_rollback()
     }
 
@@ -1400,6 +1423,8 @@ pub struct IntermediateState<S: Semantics> {
     // TODO: make query path
     // TODO: should probably remove query_path from the state struct, and add it to a final returned StateWithQueryPath struct?
     pub query_path: Vec<QueryPath>,
+
+    pub op_marker_counter: u64,
 }
 
 // TODO: unfortunately, we cannot derive Clone, since it implies a `S: Clone` bound.
@@ -1414,6 +1439,7 @@ impl<S: Semantics> Clone for IntermediateState<S> {
             node_may_be_written_to: self.node_may_be_written_to.clone(),
             edge_may_be_written_to: self.edge_may_be_written_to.clone(),
             query_path: self.query_path.clone(),
+            op_marker_counter: self.op_marker_counter,
         }
     }
 }
@@ -1428,6 +1454,7 @@ impl<S: Semantics> IntermediateState<S> {
             node_may_be_written_to: HashMap::new(),
             edge_may_be_written_to: HashMap::new(),
             query_path: Vec::new(),
+            op_marker_counter: 50000,
         }
     }
 
@@ -1449,7 +1476,14 @@ impl<S: Semantics> IntermediateState<S> {
             node_may_be_written_to: HashMap::new(),
             edge_may_be_written_to: HashMap::new(),
             query_path: Vec::new(),
+            op_marker_counter: 50000,
         }
+    }
+
+    fn get_next_op_result_marker(&mut self) -> AbstractOperationResultMarker {
+        let marker = AbstractOperationResultMarker::Implicit(self.op_marker_counter);
+        self.op_marker_counter += 1;
+        marker
     }
 
     fn add_node(
@@ -1583,13 +1617,14 @@ impl<S: Semantics> IntermediateState<S> {
         Ok(())
     }
 
+    /// Returns the abstract changes from applying the op as well as the new AIDs
     fn interpret_op(
         &mut self,
         op_ctx: &OperationContext<S>,
         marker: Option<AbstractOperationResultMarker>,
         op: AbstractOperation<S>,
         args: Vec<AbstractNodeId>,
-    ) -> Result<AbstractOperationArgument, OperationBuilderError> {
+    ) -> Result<(AbstractOperationArgument, Vec<AbstractNodeId>), OperationBuilderError> {
         let param = op.parameter();
         let (subst, abstract_arg) = self.get_substitution(&param, args)?;
 
@@ -1599,9 +1634,9 @@ impl<S: Semantics> IntermediateState<S> {
             op.apply_abstract(op_ctx, &mut gws)
                 .map_err(|e| OperationBuilderError::AbstractApplyOperationError(e))?
         };
-        self.handle_abstract_output_changes(marker, operation_output)?;
+        let new_aids = self.handle_abstract_output_changes(marker, operation_output)?;
 
-        Ok(abstract_arg)
+        Ok((abstract_arg, new_aids))
     }
 
     fn interpret_builtin_query(
@@ -1617,17 +1652,20 @@ impl<S: Semantics> IntermediateState<S> {
         Ok(abstract_arg)
     }
 
+    /// Returns the newly added AIDs
     fn handle_abstract_output_changes(
         &mut self,
         marker: Option<AbstractOperationResultMarker>,
         operation_output: AbstractOperationOutput<S>,
-    ) -> Result<(), OperationBuilderError> {
+    ) -> Result<Vec<AbstractNodeId>, OperationBuilderError> {
         // go over new nodes
+        let mut new_aids = Vec::new();
         for (node_marker, node_key) in operation_output.new_nodes {
             if let Some(op_marker) = marker {
                 let aid = AbstractNodeId::DynamicOutputMarker(op_marker, node_marker);
                 // TODO: override the may_come_from_shape_query set here! remove the node - it's a non-shape-query node.
                 self.node_keys_to_aid.insert(node_key, aid);
+                new_aids.push(aid);
             } else {
                 // we don't keep track of it, so better remove it from the graph
                 self.graph.remove_node(node_key);
@@ -1659,7 +1697,7 @@ impl<S: Semantics> IntermediateState<S> {
                 .insert((source_aid, target_aid), edge_abstract);
         }
 
-        Ok(())
+        Ok(new_aids)
     }
 
     fn get_substitution(
@@ -2227,7 +2265,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             marker,
             AbstractOperation::from_operation(op),
             args,
-        )
+        ).map(|x| x.0)
     }
 
     fn interpret_builtin_query(

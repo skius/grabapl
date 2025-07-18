@@ -262,7 +262,11 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
 
     fn interpret_let_stmt(&mut self, (let_stmt, _): Spanned<LetStmt<'src>>) {
         if let_stmt.bang {
-            todo!("Bang let statements are not yet supported in the OperationBuilder");
+            let result_name = let_stmt.ident.0;
+            let (op_like, args) = self.call_expr_to_op_like(let_stmt.call);
+            self.builder.add_bang_operation(result_name, op_like, args).unwrap();
+            let new_aid = AbstractNodeId::named(result_name);
+            self.single_node_aids.insert(result_name, new_aid);
         } else {
             let op_name = let_stmt.ident.0;
             let (op_like, args) = self.call_expr_to_op_like(let_stmt.call);
