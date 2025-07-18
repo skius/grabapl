@@ -32,30 +32,8 @@ fn add_node_args_parser<'src>()
             })?;
 
         let node_typ_parser = MyCustomSyntax::get_node_type_parser()
-            .try_map(|custom_typ, span| {
-               match custom_typ {
-                   MyCustomType::Primitive(prim) => {
-                          let node_type = match prim.to_lowercase().as_str() {
-                            "string" => NodeType::String,
-                            "integer" => NodeType::Integer,
-                            "object" => NodeType::Object,
-                            "separate" => NodeType::Separate,
-                            _ => {
-                                 return Err(Rich::custom(
-                                      span,
-                                      format!("Unsupported node type: {}", prim),
-                                 ));
-                            }
-                          };
-                          Ok(node_type)
-                   }
-                   _ => {
-                          Err(Rich::custom(
-                            span,
-                            format!("Unsupported custom node type: {:?}", custom_typ),
-                          ))
-                   }
-               }
+            .map(|custom_typ| {
+               TestSemantics::convert_node_type(custom_typ)
             });
         let node_value_parser = select! {
             Token::Num(num) => NodeValue::Integer(num),

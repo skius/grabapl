@@ -70,7 +70,7 @@ fn takes_context_nodes(child: Integer) [
     child -> parent: "child"
 ] -> (
     new_node: Integer,
-    // child -> new_node: "grandchild"
+    child -> new_node: "grandchild"
 ) {
     let map = add_node();
     return (new_node: map.new);

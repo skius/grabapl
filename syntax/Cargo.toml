@@ -9,3 +9,4 @@ ariadne = "0.5.1"
 grabapl = { path = "../grabapl" }
 serde = { version = "1.0", features = ["derive"] }
 derive_more = { version = "0.99", features = ["from"] }
+serde_json = "1.0"

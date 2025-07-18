@@ -432,7 +432,9 @@ pub struct FnDef<'src, CS: CustomSyntax> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Program<'src, CS: CustomSyntax> {
-    pub functions: HashMap<&'src str, Spanned<FnDef<'src, CS>>>,
+    // vec to preserve order. functions must be ordered according to their dependency order. no mutual recursion supported right now.
+    // wrapper functions first, then their dependencies.
+    pub functions: Vec<(&'src str, Spanned<FnDef<'src, CS>>)>,
 }
 
 pub fn program_parser<'tokens, 'src: 'tokens, I, CS: CustomSyntax>()
@@ -754,13 +756,13 @@ where
         .repeated()
         .collect::<Vec<_>>()
         .map_with(|functions_with_span, e| {
-            let mut funcs_map = HashMap::new();
+            let mut funcs_list = Vec::new();
             for (func, func_span) in functions_with_span {
-                funcs_map.insert(func.name.0, (func, func_span));
+                funcs_list.push((func.name.0, (func, func_span)));
             }
             (
                 Program {
-                    functions: funcs_map,
+                    functions: funcs_list,
                 },
                 e.span(),
             )

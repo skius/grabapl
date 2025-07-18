@@ -8,6 +8,8 @@ use chumsky::{input::ValueInput, prelude::*};
 use std::{collections::HashMap, env, fmt, fs};
 
 use syntax::*;
+use syntax::interpreter::interpret;
+use syntax::semantics::TestSemantics;
 
 fn main() {
     // println!("{:?}", ascii_ident_fixed::<&str, extra::Err<Rich<char>>>().map(|x: &str| x).parse("field1").unwrap());
@@ -33,6 +35,21 @@ fn main() {
 
         if let Some((program, file_span)) = ast.filter(|_| errs.len() + parse_errs.len() == 0) {
             println!("Parsed: {program:#?}");
+            println!("interpreting...");
+
+            let (op_ctx, fns_to_ids) = interpret::<TestSemantics>(program);
+
+            let json = serde_json::to_string_pretty(&op_ctx)
+                .expect("Failed to serialize operation context to JSON");
+            println!("Operation Context: {json}");
+            println!("Function IDs: {fns_to_ids:#?}");
+
+
+
+
+
+
+
         }
 
         parse_errs
