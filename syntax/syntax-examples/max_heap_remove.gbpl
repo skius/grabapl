@@ -16,17 +16,21 @@ fn takes_context_nodes(child: Integer) [
     new_node: Integer,
     // child -> new_node: "grandchild"
 ) {
-    let map = add_node`Integer,1`();
+    let map = add_node`object,1`();
+    let some_int_node = add_node`int,2`();
+
     if shape [
       some_node: Integer,
       child -> some_node: "child2",
-      map.new: Object,
+      map.new: Integer,
     ] {
-
+        node_to_ret <- map.new;
     } else if shape []  {
-
+        node_to_ret <- some_int_node.new;
     } else if cmp_fst_snd`<`(parent, child) {
-
+        node_to_ret <- some_int_node.new;
+    } else {
+        node_to_ret <- some_int_node.new;
     }
-    return (new_node: map.new);
+    return (new_node: node_to_ret);
 }

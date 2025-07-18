@@ -178,6 +178,7 @@ pub enum Token<'src> {
     // Str(&'src str),
     // Op(&'src str),
     Arrow,
+    RevArrow,
     Ctrl(char),
     Ident(&'src str),
     Fn,
@@ -199,6 +200,7 @@ impl fmt::Display for Token<'_> {
             // Token::Str(s) => write!(f, "\"{}\"", s),
             // Token::Op(op) => write!(f, "{}", op),
             Token::Arrow => write!(f, "->"),
+            Token::RevArrow => write!(f, "<-"),
             Token::Ctrl(c) => write!(f, "{}", c),
             Token::Ident(i) => write!(f, "{}", i),
             Token::Fn => write!(f, "fn"),
@@ -227,6 +229,7 @@ pub fn lexer<'src>()
     let ctrl = one_of("()[]{};,?:*=/<>\"'.").map(Token::Ctrl);
 
     let arrow = just("->").to(Token::Arrow);
+    let rev_arrow = just("<-").to(Token::RevArrow);
 
     let let_bang = just("let!").to(Token::LetBang);
 
@@ -307,6 +310,7 @@ pub fn lexer<'src>()
         .or(num)
         .or(macro_args)
         .or(arrow)
+        .or(rev_arrow)
         .or(ctrl)
         .or(ident)
         .boxed(); //.or(node_type_src);
@@ -422,11 +426,18 @@ pub struct ReturnStmt<'src, CS: CustomSyntax> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct RenameStmt<'src> {
+    pub new_name: Spanned<&'src str>,
+    pub src: Spanned<NodeId<'src>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Statement<'src, CS: CustomSyntax> {
     Let(Spanned<LetStmt<'src>>),
     FnCall(Spanned<FnCallExpr<'src>>),
     If(Spanned<IfStmt<'src, CS>>),
     Return(Spanned<ReturnStmt<'src, CS>>),
+    Rename(Spanned<RenameStmt<'src>>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -771,10 +782,27 @@ where
             .map_with(|return_stmt, e| (return_stmt, e.span()))
             .labelled("return statement");
 
+        let spanned_rename_stmt = ident_str.then_ignore(just(Token::RevArrow))
+            .then(spanned_node_id.clone())
+            .then_ignore(just(Token::Ctrl(';')))
+            .map_with(|((new_name, new_name_span), (src, src_span)), e| {
+                (
+                    RenameStmt {
+                        new_name: (new_name, new_name_span),
+                        src: (src, src_span),
+                    },
+                    e.span(),
+                )
+            })
+            .map(Statement::Rename)
+            .map_with(|rename_stmt, e| (rename_stmt, e.span()))
+            .labelled("rename statement");
+
         let spanned_stmt = let_stmt
             .or(fn_call_stmt)
             .or(spanned_if_stmt)
             .or(spanned_return_stmt)
+            .or(spanned_rename_stmt)
             .labelled("statement")
             .boxed();
 

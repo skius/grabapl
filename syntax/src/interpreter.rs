@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use crate::{Block, CustomSyntax, FnCallExpr, FnDef, FnImplicitParam, FnNodeParam, IfCond, IfStmt, LetStmt, MacroArgs, NodeId, Program, ReturnStmt, ReturnStmtMapping, ShapeQueryParam, ShapeQueryParams, Spanned, Statement};
+use crate::{Block, CustomSyntax, FnCallExpr, FnDef, FnImplicitParam, FnNodeParam, IfCond, IfStmt, LetStmt, MacroArgs, NodeId, Program, RenameStmt, ReturnStmt, ReturnStmtMapping, ShapeQueryParam, ShapeQueryParams, Spanned, Statement};
 use grabapl::prelude::*;
 use crate::minirust::Expr;
 
@@ -163,7 +163,19 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             Statement::Return(return_stmt) => {
                 self.interpret_return(return_stmt);
             }
+            Statement::Rename(rename_stmt) => {
+                self.interpret_rename(rename_stmt);
+            }
         }
+    }
+
+    fn interpret_rename(&mut self, (rename_stmt, _): Spanned<RenameStmt<'src>>) {
+        let new_name = rename_stmt.new_name.0;
+        let new_aid = AbstractNodeId::named(new_name);
+        let old_aid = self.node_id_to_aid(rename_stmt.src.0)
+            .expect("Old name not found in single node aids");
+        self.builder.rename_node(old_aid, new_name).unwrap();
+        self.single_node_aids.insert(new_name, new_aid);
     }
 
     fn interpret_if_stmt(&mut self, (if_stmt, _): Spanned<IfStmt<'src, S::CS>>) {
@@ -309,7 +321,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         for (mapping, _) in return_stmt.mapping {
             match mapping {
                 ReturnStmtMapping::Node { ret_name, node } => {
-                    let aid = self.node_id_to_aid(node.0).unwrap();
+                    let aid = self.node_id_to_aid(node.0).expect("return node AID not found");
                     let ret_name = ret_name.0;
                     let ret_ty = self.return_marker_to_av.get(ret_name).expect("Return marker not found");
                     self.builder.return_node(aid, ret_name.into(), ret_ty.clone()).unwrap();

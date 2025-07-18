@@ -111,7 +111,7 @@ impl SemanticsWithCustomSyntax for TestSemantics {
         match x {
             MyCustomType::Primitive(name) => match name.to_lowercase().as_str() {
                 "string" => NodeType::String,
-                "integer" => NodeType::Integer,
+                "integer" | "int" => NodeType::Integer,
                 "object" => NodeType::Object,
                 "separate" => NodeType::Separate,
                 _ => {
