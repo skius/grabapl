@@ -1236,6 +1236,7 @@ dependencies = [
  "derive_more 0.99.20",
  "grabapl",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
