@@ -33,7 +33,7 @@ fn get_ops() -> (OperationContext<TestSemantics>, HashMap<&'static str, Operatio
             ] {
                 dfs_helper(child, head);
             }
-            // remove_marker<"visited">();
+            remove_marker<"visited">();
             return (head: head);
         }
 

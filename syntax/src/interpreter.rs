@@ -33,10 +33,27 @@ fn find_lib_builtin_op<S: SemanticsWithCustomSyntax>(name: &str, args: Option<Ma
             let node_type = S::convert_node_type(syntax_typ);
 
             let marker = color_name.into();
-            Some(LibBuiltinOperation::Mark {
+            Some(LibBuiltinOperation::MarkNode {
                 marker,
                 param: node_type,
             })
+        }
+        "remove_marker" => {
+            let args = args?;
+            let args_src = args.0;
+            // parse something of the form: `"color_name"`
+            let first_quote = args_src.find('"')?;
+            let args_src = &args_src[first_quote + 1..];
+            let second_quote = args_src.find('"')?;
+            let color_name = &args_src[..second_quote];
+            let rest = &args_src[second_quote + 1..].trim();
+            if !rest.is_empty() {
+                // too much stuff after the marker
+                return None;
+            }
+
+            let marker = color_name.into();
+            Some(LibBuiltinOperation::RemoveMarker { marker })
         }
         _ => {
             // TODO: add more.

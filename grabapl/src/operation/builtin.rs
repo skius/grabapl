@@ -35,10 +35,13 @@ pub enum LibBuiltinOperation<S: Semantics> {
         param: S::NodeAbstract,
         value: S::NodeConcrete,
     },
-    #[debug("Mark<{marker:?}>")]
-    Mark {
+    #[debug("MarkNode<{marker:?}>")]
+    MarkNode {
         marker: Marker,
         param: S::NodeAbstract,
+    },
+    RemoveMarker {
+        marker: Marker,
     },
 }
 
@@ -71,9 +74,12 @@ impl<S: Semantics> Clone for LibBuiltinOperation<S> {
                 param: param.clone(),
                 value: value.clone(),
             },
-            LibBuiltinOperation::Mark { marker, param } => LibBuiltinOperation::Mark {
+            LibBuiltinOperation::MarkNode { marker, param } => LibBuiltinOperation::MarkNode {
                 marker: marker.clone(),
                 param: param.clone(),
+            },
+            LibBuiltinOperation::RemoveMarker { marker } => LibBuiltinOperation::RemoveMarker {
+                marker: marker.clone(),
             },
         }
     }
@@ -116,10 +122,13 @@ impl<S: Semantics> LibBuiltinOperation<S> {
                     .expect_explicit_input_node("node", param.clone())
                     .unwrap();
             }
-            LibBuiltinOperation::Mark { marker, param } => {
+            LibBuiltinOperation::MarkNode { marker, param } => {
                 param_builder
                     .expect_explicit_input_node("node", param.clone())
                     .unwrap();
+            }
+            LibBuiltinOperation::RemoveMarker { marker } => {
+                // No parameters needed for removing a marker.
             }
         }
         param_builder.build().unwrap()
@@ -160,7 +169,10 @@ impl<S: Semantics> LibBuiltinOperation<S> {
                     S::NodeConcreteToAbstract::concrete_to_abstract(value),
                 );
             }
-            LibBuiltinOperation::Mark { marker, param } => {
+            LibBuiltinOperation::MarkNode { marker, param } => {
+                // markers dont exist in abstract
+            }
+            LibBuiltinOperation::RemoveMarker { marker } => {
                 // markers dont exist in abstract
             }
         }
@@ -193,10 +205,14 @@ impl<S: Semantics> LibBuiltinOperation<S> {
             LibBuiltinOperation::SetNode { param, value } => {
                 g.set_node_value(SubstMarker::from("node"), value.clone());
             }
-            LibBuiltinOperation::Mark { marker, param } => {
+            LibBuiltinOperation::MarkNode { marker, param } => {
                 // mark matched node
                 let node = g.get_node_key(&NodeMarker::Subst("node".into())).unwrap();
                 concrete_data.marker_set.borrow_mut().create_marker_and_mark_node(*marker, node);
+            }
+            LibBuiltinOperation::RemoveMarker { marker } => {
+                // remove marker
+                concrete_data.marker_set.borrow_mut().remove_marker(*marker);
             }
         }
         g.get_concrete_output(new_node_names)
