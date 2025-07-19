@@ -221,9 +221,13 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
     }
 
     fn interpret_block(&mut self, (body, _): Spanned<Block<'src, S::CS>>) {
+        // save and restore id mapping
+        let saved_single_node_aids = self.single_node_aids.clone();
         for stmt in body.statements {
             self.interpret_stmt(stmt);
         }
+        // restore the single node aids mapping
+        self.single_node_aids = saved_single_node_aids;
     }
 
     fn interpret_stmt(&mut self, (stmt, _): Spanned<Statement<'src, S::CS>>) {
@@ -232,6 +236,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                 self.interpret_let_stmt(let_stmt);
             }
             Statement::FnCall(fn_call) => {
+                // println!("Interpreting function call: {:?}", fn_call);
                 let (op_like, args) = self.call_expr_to_op_like(fn_call);
                 self.interpret_op_like(None, op_like, args);
             }
@@ -430,7 +435,9 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         if let Some(op_name) = op_name {
             self.builder
                 .add_named_operation(op_name.into(), op_like, args)
-                .unwrap();
+                .expect(&format!(
+                    "Failed to add operation {op_name}"
+                ));
         } else {
             self.builder.add_operation(op_like, args).unwrap();
         }
@@ -443,7 +450,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         let args = call_expr
             .args
             .into_iter()
-            .map(|(arg, _)| self.node_id_to_aid(arg).unwrap())
+            .map(|(arg, span)| self.node_id_to_aid(arg).expect(&format!("Call argument node ID {arg:?} at {span} not found")))
             .collect();
 
         let op_name = call_expr.name.0;

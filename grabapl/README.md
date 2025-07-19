@@ -45,6 +45,8 @@ cargo check --target wasm32-unknown-unknown
 - [ ] Edge orders
 - [ ] "is callable" function to determine which operations of operation context can be called!
 - [ ] Temporary nodes
+  - [ ] Temp nodes could be marked as temp _at result point_, i.e., after an operation is called
+    - its results could be marked as temporary
 - [ ] Clean up code
 - [ ] Finish examples/template
 - [ ] Write READMEs and doc comments! Especially on the operation builder and semantics.
@@ -65,3 +67,4 @@ cargo check --target wasm32-unknown-unknown
 - [ ] SigCtx for op builder - then we don't actually need a full user defined operation, just a signature, and that
    - would make mutual recursion easier.
 - [ ] syntax: propagate interpreter errors via span to parser to give pretty errors
+- [ ] syntax: error when UDOp has same name as builtin.

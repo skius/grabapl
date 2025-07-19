@@ -81,38 +81,142 @@ fn get_ops() -> (
         */
 
         fn bfs(start_node: Integer) -> (head: Integer) {
+            // initialize list
             let! head = add_node<int,0>();
             copy_value_from_to(start_node, head);
 
+            let! max_height = max_height(start_node);
+            let! curr = add_node<int,1>();
             if shape [
-                child: Integer,
-                start_node -> child: *,
+                initial_child: Integer,
+                start_node -> initial_child: *,
             ] {
-                bfs_helper(child, head);
+                // need to special case the first layer. TODO: make prettier?
+                bfs_insert_siblings(initial_child, head);
+                // start the BFS iteration
+                bfs_iter(start_node, head, curr, max_height);
             }
-
             return (head: head);
         }
 
-        fn bfs_helper(child: Integer, head: Integer) [
+        // Repeat the inner call with arguments from 1 .. max_height.
+        fn bfs_iter(start_node: Integer, head: Integer, curr: Integer, max_height: Integer)
+            [initial_child: Integer, start_node -> initial_child: *] {
+            if cmp_fst_snd%=%(curr, max_height) {
+                // we've reached the end.
+            } else {
+                // first call the helper with curr as argument
+                let! curr_modify = add_node<int,0>();
+                copy_value_from_to(curr, curr_modify);
+                bfs_helper(initial_child, head, curr_modify);
+                remove_node(curr_modify);
+                // then increment curr and call again
+                increment(curr);
+                bfs_iter(start_node, head, curr, max_height);
+            }
+
+        }
+
+        fn bfs_helper(child: Integer, head: Integer, curr: Integer) [
             parent: Integer,
             parent -> child: *,
         ] {
+            mark_node<"visited", Object>(child);
+
+            // we need to invoke our siblings as well
+            if shape [
+                sibling: Integer,
+                parent -> sibling: *,
+            ] {
+                bfs_helper(sibling, head, curr);
+            }
+
+            // we also go down to our children. we special case the curr = 1 behavior!
+            // we recurse down `curr` times, once `curr` is 0, we start inserting nodes
+            if is_eq<1>(curr) {
+                // insert all our children
+                if shape [
+                    grandchild: Integer,
+                    child -> grandchild: *,
+                ] skipping ["visited"] {
+                    bfs_insert_siblings(grandchild, head);
+                }
+            } else if shape [grandchild: Integer, child -> grandchild: *] {
+                let! curr_copy = add_node<int,0>();
+                copy_value_from_to(curr, curr_copy);
+                decrement(curr_copy);
+                bfs_helper(grandchild, head, curr_copy);
+                remove_node(curr_copy);
+            }
+        }
+
+        fn bfs_insert_siblings(child: Integer, head: Integer) [parent: Integer, parent -> child: *] {
             // insert self, then go to parent sibling
             list_insert_by_copy(head, child);
             if shape [
                 sibling: Integer,
                 parent -> sibling: *,
-            ] {
-                bfs_helper(sibling, head);
+            ] skipping ["visited"] { // NOTE: only here do we start skipping visited nodes
+                bfs_insert_siblings(sibling, head);
             }
-            // done inserting siblings, can go to child
+        }
+
+        fn max_height(start: Object) -> (max_height: Integer) {
+            let! res = add_node<int,1>();
             if shape [
-                grandchild: Integer,
+                child: Object,
+                start -> child: *,
+            ] {
+                let! child_max = max_height_helper(child);
+                increment(child_max);
+                copy_value_from_to(child_max, res);
+                remove_node(child_max);
+            }
+            return (max_height: res);
+        }
+
+        fn max_height_helper(child: Object) [parent: Object, parent -> child: *]
+            -> (max_height: Integer) {
+            let! our_height = add_node<int,1>();
+            if shape [
+                sibling: Object,
+                parent -> sibling: *,
+            ] {
+                // we have a sibling, so we need to check its height too
+                let! sibling_max = max_height_helper(sibling);
+                set_fst_to_max(our_height, sibling_max);
+                remove_node(sibling_max);
+            }
+
+            // if we have a child, recurse
+            if shape [
+                grandchild: Object,
                 child -> grandchild: *,
             ] {
-                bfs_helper(grandchild, head);
+                let! child_max = max_height_helper(grandchild);
+                // if our child has height child_max, we have height child_max + 1
+                increment(child_max);
+                set_fst_to_max(our_height, child_max);
+                remove_node(child_max);
             }
+
+            return (max_height: our_height);
+        }
+
+        fn set_fst_to_max(a: Integer, b: Integer) {
+            let! max = max(a, b);
+            copy_value_from_to(max, a);
+            remove_node(max);
+        }
+
+        fn max(a: Integer, b: Integer) -> (max: Integer) {
+            let! res = add_node<int,0>();
+            if cmp_fst_snd%>%(a, b) {
+                copy_value_from_to(a, res);
+            } else {
+                copy_value_from_to(b, res);
+            }
+            return (max: res);
         }
 
         fn list_insert_by_copy(head: Integer, value: Integer) {
@@ -262,6 +366,7 @@ fn bfs_and_dfs() {
 
     g.add_edge(l3_1, l1, edge_attr.clone());
     g.add_edge(l2_1, l1, edge_attr.clone());
+    g.add_edge(l5, l1, edge_attr.clone());
 
     let gen_vec = |g: &ConcreteGraph<TestSemantics>, nodes: &[NodeKey]| {
         nodes
@@ -324,6 +429,15 @@ fn bfs_and_dfs() {
     // assert!(valid, "grabapl DFS result does not match any of the acceptable results");
 
     println!("{}", g.dot());
+
+    let max_height_res = run_from_concrete(&mut g, &op_ctx, fn_map["max_height"], &[l1]).unwrap();
+    let max_height_node = max_height_res.new_nodes[&"max_height".into()];
+    let max_height_value = g.get_node_attr(max_height_node).unwrap();
+    println!(
+        "max height of the graph starting from node {:?}: {:?}",
+        l1,
+        max_height_value
+    );
 
     assert!(false);
 }

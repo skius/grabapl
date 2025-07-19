@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ops::Deref;
+use std::str::FromStr;
 use syntax::interpreter::SemanticsWithCustomSyntax;
 use syntax::{CustomSyntax, MacroArgs, MyCustomSyntax, MyCustomType, Span, Token};
 
@@ -101,6 +102,12 @@ impl SemanticsWithCustomSyntax for TestSemantics {
                     value: str_src,
                 })
             }
+            "increment" => {
+                Some(TestOperation::AddInteger(1))
+            }
+            "decrement" => {
+                Some(TestOperation::AddInteger(-1))
+            }
             "remove_node" => Some(TestOperation::DeleteNode),
             "copy_value_from_to" => Some(TestOperation::CopyValueFromTo),
             _ => None,
@@ -120,6 +127,14 @@ impl SemanticsWithCustomSyntax for TestSemantics {
                     _ => return None,
                 };
                 Some(TestQuery::CmpFstSnd(cmp))
+            }
+            "is_zero" => {
+                Some(TestQuery::ValueEqualTo(NodeValue::Integer(0)))
+            }
+            "is_eq" => {
+                let args_src = args?.0;
+                let x = i32::from_str(args_src).ok()?;
+                Some(TestQuery::ValueEqualTo(NodeValue::Integer(x)))
             }
             _ => None,
         }

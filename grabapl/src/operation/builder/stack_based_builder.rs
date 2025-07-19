@@ -1763,7 +1763,16 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         res.change_context(OperationBuilderError::NewBuilderError)
     }
 
-    fn push_instruction(
+    fn push_instruction(&mut self, instruction: BuilderInstruction<S>) -> Result<(), OperationBuilderError> {
+        self.__push_instruction(instruction.clone()).attach_printable_lazy(move || {
+            format!(
+                "Failed to push instruction: {:?}",
+                instruction,
+            )
+        })
+    }
+
+    fn __push_instruction(
         &mut self,
         instruction: BuilderInstruction<S>,
     ) -> Result<(), OperationBuilderError> {
