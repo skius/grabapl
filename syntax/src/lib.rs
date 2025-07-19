@@ -902,8 +902,10 @@ where
 }
 
 
+/// Important syntax note: mutually recursive functions are not supported.
+/// Function definitions must be ordered in reverse C/C++ order, i.e.,
+/// if function `foo` calls `bar`, then `bar` must be defined after `foo` in the source.
 // TODO: rework this function. terrible.
-// TODO: should take a S: SemanticsWithCustomSyntax as parameter.
 pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(src: &'src str) -> (OperationContext<S>, HashMap<&'src str, OperationId>) {
     let (tokens, mut errs) = lexer().parse(src).into_output_errors();
 
