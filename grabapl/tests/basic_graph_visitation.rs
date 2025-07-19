@@ -32,7 +32,7 @@ fn imagined_syntax() {
             ] {
                 dfs_helper<"visited">(child, head);
             }
-
+            remove_marker<"visited">();
             return (head: head);
         }
 
