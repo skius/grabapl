@@ -351,7 +351,7 @@ pub fn lexer<'src>()
 // TODO: we cannot really have this. Since both lib and custom might be able to parse the entire macro syntax,
 //  this distinction needs to happen afterwards.
 //  I suppose we could delay lib parsing and just store the tokens that are parsed into CS::MacroArgType for later consumption?
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Copy)]
 pub struct MacroArgs<'src>(pub &'src str);
 
 #[derive(Clone, Debug, PartialEq)]

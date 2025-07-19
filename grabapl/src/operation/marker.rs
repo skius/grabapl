@@ -32,6 +32,10 @@ impl MarkerSet {
         MarkerSet::default()
     }
 
+    pub fn all_marked_nodes(&self) -> impl Iterator<Item = NodeKey> {
+        self.marked_nodes_to_markers.keys().cloned()
+    }
+
     pub fn add_marker(&mut self, marker: impl Into<Marker>) -> Result<(), MarkerError> {
         let marker = marker.into();
         if self.markers.contains(&marker) {

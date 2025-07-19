@@ -544,6 +544,9 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
             .copied()
             .chain(self.abstract_to_concrete.values().copied())
             .chain(self.arg.hidden_nodes.iter().copied())
+            // TODO: in the future a shape query could just hide some markers
+            // TODO: directly pass the marker_set to run_shape_query to avoid some allocations?
+            .chain(self.arg.marker_set.borrow().all_marked_nodes())
             .collect();
 
         Ok(OperationArgument {

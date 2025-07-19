@@ -1,7 +1,49 @@
+use chumsky::prelude::*;
 use std::collections::HashMap;
-use crate::{Block, CustomSyntax, FnCallExpr, FnDef, FnImplicitParam, FnNodeParam, IfCond, IfStmt, LetStmt, MacroArgs, NodeId, Program, RenameStmt, ReturnStmt, ReturnStmtMapping, ShapeQueryParam, ShapeQueryParams, Spanned, Statement};
+use crate::{lexer, Block, CustomSyntax, FnCallExpr, FnDef, FnImplicitParam, FnNodeParam, IfCond, IfStmt, LetStmt, MacroArgs, NodeId, Program, RenameStmt, ReturnStmt, ReturnStmtMapping, ShapeQueryParam, ShapeQueryParams, Spanned, Statement};
 use grabapl::prelude::*;
 use crate::minirust::Expr;
+
+fn parse_abstract_node_type<S: SemanticsWithCustomSyntax>(src: &str) -> Option<<S::CS as CustomSyntax>::AbstractNodeType> {
+    let tokens = lexer().parse(src).into_result().ok()?;
+    let tokens_input = tokens
+        .as_slice()
+        .map((src.len()..src.len()).into(), |(t, s)| (t, s));
+
+    let parser = S::CS::get_node_type_parser();
+    parser.parse(tokens_input).into_result().ok()
+}
+
+fn find_lib_builtin_op<S: SemanticsWithCustomSyntax>(name: &str, args: Option<MacroArgs>) -> Option<LibBuiltinOperation<S>> {
+    match name {
+        "mark_node" => {
+            let args = args?;
+            let args_src = args.0;
+            // parse something of the form: `"color_name", NodeType`
+            let first_quote = args_src.find('"')?;
+            let args_src = &args_src[first_quote + 1..];
+            let second_quote = args_src.find('"')?;
+            let color_name = &args_src[..second_quote];
+            let rest = &args_src[second_quote + 1..];
+            let comma_pos = rest.find(',')?;
+            let rest = &rest[comma_pos + 1..];
+
+            // parse S::CS::AbstractNodeType
+            let syntax_typ = parse_abstract_node_type::<S>(rest)?;
+            let node_type = S::convert_node_type(syntax_typ);
+
+            let marker = color_name.into();
+            Some(LibBuiltinOperation::Mark {
+                marker,
+                param: node_type,
+            })
+        }
+        _ => {
+            // TODO: add more.
+            None
+        }
+    }
+}
 
 pub trait SemanticsWithCustomSyntax: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone> {
     type CS: CustomSyntax;
@@ -286,11 +328,13 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
     fn op_name_to_op_like(&self, op_name: &str, args: Option<Spanned<MacroArgs>>) -> BuilderOpLike<S> {
         // TODO: do we want to enforce consumption of a Some(macro_args)?
 
-
+        // we don't care about the span
         let args = args.map(|(args, _)| args);
 
         // first try lib builtin
-        // TODO
+        if let Some(op) = find_lib_builtin_op::<S>(op_name, args) {
+            return BuilderOpLike::LibBuiltin(op);
+        }
 
         // then try client builtin
         if let Some(op) = S::find_builtin_op(op_name, args) {
