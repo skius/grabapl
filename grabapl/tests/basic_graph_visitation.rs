@@ -82,71 +82,94 @@ fn get_ops() -> (
 
         fn bfs(start_node: Integer) -> (head: Integer) {
             // initialize list
+            // (layer #1)
             let! head = add_node<int,0>();
             copy_value_from_to(start_node, head);
 
             let! max_height = max_height(start_node);
-            let! curr = add_node<int,1>();
             if shape [
                 initial_child: Integer,
                 start_node -> initial_child: *,
             ] {
-                // need to special case the first layer. TODO: make prettier?
-                bfs_insert_siblings(initial_child, head);
+                // we wish to insert the very next layer.
+                let! curr_dist = add_node<int,0>();
                 // start the BFS iteration
-                bfs_iter(start_node, head, curr, max_height);
+                // since we already inserted layer #1, and we're starting with `initial_child`,
+                // our max_height is actually one higher than necessary. hence we decrement it.
+                decrement(max_height);
+                // also, a height of N nodes means a distance of N-1 nodes to the last layer.
+                // hence we decrement again.
+                decrement(max_height);
+                bfs_iter(start_node, head, curr_dist, max_height);
+                remove_node(curr_dist);
             }
             return (head: head);
         }
 
         // Repeat the inner call with arguments from 1 .. max_height.
-        fn bfs_iter(start_node: Integer, head: Integer, curr: Integer, max_height: Integer)
+        // in particular, we want proceed as follows:
+        //  1. first insert the layer that's 1 away
+        //  2. then insert the layer that's 2 away
+        //  3. and so on...
+        fn bfs_iter(start_node: Integer, head: Integer, curr_dist: Integer, max_dist_to_last_layer: Integer)
             [initial_child: Integer, start_node -> initial_child: *] {
-            if cmp_fst_snd%=%(curr, max_height) {
-                // we've reached the end.
+            if cmp_fst_snd%>%(curr_dist, max_dist_to_last_layer) {
+                // we've handled every distance up to the max distance, so we're done.
             } else {
-                // first call the helper with curr as argument
-                let! curr_modify = add_node<int,0>();
-                copy_value_from_to(curr, curr_modify);
-                bfs_helper(initial_child, head, curr_modify);
-                remove_node(curr_modify);
-                // then increment curr and call again
-                increment(curr);
-                bfs_iter(start_node, head, curr, max_height);
+                // first call the helper with curr_dist as argument
+                let! layers_until_insert = add_node<int,0>();
+                copy_value_from_to(curr_dist, layers_until_insert);
+                bfs_insert_layer(initial_child, head, layers_until_insert);
+                remove_node(layers_until_insert);
+                // then increment curr_dist and call again
+                increment(curr_dist);
+                bfs_iter(start_node, head, curr_dist, max_dist_to_last_layer);
             }
 
         }
 
-        fn bfs_helper(child: Integer, head: Integer, curr: Integer) [
+        // inserts the layer that is `layer` away from the input node. i.e., if layer is 2, we insert the node x from the chain: input -> a -> x.
+        fn bfs_insert_layer(child: Integer, head: Integer, layer: Integer) [
             parent: Integer,
             parent -> child: *,
         ] {
             mark_node<"visited", Object>(child);
 
-            // we need to invoke our siblings as well
-            if shape [
-                sibling: Integer,
-                parent -> sibling: *,
-            ] {
-                bfs_helper(sibling, head, curr);
-            }
+            if is_eq<0>(layer) {
+                // if the distance is zero, we insert ourselves
+                // this is an edge case for the first iteration because no backedge can exist yet.
+                // if we ever have a larger distance, we need to skip visited nodes. this happens in the `is_eq<0>(layer)` check.
+                bfs_insert_siblings(child, head);
+            } else {
+                // general case: not this layer.
 
-            // we also go down to our children. we special case the curr = 1 behavior!
-            // we recurse down `curr` times, once `curr` is 0, we start inserting nodes
-            if is_eq<1>(curr) {
-                // insert all our children
+                // we need to invoke our siblings as well
                 if shape [
-                    grandchild: Integer,
-                    child -> grandchild: *,
-                ] skipping ["visited"] {
-                    bfs_insert_siblings(grandchild, head);
+                    sibling: Integer,
+                    parent -> sibling: *,
+                ] {
+                    bfs_insert_layer(sibling, head, layer);
                 }
-            } else if shape [grandchild: Integer, child -> grandchild: *] {
-                let! curr_copy = add_node<int,0>();
-                copy_value_from_to(curr, curr_copy);
-                decrement(curr_copy);
-                bfs_helper(grandchild, head, curr_copy);
-                remove_node(curr_copy);
+
+                // we also go down to our children.
+                if is_eq<1>(layer) {
+                    // if we're one before the layer-to-insert, that means we need to insert our children
+                    if shape [
+                        grandchild: Integer,
+                        child -> grandchild: *,
+                    ] skipping ["visited"] {
+                        // NOTE we skip visited nodes here!
+                        // if we did not skip visited nodes, we could be taking a back-edge here to a node that was already inserted from a previous layer.
+                        bfs_insert_siblings(grandchild, head);
+                    }
+                } else if shape [grandchild: Integer, child -> grandchild: *] {
+                    // if we have more layers to go, we recurse down to our children, while reducing the layer distance by one.
+                    let! layer_copy = add_node<int,0>();
+                    copy_value_from_to(layer, layer_copy);
+                    decrement(layer_copy);
+                    bfs_insert_layer(grandchild, head, layer_copy);
+                    remove_node(layer_copy);
+                }
             }
         }
 
@@ -156,7 +179,7 @@ fn get_ops() -> (
             if shape [
                 sibling: Integer,
                 parent -> sibling: *,
-            ] skipping ["visited"] { // NOTE: only here do we start skipping visited nodes
+            ] skipping ["visited"] { // NOTE: only here do we start skipping visited nodes. Similarly, this is to avoid back-edges.
                 bfs_insert_siblings(sibling, head);
             }
         }
@@ -419,14 +442,14 @@ fn bfs_and_dfs() {
     let grabapl_bfs_list = list_to_value_vec(&g, head_bfs);
     let valid = acceptable_bfs.contains(&grabapl_bfs_list);
     println!("grabapl  BFS: {:?} - valid: {valid}", grabapl_bfs_list);
-    // assert!(valid, "grabapl BFS result does not match any of the acceptable results");
+    assert!(valid, "grabapl BFS result does not match any of the acceptable results");
 
     let res = run_from_concrete(&mut g, &op_ctx, fn_map["dfs"], &[l1]).unwrap();
     let head_dfs = res.new_nodes[&"head".into()];
     let grabapl_dfs_list = list_to_value_vec(&g, head_dfs);
     let valid = acceptable_dfs.contains(&grabapl_dfs_list);
     println!("grabapl  DFS: {:?} - valid: {valid}", grabapl_dfs_list);
-    // assert!(valid, "grabapl DFS result does not match any of the acceptable results");
+    assert!(valid, "grabapl DFS result does not match any of the acceptable results");
 
     println!("{}", g.dot());
 
