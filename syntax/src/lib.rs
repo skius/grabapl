@@ -603,6 +603,7 @@ where
             })
             .boxed();
 
+        // TODO: add support for `skipping all` in addition to the current `skipping [...]` syntax.
         let optional_skipping_markers = select! {
             Token::Ident("skipping") => (),
         }.ignore_then(just(Token::Ctrl('[')))
