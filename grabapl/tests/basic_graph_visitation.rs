@@ -19,6 +19,104 @@ fn list_to_value_vec(graph: &ConcreteGraph<TestSemantics>, head: NodeKey) -> Vec
     values
 }
 
+fn imagined_syntax() {
+    syntax::grabapl_parse!(TestSemantics,
+        // -------- DFS ---------
+        fn dfs(start_node: Integer) -> (head: Integer) {
+            let! head = add_node<int,0>();
+            copy_value_from_to(start_node, head);
+            mark<"visited">(start_node);
+            if shape [
+                child: Integer,
+                start_node -> child: *,
+            ] {
+                dfs_helper<"visited">(child, head);
+            }
+
+            return (head: head);
+        }
+
+        fn dfs_helper<color>(child: Integer, head: Integer) [
+            parent: Integer,
+            parent -> child: *,
+        ] {
+            // mark self as visited
+            mark<color>(child);
+            // insert self
+            list_insert_by_copy(head, child);
+            // then go to our children
+            if shape [
+                grandchild: Integer,
+                child -> grandchild: *,
+            ] {
+                dfs_helper<color>(grandchild, head);
+            }
+            // then go to our siblings
+            // problem is, here we lost the function stack 'visited' marker from above, so if a sibling has the same descendant as us,
+            // we will visit it again.
+            if shape [
+                sibling: Integer,
+                parent -> sibling: *,
+            ] {
+                dfs_helper<color>(sibling, head);
+            }
+        }
+
+
+        // ------ BFS --------
+
+        fn bfs(start_node: Integer) -> (head: Integer) {
+            let! head = add_node<int,0>();
+            copy_value_from_to(start_node, head);
+
+            if shape [
+                child: Integer,
+                start_node -> child: *,
+            ] {
+                bfs_helper(child, head);
+            }
+
+            return (head: head);
+        }
+
+        fn bfs_helper(child: Integer, head: Integer) [
+            parent: Integer,
+            parent -> child: *,
+        ] {
+            // insert self, then go to parent sibling
+            list_insert_by_copy(head, child);
+            if shape [
+                sibling: Integer,
+                parent -> sibling: *,
+            ] {
+                bfs_helper(sibling, head);
+            }
+            // done inserting siblings, can go to child
+            if shape [
+                grandchild: Integer,
+                child -> grandchild: *,
+            ] {
+                bfs_helper(grandchild, head);
+            }
+        }
+
+        fn list_insert_by_copy(head: Integer, value: Integer) {
+            if shape [
+                child: Integer,
+                head -> child: *,
+            ] {
+                list_insert_by_copy(child, value);
+            } else {
+                // we're at the tail
+                let! new_node = add_node<int,0>();
+                copy_value_from_to(value, new_node);
+                add_edge<"next">(head, new_node);
+            }
+        }
+
+    );
+}
+
 #[test]
 fn bfs_and_dfs() {
     let (op_ctx, fn_map) = syntax::grabapl_parse!(TestSemantics,
