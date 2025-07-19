@@ -338,9 +338,14 @@ pub fn lexer<'src>()
         .then(any().and_is(just('\n').not()).repeated())
         .padded();
 
+    let block_comment = just("/*")
+        .then(any().and_is(just("*/").not()).repeated())
+        .then_ignore(just("*/"))
+        .padded();
+
     token
         .map_with(|tok, e| (tok, e.span()))
-        .padded_by(comment.repeated())
+        .padded_by(comment.or(block_comment).repeated())
         .padded()
         // If we encounter an error, skip and attempt to lex the next character as a token instead
         .recover_with(skip_then_retry_until(any().ignored(), end()))
