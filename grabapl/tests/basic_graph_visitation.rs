@@ -52,14 +52,14 @@ fn get_ops() -> (
             if shape [
                 grandchild: Integer,
                 child -> grandchild: *,
-            ] skipping [visited] {
+            ] skipping ["visited"] {
                 dfs_helper(grandchild, head);
             }
             // then go to our siblings
             if shape [
                 sibling: Integer,
                 parent -> sibling: *,
-            ] skipping [visited] {
+            ] skipping ["visited"] {
                 dfs_helper(sibling, head);
             }
         }

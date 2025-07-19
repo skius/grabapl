@@ -37,6 +37,8 @@ pub trait CustomSyntax: Clone + Debug + 'static {
     + Clone;
 }
 
+// TODO: move MyCustomBlah away from this file.
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct MyCustomSyntax;
 
@@ -151,14 +153,11 @@ impl CustomSyntax for MyCustomSyntax {
             .to(EdgeType::Wildcard)
             .labelled("wildcard edge type");
 
-        // TODO: oh. for string we need actual lexer support.
-        let ident = select! {
-            Token::Ident(ident) => ident,
+        let str_ = select! {
+            Token::Str(s) => s,
         };
 
-        let exact = just(Token::Ctrl('"'))
-            .ignore_then(ident)
-            .then_ignore(just(Token::Ctrl('"')))
+        let exact = str_
             .map(|s: &'src str| EdgeType::Exact(s.to_string()))
             .labelled("exact edge type");
 
@@ -176,7 +175,7 @@ pub enum Token<'src> {
     Bool(bool),
     Num(i32),
     // TODO: readd str token.
-    // Str(&'src str),
+    Str(&'src str),
     // Op(&'src str),
     Arrow,
     RevArrow,
@@ -198,7 +197,7 @@ impl fmt::Display for Token<'_> {
         match self {
             Token::Bool(b) => write!(f, "{}", b),
             Token::Num(n) => write!(f, "{}", n),
-            // Token::Str(s) => write!(f, "\"{}\"", s),
+            Token::Str(s) => write!(f, "\"{}\"", s),
             // Token::Op(op) => write!(f, "{}", op),
             Token::Arrow => write!(f, "->"),
             Token::RevArrow => write!(f, "<-"),
@@ -247,57 +246,11 @@ pub fn lexer<'src>()
         _ => Token::Ident(ident),
     });
 
-    // node type parser.
-    // node type returns a src that can then be parsed by a client provided parser.
-    // it is the entire string slice until the next ',', but it skips over matched parentheses.
-    // eg, it should parse "{ x , b } , bla"'s prefix "{ x , b }".
-    // or "(,,,())" is fine as well.
-
-    // unfortunately, below clashes with 'ident' parser.
-    // let inner = recursive(|inner| {
-    //     let mut matched_square = inner.clone()
-    //         .repeated()
-    //         .delimited_by(just('['), just(']'))
-    //         .to_slice()
-    //         ;
-    //     let mut matched_paren = inner.clone()
-    //         .repeated()
-    //         .delimited_by(just('('), just(')'))
-    //         .to_slice()
-    //         ;
-    //     let mut matched_brace = inner.clone()
-    //         .repeated()
-    //         .delimited_by(just('{'), just('}'))
-    //         .to_slice()
-    //         ;
-    //     let mut matched_angle = inner.clone()
-    //         .repeated()
-    //         .delimited_by(just('<'), just('>'))
-    //         .to_slice()
-    //         ;
-    //
-    //     let inner_content = none_of("()[]{}<>").repeated().at_least(1).to_slice()
-    //         .or(matched_square)
-    //         .or(matched_paren)
-    //         .or(matched_brace)
-    //         .or(matched_angle);
-    //     inner_content
-    //
-    //     // just('[').repeated().delimited_by(just('['), just(']')).or(just('b').repeated())
-    // });
-    //
-    // // let mut inner = Recursive::declare();
-    //
-    //
-    // // inner.define(inner_content.to_slice());
-    //
-    // let node_type_src = inner.repeated().at_least(1).to_slice().map(Token::NodeType);
-
-    // let node_type_src = just('`').ignore_then(none_of("`")
-    //     .repeated()
-    //     .to_slice())
-    //     .then_ignore(just('`'))
-    //     .map(Token::NodeType);
+    // A parser for strings
+    let str_ = just('"')
+        .ignore_then(none_of('"').repeated().to_slice())
+        .then_ignore(just('"'))
+        .map(Token::Str);
 
     let macro_args = none_of("`")
         .repeated()
@@ -326,6 +279,7 @@ pub fn lexer<'src>()
         .or(macro_args_opt3)
         .or(arrow)
         .or(rev_arrow)
+        .or(str_)
         .or(ctrl)
         .or(ident)
         .boxed(); //.or(node_type_src);
@@ -652,11 +606,11 @@ where
         let optional_skipping_markers = select! {
             Token::Ident("skipping") => (),
         }.ignore_then(just(Token::Ctrl('[')))
-            .ignore_then(ident_str.clone())
+            .ignore_then(select! { Token::Str(s) => s }.separated_by(just(Token::Ctrl(','))).allow_trailing().collect::<Vec<_>>())
             .then_ignore(just(Token::Ctrl(']')))
             .or_not()
-            .map(|opt| opt.map(|(ident, _)| {
-                SkipMarkers::new([ident])
+            .map(|opt| opt.map(|marker_names| {
+                SkipMarkers::new(marker_names)
             }).unwrap_or(SkipMarkers::default()))
             .boxed();
 
