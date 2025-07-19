@@ -6,6 +6,7 @@ use crate::{
 use chumsky::prelude::*;
 use grabapl::prelude::*;
 use std::collections::HashMap;
+use grabapl::operation::marker::SkipMarkers;
 
 fn parse_abstract_node_type<S: SemanticsWithCustomSyntax>(
     src: &str,
@@ -295,6 +296,17 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         let marker = self.get_new_shape_query_marker();
         let marker = marker.as_str();
         self.builder.start_shape_query(marker).unwrap();
+        // send the markers
+        match shape_query_params.skip_markers {
+            SkipMarkers::All => {
+                self.builder.skip_all_markers().unwrap();
+            }
+            SkipMarkers::Set(set) => {
+                for marker in set {
+                    self.builder.skip_marker(marker).unwrap();
+                }
+            }
+        }
         // then interpret the shape query parameters
         for (param, _) in shape_query_params.params {
             match param {

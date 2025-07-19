@@ -28,7 +28,7 @@ use crate::semantics::{AbstractJoin, AbstractMatcher};
 use crate::util::bimap::BiMap;
 use crate::util::log;
 use error_stack::Result;
-use crate::operation::marker::SkipMarkers;
+use crate::operation::marker::{Marker, SkipMarkers};
 
 macro_rules! bail_unexpected_instruction {
     ($i:expr, $i_opt:expr, $frame:literal) => {
@@ -1665,6 +1665,14 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
     ) -> Result<(), OperationBuilderError> {
         // TODO:
         self.push_instruction(BuilderInstruction::ExpectShapeEdge(source, target, edge))
+    }
+
+    pub fn skip_marker(&mut self, marker: impl Into<Marker>) -> Result<(), OperationBuilderError> {
+        self.push_instruction(BuilderInstruction::SkipMarker(marker.into()))
+    }
+
+    pub fn skip_all_markers(&mut self) -> Result<(), OperationBuilderError> {
+        self.push_instruction(BuilderInstruction::SkipAllMarkers)
     }
 
     pub fn add_named_operation(

@@ -52,14 +52,14 @@ fn get_ops() -> (
             if shape [
                 grandchild: Integer,
                 child -> grandchild: *,
-            ] {
+            ] skipping [visited] {
                 dfs_helper(grandchild, head);
             }
             // then go to our siblings
             if shape [
                 sibling: Integer,
                 parent -> sibling: *,
-            ] {
+            ] skipping [visited] {
                 dfs_helper(sibling, head);
             }
         }
@@ -76,7 +76,7 @@ fn get_ops() -> (
            // this is a problem though since going to a child for the next layer requires a shape query
            // hence we must tell the shape query to not skip marked nodes for everything except the last layer.
            // in the last layer, i.e., when we could accidentally have a back-edge to a earlier layer, we skip marked nodes again.
-           // 
+           //
 
         */
 

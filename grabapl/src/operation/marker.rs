@@ -14,9 +14,15 @@ pub enum SkipMarkers {
     Set(HashSet<Marker>),
 }
 
+impl Default for SkipMarkers {
+    fn default() -> Self {
+        SkipMarkers::none()
+    }
+}
+
 impl SkipMarkers {
-    pub fn new(markers: impl IntoIterator<Item = Marker>) -> Self {
-        SkipMarkers::Set(markers.into_iter().collect())
+    pub fn new(markers: impl IntoIterator<Item = impl Into<Marker>>) -> Self {
+        SkipMarkers::Set(markers.into_iter().map(Into::into).collect())
     }
 
     pub fn none() -> Self {

@@ -81,7 +81,7 @@ impl<S: Semantics> GraphShapeQuery<S> {
             parameter,
             expected_graph,
             node_keys_to_shape_idents,
-            skip_markers: SkipMarkers::none(), // by default, skip no markers
+            skip_markers: SkipMarkers::default(),
         }
     }
 

@@ -10,6 +10,7 @@ use grabapl::prelude::{OperationContext, OperationId};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
+use grabapl::operation::marker::SkipMarkers;
 
 pub trait CustomSyntax: Clone + Debug + 'static {
     type MacroArgType: Clone + fmt::Debug + Default + PartialEq;
@@ -390,6 +391,8 @@ pub enum ShapeQueryParam<'src, CS: CustomSyntax> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ShapeQueryParams<'src, CS: CustomSyntax> {
     pub params: Vec<Spanned<ShapeQueryParam<'src, CS>>>,
+    // TODO: spanned<>
+    pub skip_markers: SkipMarkers,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -610,7 +613,7 @@ where
         .separated_by(just(Token::Ctrl(',')))
         .allow_trailing()
         .collect::<Vec<_>>()
-        .map(|params| (ShapeQueryParams { params }))
+        .map(|params| (ShapeQueryParams { params, skip_markers: SkipMarkers::default() }))
         .boxed();
 
     let block = recursive(|block| {
@@ -646,10 +649,26 @@ where
             })
             .boxed();
 
+        let optional_skipping_markers = select! {
+            Token::Ident("skipping") => (),
+        }.ignore_then(just(Token::Ctrl('[')))
+            .ignore_then(ident_str.clone())
+            .then_ignore(just(Token::Ctrl(']')))
+            .or_not()
+            .map(|opt| opt.map(|(ident, _)| {
+                SkipMarkers::new([ident])
+            }).unwrap_or(SkipMarkers::default()))
+            .boxed();
+
         let if_cond_shape = just(Token::Shape)
             .ignore_then(just(Token::Ctrl('[')))
             .ignore_then(shape_params.clone())
             .then_ignore(just(Token::Ctrl(']')))
+            .then(optional_skipping_markers)
+            .map(|(mut params, skip_markers)| {
+                params.skip_markers = skip_markers;
+                params
+            })
             .map(IfCond::Shape);
 
         let if_cond_query = fn_call_expr
