@@ -363,9 +363,11 @@ pub struct IfStmt<'src, CS: CustomSyntax> {
     pub else_block: Spanned<Block<'src, CS>>,
 }
 
-#[derive(Clone, Debug, PartialEq, Copy)]
+#[derive(Clone, derive_more::Debug, PartialEq, Copy)]
 pub enum NodeId<'src> {
+    #[debug("{_0}")]
     Single(&'src str),
+    #[debug("{0}.{1}", _0.0, _1.0)]
     Output(Spanned<&'src str>, Spanned<&'src str>),
 }
 
