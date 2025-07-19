@@ -1,6 +1,7 @@
 pub mod sample_user_defined_operations;
 
 use grabapl::SubstMarker;
+use grabapl::operation::ConcreteData;
 use grabapl::operation::query::{BuiltinQuery as BuiltinQueryTrait, ConcreteQueryOutput};
 use grabapl::operation::signature::parameter::{
     AbstractOperationOutput, GraphWithSubstitution, NewNodeMarker, OperationOutput,
@@ -15,7 +16,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::Into;
 use std::fmt::Debug;
-use grabapl::operation::ConcreteData;
 
 pub struct SimpleSemantics;
 
@@ -490,7 +490,11 @@ impl grabapl::operation::BuiltinOperation for BuiltinOperation {
         g.get_abstract_output(new_nodes)
     }
 
-    fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>, _: &mut ConcreteData) -> OperationOutput {
+    fn apply(
+        &self,
+        g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>,
+        _: &mut ConcreteData,
+    ) -> OperationOutput {
         let mut new_nodes = HashMap::new();
         match self {
             BuiltinOperation::AddNode => {

@@ -169,11 +169,7 @@ pub enum BuilderInstruction<S: Semantics> {
     // the same as AddNamedOperation, but without enforces the output to have a single node, and uses that node
     // to create a AbstractNodeId::named node to bind to it.
     #[debug("AddBangOperation({_0:?}, ???, args: {_2:?})")]
-    AddBangOperation(
-        NamedMarker,
-        BuilderOpLike<S>,
-        Vec<AbstractNodeId>,
-    ),
+    AddBangOperation(NamedMarker, BuilderOpLike<S>, Vec<AbstractNodeId>),
     #[debug("AddOperation(???, args: {_1:?})")]
     AddOperation(BuilderOpLike<S>, Vec<AbstractNodeId>),
     #[debug("ReturnNode({_0:?}, {_1:?}, ???)")]
@@ -2262,12 +2258,14 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         op: Operation<S>,
         args: Vec<AbstractNodeId>,
     ) -> Result<AbstractOperationArgument, OperationBuilderError> {
-        self.current_state.interpret_op(
-            &self.op_ctx,
-            marker,
-            AbstractOperation::from_operation(op),
-            args,
-        ).map(|x| x.0)
+        self.current_state
+            .interpret_op(
+                &self.op_ctx,
+                marker,
+                AbstractOperation::from_operation(op),
+                args,
+            )
+            .map(|x| x.0)
     }
 
     fn interpret_builtin_query(

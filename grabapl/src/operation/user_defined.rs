@@ -14,11 +14,11 @@ use crate::semantics::{AbstractGraph, ConcreteGraph};
 use crate::util::{InternString, log};
 use crate::{NodeKey, Semantics, SubstMarker, interned_string_newtype};
 use derive_more::with_trait::From;
+use error_stack::{FutureExt, ResultExt, bail, report};
 use internment::Intern;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
-use error_stack::{bail, report, FutureExt, ResultExt};
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
@@ -493,7 +493,9 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
                 .mapping
                 .get(&subst_marker)
                 .copied()
-                .ok_or(report!(OperationError::UnknownParameterMarker(subst_marker))),
+                .ok_or(report!(OperationError::UnknownParameterMarker(
+                    subst_marker
+                ))),
             AbstractNodeId::DynamicOutputMarker(..) | AbstractNodeId::Named(..) => {
                 let key = self
                     .abstract_to_concrete
@@ -519,8 +521,11 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
         let selected_keys: Vec<NodeKey> = arg
             .selected_input_nodes
             .iter()
-            .map(|arg| self.aid_to_node_key(*arg)
-                .attach_printable_lazy(|| "while converting abstract selected input nodes to concrete keys"))
+            .map(|arg| {
+                self.aid_to_node_key(*arg).attach_printable_lazy(
+                    || "while converting abstract selected input nodes to concrete keys",
+                )
+            })
             .collect::<OperationResult<_>>()?;
 
         let new_subst = ParameterSubstitution::new(

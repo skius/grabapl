@@ -1,5 +1,5 @@
-use grabapl::prelude::run_from_concrete;
 use grabapl::Semantics;
+use grabapl::prelude::run_from_concrete;
 use syntax::semantics::{NodeValue, TestSemantics};
 
 const SRC: &'static str = stringify!(
@@ -48,6 +48,4 @@ fn rename_scope() {
     println!("Return node value {ret_node:?}: {:?}", value);
 
     // assert!(false);
-
-
 }

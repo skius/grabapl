@@ -1,7 +1,7 @@
+use crate::util::InternString;
+use crate::{NodeKey, interned_string_newtype};
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
-use crate::{interned_string_newtype, NodeKey};
-use crate::util::InternString;
 
 #[derive(derive_more::Debug, Clone, PartialEq, Eq, Hash, Copy)]
 #[debug("{_0}")]
@@ -46,22 +46,34 @@ impl MarkerSet {
         Ok(())
     }
 
-    pub fn mark_node(&mut self, marker: impl Into<Marker>, node_key: NodeKey) -> Result<(), MarkerError> {
+    pub fn mark_node(
+        &mut self,
+        marker: impl Into<Marker>,
+        node_key: NodeKey,
+    ) -> Result<(), MarkerError> {
         let marker = marker.into();
         if !self.markers.contains(&marker) {
             return Err(MarkerError::MarkerDoesNotExist(marker));
         }
-        self.marker_to_marked_nodes.get_mut(&marker).unwrap().insert(node_key);
-        self.marked_nodes_to_markers.entry(node_key).or_default().insert(marker);
+        self.marker_to_marked_nodes
+            .get_mut(&marker)
+            .unwrap()
+            .insert(node_key);
+        self.marked_nodes_to_markers
+            .entry(node_key)
+            .or_default()
+            .insert(marker);
         Ok(())
     }
 
     pub fn create_marker_and_mark_node(&mut self, marker: impl Into<Marker>, node_key: NodeKey) {
         let marker = marker.into();
         if !self.markers.contains(&marker) {
-            self.add_marker(marker).expect("Marker should not already exist");
+            self.add_marker(marker)
+                .expect("Marker should not already exist");
         }
-        self.mark_node(marker, node_key).expect("Node should be able to be marked");
+        self.mark_node(marker, node_key)
+            .expect("Node should be able to be marked");
     }
 
     pub fn remove_marker(&mut self, marker: impl Into<Marker>) {

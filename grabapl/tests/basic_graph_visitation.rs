@@ -1,8 +1,8 @@
-use std::collections::HashMap;
 use grabapl::prelude::*;
+use std::collections::HashMap;
 mod util;
-use util::semantics::*;
 use test_log::test;
+use util::semantics::*;
 
 fn list_to_value_vec(graph: &ConcreteGraph<TestSemantics>, head: NodeKey) -> Vec<NodeValue> {
     let mut values = vec![];
@@ -20,7 +20,10 @@ fn list_to_value_vec(graph: &ConcreteGraph<TestSemantics>, head: NodeKey) -> Vec
     values
 }
 
-fn get_ops() -> (OperationContext<TestSemantics>, HashMap<&'static str, OperationId>) {
+fn get_ops() -> (
+    OperationContext<TestSemantics>,
+    HashMap<&'static str, OperationId>,
+) {
     syntax::grabapl_parse!(TestSemantics,
         // -------- DFS ---------
         fn dfs(start_node: Integer) -> (head: Integer) {
@@ -250,7 +253,10 @@ fn bfs_and_dfs() {
     g.add_edge(l2_1, l1, edge_attr.clone());
 
     let gen_vec = |g: &ConcreteGraph<TestSemantics>, nodes: &[NodeKey]| {
-        nodes.iter().map(|&n| g.get_node_attr(n).unwrap().clone()).collect::<Vec<_>>()
+        nodes
+            .iter()
+            .map(|&n| g.get_node_attr(n).unwrap().clone())
+            .collect::<Vec<_>>()
     };
 
     let acceptable_bfs = vec![
@@ -273,7 +279,10 @@ fn bfs_and_dfs() {
         // bfs_nodes.push((node, val.clone()));
         bfs_nodes.push(val.clone());
     }
-    assert!(acceptable_bfs.contains(&bfs_nodes), "petgraph BFS result does not match any of the acceptable results");
+    assert!(
+        acceptable_bfs.contains(&bfs_nodes),
+        "petgraph BFS result does not match any of the acceptable results"
+    );
     println!("petgraph BFS: {:?}", bfs_nodes);
 
     let mut dfs = petgraph::visit::Dfs::new(g.inner_graph(), l1);
@@ -283,7 +292,10 @@ fn bfs_and_dfs() {
         // dfs_nodes.push((node, val.clone()));
         dfs_nodes.push(val.clone());
     }
-    assert!(acceptable_dfs.contains(&dfs_nodes), "petgraph DFS result does not match any of the acceptable results");
+    assert!(
+        acceptable_dfs.contains(&dfs_nodes),
+        "petgraph DFS result does not match any of the acceptable results"
+    );
     println!("petgraph DFS: {:?}", dfs_nodes);
 
     let res = run_from_concrete(&mut g, &op_ctx, fn_map["bfs"], &[l1]).unwrap();

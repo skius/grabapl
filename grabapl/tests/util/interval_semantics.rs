@@ -1,9 +1,9 @@
-use grabapl::operation::{BuiltinOperation, ConcreteData};
 use grabapl::operation::query::{BuiltinQuery, ConcreteQueryOutput};
 use grabapl::operation::signature::parameter::{
     AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter,
 };
 use grabapl::operation::signature::parameterbuilder::OperationParameterBuilder;
+use grabapl::operation::{BuiltinOperation, ConcreteData};
 use grabapl::semantics::{
     AbstractGraph, AbstractJoin, AbstractMatcher, ConcreteGraph, ConcreteToAbstract,
 };
@@ -315,7 +315,11 @@ impl BuiltinOperation for TestOperation {
         g.get_abstract_output(new_node_names)
     }
 
-    fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>, _: &mut ConcreteData) -> OperationOutput {
+    fn apply(
+        &self,
+        g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>,
+        _: &mut ConcreteData,
+    ) -> OperationOutput {
         let mut new_node_names = HashMap::new();
         match self {
             TestOperation::NoOp => {

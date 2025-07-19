@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned};
 use quote::__private::ext::RepToTokensExt;
+use quote::{quote, quote_spanned};
 use syn::parse_macro_input;
 use syn::spanned::Spanned;
 

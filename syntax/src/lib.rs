@@ -2,19 +2,19 @@ pub mod interpreter;
 pub mod minirust;
 pub mod semantics;
 
+use crate::interpreter::{SemanticsWithCustomSyntax, interpret};
+use crate::semantics::TestSemantics;
+use ariadne::{Color, Label, Report, ReportKind, sources};
 use chumsky::error::LabelError;
 use chumsky::extra::ParserExtra;
 use chumsky::input::{MapExtra, SliceInput, StrInput};
 use chumsky::text::{Char, TextExpected};
 use chumsky::util::MaybeRef;
 use chumsky::{input::ValueInput, prelude::*};
+use grabapl::prelude::{OperationContext, OperationId};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
-use ariadne::{sources, Color, Label, Report, ReportKind};
-use grabapl::prelude::{OperationContext, OperationId};
-use crate::interpreter::{interpret, SemanticsWithCustomSyntax};
-use crate::semantics::TestSemantics;
 
 pub trait CustomSyntax: Clone + Debug + 'static {
     type MacroArgType: Clone + fmt::Debug + Default + PartialEq;
@@ -578,44 +578,38 @@ where
         .allow_trailing()
         .collect::<Vec<_>>();
 
-    let shape_node_param = spanned_node_id.clone()
+    let shape_node_param = spanned_node_id
+        .clone()
         .then_ignore(just(Token::Ctrl(':')))
         .then(CS::get_node_type_parser().map_with(|s, e| (s, e.span())))
         .map(|((name, name_span), (node_type, node_type_span))| {
-            (
-                ShapeNodeParam {
-                    name: (name, name_span),
-                    node_type: (node_type, node_type_span),
-                }
-            )
+            (ShapeNodeParam {
+                name: (name, name_span),
+                node_type: (node_type, node_type_span),
+            })
         })
         .boxed();
 
-    let shape_edge_param = spanned_node_id.clone()
+    let shape_edge_param = spanned_node_id
+        .clone()
         .then_ignore(just(Token::Arrow))
         .then(spanned_node_id.clone())
         .then_ignore(just(Token::Ctrl(':')))
         .then(CS::get_edge_type_parser().map_with(|s, e| (s, e.span())))
         .map(
             |(((src, src_span), (dst, dst_span)), (edge_type, edge_type_span))| {
-                (
-                    ShapeEdgeParam {
-                        src: (src, src_span),
-                        dst: (dst, dst_span),
-                        edge_type: (edge_type, edge_type_span),
-                    }
-                )
+                (ShapeEdgeParam {
+                    src: (src, src_span),
+                    dst: (dst, dst_span),
+                    edge_type: (edge_type, edge_type_span),
+                })
             },
         )
         .boxed();
 
-    let spanned_shape_param = shape_node_param.map(|(node_param)| {
-        ShapeQueryParam::Node(node_param)
-    }).or(
-        shape_edge_param.map(|(edge_param)| {
-            ShapeQueryParam::Edge(edge_param)
-        }),
-    )
+    let spanned_shape_param = shape_node_param
+        .map(|(node_param)| ShapeQueryParam::Node(node_param))
+        .or(shape_edge_param.map(|(edge_param)| ShapeQueryParam::Edge(edge_param)))
         .map_with(|s, e| (s, e.span()))
         .boxed();
 
@@ -623,7 +617,7 @@ where
         .separated_by(just(Token::Ctrl(',')))
         .allow_trailing()
         .collect::<Vec<_>>()
-        .map(|params| (ShapeQueryParams { params } ))
+        .map(|params| (ShapeQueryParams { params }))
         .boxed();
 
     let block = recursive(|block| {
@@ -637,10 +631,7 @@ where
             .boxed();
 
         let fn_call_expr = ident_str
-            .then(
-                spanned_macro_args
-                    .or_not(),
-            )
+            .then(spanned_macro_args.or_not())
             .then_ignore(just(Token::Ctrl('(')))
             .then(
                 spanned_node_id
@@ -662,8 +653,6 @@ where
             })
             .boxed();
 
-
-
         let if_cond_shape = just(Token::Shape)
             .ignore_then(just(Token::Ctrl('[')))
             .ignore_then(shape_params.clone())
@@ -674,7 +663,9 @@ where
             .clone()
             .map(|spanned_call| IfCond::Query(spanned_call.0));
 
-        let spanned_if_cond = if_cond_shape.or(if_cond_query).map_with(|c, e| (c, e.span()))
+        let spanned_if_cond = if_cond_shape
+            .or(if_cond_query)
+            .map_with(|c, e| (c, e.span()))
             .labelled("if condition")
             .boxed();
 
@@ -806,7 +797,8 @@ where
             .map_with(|return_stmt, e| (return_stmt, e.span()))
             .labelled("return statement");
 
-        let spanned_rename_stmt = ident_str.then_ignore(just(Token::RevArrow))
+        let spanned_rename_stmt = ident_str
+            .then_ignore(just(Token::RevArrow))
             .then(spanned_node_id.clone())
             .then_ignore(just(Token::Ctrl(';')))
             .map_with(|((new_name, new_name_span), (src, src_span)), e| {
@@ -906,12 +898,13 @@ where
     program
 }
 
-
 /// Important syntax note: mutually recursive functions are not supported.
 /// Function definitions must be ordered in reverse C/C++ order, i.e.,
 /// if function `foo` calls `bar`, then `bar` must be defined after `foo` in the source.
 // TODO: rework this function. terrible.
-pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(src: &'src str) -> (OperationContext<S>, HashMap<&'src str, OperationId>) {
+pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
+    src: &'src str,
+) -> (OperationContext<S>, HashMap<&'src str, OperationId>) {
     let (tokens, mut errs) = lexer().parse(src).into_output_errors();
 
     // println!("Tokens: {tokens:?}");

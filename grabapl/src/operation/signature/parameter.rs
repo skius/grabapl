@@ -1,19 +1,19 @@
 use crate::graph::GraphTrait;
+use crate::operation::marker::MarkerSet;
 use crate::operation::{OperationError, OperationResult};
 use crate::semantics::AbstractGraph;
 use crate::util::bimap::BiMap;
 use crate::util::{InternString, log};
 use crate::{NodeKey, Semantics, SubstMarker, interned_string_newtype};
 use derive_more::From;
+use error_stack::bail;
 use internment::Intern;
 use petgraph::visit::UndirectedAdaptor;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use error_stack::bail;
 use thiserror::Error;
-use crate::operation::marker::MarkerSet;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
 // renamed.
 

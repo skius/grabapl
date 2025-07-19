@@ -1,13 +1,13 @@
 pub mod builder;
 pub mod builtin;
+pub mod marker;
 pub mod query;
 pub mod signature;
 pub mod user_defined;
-pub mod marker;
 
-use std::cell::RefCell;
 use crate::graph::EdgeAttribute;
 use crate::operation::builtin::LibBuiltinOperation;
+use crate::operation::marker::MarkerSet;
 use crate::operation::user_defined::{
     AbstractNodeId, AbstractOperationResultMarker, UserDefinedOperation,
 };
@@ -16,6 +16,7 @@ use crate::semantics::{
 };
 use crate::util::log;
 use crate::{Graph, NodeKey, SubstMarker};
+use error_stack::ResultExt;
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
 use serde::{Deserialize, Serialize};
@@ -23,11 +24,10 @@ use signature::parameter::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument,
     OperationOutput, OperationParameter, ParameterSubstitution,
 };
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
-use error_stack::ResultExt;
 use thiserror::Error;
-use crate::operation::marker::MarkerSet;
 
 pub trait BuiltinOperation: Debug {
     type S: Semantics;
@@ -41,7 +41,11 @@ pub trait BuiltinOperation: Debug {
         g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>,
     ) -> AbstractOperationOutput<Self::S>;
 
-    fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>, concrete_data: &mut ConcreteData) -> OperationOutput;
+    fn apply(
+        &self,
+        g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>,
+        concrete_data: &mut ConcreteData,
+    ) -> OperationOutput;
 }
 
 /// Additional, global data that can be used and modified by operations.

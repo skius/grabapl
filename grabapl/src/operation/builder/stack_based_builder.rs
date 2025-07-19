@@ -1672,11 +1672,7 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         op: BuilderOpLike<S>,
         args: Vec<AbstractNodeId>,
     ) -> Result<(), OperationBuilderError> {
-        self.push_instruction(BuilderInstruction::AddBangOperation(
-            name.into(),
-            op,
-            args,
-        ))
+        self.push_instruction(BuilderInstruction::AddBangOperation(name.into(), op, args))
     }
 
     // TODO: for ergonomics, could take an impl Into<BuilderOpLike<S>> and blanket impl that for all S::BuiltinOperation etc.
