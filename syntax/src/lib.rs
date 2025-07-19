@@ -351,9 +351,8 @@ pub struct ShapeQueryParams<'src, CS: CustomSyntax> {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum IfCond<'src, CS: CustomSyntax> {
-    // TODO: Spanned<> should be moved out and into IfStmt::cond
-    Query(FnCallExpr<'src>),
-    Shape(ShapeQueryParams<'src, CS>),
+    Query(Spanned<FnCallExpr<'src>>),
+    Shape(Spanned<ShapeQueryParams<'src, CS>>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -377,6 +376,13 @@ impl<'src> NodeId<'src> {
             _ => {
                 panic!("NodeId must be a single node, but was: {:?}", self);
             }
+        }
+    }
+
+    pub fn single(&self) -> Option<&'src str> {
+        match self {
+            NodeId::Single(name) => Some(name),
+            _ => None,
         }
     }
 }
@@ -636,11 +642,12 @@ where
                 params.skip_markers = skip_markers;
                 params
             })
+            .map_with(|params, e| (params, e.span()))
             .map(IfCond::Shape);
 
         let if_cond_query = fn_call_expr
             .clone()
-            .map(|spanned_call| IfCond::Query(spanned_call.0));
+            .map(|spanned_call| IfCond::Query(spanned_call));
 
         let spanned_if_cond = if_cond_shape
             .or(if_cond_query)
