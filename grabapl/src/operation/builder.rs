@@ -29,6 +29,7 @@ use std::marker::PhantomData;
 use std::mem;
 use std::slice::Iter;
 use thiserror::Error;
+use crate::operation::marker::Marker;
 
 mod programming_by_demonstration;
 pub mod stack_based_builder;
@@ -160,6 +161,10 @@ pub enum BuilderInstruction<S: Semantics> {
     ExpectShapeNodeChange(AbstractNodeId, S::NodeAbstract),
     #[debug("ExpectShapeEdge({_0:?}, {_1:?}, ???)")]
     ExpectShapeEdge(AbstractNodeId, AbstractNodeId, S::EdgeAbstract),
+    #[debug("SkipMarker({_0:?})")]
+    SkipMarker(Marker),
+    #[debug("SkipAllMarkers")]
+    SkipAllMarkers,
     #[debug("AddNamedOperation({_0:?}, ???, args: {_2:?})")]
     AddNamedOperation(
         AbstractOperationResultMarker,
@@ -218,6 +223,8 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Build
             ExpectShapeEdge(source, target, edge) => {
                 ExpectShapeEdge(source.clone(), target.clone(), edge.clone())
             }
+            SkipMarker(marker) => SkipMarker(marker.clone()),
+            SkipAllMarkers => SkipAllMarkers,
             AddNamedOperation(name, op, args) => {
                 AddNamedOperation(name.clone(), op.clone(), args.clone())
             }
@@ -2460,11 +2467,11 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             }
         }
 
-        let gsq = GraphShapeQuery {
-            parameter: param,
+        let gsq = GraphShapeQuery::new(
+            param,
             expected_graph,
             node_keys_to_shape_idents,
-        };
+        );
 
         // TODO: need to validate GSQ somewhere.
         //  Most importantly, that there are no free floating shape nodes.
@@ -2709,11 +2716,11 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             }
         }
 
-        let gsq = GraphShapeQuery {
-            parameter: param,
+        let gsq = GraphShapeQuery::new(
+            param,
             expected_graph,
             node_keys_to_shape_idents,
-        };
+        );
 
         // TODO: need to validate GSQ somewhere.
         //  Most importantly, that there are no free floating shape nodes.

@@ -13,6 +13,7 @@ use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use crate::operation::marker::{MarkerSet, SkipMarkers};
 
 pub trait BuiltinQuery {
     type S: Semantics;
@@ -55,6 +56,8 @@ pub struct GraphShapeQuery<S: Semantics> {
     // In the expected graph, these nodes are _new_ nodes that are expected to be created by the operation and that will be returned with a mapping
     // the node keys is the key for the expected_graph.
     pub node_keys_to_shape_idents: BiMap<NodeKey, ShapeNodeIdentifier>,
+    // nodes marked with which markers should be skipped in the shape query
+    pub skip_markers: SkipMarkers,
 }
 
 impl<S: Semantics> Clone for GraphShapeQuery<S> {
@@ -63,7 +66,31 @@ impl<S: Semantics> Clone for GraphShapeQuery<S> {
             parameter: self.parameter.clone(),
             expected_graph: self.expected_graph.clone(),
             node_keys_to_shape_idents: self.node_keys_to_shape_idents.clone(),
+            skip_markers: self.skip_markers.clone(),
         }
+    }
+}
+
+impl<S: Semantics> GraphShapeQuery<S> {
+    pub fn new(
+        parameter: OperationParameter<S>,
+        expected_graph: AbstractGraph<S>,
+        node_keys_to_shape_idents: BiMap<NodeKey, ShapeNodeIdentifier>,
+    ) -> Self {
+        GraphShapeQuery {
+            parameter,
+            expected_graph,
+            node_keys_to_shape_idents,
+            skip_markers: SkipMarkers::none(), // by default, skip no markers
+        }
+    }
+
+    pub fn with_skip_markers(
+        mut self,
+        skip_markers: SkipMarkers,
+    ) -> Self {
+        self.skip_markers = skip_markers;
+        self
     }
 }
 
@@ -100,13 +127,18 @@ pub(crate) fn run_shape_query<S: Semantics>(
     query: &GraphShapeQuery<S>,
     selected_inputs: &[NodeKey],
     hidden_nodes: &HashSet<NodeKey>,
+    marker_set: &MarkerSet,
 ) -> OperationResult<ConcreteShapeQueryResult> {
     let abstract_graph = S::concrete_to_abstract(g);
     let subst = ParameterSubstitution::infer_explicit_for_param(selected_inputs, &query.parameter)?;
 
     // TODO: implement edge order?
 
-    get_shape_query_substitution(query, &abstract_graph, &subst, hidden_nodes)
+    let mut hidden_nodes_incl_marker_hidden = hidden_nodes.clone();
+    hidden_nodes_incl_marker_hidden.extend(marker_set.skipped_nodes(&query.skip_markers));
+
+
+    get_shape_query_substitution(query, &abstract_graph, &subst, &hidden_nodes_incl_marker_hidden)
 
     // TODO: after calling this, the abstract graph needs to somehow know that it can be changed for changed values!
 }

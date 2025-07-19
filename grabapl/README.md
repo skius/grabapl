@@ -64,3 +64,4 @@ cargo check --target wasm32-unknown-unknown
 - [ ] Lift restriction of not being able to return edges from shape queries. They cannot be aliased, and returning edges from there is actually useful! (eg, add_edge_if_not_exists)
 - [ ] SigCtx for op builder - then we don't actually need a full user defined operation, just a signature, and that
    - would make mutual recursion easier.
+- [ ] syntax: propagate interpreter errors via span to parser to give pretty errors

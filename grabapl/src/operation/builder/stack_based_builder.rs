@@ -28,6 +28,7 @@ use crate::semantics::{AbstractJoin, AbstractMatcher};
 use crate::util::bimap::BiMap;
 use crate::util::log;
 use error_stack::Result;
+use crate::operation::marker::SkipMarkers;
 
 macro_rules! bail_unexpected_instruction {
     ($i:expr, $i_opt:expr, $frame:literal) => {
@@ -761,6 +762,7 @@ struct BuildingShapeQueryFrame<S: Semantics> {
     /// Holds the state if the shape query matches.
     /// This is simultaneously the expected graph of the shape query.
     true_branch_state: IntermediateState<S>,
+    skip_markers: SkipMarkers,
 }
 
 impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone
@@ -774,6 +776,7 @@ impl<S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> Clone
             query_marker: self.query_marker,
             initial_state: self.initial_state.clone(),
             true_branch_state: self.true_branch_state.clone(),
+            skip_markers: self.skip_markers.clone(),
         }
     }
 }
@@ -792,6 +795,7 @@ impl<S: Semantics> BuildingShapeQueryFrame<S> {
             gsq_node_keys_to_shape_idents: BiMap::new(),
             initial_state,
             true_branch_state,
+            skip_markers: SkipMarkers::none(), // we don't skip any markers by default
         }
     }
 
@@ -829,6 +833,12 @@ impl<S: Semantics> BuildingShapeQueryFrame<S> {
                     .add_edge(src, dst, edge, true)
                     .change_context(BuilderError::OutsideError)?;
             }
+            BI::SkipMarker(marker) => {
+                this.skip_markers.skip(marker);
+            }
+            BI::SkipAllMarkers => {
+                this.skip_markers.skip_all();
+            }
             instruction if instruction.can_break_body() => {
                 // Advance to BuiltShapeQueryFrame
                 // it needs to consume this instruction
@@ -859,11 +869,11 @@ impl<S: Semantics> BuildingShapeQueryFrame<S> {
 
         // TODO: check validity, i.e., no free floating shape nodes, etc.
 
-        let query = GraphShapeQuery {
-            parameter: self.parameter,
-            expected_graph: self.true_branch_state.graph.clone(),
-            node_keys_to_shape_idents: self.gsq_node_keys_to_shape_idents,
-        };
+        let query = GraphShapeQuery::new(
+            self.parameter,
+            self.true_branch_state.graph.clone(),
+            self.gsq_node_keys_to_shape_idents,
+        ).with_skip_markers(self.skip_markers);
 
         let built_frame = BuiltShapeQueryFrame::new(
             self.query_marker,

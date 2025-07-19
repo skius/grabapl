@@ -245,11 +245,11 @@ pub fn get_count_list_len_user_defined_operation(
 
         let child = expected_g.add_node(());
         expected_g.add_edge(head, child, EdgePattern::Wildcard);
-        GraphShapeQuery {
-            parameter: param,
-            expected_graph: expected_g,
-            node_keys_to_shape_idents: BiMap::from([(child, "child".into())]),
-        }
+        GraphShapeQuery::new(
+            param,
+            expected_g,
+            BiMap::from([(child, "child".into())]),
+        )
     };
 
     let new_child = AbstractNodeId::DynamicOutputMarker("next_child_query".into(), "child".into());
@@ -324,18 +324,18 @@ pub fn get_insert_bst_user_defined_operation(
                     let right_child = expected_g.add_node(());
                     expected_g.add_edge(head, left_child, EdgePattern::Wildcard);
                     expected_g.add_edge(head, right_child, EdgePattern::Wildcard);
-                    GraphShapeQuery {
-                        parameter: OperationParameter {
+                    GraphShapeQuery::new(
+                        OperationParameter {
                             explicit_input_nodes: vec!["input".into()],
                             parameter_graph: g,
                             node_keys_to_subst: BiMap::from([(head, "input".into())]),
                         },
-                        expected_graph: expected_g,
-                        node_keys_to_shape_idents: BiMap::from([
+                        expected_g,
+                        BiMap::from([
                             (left_child, "left".into()),
                             (right_child, "right".into()),
                         ]),
-                    }
+                    )
                 },
                 AbstractOperationArgument {  selected_input_nodes: vec![root_node],
                     subst_to_aid: HashMap::from([("input".into(), root_node)]),
@@ -364,15 +364,15 @@ pub fn get_insert_bst_user_defined_operation(
                                 let mut expected_g = g.clone();
                                 let child = expected_g.add_node(());
                                 expected_g.add_edge(head, child, EdgePattern::Wildcard);
-                                GraphShapeQuery {
-                                    parameter: OperationParameter {
+                                GraphShapeQuery::new(
+                                    OperationParameter {
                                         explicit_input_nodes: vec!["input".into()],
                                         parameter_graph: g,
                                         node_keys_to_subst: BiMap::from([(head, "input".into())]),
                                     },
-                                    expected_graph: expected_g,
-                                    node_keys_to_shape_idents: BiMap::from([(child, "child".into())]),
-                                }
+                                    expected_g,
+                                    BiMap::from([(child, "child".into())]),
+                                )
                             },
                             AbstractOperationArgument {  selected_input_nodes: vec![root_node],
                                 subst_to_aid: HashMap::from([("input".into(), root_node)]),
@@ -504,8 +504,8 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                     right_child,
                                                     EdgePattern::Exact("right".to_string()),
                                                 );
-                                                GraphShapeQuery {
-                                                    parameter: OperationParameter {
+                                                GraphShapeQuery::new(
+                                                    OperationParameter {
                                                         explicit_input_nodes: vec!["input".into()],
                                                         parameter_graph: g,
                                                         node_keys_to_subst: BiMap::from([(
@@ -513,12 +513,12 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                             "input".into(),
                                                         )]),
                                                     },
-                                                    expected_graph: expected_g,
-                                                    node_keys_to_shape_idents: BiMap::from([(
+                                                    expected_g,
+                                                    BiMap::from([(
                                                         right_child,
                                                         "right".into(),
                                                     )]),
-                                                }
+                                                )
                                             },
                                             AbstractOperationArgument {
                                                 selected_input_nodes: vec![root_node],
@@ -613,8 +613,8 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                     left_child,
                                                     EdgePattern::Exact("left".to_string()),
                                                 );
-                                                GraphShapeQuery {
-                                                    parameter: OperationParameter {
+                                                GraphShapeQuery::new(
+                                                    OperationParameter {
                                                         explicit_input_nodes: vec!["input".into()],
                                                         parameter_graph: g,
                                                         node_keys_to_subst: BiMap::from([(
@@ -622,12 +622,12 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                             "input".into(),
                                                         )]),
                                                     },
-                                                    expected_graph: expected_g,
-                                                    node_keys_to_shape_idents: BiMap::from([(
+                                                    expected_g,
+                                                    BiMap::from([(
                                                         left_child,
                                                         "left".into(),
                                                     )]),
-                                                }
+                                                )
                                             },
                                             AbstractOperationArgument {
                                                 selected_input_nodes: vec![root_node],
@@ -757,15 +757,15 @@ pub fn get_node_heights_user_defined_operation(
         let mut expected_g = g.clone();
         let left_child = expected_g.add_node(());
         expected_g.add_edge(head, left_child, EdgePattern::Exact("left".to_string()));
-        GraphShapeQuery {
-            parameter: OperationParameter {
+        GraphShapeQuery::new(
+            OperationParameter {
                 explicit_input_nodes: vec!["input".into()],
                 parameter_graph: g,
                 node_keys_to_subst: BiMap::from([(head, "input".into())]),
             },
-            expected_graph: expected_g,
-            node_keys_to_shape_idents: BiMap::from([(left_child, "left".into())]),
-        }
+            expected_g,
+            BiMap::from([(left_child, "left".into())]),
+        )
     };
     let right_child_query = {
         // the graph shape query
@@ -774,15 +774,15 @@ pub fn get_node_heights_user_defined_operation(
         let mut expected_g = g.clone();
         let right_child = expected_g.add_node(());
         expected_g.add_edge(head, right_child, EdgePattern::Exact("right".to_string()));
-        GraphShapeQuery {
-            parameter: OperationParameter {
-                explicit_input_nodes: vec!["input".into()],
-                parameter_graph: g,
-                node_keys_to_subst: BiMap::from([(head, "input".into())]),
-            },
-            expected_graph: expected_g,
-            node_keys_to_shape_idents: BiMap::from([(right_child, "right".into())]),
-        }
+        GraphShapeQuery::new(
+                    OperationParameter {
+                        explicit_input_nodes: vec!["input".into()],
+                        parameter_graph: g,
+                        node_keys_to_subst: BiMap::from([(head, "input".into())]),
+                    },
+                    expected_g,
+                    BiMap::from([(right_child, "right".into())]),
+        )
     };
     let left_child = AbstractNodeId::DynamicOutputMarker("left_child_query".into(), "left".into());
     let right_child =

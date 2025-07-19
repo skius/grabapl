@@ -1,7 +1,45 @@
-use crate::util::InternString;
+//! Markers are tags that can be applied to nodes in the concrete graph. They do not exist abstractly.
+//! Markers are primarily used to hide nodes from shape queries.
+
+use crate::util::{log, InternString};
 use crate::{NodeKey, interned_string_newtype};
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
+
+/// Defines a set of markers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum SkipMarkers {
+    All,
+    Set(HashSet<Marker>),
+}
+
+impl SkipMarkers {
+    pub fn new(markers: impl IntoIterator<Item = Marker>) -> Self {
+        SkipMarkers::Set(markers.into_iter().collect())
+    }
+
+    pub fn none() -> Self {
+        SkipMarkers::Set(HashSet::new())
+    }
+
+    pub fn all() -> Self {
+        SkipMarkers::All
+    }
+
+    pub fn skip_all(&mut self) {
+        *self = SkipMarkers::All;
+    }
+
+    pub fn skip(&mut self, marker: Marker) {
+        match self {
+            SkipMarkers::All => {}
+            SkipMarkers::Set(set) => {
+                set.insert(marker);
+            }
+        }
+    }
+}
 
 #[derive(derive_more::Debug, Clone, PartialEq, Eq, Hash, Copy)]
 #[debug("{_0}")]
@@ -17,6 +55,7 @@ pub enum MarkerError {
     MarkerDoesNotExist(Marker),
 }
 
+// TODO: this is not only a marker set, but also marked nodes themselves.
 #[derive(Debug, Clone, Default)]
 pub struct MarkerSet {
     // which markers currently exist
@@ -34,6 +73,25 @@ impl MarkerSet {
 
     pub fn all_marked_nodes(&self) -> impl Iterator<Item = NodeKey> {
         self.marked_nodes_to_markers.keys().cloned()
+    }
+
+    /// Returns an iterator over all nodes that have a marker from the SkipMarkers set.
+    pub fn skipped_nodes<'a>(&'a self, skip_markers: &'a SkipMarkers) -> impl Iterator<Item = NodeKey> + 'a {
+        let filter: Box<dyn for<'b> Fn(&'b NodeKey) -> bool> = match skip_markers {
+            SkipMarkers::All => Box::new(|_node: &NodeKey| true),
+            SkipMarkers::Set(markers) => Box::new(|node: &NodeKey| {
+                if let Some(node_markers) = self.marked_nodes_to_markers.get(node) {
+                    !node_markers.is_disjoint(markers)
+                } else {
+                    log::warn!("Node {:?} has no marker mapping, should not happen", node);
+                    true
+                }
+            }),
+        };
+        self.marked_nodes_to_markers
+            .keys()
+            .copied()
+            .filter(filter)
     }
 
     pub fn add_marker(&mut self, marker: impl Into<Marker>) -> Result<(), MarkerError> {
