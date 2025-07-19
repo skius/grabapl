@@ -1,14 +1,10 @@
 use grabapl::graph::GraphTrait;
-use grabapl::operation::OperationContext;
 use grabapl::operation::signature::parameter::AbstractOutputNodeMarker;
 use grabapl::prelude::{ConcreteGraph, run_from_concrete};
-use grabapl::util::log;
 use grabapl::{NodeKey, Semantics};
 use proptest::proptest;
 use proptest::test_runner::Config;
 use std::collections::BinaryHeap;
-use std::path::PathBuf;
-use std::str::FromStr;
 use syntax::semantics::{NodeValue, TestSemantics};
 
 /// Creates a max-heap from a set of integer values and returns the sentinel node key.

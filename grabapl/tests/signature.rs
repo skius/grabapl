@@ -1,7 +1,7 @@
 mod util;
 
 use grabapl::prelude::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use util::semantics::*;
 
 #[test_log::test]

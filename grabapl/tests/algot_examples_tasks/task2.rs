@@ -1,12 +1,11 @@
 use super::semantics::*;
 use grabapl::graph::GraphTrait;
-use grabapl::operation::builder::stack_based_builder::OperationBuilder2;
 use grabapl::operation::signature::parameter::AbstractOutputNodeMarker;
 use grabapl::prelude::*;
 use proptest::proptest;
 use proptest::test_runner::Config;
 use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::BinaryHeap;
 
 const MAX_HEAP_REMOVE_ID: OperationId = 0;
 const MAX_HEAP_REMOVE_HELPER_ID: OperationId = 1;

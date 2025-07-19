@@ -15,7 +15,6 @@ use crate::util::{InternString, log};
 use crate::{NodeKey, Semantics, SubstMarker, interned_string_newtype};
 use derive_more::with_trait::From;
 use error_stack::{FutureExt, ResultExt, bail, report};
-use internment::Intern;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;

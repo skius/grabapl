@@ -4,8 +4,8 @@
 //! cargo run --features="label" --example nano_rust -- examples/sample.nrs
 
 use ariadne::{Color, Label, Report, ReportKind, sources};
-use chumsky::{input::ValueInput, prelude::*};
-use std::{collections::HashMap, env, fmt, fs};
+use chumsky::prelude::*;
+use std::{env, fs};
 
 use syntax::interpreter::interpret;
 use syntax::semantics::TestSemantics;
@@ -19,7 +19,7 @@ fn main() {
 
     println!("Source: {src}");
 
-    let (tokens, mut errs) = lexer().parse(src.as_str()).into_output_errors();
+    let (tokens, errs) = lexer().parse(src.as_str()).into_output_errors();
 
     println!("Tokens: {tokens:?}");
 

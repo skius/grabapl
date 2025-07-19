@@ -4,7 +4,7 @@
 //! cargo run --features="label" --example nano_rust -- examples/sample.nrs
 
 use chumsky::{input::ValueInput, prelude::*};
-use std::{collections::HashMap, env, fmt, fs};
+use std::{collections::HashMap, fmt};
 
 // A few type definitions to be used by our parsers below
 pub type Span = SimpleSpan;

@@ -328,7 +328,7 @@ pub fn run_from_concrete<S: Semantics>(
         }
     };
     // then run the operation
-    let mut marker_set = RefCell::new(MarkerSet::new());
+    let marker_set = RefCell::new(MarkerSet::new());
     let arg = OperationArgument {
         subst,
         selected_input_nodes: selected_inputs.into(),

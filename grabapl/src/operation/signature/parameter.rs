@@ -7,7 +7,6 @@ use crate::util::{InternString, log};
 use crate::{NodeKey, Semantics, SubstMarker, interned_string_newtype};
 use derive_more::From;
 use error_stack::bail;
-use internment::Intern;
 use petgraph::visit::UndirectedAdaptor;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;

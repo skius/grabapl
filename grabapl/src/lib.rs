@@ -15,7 +15,6 @@ pub use graph::EdgeInsertionOrder;
 pub use graph::EdgeKey;
 pub use graph::Graph;
 pub use graph::NodeKey;
-use internment::Intern;
 pub use semantics::Semantics;
 
 /// A marker for substitution in the graph.

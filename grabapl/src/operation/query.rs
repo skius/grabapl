@@ -9,7 +9,6 @@ use crate::util::{InternString, log};
 use crate::{NodeKey, interned_string_newtype};
 use derive_more::From;
 use derive_more::with_trait::Into;
-use internment::Intern;
 use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
 use serde::{Deserialize, Serialize};

@@ -1,8 +1,4 @@
 use proc_macro2::TokenStream;
-use quote::__private::ext::RepToTokensExt;
-use quote::{quote, quote_spanned};
-use syn::parse_macro_input;
-use syn::spanned::Spanned;
 
 pub fn my_proc_impl(input: TokenStream) -> TokenStream {
     // parse input stream like so:

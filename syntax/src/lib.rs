@@ -3,13 +3,8 @@ pub mod minirust;
 pub mod semantics;
 
 use crate::interpreter::{SemanticsWithCustomSyntax, interpret};
-use crate::semantics::TestSemantics;
 use ariadne::{Color, Label, Report, ReportKind, sources};
-use chumsky::error::LabelError;
-use chumsky::extra::ParserExtra;
-use chumsky::input::{MapExtra, SliceInput, StrInput};
-use chumsky::text::{Char, TextExpected};
-use chumsky::util::MaybeRef;
+use chumsky::input::SliceInput;
 use chumsky::{input::ValueInput, prelude::*};
 use grabapl::prelude::{OperationContext, OperationId};
 use std::collections::HashMap;
@@ -583,10 +578,10 @@ where
         .then_ignore(just(Token::Ctrl(':')))
         .then(CS::get_node_type_parser().map_with(|s, e| (s, e.span())))
         .map(|((name, name_span), (node_type, node_type_span))| {
-            (ShapeNodeParam {
+            ShapeNodeParam {
                 name: (name, name_span),
                 node_type: (node_type, node_type_span),
-            })
+            }
         })
         .boxed();
 
@@ -598,18 +593,18 @@ where
         .then(CS::get_edge_type_parser().map_with(|s, e| (s, e.span())))
         .map(
             |(((src, src_span), (dst, dst_span)), (edge_type, edge_type_span))| {
-                (ShapeEdgeParam {
+                ShapeEdgeParam {
                     src: (src, src_span),
                     dst: (dst, dst_span),
                     edge_type: (edge_type, edge_type_span),
-                })
+                }
             },
         )
         .boxed();
 
     let spanned_shape_param = shape_node_param
-        .map(|(node_param)| ShapeQueryParam::Node(node_param))
-        .or(shape_edge_param.map(|(edge_param)| ShapeQueryParam::Edge(edge_param)))
+        .map(|node_param| ShapeQueryParam::Node(node_param))
+        .or(shape_edge_param.map(|edge_param| ShapeQueryParam::Edge(edge_param)))
         .map_with(|s, e| (s, e.span()))
         .boxed();
 
@@ -905,7 +900,7 @@ where
 pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
     src: &'src str,
 ) -> (OperationContext<S>, HashMap<&'src str, OperationId>) {
-    let (tokens, mut errs) = lexer().parse(src).into_output_errors();
+    let (tokens, errs) = lexer().parse(src).into_output_errors();
 
     // println!("Tokens: {tokens:?}");
 
@@ -954,7 +949,7 @@ pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
                         .with_color(Color::Yellow)
                 }))
                 .finish()
-                .eprint(sources([(filename.clone(), src.clone())]))
+                .eprint(sources([(filename.clone(), src)]))
                 .unwrap()
         });
 
