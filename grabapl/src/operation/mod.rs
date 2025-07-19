@@ -3,6 +3,7 @@ pub mod builtin;
 pub mod query;
 pub mod signature;
 pub mod user_defined;
+pub mod marker;
 
 use crate::graph::EdgeAttribute;
 use crate::operation::builtin::LibBuiltinOperation;
@@ -249,15 +250,20 @@ fn run_lib_builtin_operation<S: Semantics>(
     op: &LibBuiltinOperation<S>,
     arg: OperationArgument,
 ) -> OperationResult<OperationOutput> {
-    let mut gws = GraphWithSubstitution::new(g, &arg.subst);
-    let output = op.apply(&mut gws);
-
-    Ok(output)
+    run_builtin_or_lib_builtin_operation(g, op, arg)
 }
 
 fn run_builtin_operation<S: Semantics>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
     op: &S::BuiltinOperation,
+    arg: OperationArgument,
+) -> OperationResult<OperationOutput> {
+    run_builtin_or_lib_builtin_operation(g, op, arg)
+}
+
+fn run_builtin_or_lib_builtin_operation<S: Semantics, BO: BuiltinOperation<S = S>>(
+    g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
+    op: &BO, // LibBuiltin implements BuiltinOperation for any Semantics.
     arg: OperationArgument,
 ) -> OperationResult<OperationOutput> {
     let mut gws = GraphWithSubstitution::new(g, &arg.subst);

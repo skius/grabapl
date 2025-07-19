@@ -53,13 +53,13 @@ macro_rules! interned_string_newtype {
     ($ty_name:ident, $mk_fn:expr) => {
         impl<'a> From<&'a str> for $ty_name {
             fn from(value: &'a str) -> Self {
-                $mk_fn(Intern::<String>::from_ref(value).into())
+                $mk_fn(internment::Intern::<String>::from_ref(value).into())
             }
         }
 
         impl From<String> for $ty_name {
             fn from(value: String) -> Self {
-                $mk_fn(Intern::<String>::from(value).into())
+                $mk_fn(internment::Intern::<String>::from(value).into())
             }
         }
     };

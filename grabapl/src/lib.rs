@@ -1,3 +1,5 @@
+extern crate core;
+
 mod experimental;
 pub mod graph;
 pub mod operation;
