@@ -5,6 +5,7 @@ use crate::util::InternString;
 
 #[derive(derive_more::Debug, Clone, PartialEq, Eq, Hash, Copy)]
 #[debug("{_0}")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Marker(pub InternString);
 interned_string_newtype!(Marker);
 
@@ -16,6 +17,7 @@ pub enum MarkerError {
     MarkerDoesNotExist(Marker),
 }
 
+#[derive(Debug, Clone, Default)]
 pub struct MarkerSet {
     // which markers currently exist
     pub markers: HashSet<Marker>,
@@ -27,11 +29,7 @@ pub struct MarkerSet {
 
 impl MarkerSet {
     pub fn new() -> Self {
-        MarkerSet {
-            markers: HashSet::new(),
-            marker_to_marked_nodes: HashMap::new(),
-            marked_nodes_to_markers: HashMap::new(),
-        }
+        MarkerSet::default()
     }
 
     pub fn add_marker(&mut self, marker: impl Into<Marker>) -> Result<(), MarkerError> {
@@ -52,6 +50,14 @@ impl MarkerSet {
         self.marker_to_marked_nodes.get_mut(&marker).unwrap().insert(node_key);
         self.marked_nodes_to_markers.entry(node_key).or_default().insert(marker);
         Ok(())
+    }
+
+    pub fn create_marker_and_mark_node(&mut self, marker: impl Into<Marker>, node_key: NodeKey) {
+        let marker = marker.into();
+        if !self.markers.contains(&marker) {
+            self.add_marker(marker).expect("Marker should not already exist");
+        }
+        self.mark_node(marker, node_key).expect("Node should be able to be marked");
     }
 
     pub fn remove_marker(&mut self, marker: impl Into<Marker>) {

@@ -338,9 +338,9 @@ impl<S: Semantics> UserDefinedOperation<S> {
         &self,
         op_ctx: &OperationContext<S>,
         g: &mut ConcreteGraph<S>,
-        arg: &OperationArgument,
+        arg: OperationArgument,
     ) -> OperationResult<OperationOutput> {
-        let mut runner = Runner::new(op_ctx, g, arg);
+        let mut runner = Runner::new(op_ctx, g, &arg);
         runner.run(&self.instructions)?;
 
         let our_output_map = self
@@ -367,20 +367,20 @@ impl<S: Semantics> UserDefinedOperation<S> {
 }
 
 /// Runs a user defined operation.
-struct Runner<'a, S: Semantics> {
+struct Runner<'a, 'arg, S: Semantics> {
     op_ctx: &'a OperationContext<S>,
     g: &'a mut ConcreteGraph<S>,
     /// The argument with which our operation was called.
-    arg: &'a OperationArgument<'a>,
+    arg: &'a OperationArgument<'arg>,
     // Note: should not store AID::Parameter nodes, those are in `arg` already.
     abstract_to_concrete: HashMap<AbstractNodeId, NodeKey>,
 }
 
-impl<'a, S: Semantics> Runner<'a, S> {
+impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
     pub fn new(
         op_ctx: &'a OperationContext<S>,
         g: &'a mut ConcreteGraph<S>,
-        arg: &'a OperationArgument<'a>,
+        arg: &'a OperationArgument<'arg>,
     ) -> Self {
         Runner {
             op_ctx,
@@ -510,7 +510,7 @@ impl<'a, S: Semantics> Runner<'a, S> {
     fn abstract_to_concrete_arg(
         &self,
         arg: &AbstractOperationArgument,
-    ) -> OperationResult<OperationArgument<'static>> {
+    ) -> OperationResult<OperationArgument<'arg>> {
         log::trace!(
             "Getting concrete arg of abstract arg: {arg:#?} previous_results: {:#?}, our operation's argument: {:#?}",
             &self.abstract_to_concrete,
@@ -550,6 +550,7 @@ impl<'a, S: Semantics> Runner<'a, S> {
             selected_input_nodes: selected_keys.into(),
             subst: new_subst,
             hidden_nodes,
+            marker_set: self.arg.marker_set,
         })
     }
 }

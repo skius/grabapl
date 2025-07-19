@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 use derive_more::From;
-use grabapl::operation::BuiltinOperation;
+use grabapl::operation::{BuiltinOperation, ConcreteData};
 use grabapl::operation::query::{BuiltinQuery, ConcreteQueryOutput};
 use grabapl::operation::signature::parameter::{
     AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter,
@@ -526,7 +526,7 @@ impl BuiltinOperation for TestOperation {
         g.get_abstract_output(new_node_names)
     }
 
-    fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>) -> OperationOutput {
+    fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>, _: &mut ConcreteData) -> OperationOutput {
         let mut new_node_names = HashMap::new();
         match self {
             TestOperation::NoOp => {

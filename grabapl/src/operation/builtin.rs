@@ -1,13 +1,11 @@
-use crate::operation::BuiltinOperation;
-use crate::operation::signature::parameter::{
-    AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter,
-};
+use crate::operation::{BuiltinOperation, ConcreteData};
+use crate::operation::signature::parameter::{AbstractOperationOutput, GraphWithSubstitution, NodeMarker, OperationOutput, OperationParameter};
 use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
 use crate::semantics::{AbstractGraph, ConcreteGraph, ConcreteToAbstract};
 use crate::{Semantics, SubstMarker};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
+use crate::operation::marker::Marker;
 // TODO: similarly, create a LibBuiltinQuery.
 
 /// Operations that are available for every semantics.
@@ -36,6 +34,11 @@ pub enum LibBuiltinOperation<S: Semantics> {
     SetNode {
         param: S::NodeAbstract,
         value: S::NodeConcrete,
+    },
+    #[debug("Mark<{marker:?}>")]
+    Mark {
+        marker: Marker,
+        param: S::NodeAbstract,
     },
 }
 
@@ -67,6 +70,10 @@ impl<S: Semantics> Clone for LibBuiltinOperation<S> {
             LibBuiltinOperation::SetNode { param, value } => LibBuiltinOperation::SetNode {
                 param: param.clone(),
                 value: value.clone(),
+            },
+            LibBuiltinOperation::Mark { marker, param } => LibBuiltinOperation::Mark {
+                marker: marker.clone(),
+                param: param.clone(),
             },
         }
     }
@@ -105,6 +112,11 @@ impl<S: Semantics> LibBuiltinOperation<S> {
                     .unwrap();
             }
             LibBuiltinOperation::SetNode { param, value } => {
+                param_builder
+                    .expect_explicit_input_node("node", param.clone())
+                    .unwrap();
+            }
+            LibBuiltinOperation::Mark { marker, param } => {
                 param_builder
                     .expect_explicit_input_node("node", param.clone())
                     .unwrap();
@@ -148,11 +160,14 @@ impl<S: Semantics> LibBuiltinOperation<S> {
                     S::NodeConcreteToAbstract::concrete_to_abstract(value),
                 );
             }
+            LibBuiltinOperation::Mark { marker, param } => {
+                // markers dont exist in abstract
+            }
         }
         g.get_abstract_output(new_node_names)
     }
 
-    pub fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<S>>) -> OperationOutput {
+    pub fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<S>>, concrete_data: &mut ConcreteData) -> OperationOutput {
         let mut new_node_names = HashMap::new();
         match self {
             LibBuiltinOperation::AddNode { value } => {
@@ -178,6 +193,11 @@ impl<S: Semantics> LibBuiltinOperation<S> {
             LibBuiltinOperation::SetNode { param, value } => {
                 g.set_node_value(SubstMarker::from("node"), value.clone());
             }
+            LibBuiltinOperation::Mark { marker, param } => {
+                // mark matched node
+                let node = g.get_node_key(&NodeMarker::Subst("node".into())).unwrap();
+                concrete_data.marker_set.borrow_mut().create_marker_and_mark_node(*marker, node);
+            }
         }
         g.get_concrete_output(new_node_names)
     }
@@ -197,7 +217,7 @@ impl<S: Semantics> BuiltinOperation for LibBuiltinOperation<S> {
         self.apply_abstract(g)
     }
 
-    fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<S>>) -> OperationOutput {
-        self.apply(g)
+    fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>, concrete_data: &mut ConcreteData) -> OperationOutput {
+        self.apply(g, concrete_data)
     }
 }

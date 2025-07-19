@@ -9,9 +9,11 @@ use internment::Intern;
 use petgraph::visit::UndirectedAdaptor;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use error_stack::bail;
 use thiserror::Error;
+use crate::operation::marker::MarkerSet;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
 // renamed.
 
@@ -184,7 +186,7 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         }
     }
 
-    fn get_node_key(&self, marker: &NodeMarker) -> Option<NodeKey> {
+    pub fn get_node_key(&self, marker: &NodeMarker) -> Option<NodeKey> {
         let found_key = match marker {
             NodeMarker::Subst(sm) => {
                 // If the marker is a SubstMarker, we look it up in the substitution mapping.
@@ -477,6 +479,7 @@ pub struct OperationArgument<'a> {
     /// These nodes may not be matched in shape queries, as they could modify values and break the operation's
     /// abstract guarantees, since changes are not visible to outer operations.
     pub hidden_nodes: HashSet<NodeKey>,
+    pub marker_set: &'a RefCell<MarkerSet>,
 }
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]

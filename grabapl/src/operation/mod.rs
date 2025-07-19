@@ -5,6 +5,7 @@ pub mod signature;
 pub mod user_defined;
 pub mod marker;
 
+use std::cell::RefCell;
 use crate::graph::EdgeAttribute;
 use crate::operation::builtin::LibBuiltinOperation;
 use crate::operation::user_defined::{
@@ -26,6 +27,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use error_stack::ResultExt;
 use thiserror::Error;
+use crate::operation::marker::MarkerSet;
 
 pub trait BuiltinOperation: Debug {
     type S: Semantics;
@@ -39,7 +41,13 @@ pub trait BuiltinOperation: Debug {
         g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>,
     ) -> AbstractOperationOutput<Self::S>;
 
-    fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>) -> OperationOutput;
+    fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>, concrete_data: &mut ConcreteData) -> OperationOutput;
+}
+
+/// Additional, global data that can be used and modified by operations.
+#[derive(Debug, Clone)]
+pub struct ConcreteData<'a> {
+    marker_set: &'a RefCell<MarkerSet>,
 }
 
 /// Contains available operations
@@ -267,7 +275,10 @@ fn run_builtin_or_lib_builtin_operation<S: Semantics, BO: BuiltinOperation<S = S
     arg: OperationArgument,
 ) -> OperationResult<OperationOutput> {
     let mut gws = GraphWithSubstitution::new(g, &arg.subst);
-    let output = op.apply(&mut gws);
+    let mut concrete_data = ConcreteData {
+        marker_set: arg.marker_set,
+    };
+    let output = op.apply(&mut gws, &mut concrete_data);
 
     Ok(output)
 }
@@ -278,7 +289,7 @@ fn run_custom_operation<S: Semantics>(
     op: &UserDefinedOperation<S>,
     arg: OperationArgument,
 ) -> OperationResult<OperationOutput> {
-    let output = op.apply(op_ctx, g, &arg)?;
+    let output = op.apply(op_ctx, g, arg)?;
 
     Ok(output)
 }
@@ -313,10 +324,12 @@ pub fn run_from_concrete<S: Semantics>(
         }
     };
     // then run the operation
+    let mut marker_set = RefCell::new(MarkerSet::new());
     let arg = OperationArgument {
         subst,
         selected_input_nodes: selected_inputs.into(),
         hidden_nodes: HashSet::new(),
+        marker_set: &marker_set,
     };
 
     run_operation(g, op_ctx, op, arg)
