@@ -56,8 +56,6 @@ fn get_ops() -> (
                 dfs_helper(grandchild, head);
             }
             // then go to our siblings
-            // problem is, here we lost the function stack 'visited' marker from above, so if a sibling has the same descendant as us,
-            // we will visit it again.
             if shape [
                 sibling: Integer,
                 parent -> sibling: *,
@@ -68,6 +66,19 @@ fn get_ops() -> (
 
 
         // ------ BFS --------
+        /*
+        General idea:
+        1. Start with the input node
+        2. For layer 0..n call operation that first descends n times to its children,
+           then iterates over all siblings there.
+           // TODO: think about marker interactions. what if we could tell a shape query to not skip marked nodes?
+           // then we could mark all nodes already added to the result list.
+           // this is a problem though since going to a child for the next layer requires a shape query
+           // hence we must tell the shape query to not skip marked nodes for everything except the last layer.
+           // in the last layer, i.e., when we could accidentally have a back-edge to a earlier layer, we skip marked nodes again.
+           // 
+
+        */
 
         fn bfs(start_node: Integer) -> (head: Integer) {
             let! head = add_node<int,0>();
