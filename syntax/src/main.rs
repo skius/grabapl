@@ -37,7 +37,7 @@ fn main() {
             println!("Parsed: {program:#?}");
             println!("interpreting...");
 
-            let (op_ctx, fns_to_ids) = interpret::<TestSemantics>(program);
+            let (op_ctx, fns_to_ids) = interpret::<TestSemantics>(program).unwrap();
 
             let json = serde_json::to_string_pretty(&op_ctx)
                 .expect("Failed to serialize operation context to JSON");

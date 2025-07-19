@@ -1236,11 +1236,13 @@ dependencies = [
  "ariadne",
  "chumsky 0.10.1",
  "derive_more 0.99.20",
+ "error-stack",
  "grabapl",
  "proptest",
  "serde",
  "serde_json",
  "test-log",
+ "thiserror",
 ]
 
 [[package]]

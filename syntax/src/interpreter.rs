@@ -1,12 +1,10 @@
-use crate::{
-    Block, CustomSyntax, FnCallExpr, FnDef, FnImplicitParam, FnNodeParam, IfCond, IfStmt, LetStmt,
-    MacroArgs, NodeId, Program, RenameStmt, ReturnStmt, ReturnStmtMapping, ShapeQueryParam,
-    ShapeQueryParams, Spanned, Statement, lexer,
-};
+use crate::{Block, CustomSyntax, FnCallExpr, FnDef, FnImplicitParam, FnNodeParam, IfCond, IfStmt, LetStmt, MacroArgs, NodeId, Program, RenameStmt, ReturnStmt, ReturnStmtMapping, ShapeQueryParam, ShapeQueryParams, Spanned, Statement, lexer, Span};
 use chumsky::prelude::*;
 use grabapl::operation::marker::SkipMarkers;
 use grabapl::prelude::*;
 use std::collections::HashMap;
+use thiserror::Error;
+use error_stack::{Result, ResultExt};
 
 fn parse_abstract_node_type<S: SemanticsWithCustomSyntax>(
     src: &str,
@@ -88,12 +86,34 @@ pub trait SemanticsWithCustomSyntax:
     ) -> Self::EdgeAbstract;
 }
 
+#[derive(Error, Debug)]
+pub enum InterpreterError {
+    #[error("Failed to compile program due to semantic builder error")]
+    BuilderError,
+}
+
+impl InterpreterError {
+    pub fn with_span(self, span: Span) -> SpannedInterpreterError {
+        SpannedInterpreterError {
+            span,
+            error: self,
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+#[error("{error}")]
+pub struct SpannedInterpreterError {
+    pub span: Span,
+    pub error: InterpreterError,
+}
+
 pub fn interpret<S: SemanticsWithCustomSyntax>(
     prog: Spanned<Program<S::CS>>,
-) -> (OperationContext<S>, HashMap<&'_ str, OperationId>) {
+) -> Result<(OperationContext<S>, HashMap<&'_ str, OperationId>), SpannedInterpreterError> {
     let mut interpreter = Interpreter::<S>::new();
-    interpreter.interpret_program(prog);
-    (interpreter.built_op_ctx, interpreter.fns_to_op_ids)
+    interpreter.interpret_program(prog)?;
+    Ok((interpreter.built_op_ctx, interpreter.fns_to_op_ids))
 }
 
 struct Interpreter<'src, S: SemanticsWithCustomSyntax> {
@@ -109,31 +129,33 @@ impl<'src, S: SemanticsWithCustomSyntax> Interpreter<'src, S> {
         }
     }
 
-    fn interpret_program(&mut self, prog: Spanned<Program<'src, S::CS>>) {
+    fn interpret_program(&mut self, prog: Spanned<Program<'src, S::CS>>) -> Result<(), SpannedInterpreterError> {
         // we iterate in reverse order such that all functions have their dependencies already parsed
         for (name, fn_def) in prog.0.functions.into_iter().rev() {
             let op_id = self.fns_to_op_ids.len() as u32;
             self.fns_to_op_ids.insert(name, op_id);
 
-            let user_op = self.interpret_fn_def(op_id, fn_def);
+            let user_op = self.interpret_fn_def(op_id, fn_def)?;
             self.built_op_ctx.add_custom_operation(op_id, user_op);
         }
+        Ok(())
     }
 
     fn interpret_fn_def(
         &mut self,
         self_op_id: OperationId,
         fn_def: Spanned<FnDef<S::CS>>,
-    ) -> UserDefinedOperation<S> {
+    ) -> Result<UserDefinedOperation<S>, SpannedInterpreterError> {
         // use a OperationBuilder to interpret the function definition and build a user defined operation
 
         let mut builder = OperationBuilder::new(&self.built_op_ctx, self_op_id);
 
         let mut interpreter =
             FnInterpreter::new(&mut builder, &self.fns_to_op_ids, fn_def.0.name.0);
+        let fn_span = fn_def.1;
         interpreter.interpret_fn_def(fn_def);
 
-        builder.build().unwrap()
+        builder.build().change_context(InterpreterError::BuilderError.with_span(fn_span))
     }
 }
 

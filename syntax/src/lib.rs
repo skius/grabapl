@@ -884,6 +884,7 @@ where
 pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
     src: &'src str,
 ) -> (OperationContext<S>, HashMap<&'src str, OperationId>) {
+    let filename = "input".to_string();
     let (tokens, errs) = lexer().parse(src).into_output_errors();
 
     // println!("Tokens: {tokens:?}");
@@ -899,17 +900,34 @@ pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
             .into_output_errors();
 
         if let Some((program, file_span)) = ast.filter(|_| errs.len() + parse_errs.len() == 0) {
-            let (op_ctx, fns_to_ids) = interpret::<S>(program);
+            let res = interpret::<S>(program);
+            match res {
+                Ok((op_ctx, fns_to_ids)) => {
+                    return (op_ctx, fns_to_ids);
+                },
+                Err(e) => {
+                    // build report with error
+                    let error_span = e.current_context().span;
+                    Report::build(ReportKind::Error, (filename.clone(), error_span.into_range()))
+                        .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte))
+                        .with_message(e.to_string())
+                        .with_label(
+                            Label::new((filename.clone(), error_span.into_range()))
+                                .with_message(format!("detailed message:\n{e:?}"))
+                                .with_color(Color::Red),
+                        )
+                        .finish()
+                        .eprint(sources([(filename.clone(), src)]))
+                        .unwrap()
 
-            return (op_ctx, fns_to_ids);
+                }
+            }
         }
 
         parse_errs
     } else {
         Vec::new()
     };
-
-    let filename = "input".to_string();
 
     errs.into_iter()
         .map(|e| e.map_token(|c| c.to_string()))
