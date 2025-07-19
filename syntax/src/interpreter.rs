@@ -4,7 +4,7 @@ use grabapl::operation::marker::SkipMarkers;
 use grabapl::prelude::*;
 use std::collections::HashMap;
 use thiserror::Error;
-use error_stack::{report, Result, ResultExt};
+use error_stack::{report, Report, Result, ResultExt};
 
 fn parse_abstract_node_type<S: SemanticsWithCustomSyntax>(
     src: &str,
@@ -87,21 +87,21 @@ pub trait SemanticsWithCustomSyntax:
 }
 
 #[derive(Error, Debug)]
-pub enum InterpreterError<'src> {
+pub enum InterpreterError {
     #[error("Failed to compile program due to semantic builder error")]
     BuilderError,
     #[error("Operation with name '{0}' not found in the program")]
     NotFoundOperation(String),
     #[error("Query with name '{0}' not found in the program")]
     NotFoundQuery(String),
-    #[error("Node ID '{0:?}' not found in current context")]
-    NotFoundNodeId(NodeId<'src>),
+    #[error("Node ID '{0}' not found in current context")]
+    NotFoundNodeId(String),
     #[error("Return marker '{0}' not found in the function")]
-    NotFoundReturnMarker(&'src str),
+    NotFoundReturnMarker(String),
 }
 
-impl<'src> InterpreterError<'src> {
-    pub fn with_span(self, span: Span) -> SpannedInterpreterError<'src> {
+impl InterpreterError {
+    pub fn with_span(self, span: Span) -> SpannedInterpreterError {
         SpannedInterpreterError {
             span,
             error: self,
@@ -111,14 +111,14 @@ impl<'src> InterpreterError<'src> {
 
 #[derive(Error, Debug)]
 #[error("{error}")]
-pub struct SpannedInterpreterError<'src> {
+pub struct SpannedInterpreterError {
     pub span: Span,
-    pub error: InterpreterError<'src>,
+    pub error: InterpreterError,
 }
 
 pub fn interpret<'src, S: SemanticsWithCustomSyntax>(
     prog: Spanned<Program<'src, S::CS>>,
-) -> Result<(OperationContext<S>, HashMap<&'src str, OperationId>), SpannedInterpreterError<'src>> {
+) -> Result<(OperationContext<S>, HashMap<&'src str, OperationId>), SpannedInterpreterError> {
     let mut interpreter = Interpreter::<S>::new();
     interpreter.interpret_program(prog)?;
     Ok((interpreter.built_op_ctx, interpreter.fns_to_op_ids))
@@ -137,7 +137,7 @@ impl<'src, S: SemanticsWithCustomSyntax> Interpreter<'src, S> {
         }
     }
 
-    fn interpret_program(&mut self, prog: Spanned<Program<'src, S::CS>>) -> Result<(), SpannedInterpreterError<'src>> {
+    fn interpret_program(&mut self, prog: Spanned<Program<'src, S::CS>>) -> Result<(), SpannedInterpreterError> {
         // we iterate in reverse order such that all functions have their dependencies already parsed
         for (name, fn_def) in prog.0.functions.into_iter().rev() {
             let op_id = self.fns_to_op_ids.len() as u32;
@@ -152,8 +152,8 @@ impl<'src, S: SemanticsWithCustomSyntax> Interpreter<'src, S> {
     fn interpret_fn_def(
         &mut self,
         self_op_id: OperationId,
-        fn_def: Spanned<FnDef<S::CS>>,
-    ) -> Result<UserDefinedOperation<S>, SpannedInterpreterError<'src>> {
+        fn_def: Spanned<FnDef<'src, S::CS>>,
+    ) -> Result<UserDefinedOperation<S>, SpannedInterpreterError> {
         // use a OperationBuilder to interpret the function definition and build a user defined operation
 
         let mut builder = OperationBuilder::new(&self.built_op_ctx, self_op_id);
@@ -161,7 +161,7 @@ impl<'src, S: SemanticsWithCustomSyntax> Interpreter<'src, S> {
         let mut interpreter =
             FnInterpreter::new(&mut builder, &self.fns_to_op_ids, fn_def.0.name.0);
         let fn_span = fn_def.1;
-        interpreter.interpret_fn_def(fn_def);
+        interpreter.interpret_fn_def(fn_def)?;
 
         builder.build().change_context(InterpreterError::BuilderError.with_span(fn_span))
     }
@@ -192,7 +192,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         }
     }
 
-    fn interpret_fn_def(&mut self, (fn_def, _): Spanned<FnDef<'src, S::CS>>) -> Result<(), SpannedInterpreterError<'src>> {
+    fn interpret_fn_def(&mut self, (fn_def, _): Spanned<FnDef<'src, S::CS>>) -> Result<(), SpannedInterpreterError> {
         // interpret the parameter graph
         // explicit
         for param in fn_def.explicit_params {
@@ -237,7 +237,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         Ok(())
     }
 
-    fn interpret_fn_node_param(&mut self, explicit: bool, (param, param_span): Spanned<FnNodeParam<'src, S::CS>>) -> Result<(), SpannedInterpreterError<'src>> {
+    fn interpret_fn_node_param(&mut self, explicit: bool, (param, param_span): Spanned<FnNodeParam<'src, S::CS>>) -> Result<(), SpannedInterpreterError> {
         let name = param.name.0;
         let param_type = S::convert_node_type(param.node_type.0);
         // TODO: instead of unwrap, should be returning results?
@@ -256,7 +256,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         Ok(())
     }
 
-    fn interpret_block(&mut self, (body, _): Spanned<Block<'src, S::CS>>) -> Result<(), SpannedInterpreterError<'src>> {
+    fn interpret_block(&mut self, (body, _): Spanned<Block<'src, S::CS>>) -> Result<(), SpannedInterpreterError> {
         // save and restore id mapping
         // let saved_single_node_aids = self.single_node_aids.clone();
         for stmt in body.statements {
@@ -267,7 +267,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         Ok(())
     }
 
-    fn interpret_stmt(&mut self, (stmt, _): Spanned<Statement<'src, S::CS>>) -> Result<(), SpannedInterpreterError<'src>> {
+    fn interpret_stmt(&mut self, (stmt, _): Spanned<Statement<'src, S::CS>>) -> Result<(), SpannedInterpreterError> {
         match stmt {
             Statement::Let(let_stmt) => {
                 self.interpret_let_stmt(let_stmt)?;
@@ -291,12 +291,12 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         Ok(())
     }
 
-    fn interpret_rename(&mut self, (rename_stmt, rename_stmt_span): Spanned<RenameStmt<'src>>) -> Result<(), SpannedInterpreterError<'src>> {
+    fn interpret_rename(&mut self, (rename_stmt, rename_stmt_span): Spanned<RenameStmt<'src>>) -> Result<(), SpannedInterpreterError> {
         let new_name = rename_stmt.new_name.0;
         let new_aid = AbstractNodeId::named(new_name);
         let old_aid = self
             .node_id_to_aid(rename_stmt.src.0)
-            .ok_or(report!(InterpreterError::NotFoundNodeId(rename_stmt.src.0).with_span(rename_stmt.src.1)))?;
+            .ok_or(report!(InterpreterError::NotFoundNodeId(format!("{:?}", rename_stmt.src.0)).with_span(rename_stmt.src.1)))?;
         self.builder.rename_node(old_aid, new_name)
             .change_context(InterpreterError::BuilderError.with_span(rename_stmt_span))
             .attach_printable_lazy(|| "Failed to rename")?;
@@ -304,7 +304,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         Ok(())
     }
 
-    fn interpret_if_stmt(&mut self, (if_stmt, if_stmt_span): Spanned<IfStmt<'src, S::CS>>) -> Result<(), SpannedInterpreterError<'src>> {
+    fn interpret_if_stmt(&mut self, (if_stmt, if_stmt_span): Spanned<IfStmt<'src, S::CS>>) -> Result<(), SpannedInterpreterError> {
         // start the branchable query (shape or builtin)
 
         // TODO: if queries could create nodes, this would need to be handled.
@@ -336,7 +336,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         Ok(())
     }
 
-    fn interpret_if_cond_and_start(&mut self, (cond, _): Spanned<IfCond<'src, S::CS>>) -> Result<(), SpannedInterpreterError<'src>> {
+    fn interpret_if_cond_and_start(&mut self, (cond, _): Spanned<IfCond<'src, S::CS>>) -> Result<(), SpannedInterpreterError> {
         // starts either a builtin query or a shape query
         match cond {
             IfCond::Query((fn_call, fn_call_span)) => {
@@ -344,8 +344,8 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                 let args = fn_call
                     .args
                     .into_iter()
-                    .map(|(arg, arg_span)| self.node_id_to_aid(arg).ok_or(report!(InterpreterError::NotFoundNodeId(arg).with_span(arg_span))))
-                    .collect::<Result<Vec<_>, SpannedInterpreterError<'src>>>()?;
+                    .map(|(arg, arg_span)| self.node_id_to_aid(arg).ok_or(report!(InterpreterError::NotFoundNodeId(format!("{:?}", arg)).with_span(arg_span))))
+                    .collect::<Result<Vec<_>, SpannedInterpreterError>>()?;
                 self.builder.start_query(query, args)
                     .change_context(InterpreterError::BuilderError.with_span(fn_call_span))?;
             }
@@ -359,7 +359,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
     fn interpret_and_start_shape_query(
         &mut self,
         (shape_query_params, sqp_span): Spanned<ShapeQueryParams<'src, S::CS>>,
-    ) -> Result<(), SpannedInterpreterError<'src>> {
+    ) -> Result<(), SpannedInterpreterError> {
         // need to invent a marker.
         let marker = self.get_new_shape_query_marker()?;
         let marker = marker.as_str();
@@ -418,10 +418,10 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
 
                     let src_aid = self.node_id_to_aid(src).or_else(|| {
                         Some(AbstractNodeId::dynamic_output(marker, src.single()?))
-                    }).ok_or(report!(InterpreterError::NotFoundNodeId(src).with_span(edge_param.src.1)))?;
+                    }).ok_or(report!(InterpreterError::NotFoundNodeId(format!("{:?}", src)).with_span(edge_param.src.1)))?;
                     let dst_aid = self.node_id_to_aid(dst).or_else(|| {
                         Some(AbstractNodeId::dynamic_output(marker, dst.single()?))
-                    }).ok_or(report!(InterpreterError::NotFoundNodeId(dst).with_span(edge_param.dst.1)))?;
+                    }).ok_or(report!(InterpreterError::NotFoundNodeId(format!("{:?}", dst)).with_span(edge_param.dst.1)))?;
 
                     let typ = S::convert_edge_type(edge_param.edge_type.0);
                     self.builder
@@ -433,13 +433,13 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         Ok(())
     }
 
-    fn get_new_shape_query_marker(&mut self) -> Result<String, SpannedInterpreterError<'src>>  {
+    fn get_new_shape_query_marker(&mut self) -> Result<String, SpannedInterpreterError>  {
         let marker = format!("shape_query_{}", self.shape_query_counter);
         self.shape_query_counter += 1;
         Ok(marker)
     }
 
-    fn interpret_let_stmt(&mut self, (let_stmt, let_span): Spanned<LetStmt<'src>>) -> Result<(), SpannedInterpreterError<'src>> {
+    fn interpret_let_stmt(&mut self, (let_stmt, let_span): Spanned<LetStmt<'src>>) -> Result<(), SpannedInterpreterError> {
         if let_stmt.bang {
             let result_name = let_stmt.ident.0;
             let (op_like, args) = self.call_expr_to_op_like(let_stmt.call)?;
@@ -462,7 +462,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         &self,
         (query_name, query_span): Spanned<&str>,
         args: Option<Spanned<MacroArgs>>,
-    ) -> Result<S::BuiltinQuery, SpannedInterpreterError<'src>>  {
+    ) -> Result<S::BuiltinQuery, SpannedInterpreterError>  {
         let args = args.map(|(args, _)| args);
         S::find_builtin_query(query_name, args)
             .ok_or(report!(InterpreterError::NotFoundQuery(query_name.to_string()).with_span(query_span)))
@@ -473,7 +473,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         op_name: &str,
         args: Option<Spanned<MacroArgs>>,
         err_span: Span,
-    ) -> Result<BuilderOpLike<S>, SpannedInterpreterError<'src>> {
+    ) -> Result<BuilderOpLike<S>, SpannedInterpreterError> {
         // TODO: do we want to enforce consumption of a Some(macro_args)?
 
         // we don't care about the span
@@ -506,7 +506,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         op_like: BuilderOpLike<S>,
         args: Vec<AbstractNodeId>,
         err_span: Span,
-    ) -> Result<(), SpannedInterpreterError<'src>> {
+    ) -> Result<(), SpannedInterpreterError> {
         if let Some(op_name) = op_name {
             self.builder
                 .add_named_operation(op_name.into(), op_like, args)
@@ -525,7 +525,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
     fn call_expr_to_op_like(
         &mut self,
         (call_expr, _): Spanned<FnCallExpr<'src>>,
-    ) -> Result<(BuilderOpLike<S>, Vec<AbstractNodeId>), SpannedInterpreterError<'src>> {
+    ) -> Result<(BuilderOpLike<S>, Vec<AbstractNodeId>), SpannedInterpreterError> {
         let args = call_expr
             .args
             .into_iter()
@@ -540,19 +540,19 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         Ok((op_like, args))
     }
 
-    fn interpret_return(&mut self, (return_stmt, return_stmt_span): Spanned<ReturnStmt<'src, S::CS>>) -> Result<(), SpannedInterpreterError<'src>> {
+    fn interpret_return(&mut self, (return_stmt, return_stmt_span): Spanned<ReturnStmt<'src, S::CS>>) -> Result<(), SpannedInterpreterError> {
         for (mapping, mapping_span) in return_stmt.mapping {
             match mapping {
                 ReturnStmtMapping::Node { ret_name, node } => {
                     let aid = self
                         .node_id_to_aid(node.0)
-                        .ok_or(report!(InterpreterError::NotFoundNodeId(node.0).with_span(node.1)))
+                        .ok_or(report!(InterpreterError::NotFoundNodeId(format!("{:?}", node.0)).with_span(node.1)))
                         .attach_printable("return node AID not found")?;
                     let ret_name = ret_name.0;
                     let ret_ty = self
                         .return_marker_to_av
                         .get(ret_name)
-                        .ok_or(report!(InterpreterError::NotFoundReturnMarker(ret_name).with_span(node.1)))
+                        .ok_or(report!(InterpreterError::NotFoundReturnMarker(ret_name.to_string()).with_span(node.1)))
                         .attach_printable("Return marker not found")?;
                     self.builder
                         .return_node(aid, ret_name.into(), ret_ty.clone())
