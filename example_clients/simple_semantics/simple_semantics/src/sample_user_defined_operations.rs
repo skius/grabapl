@@ -245,11 +245,7 @@ pub fn get_count_list_len_user_defined_operation(
 
         let child = expected_g.add_node(());
         expected_g.add_edge(head, child, EdgePattern::Wildcard);
-        GraphShapeQuery::new(
-            param,
-            expected_g,
-            BiMap::from([(child, "child".into())]),
-        )
+        GraphShapeQuery::new(param, expected_g, BiMap::from([(child, "child".into())]))
     };
 
     let new_child = AbstractNodeId::DynamicOutputMarker("next_child_query".into(), "child".into());
@@ -514,10 +510,7 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                         )]),
                                                     },
                                                     expected_g,
-                                                    BiMap::from([(
-                                                        right_child,
-                                                        "right".into(),
-                                                    )]),
+                                                    BiMap::from([(right_child, "right".into())]),
                                                 )
                                             },
                                             AbstractOperationArgument {
@@ -623,10 +616,7 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
                                                         )]),
                                                     },
                                                     expected_g,
-                                                    BiMap::from([(
-                                                        left_child,
-                                                        "left".into(),
-                                                    )]),
+                                                    BiMap::from([(left_child, "left".into())]),
                                                 )
                                             },
                                             AbstractOperationArgument {
@@ -775,13 +765,13 @@ pub fn get_node_heights_user_defined_operation(
         let right_child = expected_g.add_node(());
         expected_g.add_edge(head, right_child, EdgePattern::Exact("right".to_string()));
         GraphShapeQuery::new(
-                    OperationParameter {
-                        explicit_input_nodes: vec!["input".into()],
-                        parameter_graph: g,
-                        node_keys_to_subst: BiMap::from([(head, "input".into())]),
-                    },
-                    expected_g,
-                    BiMap::from([(right_child, "right".into())]),
+            OperationParameter {
+                explicit_input_nodes: vec!["input".into()],
+                parameter_graph: g,
+                node_keys_to_subst: BiMap::from([(head, "input".into())]),
+            },
+            expected_g,
+            BiMap::from([(right_child, "right".into())]),
         )
     };
     let left_child = AbstractNodeId::DynamicOutputMarker("left_child_query".into(), "left".into());

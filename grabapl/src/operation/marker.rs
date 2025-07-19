@@ -1,7 +1,7 @@
 //! Markers are tags that can be applied to nodes in the concrete graph. They do not exist abstractly.
 //! Markers are primarily used to hide nodes from shape queries.
 
-use crate::util::{log, InternString};
+use crate::util::{InternString, log};
 use crate::{NodeKey, interned_string_newtype};
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
@@ -82,7 +82,10 @@ impl MarkerSet {
     }
 
     /// Returns an iterator over all nodes that have a marker from the SkipMarkers set.
-    pub fn skipped_nodes<'a>(&'a self, skip_markers: &'a SkipMarkers) -> impl Iterator<Item = NodeKey> + 'a {
+    pub fn skipped_nodes<'a>(
+        &'a self,
+        skip_markers: &'a SkipMarkers,
+    ) -> impl Iterator<Item = NodeKey> + 'a {
         let filter: Box<dyn for<'b> Fn(&'b NodeKey) -> bool> = match skip_markers {
             SkipMarkers::All => Box::new(|_node: &NodeKey| true),
             SkipMarkers::Set(markers) => Box::new(|node: &NodeKey| {
@@ -94,10 +97,7 @@ impl MarkerSet {
                 }
             }),
         };
-        self.marked_nodes_to_markers
-            .keys()
-            .copied()
-            .filter(filter)
+        self.marked_nodes_to_markers.keys().copied().filter(filter)
     }
 
     pub fn add_marker(&mut self, marker: impl Into<Marker>) -> Result<(), MarkerError> {

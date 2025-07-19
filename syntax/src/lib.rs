@@ -6,11 +6,11 @@ use crate::interpreter::{SemanticsWithCustomSyntax, interpret};
 use ariadne::{Color, Label, Report, ReportKind, sources};
 use chumsky::input::SliceInput;
 use chumsky::{input::ValueInput, prelude::*};
+use grabapl::operation::marker::SkipMarkers;
 use grabapl::prelude::{OperationContext, OperationId};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
-use grabapl::operation::marker::SkipMarkers;
 
 pub trait CustomSyntax: Clone + Debug + 'static {
     type MacroArgType: Clone + fmt::Debug + Default + PartialEq;
@@ -567,7 +567,12 @@ where
         .separated_by(just(Token::Ctrl(',')))
         .allow_trailing()
         .collect::<Vec<_>>()
-        .map(|params| (ShapeQueryParams { params, skip_markers: SkipMarkers::default() }))
+        .map(|params| {
+            (ShapeQueryParams {
+                params,
+                skip_markers: SkipMarkers::default(),
+            })
+        })
         .boxed();
 
     let block = recursive(|block| {
@@ -606,14 +611,21 @@ where
         // TODO: add support for `skipping all` in addition to the current `skipping [...]` syntax.
         let optional_skipping_markers = select! {
             Token::Ident("skipping") => (),
-        }.ignore_then(just(Token::Ctrl('[')))
-            .ignore_then(select! { Token::Str(s) => s }.separated_by(just(Token::Ctrl(','))).allow_trailing().collect::<Vec<_>>())
-            .then_ignore(just(Token::Ctrl(']')))
-            .or_not()
-            .map(|opt| opt.map(|marker_names| {
-                SkipMarkers::new(marker_names)
-            }).unwrap_or(SkipMarkers::default()))
-            .boxed();
+        }
+        .ignore_then(just(Token::Ctrl('[')))
+        .ignore_then(
+            select! { Token::Str(s) => s }
+                .separated_by(just(Token::Ctrl(',')))
+                .allow_trailing()
+                .collect::<Vec<_>>(),
+        )
+        .then_ignore(just(Token::Ctrl(']')))
+        .or_not()
+        .map(|opt| {
+            opt.map(|marker_names| SkipMarkers::new(marker_names))
+                .unwrap_or(SkipMarkers::default())
+        })
+        .boxed();
 
         let if_cond_shape = just(Token::Shape)
             .ignore_then(just(Token::Ctrl('[')))

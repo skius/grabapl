@@ -20,6 +20,7 @@ use std::marker::PhantomData;
 use thiserror::Error;
 
 use crate::operation::OperationContext;
+use crate::operation::marker::{Marker, SkipMarkers};
 use crate::operation::query::{GraphShapeQuery, ShapeNodeIdentifier};
 use crate::operation::signature::{
     AbstractOutputChanges, AbstractSignatureNodeId, OperationSignature,
@@ -28,7 +29,6 @@ use crate::semantics::{AbstractJoin, AbstractMatcher};
 use crate::util::bimap::BiMap;
 use crate::util::log;
 use error_stack::Result;
-use crate::operation::marker::{Marker, SkipMarkers};
 
 macro_rules! bail_unexpected_instruction {
     ($i:expr, $i_opt:expr, $frame:literal) => {
@@ -873,7 +873,8 @@ impl<S: Semantics> BuildingShapeQueryFrame<S> {
             self.parameter,
             self.true_branch_state.graph.clone(),
             self.gsq_node_keys_to_shape_idents,
-        ).with_skip_markers(self.skip_markers);
+        )
+        .with_skip_markers(self.skip_markers);
 
         let built_frame = BuiltShapeQueryFrame::new(
             self.query_marker,

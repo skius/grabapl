@@ -1,5 +1,6 @@
 use crate::graph::EdgeAttribute;
 use crate::operation::OperationResult;
+use crate::operation::marker::{MarkerSet, SkipMarkers};
 use crate::operation::signature::parameter::{
     GraphWithSubstitution, OperationArgument, OperationParameter, ParameterSubstitution,
 };
@@ -13,7 +14,6 @@ use petgraph::algo::general_subgraph_monomorphisms_iter;
 use petgraph::visit::NodeIndexable;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use crate::operation::marker::{MarkerSet, SkipMarkers};
 
 pub trait BuiltinQuery {
     type S: Semantics;
@@ -85,10 +85,7 @@ impl<S: Semantics> GraphShapeQuery<S> {
         }
     }
 
-    pub fn with_skip_markers(
-        mut self,
-        skip_markers: SkipMarkers,
-    ) -> Self {
+    pub fn with_skip_markers(mut self, skip_markers: SkipMarkers) -> Self {
         self.skip_markers = skip_markers;
         self
     }
@@ -137,8 +134,12 @@ pub(crate) fn run_shape_query<S: Semantics>(
     let mut hidden_nodes_incl_marker_hidden = hidden_nodes.clone();
     hidden_nodes_incl_marker_hidden.extend(marker_set.skipped_nodes(&query.skip_markers));
 
-
-    get_shape_query_substitution(query, &abstract_graph, &subst, &hidden_nodes_incl_marker_hidden)
+    get_shape_query_substitution(
+        query,
+        &abstract_graph,
+        &subst,
+        &hidden_nodes_incl_marker_hidden,
+    )
 
     // TODO: after calling this, the abstract graph needs to somehow know that it can be changed for changed values!
 }

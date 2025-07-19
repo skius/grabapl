@@ -1,4 +1,5 @@
 use crate::operation::builtin::LibBuiltinOperation;
+use crate::operation::marker::Marker;
 use crate::operation::query::{BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier};
 use crate::operation::signature::parameter::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationParameter,
@@ -29,7 +30,6 @@ use std::marker::PhantomData;
 use std::mem;
 use std::slice::Iter;
 use thiserror::Error;
-use crate::operation::marker::Marker;
 
 mod programming_by_demonstration;
 pub mod stack_based_builder;
@@ -2467,11 +2467,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             }
         }
 
-        let gsq = GraphShapeQuery::new(
-            param,
-            expected_graph,
-            node_keys_to_shape_idents,
-        );
+        let gsq = GraphShapeQuery::new(param, expected_graph, node_keys_to_shape_idents);
 
         // TODO: need to validate GSQ somewhere.
         //  Most importantly, that there are no free floating shape nodes.
@@ -2716,11 +2712,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             }
         }
 
-        let gsq = GraphShapeQuery::new(
-            param,
-            expected_graph,
-            node_keys_to_shape_idents,
-        );
+        let gsq = GraphShapeQuery::new(param, expected_graph, node_keys_to_shape_idents);
 
         // TODO: need to validate GSQ somewhere.
         //  Most importantly, that there are no free floating shape nodes.

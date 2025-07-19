@@ -4,9 +4,9 @@ use crate::{
     ShapeQueryParams, Spanned, Statement, lexer,
 };
 use chumsky::prelude::*;
+use grabapl::operation::marker::SkipMarkers;
 use grabapl::prelude::*;
 use std::collections::HashMap;
-use grabapl::operation::marker::SkipMarkers;
 
 fn parse_abstract_node_type<S: SemanticsWithCustomSyntax>(
     src: &str,
