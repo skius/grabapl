@@ -25,6 +25,94 @@ fn get_ops() -> (
     HashMap<&'static str, OperationId>,
 ) {
     syntax::grabapl_parse!(TestSemantics,
+        // -------- BFS with Queue --------
+        /*
+        Idea is:
+        1. push all siblings to queue.
+        2. ah. this only works by copy. we cannot get a node from the queue and then find outgoing edges.
+        */
+
+        fn bfs_by_queue(start_node: Integer) -> (head: Integer) {
+            let! head = mk_list();
+            let! queue = mk_queue();
+            copy_value_from_to(start_node, head);
+            if shape [
+                child: Integer,
+                start_node -> child: *,
+            ] {
+                // bfs_by_queue_helper(start_node, head);
+            }
+            return (head: head);
+        }
+
+
+        // The FIFO queue
+
+        fn mk_queue() -> (head: Object) {
+            let! head = add_node<int,0>();
+            return (head: head);
+        }
+
+        // 0: false, non-zero: true
+        fn queue_empty(head: Object) -> (is_empty: Integer) {
+            let! res = add_node<int,1>();
+            // check if the queue is empty
+            if shape [
+                next: Object,
+                head -> next: *,
+            ] {
+                // set res to false by decrementing if we have a next node
+                decrement(res);
+            }
+            return (is_empty: res);
+        }
+
+        fn pop_queue(head: Object) -> (value: Integer) {
+            // remove the first element from the queue
+            let! res = add_node<int,-9999>();
+            if shape [
+                fst: Integer,
+                snd: Integer,
+                head -> fst: *,
+                fst -> snd: *,
+            ] {
+                // remove the edge from head to fst and fst to snd
+                remove_edge(head, fst);
+                remove_edge(fst, snd);
+                add_edge<"next">(head, snd);
+                // return fst
+                copy_value_from_to(fst, res);
+            } else if shape [
+                fst: Integer,
+                head -> fst: *
+            ] {
+                remove_edge(head, fst);
+                copy_value_from_to(fst, res);
+            }
+            return (value: res);
+        }
+
+        fn push_queue_by_copy(head: Object, value: Integer) {
+            // insert value at the end of the queue
+            let! new_node = add_node<int,0>();
+            copy_value_from_to(value, new_node);
+            push_queue_helper_linking(head, new_node);
+        }
+
+        // links the given node to the end of the queue.
+        fn push_queue_helper_linking(curr: Object, node_to_insert: Integer) {
+            if shape [
+                next: Object,
+                curr -> next: *,
+            ] {
+                push_queue_helper_linking(next, node_to_insert);
+            } else {
+                // we're at the tail of the queue
+                add_edge<"next">(curr, node_to_insert);
+            }
+        }
+
+
         // -------- DFS ---------
         fn dfs(start_node: Integer) -> (head: Integer) {
             let! head = add_node<int,0>();
@@ -240,6 +328,11 @@ fn get_ops() -> (
                 copy_value_from_to(b, res);
             }
             return (max: res);
+        }
+
+        fn mk_list() -> (head: Integer) {
+            let! head = add_node<int,0>();
+            return (head: head);
         }
 
         fn list_insert_by_copy(head: Integer, value: Integer) {
@@ -461,6 +554,30 @@ fn bfs_and_dfs() {
         l1,
         max_height_value
     );
+
+
+    // queue test
+    let queue_head = g.add_node(NodeValue::Integer(next_i()));
+    let nums = [5, 9, 10, 22, 5, 2];
+    for &num in &nums {
+        let new_node = g.add_node(NodeValue::Integer(num));
+        run_from_concrete(&mut g, &op_ctx, fn_map["push_queue_by_copy"], &[queue_head, new_node]).unwrap();
+    }
+    let mut returned_queue = vec![];
+    loop {
+        let is_empty_res = run_from_concrete(&mut g, &op_ctx, fn_map["queue_empty"], &[queue_head]).unwrap();
+        let is_empty_node = is_empty_res.new_nodes[&"is_empty".into()];
+        let is_empty_value = g.get_node_attr(is_empty_node).unwrap();
+        if is_empty_value.must_integer() == 1 {
+            // queue is empty
+            break;
+        }
+        let pop_res = run_from_concrete(&mut g, &op_ctx, fn_map["pop_queue"], &[queue_head]).unwrap();
+        let popped_value_node = pop_res.new_nodes[&"value".into()];
+        let popped_value = g.get_node_attr(popped_value_node).unwrap();
+        returned_queue.push(popped_value.must_integer());
+    }
+    assert_eq!(returned_queue, nums);
 
     assert!(false);
 }

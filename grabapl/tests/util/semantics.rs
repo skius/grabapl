@@ -109,6 +109,7 @@ impl SemanticsWithCustomSyntax for TestSemantics {
                 Some(TestOperation::AddInteger(-1))
             }
             "remove_node" => Some(TestOperation::DeleteNode),
+            "remove_edge" => Some(TestOperation::DeleteEdge),
             "copy_value_from_to" => Some(TestOperation::CopyValueFromTo),
             _ => None,
         }

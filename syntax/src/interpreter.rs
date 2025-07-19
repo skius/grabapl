@@ -222,12 +222,12 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
 
     fn interpret_block(&mut self, (body, _): Spanned<Block<'src, S::CS>>) {
         // save and restore id mapping
-        let saved_single_node_aids = self.single_node_aids.clone();
+        // let saved_single_node_aids = self.single_node_aids.clone();
         for stmt in body.statements {
             self.interpret_stmt(stmt);
         }
         // restore the single node aids mapping
-        self.single_node_aids = saved_single_node_aids;
+        // self.single_node_aids = saved_single_node_aids;
     }
 
     fn interpret_stmt(&mut self, (stmt, _): Spanned<Statement<'src, S::CS>>) {
@@ -264,15 +264,27 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
 
     fn interpret_if_stmt(&mut self, (if_stmt, _): Spanned<IfStmt<'src, S::CS>>) {
         // start the branchable query (shape or builtin)
+
+        // TODO: if queries could create nodes, this would need to be handled.
+        let initial_nodes = self.single_node_aids.clone();
+
         self.interpret_if_cond_and_start(if_stmt.cond);
 
         self.builder.enter_true_branch().unwrap();
         // interpret the true branch
         self.interpret_block(if_stmt.then_block);
         self.builder.enter_false_branch().unwrap();
+
+        let true_branch_aids = std::mem::replace(&mut self.single_node_aids, initial_nodes);
+
         // interpret the false branch
         self.interpret_block(if_stmt.else_block);
         self.builder.end_query().unwrap();
+
+        self.single_node_aids = merge_node_aids(
+            &true_branch_aids,
+            &self.single_node_aids,
+        );
     }
 
     fn interpret_if_cond_and_start(&mut self, (cond, _): Spanned<IfCond<'src, S::CS>>) {
@@ -492,4 +504,20 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             }
         }
     }
+}
+
+// merges entries only if they're the same in both maps
+fn merge_node_aids<'a>(
+    true_branch: &HashMap<&'a str, AbstractNodeId>,
+    false_branch: &HashMap<&'a str, AbstractNodeId>,
+) -> HashMap<&'a str, AbstractNodeId> {
+    let mut merged = HashMap::new();
+    for (name, aid) in true_branch.iter() {
+        if let Some(false_aid) = false_branch.get(name) {
+            if aid == false_aid {
+                merged.insert(*name, *aid);
+            }
+        }
+    }
+    merged
 }
