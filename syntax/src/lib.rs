@@ -577,12 +577,12 @@ where
         .clone()
         .then_ignore(just(Token::Ctrl(':')))
         .then(CS::get_node_type_parser().map_with(|s, e| (s, e.span())))
-        .map(|((name, name_span), (node_type, node_type_span))| {
-            ShapeNodeParam {
+        .map(
+            |((name, name_span), (node_type, node_type_span))| ShapeNodeParam {
                 name: (name, name_span),
                 node_type: (node_type, node_type_span),
-            }
-        })
+            },
+        )
         .boxed();
 
     let shape_edge_param = spanned_node_id
@@ -592,12 +592,10 @@ where
         .then_ignore(just(Token::Ctrl(':')))
         .then(CS::get_edge_type_parser().map_with(|s, e| (s, e.span())))
         .map(
-            |(((src, src_span), (dst, dst_span)), (edge_type, edge_type_span))| {
-                ShapeEdgeParam {
-                    src: (src, src_span),
-                    dst: (dst, dst_span),
-                    edge_type: (edge_type, edge_type_span),
-                }
+            |(((src, src_span), (dst, dst_span)), (edge_type, edge_type_span))| ShapeEdgeParam {
+                src: (src, src_span),
+                dst: (dst, dst_span),
+                edge_type: (edge_type, edge_type_span),
             },
         )
         .boxed();
