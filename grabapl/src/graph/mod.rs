@@ -118,6 +118,10 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
         }
     }
 
+    pub fn inner_graph(&self) -> &DiGraphMap<NodeKey, EdgeAttribute<EdgeAttr>, RandomState> {
+        &self.graph
+    }
+
     pub fn add_node(&mut self, node_attr: NodeAttr) -> NodeKey {
         let node_key = self.max_node_key;
         let node_key = self.graph.add_node(node_key);
@@ -331,6 +335,12 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
         } else {
             None
         }
+    }
+
+    pub fn out_edges(&self, source: NodeKey) -> impl Iterator<Item = (NodeKey, &EdgeAttr)> {
+        self.graph
+            .edges_directed(source, Direction::Outgoing)
+            .map(|(src, target, attr)| (target, &attr.edge_attr))
     }
 }
 

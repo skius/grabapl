@@ -93,6 +93,18 @@ impl SemanticsWithCustomSyntax for TestSemantics {
                     value: node_value,
                 })
             }
+            "add_edge" => {
+                let args = args?;
+                let args_src = args.0;
+                // must parse string
+                let str_src = args_src.trim_matches(&['"']).to_string();
+                Some(TestOperation::AddEdge {
+                    node_typ: NodeType::Object,
+                    param_typ: EdgeType::Wildcard,
+                    target_typ: EdgeType::Exact(str_src.clone()),
+                    value: str_src,
+                })
+            }
             "remove_node" => {
                 Some(TestOperation::DeleteNode)
             }

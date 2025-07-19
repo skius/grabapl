@@ -315,12 +315,19 @@ pub fn lexer<'src>()
         .delimited_by(just('%'), just('%'))
         .map(Token::MacroArgs);
 
+    let macro_args_opt3 = none_of("<>")
+        .repeated()
+        .to_slice()
+        .delimited_by(just('<'), just('>'))
+        .map(Token::MacroArgs);
+
     // A single token can be one of the above
     // (macro_args needs to be before ctrl, since ctrl has the same prefix)
     let token = let_bang
         .or(num)
         .or(macro_args)
         .or(macro_args_opt2)
+        .or(macro_args_opt3)
         .or(arrow)
         .or(rev_arrow)
         .or(ctrl)
