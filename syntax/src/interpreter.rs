@@ -1,14 +1,15 @@
 use crate::{
-    Block, CustomSyntax, FnCallExpr, FnDef, FnImplicitParam, FnNodeParam, IfCond, IfStmt, LetStmt,
-    MacroArgs, NodeId, Program, RenameStmt, ReturnStmt, ReturnStmtMapping, ShapeQueryParam,
-    ShapeQueryParams, Span, Spanned, Statement, lexer,
+    lexer, Block, FnCallExpr, FnDef, FnImplicitParam, FnNodeParam, IfCond, IfStmt,
+    LetStmt, MacroArgs, NodeId, Program, RenameStmt, ReturnStmt, ReturnStmtMapping,
+    ShapeQueryParam, ShapeQueryParams, Span, Spanned, Statement,
 };
 use chumsky::prelude::*;
-use error_stack::{Result, ResultExt, report};
+use error_stack::{report, Result, ResultExt};
 use grabapl::operation::marker::SkipMarkers;
 use grabapl::prelude::*;
 use std::collections::HashMap;
 use thiserror::Error;
+use crate::custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
 
 fn parse_abstract_node_type<S: SemanticsWithCustomSyntax>(
     src: &str,
@@ -71,23 +72,6 @@ fn find_lib_builtin_op<S: SemanticsWithCustomSyntax>(
             None
         }
     }
-}
-
-pub trait SemanticsWithCustomSyntax:
-    Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>
-{
-    type CS: CustomSyntax;
-
-    fn find_builtin_op(name: &str, args: Option<MacroArgs>) -> Option<Self::BuiltinOperation>;
-
-    fn find_builtin_query(name: &str, args: Option<MacroArgs>) -> Option<Self::BuiltinQuery>;
-
-    fn convert_node_type(
-        syn_typ: <<Self as SemanticsWithCustomSyntax>::CS as CustomSyntax>::AbstractNodeType,
-    ) -> Self::NodeAbstract;
-    fn convert_edge_type(
-        syn_typ: <<Self as SemanticsWithCustomSyntax>::CS as CustomSyntax>::AbstractEdgeType,
-    ) -> Self::EdgeAbstract;
 }
 
 #[derive(Error, Debug)]

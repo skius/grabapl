@@ -1,0 +1,52 @@
+pub mod example;
+
+use std::fmt;
+use std::fmt::Debug;
+use chumsky::{extra, IterParser, Parser};
+use chumsky::error::Rich;
+use chumsky::input::ValueInput;
+use grabapl::Semantics;
+use crate::{MacroArgs, Span, Token};
+
+
+pub trait CustomSyntax: Clone + Debug + 'static {
+    type MacroArgType: Clone + fmt::Debug + Default + PartialEq;
+
+    type AbstractNodeType: Clone + Debug + PartialEq;
+    type AbstractEdgeType: Clone + Debug + PartialEq;
+
+    fn get_macro_arg_parser<'src>()
+    -> impl Parser<'src, &'src str, Self::MacroArgType, extra::Err<Rich<'src, char, Span>>> + Clone;
+
+    fn get_node_type_parser<
+        'src: 'tokens,
+        'tokens,
+        I: ValueInput<'tokens, Token = Token<'src>, Span = Span>,
+    >()
+    -> impl Parser<'tokens, I, Self::AbstractNodeType, extra::Err<Rich<'tokens, Token<'src>, Span>>>
+    + Clone;
+    fn get_edge_type_parser<
+        'src: 'tokens,
+        'tokens,
+        I: ValueInput<'tokens, Token = Token<'src>, Span = Span>,
+    >()
+    -> impl Parser<'tokens, I, Self::AbstractEdgeType, extra::Err<Rich<'tokens, Token<'src>, Span>>>
+    + Clone;
+}
+
+pub trait SemanticsWithCustomSyntax:
+    Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>
+{
+    type CS: CustomSyntax;
+
+    fn find_builtin_op(name: &str, args: Option<MacroArgs>) -> Option<Self::BuiltinOperation>;
+
+    fn find_builtin_query(name: &str, args: Option<MacroArgs>) -> Option<Self::BuiltinQuery>;
+
+    fn convert_node_type(
+        syn_typ: <<Self as SemanticsWithCustomSyntax>::CS as CustomSyntax>::AbstractNodeType,
+    ) -> Self::NodeAbstract;
+    fn convert_edge_type(
+        syn_typ: <<Self as SemanticsWithCustomSyntax>::CS as CustomSyntax>::AbstractEdgeType,
+    ) -> Self::EdgeAbstract;
+}
