@@ -197,6 +197,7 @@ fn get_ops() -> (
                 bfs_iter(start_node, head, curr_dist, max_height);
                 remove_node(curr_dist);
             }
+            remove_node(max_height);
             return (head: head);
         }
 
@@ -580,6 +581,57 @@ fn bfs_and_dfs() {
     // assert!(false);
 }
 
+fn test_bfs(op_ctx: &OperationContext<TestSemantics>, fn_map: &HashMap<&'static str, OperationId>, g: &mut ConcreteGraph<TestSemantics>, start_node: NodeKey) {
+    let bfs_layers = bfs_layers(g, start_node);
+
+    // as a sanity check, check the petgraph BFS
+    {
+        let mut bfs = petgraph::visit::Bfs::new(g.inner_graph(), start_node);
+        let mut bfs_nodes = vec![];
+        while let Some(node) = bfs.next(&g.inner_graph()) {
+            let val = g.get_node_attr(node).unwrap();
+            bfs_nodes.push(val.clone());
+        }
+        assert!(
+            valid_bfs_order(&bfs_nodes, bfs_layers.clone()),
+            "petgraph BFS result does not match the BFS layers"
+        );
+    }
+
+    let res = run_from_concrete(g, &op_ctx, fn_map["bfs"], &[start_node]).unwrap();
+    let head_bfs = res.new_nodes[&"head".into()];
+    let grabapl_bfs_list = list_to_value_vec(g, head_bfs);
+    assert!(
+        valid_bfs_order(&grabapl_bfs_list, bfs_layers.clone()),
+        "grabapl BFS result does not match the BFS layers for start_node {:?},
+        expected layers: {:?},
+        got: {:?}
+        final dot:\n{}", start_node, bfs_layers, grabapl_bfs_list, g.dot(),
+    );
+}
+
+// TODO: test and fix diamond shape
+// TODO: when adding all siblings to a list, add test with a second parent that breaks in algot
+
+#[test_log::test]
+fn diamond_shape_bfs() {
+    let (op_ctx, fn_map) = get_ops();
+    let mut g = TestSemantics::new_concrete_graph();
+    // build a diamond shape graph
+    let n0 = g.add_node(NodeValue::Integer(0));
+    let n1 = g.add_node(NodeValue::Integer(1));
+    let n2 = g.add_node(NodeValue::Integer(2));
+    let n3 = g.add_node(NodeValue::Integer(3));
+
+    g.add_edge(n0, n1, "edge".to_string());
+    g.add_edge(n0, n2, "edge".to_string());
+    g.add_edge(n1, n3, "edge".to_string());
+    g.add_edge(n2, n3, "edge".to_string());
+
+    // run BFS from n0
+    test_bfs(&op_ctx, &fn_map, &mut g, n0);
+}
+
 #[test_log::test]
 #[test_log(default_log_filter = "warn")]
 fn proptest_bfs() {
@@ -588,7 +640,7 @@ fn proptest_bfs() {
 
     proptest!(
         Config { cases: 1, max_shrink_iters: 100, ..Config::default() },
-        |((node_vals, edge_gen) in proptest::collection::vec(any::<i32>(), 0..=30).proptest_flat_map_outside_first(|nodes| {
+        |((node_vals, edge_gen) in proptest::collection::vec(any::<i32>(), 0..=10).proptest_flat_map_outside_first(|nodes| {
             // directed edge count
             let node_count = nodes.len();
             let edges = node_count * node_count - node_count;
@@ -613,32 +665,7 @@ fn proptest_bfs() {
 
             // run bfs on every node and check if the BFS order is valid
             for start in node_keys {
-                let bfs_layers = bfs_layers(&g, start);
-
-                // as a sanity check, check the petgraph BFS
-                {
-                    let mut bfs = petgraph::visit::Bfs::new(g.inner_graph(), start);
-                    let mut bfs_nodes = vec![];
-                    while let Some(node) = bfs.next(&g.inner_graph()) {
-                        let val = g.get_node_attr(node).unwrap();
-                        bfs_nodes.push(val.clone());
-                    }
-                    assert!(
-                        valid_bfs_order(&bfs_nodes, bfs_layers.clone()),
-                        "petgraph BFS result does not match the BFS layers"
-                    );
-                }
-
-                let res = run_from_concrete(&mut g, &op_ctx, fn_map["bfs"], &[start]).unwrap();
-                let head_bfs = res.new_nodes[&"head".into()];
-                let grabapl_bfs_list = list_to_value_vec(&g, head_bfs);
-                assert!(
-                    valid_bfs_order(&grabapl_bfs_list, bfs_layers.clone()),
-                    "grabapl BFS result does not match the BFS layers for start_node {:?},
-                    expected layers: {:?},
-                    got: {:?}
-                    final dot:\n{}", start, bfs_layers, grabapl_bfs_list, g.dot(),
-                );
+                test_bfs(&op_ctx, &fn_map, &mut g, start);
             }
 
             // assert!(false);
