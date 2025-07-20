@@ -10,6 +10,8 @@ use petgraph::data::Build;
 //     fn to_abstract(&self) -> Self::Abstract;
 // }
 
+pub mod example;
+
 /// This matcher always returns true.
 #[derive(Default)]
 pub struct AnyMatcher<A> {

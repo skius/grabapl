@@ -24,7 +24,7 @@ use signature::parameter::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument,
     OperationOutput, OperationParameter, ParameterSubstitution,
 };
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell, RefMut};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use thiserror::Error;
@@ -52,6 +52,16 @@ pub trait BuiltinOperation: Debug {
 #[derive(Debug, Clone)]
 pub struct ConcreteData<'a> {
     marker_set: &'a RefCell<MarkerSet>,
+}
+
+impl ConcreteData<'_> {
+    pub fn marker_set_mut(&mut self) -> RefMut<MarkerSet> {
+        self.marker_set.borrow_mut()
+    }
+
+    pub fn marker_set(&self) -> Ref<MarkerSet> {
+        self.marker_set.borrow()
+    }
 }
 
 /// Contains available operations
