@@ -1,8 +1,8 @@
-use std::{fmt, mem};
-use std::sync::Arc;
 use proptest::prelude::Strategy;
 use proptest::strategy::{Fuse, Map, NewTree, ValueTree};
 use proptest::test_runner::{Reason, TestRunner};
+use std::sync::Arc;
+use std::{fmt, mem};
 
 pub trait StrategyOutsideFirstExtension: Strategy {
     fn proptest_flat_map_outside_first<S: Strategy, F: Fn(Self::Value) -> S>(
@@ -147,10 +147,7 @@ where
         if self.meta.simplify() {
             if let Ok(v) = self.meta.current().new_tree(&mut self.runner) {
                 self.last_complication = Some(Fuse::new(v));
-                mem::swap(
-                    self.last_complication.as_mut().unwrap(),
-                    &mut self.current,
-                );
+                mem::swap(self.last_complication.as_mut().unwrap(), &mut self.current);
                 self.complicate_regen_remaining = self.runner.config().cases;
                 return true;
             } else {

@@ -1,9 +1,9 @@
 use grabapl::prelude::*;
-use std::collections::{HashMap, HashSet};
 use proptest::bool::weighted;
 use proptest::prelude::*;
 use proptest::proptest;
 use proptest::test_runner::Config;
+use std::collections::{HashMap, HashSet};
 
 mod util;
 use test_log::test;
@@ -593,7 +593,12 @@ fn bfs_and_dfs() {
     // assert!(false);
 }
 
-fn test_bfs(op_ctx: &OperationContext<TestSemantics>, fn_map: &HashMap<&'static str, OperationId>, g: &mut ConcreteGraph<TestSemantics>, start_node: NodeKey) {
+fn test_bfs(
+    op_ctx: &OperationContext<TestSemantics>,
+    fn_map: &HashMap<&'static str, OperationId>,
+    g: &mut ConcreteGraph<TestSemantics>,
+    start_node: NodeKey,
+) {
     let bfs_layers = bfs_layers(g, start_node);
 
     // as a sanity check, check the petgraph BFS
@@ -618,7 +623,11 @@ fn test_bfs(op_ctx: &OperationContext<TestSemantics>, fn_map: &HashMap<&'static 
         "grabapl BFS result does not match the BFS layers for start_node {:?},
         expected layers: {:?},
         got: {:?}
-        final dot:\n{}", start_node, bfs_layers, grabapl_bfs_list, g.dot(),
+        final dot:\n{}",
+        start_node,
+        bfs_layers,
+        grabapl_bfs_list,
+        g.dot(),
     );
 }
 
@@ -663,9 +672,16 @@ fn all_siblings_test() {
     let res = run_from_concrete(&mut g, &op_ctx, op, &[p2]).unwrap();
     let head = res.new_nodes[&"head".into()];
     let siblings_list = list_to_value_vec(&g, head);
-    assert_eq!(siblings_list, vec![NodeValue::Integer(0) /*list head sentinel*/, NodeValue::Integer(1), NodeValue::Integer(2)],
-        "Expected siblings list to contain 1 and 2, got: {:?}", siblings_list);
-
+    assert_eq!(
+        siblings_list,
+        vec![
+            NodeValue::Integer(0), /*list head sentinel*/
+            NodeValue::Integer(1),
+            NodeValue::Integer(2)
+        ],
+        "Expected siblings list to contain 1 and 2, got: {:?}",
+        siblings_list
+    );
 }
 
 #[test_log::test]
