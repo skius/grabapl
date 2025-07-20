@@ -71,3 +71,4 @@ cargo check --target wasm32-unknown-unknown
 - [ ] Debug idea: concrete call-graph joined with node mapping visualized. i.e., every call graph node
       - has the name of the operation, as well as the parts of the concrete graph that were passed to it as argument colored. context: light blue, param: dark blue
 - [ ] VF2++ for faster isomorphisms? https://lemon.cs.elte.hu/trac/lemon/browser/lemon/lemon/vf2pp.h
+- [ ] concrete graph dot parsing using dot_parser crate
