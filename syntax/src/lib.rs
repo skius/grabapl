@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
 use std::io::BufWriter;
+use std::ops::Range;
 use custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
 
 // A few type definitions to be used by our parsers below
@@ -754,6 +755,14 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
     let filename = "input".to_string();
     let (tokens, errs) = lexer().parse(src).into_output_errors();
 
+    fn string_of_report(filename: String, src: &str, report: Report<(String, Range<usize>)>) -> String {
+        let mut output_buf = BufWriter::new(Vec::new());
+        report
+            .write(sources([(filename, src)]), &mut output_buf)
+            .unwrap();
+        String::from_utf8(output_buf.into_inner().unwrap()).unwrap()
+    }
+
     // println!("Tokens: {tokens:?}");
 
     let parse_errs = if let Some(tokens) = &tokens {
@@ -775,20 +784,18 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
                 Err(e) => {
                     // build report with error
                     let error_span = e.current_context().span;
-                    Report::build(
+                    return Err(string_of_report(filename.clone(), src, Report::build(
                         ReportKind::Error,
                         (filename.clone(), error_span.into_range()),
                     )
-                        .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte))
+                        .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte).with_color(color_enabled))
                         .with_message(e.to_string())
                         .with_label(
                             Label::new((filename.clone(), error_span.into_range()))
                                 .with_message(format!("detailed message:\n{e:?}"))
                                 .with_color(Color::Red),
                         )
-                        .finish()
-                        .eprint(sources([(filename.clone(), src)]))
-                        .unwrap()
+                        .finish()));
                 }
             }
         }

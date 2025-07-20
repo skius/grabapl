@@ -42,7 +42,9 @@ fn find_lib_builtin_op<S: SemanticsWithCustomSyntax>(
 
             // parse S::CS::AbstractNodeType
             let syntax_typ = parse_abstract_node_type::<S>(rest)?;
-            let node_type = S::convert_node_type(syntax_typ);
+            // TODO: these functions should return errors. Something like Option<Result<>>, so that a Some() indicates "we're responsible for this op name", and a Some(Err())
+            //  indicates "we are responsible, and we're telling you that this is an error".
+            let node_type = S::convert_node_type(syntax_typ)?;
 
             let marker = color_name.into();
             Some(LibBuiltinOperation::MarkNode {
@@ -86,6 +88,8 @@ pub enum InterpreterError {
     NotFoundNodeId(String),
     #[error("Return marker '{0}' not found in the function")]
     NotFoundReturnMarker(String),
+    #[error("Failed to parse type: {0}")]
+    InvalidType(String),
 }
 
 impl InterpreterError {
@@ -201,7 +205,11 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                 FnImplicitParam::Edge(edge_param) => {
                     let src = edge_param.src.0;
                     let dst = edge_param.dst.0;
-                    let typ = S::convert_edge_type(edge_param.edge_type.0);
+                    let typ = S::convert_edge_type(edge_param.edge_type.0.clone())
+                        .ok_or(report!(
+                            InterpreterError::InvalidType(format!("{:?}", edge_param.edge_type.0))
+                                .with_span(edge_param.edge_type.1)
+                        ))?;
                     self.builder
                         .expect_parameter_edge(src, dst, typ)
                         .change_context(InterpreterError::BuilderError.with_span(param_span))?;
@@ -214,7 +222,13 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             match return_sig {
                 FnImplicitParam::Node(node_sig) => {
                     let name = node_sig.name.0;
-                    let param_type = S::convert_node_type(node_sig.node_type.0);
+                    let param_type = S::convert_node_type(node_sig.node_type.0.clone())
+                        .ok_or(report!(
+                            InterpreterError::InvalidType(format!(
+                                "{:?}",
+                                node_sig.node_type.0
+                            )).with_span(node_sig.node_type.1)
+                        ))?;
                     self.return_marker_to_av.insert(name, param_type.clone());
                     self.builder
                         .expect_self_return_node(name, param_type)
@@ -239,7 +253,12 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         (param, param_span): Spanned<FnNodeParam<'src, S::CS>>,
     ) -> Result<(), SpannedInterpreterError> {
         let name = param.name.0;
-        let param_type = S::convert_node_type(param.node_type.0);
+        let param_type = S::convert_node_type(param.node_type.0.clone()).ok_or(report!(
+            InterpreterError::InvalidType(format!(
+                "{:?}",
+                param.node_type.0)
+            ).with_span(param.node_type.1)
+        ))?;
         // TODO: instead of unwrap, should be returning results?
         if explicit {
             self.builder
@@ -421,7 +440,11 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             match param {
                 ShapeQueryParam::Node(node_param) => {
                     let node_id = node_param.name.0;
-                    let param_type = S::convert_node_type(node_param.node_type.0);
+                    let param_type = S::convert_node_type(node_param.node_type.0.clone())
+                        .ok_or(report!(
+                            InterpreterError::InvalidType(format!("{:?}", node_param.node_type.0))
+                                .with_span(node_param.node_type.1)
+                        ))?;
 
                     // we differentiate between an existing node, in which case we issue an expected value change,
                     // or a new one, in which case it must be a single.
@@ -464,7 +487,11 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                                 .with_span(edge_param.dst.1)
                         ))?;
 
-                    let typ = S::convert_edge_type(edge_param.edge_type.0);
+                    let typ = S::convert_edge_type(edge_param.edge_type.0.clone())
+                        .ok_or(report!(
+                            InterpreterError::InvalidType(format!("{:?}", edge_param.edge_type.0))
+                                .with_span(edge_param.edge_type.1)
+                        ))?;
                     self.builder
                         .expect_shape_edge(src_aid, dst_aid, typ)
                         .change_context(InterpreterError::BuilderError.with_span(param_span))?;
@@ -578,11 +605,15 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             .args
             .into_iter()
             .map(|(arg, span)| {
-                self.node_id_to_aid(arg).expect(&format!(
-                    "Call argument node ID {arg:?} at {span} not found"
-                ))
+                self.node_id_to_aid(arg)
+                    .ok_or(
+                        report!(
+                            InterpreterError::NotFoundNodeId(format!("{:?}", arg))
+                                .with_span(span)
+                    )
+                )
             })
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
 
         let op_name = call_expr.name.0;
         let macro_args = call_expr.macro_args;

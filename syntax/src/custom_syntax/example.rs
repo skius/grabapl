@@ -147,7 +147,12 @@ fn add_node_args_parser<'src>()
         })?;
 
         let node_typ_parser = MyCustomSyntax::get_node_type_parser()
-            .map(|custom_typ| ExampleSemantics::convert_node_type(custom_typ));
+            .try_map_with(|custom_typ, e| ExampleSemantics::convert_node_type(custom_typ).ok_or_else(|| {
+                Rich::custom(
+                    e.span(),
+                    format!("node type not supported"),
+                )
+            }));
         // let node_value_parser = select! {
         //     Token::Num(num) => NodeValue::Integer(num),
         // };
@@ -253,29 +258,29 @@ impl SemanticsWithCustomSyntax for ExampleSemantics {
 
     fn convert_node_type(
         x: <<Self as SemanticsWithCustomSyntax>::CS as CustomSyntax>::AbstractNodeType,
-    ) -> Self::NodeAbstract {
+    ) -> Option<Self::NodeAbstract> {
         match x {
             MyCustomType::Primitive(name) => match name.to_lowercase().as_str() {
-                "string" => NodeType::String,
-                "integer" | "int" => NodeType::Integer,
-                "object" => NodeType::Object,
-                "separate" => NodeType::Separate,
+                "string" => Some(NodeType::String),
+                "integer" | "int" => Some(NodeType::Integer),
+                "object" => Some(NodeType::Object),
+                "separate" => Some(NodeType::Separate),
                 _ => {
-                    panic!("unsupported node type: {name}");
+                    None
                 }
             },
             MyCustomType::Custom(_) => {
-                panic!("unsupported")
+                None
             }
         }
     }
 
     fn convert_edge_type(
         x: <<Self as SemanticsWithCustomSyntax>::CS as CustomSyntax>::AbstractEdgeType,
-    ) -> Self::EdgeAbstract {
+    ) -> Option<Self::EdgeAbstract> {
         match x {
-            CustomEdgeType::Exact(s) => EdgeType::Exact(s),
-            CustomEdgeType::Wildcard => EdgeType::Wildcard,
+            CustomEdgeType::Exact(s) => Some(EdgeType::Exact(s)),
+            CustomEdgeType::Wildcard => Some(EdgeType::Wildcard),
         }
     }
 }

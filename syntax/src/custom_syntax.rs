@@ -43,10 +43,12 @@ pub trait SemanticsWithCustomSyntax:
 
     fn find_builtin_query(name: &str, args: Option<MacroArgs>) -> Option<Self::BuiltinQuery>;
 
+    /// Returns an option so a more general CustomSyntax can be reused for multiple semantics.
     fn convert_node_type(
         syn_typ: <<Self as SemanticsWithCustomSyntax>::CS as CustomSyntax>::AbstractNodeType,
-    ) -> Self::NodeAbstract;
+    ) -> Option<Self::NodeAbstract>;
+    /// Returns an option so a more general CustomSyntax can be reused for multiple semantics.
     fn convert_edge_type(
         syn_typ: <<Self as SemanticsWithCustomSyntax>::CS as CustomSyntax>::AbstractEdgeType,
-    ) -> Self::EdgeAbstract;
+    ) -> Option<Self::EdgeAbstract>;
 }
