@@ -40,8 +40,10 @@ cargo check --target wasm32-unknown-unknown
     - allow reutrning nodes again? 
     - We'd have the difference of a returned node would either be a completely newly created node, or a shape-matched node.
     - Is that a problem though? I don't think we have any asserts of concrete_size_before_op + returned_nodes == concrete_size_after. (those would break!)
-- [ ] online editor monaco?
+- [x] online editor monaco?
+  - online-syntax
 - [ ] show state
+  - do a map, eg, show!("name"); will return a result with mapping name => intermediatestate at that point.
 - [x] Define builder behavior when running a cache-induced build() that errors (see negative_tests comment)
 - [x] Recursion actually CAN add nodes! Add a test for this (if cond { return 0 } else { return recurse() })
 - [x] Fix web demo (builder now needs an ID in the beginning)
