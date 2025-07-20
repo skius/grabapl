@@ -65,9 +65,9 @@ fn task3() {
     //        / \
     //       3   6
     //      / \   \
-    //     2   4   7
-    //    /
-    //   1
+    //     2   4   8
+    //    /       /
+    //   1       7
 
     let n1 = g.add_node(NodeValue::Integer(1));
     let n2 = g.add_node(NodeValue::Integer(2));
@@ -76,13 +76,15 @@ fn task3() {
     let n5 = g.add_node(NodeValue::Integer(5));
     let n6 = g.add_node(NodeValue::Integer(6));
     let n7 = g.add_node(NodeValue::Integer(7));
+    let n8 = g.add_node(NodeValue::Integer(8));
 
     g.add_edge(n2, n1, "left".to_string());
     g.add_edge(n3, n2, "left".to_string());
     g.add_edge(n3, n4, "right".to_string());
     g.add_edge(n5, n3, "left".to_string());
     g.add_edge(n5, n6, "right".to_string());
-    g.add_edge(n6, n7, "right".to_string());
+    g.add_edge(n6, n8, "right".to_string());
+    g.add_edge(n8, n7, "left".to_string());
 
     let root = n5;
     let res = run_from_concrete(&mut g, &op_ctx, fn_names["tree_serialize"], &[root]).unwrap();
@@ -97,6 +99,7 @@ fn task3() {
         NodeValue::Integer(5),
         NodeValue::Integer(6),
         NodeValue::Integer(7),
+        NodeValue::Integer(8),
     ], "Serialized tree does not match expected order");
 
 
