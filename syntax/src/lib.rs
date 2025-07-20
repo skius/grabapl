@@ -978,7 +978,7 @@ macro_rules! grabapl_parse {
 macro_rules! grabapl_defs {
     ($fn_name:ident, $semantics:ty, $($t:tt)*) => {
         fn $fn_name() -> (OperationContext<$semantics>, std::collections::HashMap<&'static str, grabapl::prelude::OperationId>) {
-            grabapl_parse!($semantics, $($t)*)
+            $crate::grabapl_parse!($semantics, $($t)*)
         }
     };
 }
