@@ -9,12 +9,17 @@ Context.init()
 let output_pre = document.getElementById('output');
 
 let editor = monaco.editor.create(document.getElementById('container'), {
-    value: 'fn main() {}',
+    // load from local storage
+    value: localStorage.getItem('last_code'),
     language: 'rust'
 });
 
 editor.onDidChangeModelContent((_change_event) => {
     let reconstructed = editor.getModel().getLinesContent().join('\n');
+
+    // store to local storage
+    localStorage.setItem('last_code', reconstructed);
+
     try {
         let res = Context.parse(reconstructed);
         output_pre.innerText = "Code parsed successfully!";
