@@ -8,6 +8,7 @@ use proptest::test_runner::Config;
 mod util;
 use test_log::test;
 use util::semantics::*;
+use util::shrink_outer_first_extension::StrategyOutsideFirstExtension;
 
 fn list_to_value_vec(graph: &ConcreteGraph<TestSemantics>, head: NodeKey) -> Vec<NodeValue> {
     let mut values = vec![];
@@ -586,7 +587,7 @@ fn proptest_bfs() {
 
     proptest!(
         Config { cases: 1, max_shrink_iters: 1000, ..Config::default() },
-        |((node_vals, edge_gen) in proptest::collection::vec(any::<i32>(), 0..=30).prop_flat_map(|nodes| {
+        |((node_vals, edge_gen) in proptest::collection::vec(any::<i32>(), 0..=30).proptest_flat_map_outside_first(|nodes| {
             // directed edge count
             let node_count = nodes.len();
             let edges = node_count * node_count - node_count;
