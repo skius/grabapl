@@ -1,0 +1,15 @@
+{
+  "name": "online_syntax_ffi",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "online_syntax_ffi_bg.wasm",
+    "online_syntax_ffi.js",
+    "online_syntax_ffi.d.ts"
+  ],
+  "main": "online_syntax_ffi.js",
+  "types": "online_syntax_ffi.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+    "name": "online-syntax",
+    "version": "0.0.1",
+    "description": "Grabapl syntax editor",
+    "main": "./api/index.mjs",
+    "exports": {
+        ".": "./api/index.mjs"
+    },
+    "author": "Niels Saurer",
+    "dependencies": {
+    },
+    "devDependencies": {
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}
