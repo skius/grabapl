@@ -575,11 +575,9 @@ where
         .separated_by(just(Token::Ctrl(',')))
         .allow_trailing()
         .collect::<Vec<_>>()
-        .map(|params| {
-            ShapeQueryParams {
-                params,
-                skip_markers: SkipMarkers::default(),
-            }
+        .map(|params| ShapeQueryParams {
+            params,
+            skip_markers: SkipMarkers::default(),
         })
         .boxed();
 
