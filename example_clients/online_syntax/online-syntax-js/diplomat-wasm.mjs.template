@@ -1,6 +1,6 @@
 import cfg from '../diplomat.config.mjs';
 import {readString8} from './diplomat-runtime.mjs'
-import * as wbg from '../wbg/simple_semantics_ffi.js'
+import * as wbg from '../wbg/online_syntax_ffi.js'
 
 const imports = {
     env: {
