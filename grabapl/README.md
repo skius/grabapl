@@ -68,3 +68,5 @@ cargo check --target wasm32-unknown-unknown
    - would make mutual recursion easier.
 - [ ] syntax: propagate interpreter errors via span to parser to give pretty errors
 - [ ] syntax: error when UDOp has same name as builtin.
+- [ ] Debug idea: concrete call-graph joined with node mapping visualized. i.e., every call graph node
+      - has the name of the operation, as well as the parts of the concrete graph that were passed to it as argument colored. context: light blue, param: dark blue

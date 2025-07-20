@@ -268,6 +268,17 @@ fn get_ops() -> (
             }
         }
 
+        fn test_insert_all_siblings_of(parent: Integer) -> (head: Integer) {
+            let! head = mk_list();
+            if shape [
+                child: Integer,
+                parent -> child: *,
+            ] {
+                bfs_insert_siblings(child, head);
+            }
+            return (head: head);
+        }
+
         fn bfs_insert_siblings(child: Integer, head: Integer) [parent: Integer, parent -> child: *] {
             mark_node<"visited", Object>(child);
             // insert self, then go to parent sibling
@@ -611,7 +622,6 @@ fn test_bfs(op_ctx: &OperationContext<TestSemantics>, fn_map: &HashMap<&'static 
     );
 }
 
-// TODO: test and fix diamond shape
 // TODO: when adding all siblings to a list, add test with a second parent that breaks in algot
 
 #[test_log::test]
@@ -631,6 +641,31 @@ fn diamond_shape_bfs() {
 
     // run BFS from n0
     test_bfs(&op_ctx, &fn_map, &mut g, n0);
+}
+
+#[test_log::test]
+fn all_siblings_test() {
+    let (op_ctx, fn_map) = get_ops();
+    let mut g = TestSemantics::new_concrete_graph();
+    let op = fn_map["test_insert_all_siblings_of"];
+    // build a simple graph with siblings
+    // add siblings to list
+    let c1 = g.add_node(NodeValue::Integer(1));
+    // p1 is the parent that would break the algorithm in Algot's semantics
+    let p1 = g.add_node(NodeValue::Integer(-1));
+    g.add_edge(p1, c1, "edge".to_string());
+    // p2 is the parent of which we want to add all siblings to a list
+    let p2 = g.add_node(NodeValue::Integer(-2));
+    g.add_edge(p2, c1, "edge".to_string());
+    let c2 = g.add_node(NodeValue::Integer(2));
+    g.add_edge(p2, c2, "edge".to_string());
+
+    let res = run_from_concrete(&mut g, &op_ctx, op, &[p2]).unwrap();
+    let head = res.new_nodes[&"head".into()];
+    let siblings_list = list_to_value_vec(&g, head);
+    assert_eq!(siblings_list, vec![NodeValue::Integer(0) /*list head sentinel*/, NodeValue::Integer(1), NodeValue::Integer(2)],
+        "Expected siblings list to contain 1 and 2, got: {:?}", siblings_list);
+
 }
 
 #[test_log::test]
