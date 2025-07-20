@@ -535,14 +535,20 @@ fn bfs_and_dfs() {
     let grabapl_bfs_list = list_to_value_vec(&g, head_bfs);
     let valid = acceptable_bfs.contains(&grabapl_bfs_list);
     println!("grabapl  BFS: {:?} - valid: {valid}", grabapl_bfs_list);
-    assert!(valid, "grabapl BFS result does not match any of the acceptable results");
+    assert!(
+        valid,
+        "grabapl BFS result does not match any of the acceptable results"
+    );
 
     let res = run_from_concrete(&mut g, &op_ctx, fn_map["dfs"], &[l1]).unwrap();
     let head_dfs = res.new_nodes[&"head".into()];
     let grabapl_dfs_list = list_to_value_vec(&g, head_dfs);
     let valid = acceptable_dfs.contains(&grabapl_dfs_list);
     println!("grabapl  DFS: {:?} - valid: {valid}", grabapl_dfs_list);
-    assert!(valid, "grabapl DFS result does not match any of the acceptable results");
+    assert!(
+        valid,
+        "grabapl DFS result does not match any of the acceptable results"
+    );
 
     println!("{}", g.dot());
 
@@ -551,33 +557,39 @@ fn bfs_and_dfs() {
     let max_height_value = g.get_node_attr(max_height_node).unwrap();
     println!(
         "max height of the graph starting from node {:?}: {:?}",
-        l1,
-        max_height_value
+        l1, max_height_value
     );
-
 
     // queue test
     let queue_head = g.add_node(NodeValue::Integer(next_i()));
     let nums = [5, 9, 10, 22, 5, 2];
     for &num in &nums {
         let new_node = g.add_node(NodeValue::Integer(num));
-        run_from_concrete(&mut g, &op_ctx, fn_map["push_queue_by_copy"], &[queue_head, new_node]).unwrap();
+        run_from_concrete(
+            &mut g,
+            &op_ctx,
+            fn_map["push_queue_by_copy"],
+            &[queue_head, new_node],
+        )
+        .unwrap();
     }
     let mut returned_queue = vec![];
     loop {
-        let is_empty_res = run_from_concrete(&mut g, &op_ctx, fn_map["queue_empty"], &[queue_head]).unwrap();
+        let is_empty_res =
+            run_from_concrete(&mut g, &op_ctx, fn_map["queue_empty"], &[queue_head]).unwrap();
         let is_empty_node = is_empty_res.new_nodes[&"is_empty".into()];
         let is_empty_value = g.get_node_attr(is_empty_node).unwrap();
         if is_empty_value.must_integer() == 1 {
             // queue is empty
             break;
         }
-        let pop_res = run_from_concrete(&mut g, &op_ctx, fn_map["pop_queue"], &[queue_head]).unwrap();
+        let pop_res =
+            run_from_concrete(&mut g, &op_ctx, fn_map["pop_queue"], &[queue_head]).unwrap();
         let popped_value_node = pop_res.new_nodes[&"value".into()];
         let popped_value = g.get_node_attr(popped_value_node).unwrap();
         returned_queue.push(popped_value.must_integer());
     }
     assert_eq!(returned_queue, nums);
 
-    assert!(false);
+    // assert!(false);
 }

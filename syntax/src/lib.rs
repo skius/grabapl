@@ -913,22 +913,24 @@ pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
             match res {
                 Ok((op_ctx, fns_to_ids)) => {
                     return (op_ctx, fns_to_ids);
-                },
+                }
                 Err(e) => {
                     // build report with error
                     let error_span = e.current_context().span;
-                    Report::build(ReportKind::Error, (filename.clone(), error_span.into_range()))
-                        .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte))
-                        .with_message(e.to_string())
-                        .with_label(
-                            Label::new((filename.clone(), error_span.into_range()))
-                                .with_message(format!("detailed message:\n{e:?}"))
-                                .with_color(Color::Red),
-                        )
-                        .finish()
-                        .eprint(sources([(filename.clone(), src)]))
-                        .unwrap()
-
+                    Report::build(
+                        ReportKind::Error,
+                        (filename.clone(), error_span.into_range()),
+                    )
+                    .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte))
+                    .with_message(e.to_string())
+                    .with_label(
+                        Label::new((filename.clone(), error_span.into_range()))
+                            .with_message(format!("detailed message:\n{e:?}"))
+                            .with_color(Color::Red),
+                    )
+                    .finish()
+                    .eprint(sources([(filename.clone(), src)]))
+                    .unwrap()
                 }
             }
         }

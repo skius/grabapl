@@ -102,12 +102,8 @@ impl SemanticsWithCustomSyntax for TestSemantics {
                     value: str_src,
                 })
             }
-            "increment" => {
-                Some(TestOperation::AddInteger(1))
-            }
-            "decrement" => {
-                Some(TestOperation::AddInteger(-1))
-            }
+            "increment" => Some(TestOperation::AddInteger(1)),
+            "decrement" => Some(TestOperation::AddInteger(-1)),
             "remove_node" => Some(TestOperation::DeleteNode),
             "remove_edge" => Some(TestOperation::DeleteEdge),
             "copy_value_from_to" => Some(TestOperation::CopyValueFromTo),
@@ -129,9 +125,7 @@ impl SemanticsWithCustomSyntax for TestSemantics {
                 };
                 Some(TestQuery::CmpFstSnd(cmp))
             }
-            "is_zero" => {
-                Some(TestQuery::ValueEqualTo(NodeValue::Integer(0)))
-            }
+            "is_zero" => Some(TestQuery::ValueEqualTo(NodeValue::Integer(0))),
             "is_eq" => {
                 let args_src = args?.0;
                 let x = i32::from_str(args_src).ok()?;
