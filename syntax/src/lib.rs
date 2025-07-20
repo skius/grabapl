@@ -10,6 +10,7 @@ use grabapl::prelude::{OperationContext, OperationId};
 use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
+use std::io::BufWriter;
 use custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
 
 // A few type definitions to be used by our parsers below
@@ -738,6 +739,18 @@ where
 pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
     src: &'src str,
 ) -> (OperationContext<S>, HashMap<&'src str, OperationId>) {
+    match try_parse_to_op_ctx_and_map::<S>(src, true) {
+        Ok(data) => data,
+        Err(output) => {
+            panic!("Failed to parse the input source code:\n{output}")
+        }
+    }
+}
+
+pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
+    src: &'src str,
+    color_enabled: bool,
+) -> Result<(OperationContext<S>, HashMap<&'src str, OperationId>), String> {
     let filename = "input".to_string();
     let (tokens, errs) = lexer().parse(src).into_output_errors();
 
@@ -757,7 +770,7 @@ pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
             let res = interpret::<S>(program);
             match res {
                 Ok((op_ctx, fns_to_ids)) => {
-                    return (op_ctx, fns_to_ids);
+                    return Ok((op_ctx, fns_to_ids));
                 }
                 Err(e) => {
                     // build report with error
@@ -766,16 +779,16 @@ pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
                         ReportKind::Error,
                         (filename.clone(), error_span.into_range()),
                     )
-                    .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte))
-                    .with_message(e.to_string())
-                    .with_label(
-                        Label::new((filename.clone(), error_span.into_range()))
-                            .with_message(format!("detailed message:\n{e:?}"))
-                            .with_color(Color::Red),
-                    )
-                    .finish()
-                    .eprint(sources([(filename.clone(), src)]))
-                    .unwrap()
+                        .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte))
+                        .with_message(e.to_string())
+                        .with_label(
+                            Label::new((filename.clone(), error_span.into_range()))
+                                .with_message(format!("detailed message:\n{e:?}"))
+                                .with_color(Color::Red),
+                        )
+                        .finish()
+                        .eprint(sources([(filename.clone(), src)]))
+                        .unwrap()
                 }
             }
         }
@@ -784,6 +797,8 @@ pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
     } else {
         Vec::new()
     };
+
+    let mut output_buf = BufWriter::new(Vec::new());
 
     errs.into_iter()
         .map(|e| e.map_token(|c| c.to_string()))
@@ -794,7 +809,7 @@ pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
         )
         .for_each(|e| {
             Report::build(ReportKind::Error, (filename.clone(), e.span().into_range()))
-                .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte))
+                .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte).with_color(color_enabled))
                 .with_message(e.to_string())
                 .with_label(
                     Label::new((filename.clone(), e.span().into_range()))
@@ -807,11 +822,12 @@ pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
                         .with_color(Color::Yellow)
                 }))
                 .finish()
-                .eprint(sources([(filename.clone(), src)]))
+                .write(sources([(filename.clone(), src)]), &mut output_buf)
                 .unwrap()
         });
 
-    panic!("Failed to parse the input source code (see stderr for details)");
+    let output = String::from_utf8(output_buf.into_inner().unwrap()).unwrap();
+    Err(output)
 }
 
 /// Compared to the syntax_macro, this will only parse at runtime. The syntax_macro will parse at runtime as well,
