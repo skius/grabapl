@@ -1,5 +1,5 @@
 use grabapl::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 mod util;
 use test_log::test;
 use util::semantics::*;
@@ -352,102 +352,72 @@ fn get_ops() -> (
     )
 }
 
+type BfsLayers = Vec<Vec<NodeValue>>;
+
+/// Returns a vec where vec[i] contains all nodes that are at distance i from the start_node. vec[0] contains the start_node itself.
+fn bfs_layers(g: &ConcreteGraph<TestSemantics>, start_node: NodeKey) -> BfsLayers {
+    let mut layers = vec![];
+    let mut visited = HashSet::new();
+    visited.insert(start_node);
+    let start_node_value = g.get_node_attr(start_node).unwrap().clone();
+    let current_layer = HashSet::from([(start_node, start_node_value)]);
+    layers.push(current_layer);
+    loop {
+        let mut next_layer = HashSet::new();
+        for (node, _) in layers.last().unwrap() {
+            for (neighbor, _) in g.out_edges(*node) {
+                if !visited.contains(&neighbor) {
+                    visited.insert(neighbor);
+                    let neighbor_value = g.get_node_attr(neighbor).unwrap().clone();
+                    next_layer.insert((neighbor, neighbor_value));
+                }
+            }
+        }
+        if !next_layer.is_empty() {
+            layers.push(next_layer);
+        } else {
+            break; // no more nodes to visit
+        }
+    }
+    layers
+        .into_iter()
+        .map(|layer| {
+            layer
+                .into_iter()
+                .map(|(_, value)| value)
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>()
+}
+
+fn valid_bfs_order(bfs_order: &[NodeValue], mut bfs_layers: BfsLayers) -> bool {
+    let total_bfs_nodes: usize = bfs_layers.iter().map(|layer| layer.len()).sum();
+    if bfs_order.len() != total_bfs_nodes {
+        return false; // the BFS order must contain all nodes in the layers
+    }
+    let mut bfs_order_iter = bfs_order.iter();
+    let mut curr_layer_index = 0;
+    while curr_layer_index < bfs_layers.len() {
+        let current_layer = &mut bfs_layers[curr_layer_index];
+        if current_layer.is_empty() {
+            // advance to the next layer
+            curr_layer_index += 1;
+            continue;
+        }
+
+        // if it's not empty, the next element in the bfs_order must be in the current layer
+        let node_value = bfs_order_iter.next().unwrap();
+        let Some(index) = current_layer.iter().position(|v| v == node_value) else {
+            return false; // the node is not in the current layer
+        };
+        // remove the node from the current layer
+        current_layer.remove(index);
+    }
+    true
+}
+
 #[test]
 fn bfs_and_dfs() {
-    // let (op_ctx, fn_map) = syntax::grabapl_parse!(TestSemantics,
-    //     // -------- DFS ---------
-    //     fn dfs(start_node: Integer) -> (head: Integer) {
-    //         let! head = add_node<int,0>();
-    //         copy_value_from_to(start_node, head);
-    //
-    //         if shape [
-    //             child: Integer,
-    //             start_node -> child: *,
-    //         ] {
-    //             dfs_helper(child, head);
-    //         }
-    //
-    //         return (head: head);
-    //     }
-    //
-    //     fn dfs_helper(child: Integer, head: Integer) [
-    //         parent: Integer,
-    //         parent -> child: *,
-    //     ] {
-    //         // insert self
-    //         list_insert_by_copy(head, child);
-    //         // then go to our children
-    //         if shape [
-    //             grandchild: Integer,
-    //             child -> grandchild: *,
-    //         ] {
-    //             dfs_helper(grandchild, head);
-    //         }
-    //         // then go to our siblings
-    //         // problem is, here we lost the function stack 'visited' marker from above, so if a sibling has the same descendant as us,
-    //         // we will visit it again.
-    //         if shape [
-    //             sibling: Integer,
-    //             parent -> sibling: *,
-    //         ] {
-    //             dfs_helper(sibling, head);
-    //         }
-    //     }
-    //
-    //
-    //     // ------ BFS --------
-    //
-    //     fn bfs(start_node: Integer) -> (head: Integer) {
-    //         let! head = add_node<int,0>();
-    //         copy_value_from_to(start_node, head);
-    //
-    //         if shape [
-    //             child: Integer,
-    //             start_node -> child: *,
-    //         ] {
-    //             bfs_helper(child, head);
-    //         }
-    //
-    //         return (head: head);
-    //     }
-    //
-    //     fn bfs_helper(child: Integer, head: Integer) [
-    //         parent: Integer,
-    //         parent -> child: *,
-    //     ] {
-    //         // insert self, then go to parent sibling
-    //         list_insert_by_copy(head, child);
-    //         if shape [
-    //             sibling: Integer,
-    //             parent -> sibling: *,
-    //         ] {
-    //             bfs_helper(sibling, head);
-    //         }
-    //         // done inserting siblings, can go to child
-    //         if shape [
-    //             grandchild: Integer,
-    //             child -> grandchild: *,
-    //         ] {
-    //             bfs_helper(grandchild, head);
-    //         }
-    //     }
-    //
-    //     fn list_insert_by_copy(head: Integer, value: Integer) {
-    //         if shape [
-    //             child: Integer,
-    //             head -> child: *,
-    //         ] {
-    //             list_insert_by_copy(child, value);
-    //         } else {
-    //             // we're at the tail
-    //             let! new_node = add_node<int,0>();
-    //             copy_value_from_to(value, new_node);
-    //             add_edge<"next">(head, new_node);
-    //         }
-    //     }
-    //
-    // );
-
     let (op_ctx, fn_map) = get_ops();
 
     let mut g = TestSemantics::new_concrete_graph();
@@ -503,6 +473,8 @@ fn bfs_and_dfs() {
         gen_vec(&g, &[l1, l2_2, l3_2, l2_1, l3_1, l4, l5]),
     ];
 
+    let bfs_layers = bfs_layers(&g, l1);
+
     let mut bfs = petgraph::visit::Bfs::new(g.inner_graph(), l1);
 
     let mut bfs_nodes = vec![];
@@ -514,6 +486,10 @@ fn bfs_and_dfs() {
     assert!(
         acceptable_bfs.contains(&bfs_nodes),
         "petgraph BFS result does not match any of the acceptable results"
+    );
+    assert!(
+        valid_bfs_order(&bfs_nodes, bfs_layers.clone()),
+        "petgraph BFS result does not match the BFS layers"
     );
     println!("petgraph BFS: {:?}", bfs_nodes);
 
@@ -538,6 +514,10 @@ fn bfs_and_dfs() {
     assert!(
         valid,
         "grabapl BFS result does not match any of the acceptable results"
+    );
+    assert!(
+        valid_bfs_order(&grabapl_bfs_list, bfs_layers.clone()),
+        "grabapl BFS result does not match the BFS layers"
     );
 
     let res = run_from_concrete(&mut g, &op_ctx, fn_map["dfs"], &[l1]).unwrap();
