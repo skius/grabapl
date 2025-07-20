@@ -42,6 +42,7 @@ cargo check --target wasm32-unknown-unknown
     - Is that a problem though? I don't think we have any asserts of concrete_size_before_op + returned_nodes == concrete_size_after. (those would break!)
 - [x] online editor monaco?
   - online-syntax
+  - [ ] timer for when to save state to avoid lag (1s after typing)
 - [ ] show state
   - do a map, eg, show!("name"); will return a result with mapping name => intermediatestate at that point.
 - [x] Define builder behavior when running a cache-induced build() that errors (see negative_tests comment)
