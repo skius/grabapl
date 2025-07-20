@@ -1,5 +1,10 @@
 use grabapl::prelude::*;
 use std::collections::{HashMap, HashSet};
+use proptest::bool::weighted;
+use proptest::prelude::*;
+use proptest::proptest;
+use proptest::test_runner::Config;
+
 mod util;
 use test_log::test;
 use util::semantics::*;
@@ -572,4 +577,65 @@ fn bfs_and_dfs() {
     assert_eq!(returned_queue, nums);
 
     // assert!(false);
+}
+
+#[test_log::test]
+fn proptest_bfs() {
+    // Generate a random graph and test BFS on it
+    let (op_ctx, fn_map) = get_ops();
+
+    proptest!(
+        Config { cases: 2, max_shrink_iters: 10, ..Config::default() },
+        |((node_vals, edge_gen) in (0usize..30).prop_flat_map(|node_count| {
+            // directed edge count
+            let edges = node_count * node_count - node_count;
+
+            (proptest::collection::vec(any::<i32>(), node_count..=node_count), proptest::collection::vec(weighted(0.2), edges..=edges))
+        }))| {
+            let mut g = TestSemantics::new_concrete_graph();
+            let mut node_keys = vec![];
+            for node_val in node_vals {
+                let key = g.add_node(NodeValue::Integer(node_val));
+                node_keys.push(key);
+            }
+            let mut edge_gen_iter = edge_gen.iter();
+            for src in &node_keys {
+                for dst in &node_keys {
+                    if src != dst && *edge_gen_iter.next().unwrap() {
+                        g.add_edge(*src, *dst, "irrelevant".to_string());
+                    }
+                }
+            }
+
+            // run bfs on every node and check if the BFS order is valid
+            for start in node_keys {
+                let bfs_layers = bfs_layers(&g, start);
+
+                // as a sanity check, check the petgraph BFS
+                {
+                    let mut bfs = petgraph::visit::Bfs::new(g.inner_graph(), start);
+                    let mut bfs_nodes = vec![];
+                    while let Some(node) = bfs.next(&g.inner_graph()) {
+                        let val = g.get_node_attr(node).unwrap();
+                        bfs_nodes.push(val.clone());
+                    }
+                    assert!(
+                        valid_bfs_order(&bfs_nodes, bfs_layers.clone()),
+                        "petgraph BFS result does not match the BFS layers"
+                    );
+                }
+
+                let res = run_from_concrete(&mut g, &op_ctx, fn_map["bfs"], &[start]).unwrap();
+                let head_bfs = res.new_nodes[&"head".into()];
+                let grabapl_bfs_list = list_to_value_vec(&g, head_bfs);
+                assert!(
+                    valid_bfs_order(&grabapl_bfs_list, bfs_layers),
+                    "grabapl BFS result does not match the BFS layers"
+                );
+            }
+
+            println!("dot: {}", g.dot());
+            // assert!(false);
+        }
+    )
 }
