@@ -19,7 +19,8 @@ serde_json_any_key = { version = "2.0.0", optional = true }
 
 [dev-dependencies]
 criterion = "0.5.1"
-proptest = "1.6.0"
+proptest = "1.7.0"
+#proptest = { git = "https://github.com/matthew-russo/proptest", branch = "269-improve-shrinking-prop-flat-map"}
 rand = "0.9.1"
 test-log = "0.2"
 serde_json = "1.0"

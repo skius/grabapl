@@ -585,7 +585,7 @@ fn proptest_bfs() {
     let (op_ctx, fn_map) = get_ops();
 
     proptest!(
-        Config { cases: 1, max_shrink_iters: 10000, ..Config::default() },
+        Config { cases: 1, max_shrink_iters: 1000, ..Config::default() },
         |((node_vals, edge_gen) in proptest::collection::vec(any::<i32>(), 0..=30).prop_flat_map(|nodes| {
             // directed edge count
             let node_count = nodes.len();
@@ -634,8 +634,7 @@ fn proptest_bfs() {
                     "grabapl BFS result does not match the BFS layers for start_node {:?},
                     expected layers: {:?},
                     got: {:?}
-                    dot:
-                    {}", start, bfs_layers, grabapl_bfs_list, g.dot(),
+                    dot:\n{}", start, bfs_layers, grabapl_bfs_list, g.dot(),
                 );
             }
 
