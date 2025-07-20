@@ -269,6 +269,7 @@ fn get_ops() -> (
         }
 
         fn bfs_insert_siblings(child: Integer, head: Integer) [parent: Integer, parent -> child: *] {
+            mark_node<"visited", Object>(child);
             // insert self, then go to parent sibling
             list_insert_by_copy(head, child);
             if shape [
