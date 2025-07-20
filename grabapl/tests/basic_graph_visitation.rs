@@ -585,12 +585,13 @@ fn proptest_bfs() {
     let (op_ctx, fn_map) = get_ops();
 
     proptest!(
-        Config { cases: 2, max_shrink_iters: 10, ..Config::default() },
-        |((node_vals, edge_gen) in (0usize..30).prop_flat_map(|node_count| {
+        Config { cases: 1, max_shrink_iters: 10000, ..Config::default() },
+        |((node_vals, edge_gen) in proptest::collection::vec(any::<i32>(), 0..=30).prop_flat_map(|nodes| {
             // directed edge count
+            let node_count = nodes.len();
             let edges = node_count * node_count - node_count;
 
-            (proptest::collection::vec(any::<i32>(), node_count..=node_count), proptest::collection::vec(weighted(0.2), edges..=edges))
+            (Just(nodes), proptest::collection::vec(weighted(0.2), edges..=edges))
         }))| {
             let mut g = TestSemantics::new_concrete_graph();
             let mut node_keys = vec![];
@@ -629,12 +630,15 @@ fn proptest_bfs() {
                 let head_bfs = res.new_nodes[&"head".into()];
                 let grabapl_bfs_list = list_to_value_vec(&g, head_bfs);
                 assert!(
-                    valid_bfs_order(&grabapl_bfs_list, bfs_layers),
-                    "grabapl BFS result does not match the BFS layers"
+                    valid_bfs_order(&grabapl_bfs_list, bfs_layers.clone()),
+                    "grabapl BFS result does not match the BFS layers for start_node {:?},
+                    expected layers: {:?},
+                    got: {:?}
+                    dot:
+                    {}", start, bfs_layers, grabapl_bfs_list, g.dot(),
                 );
             }
 
-            println!("dot: {}", g.dot());
             // assert!(false);
         }
     )
