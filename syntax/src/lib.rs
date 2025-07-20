@@ -576,10 +576,10 @@ where
         .allow_trailing()
         .collect::<Vec<_>>()
         .map(|params| {
-            (ShapeQueryParams {
+            ShapeQueryParams {
                 params,
                 skip_markers: SkipMarkers::default(),
-            })
+            }
         })
         .boxed();
 

@@ -4,7 +4,7 @@ use crate::{
     ShapeQueryParams, Span, Spanned, Statement, lexer,
 };
 use chumsky::prelude::*;
-use error_stack::{Report, Result, ResultExt, report};
+use error_stack::{Result, ResultExt, report};
 use grabapl::operation::marker::SkipMarkers;
 use grabapl::prelude::*;
 use std::collections::HashMap;
