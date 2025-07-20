@@ -675,7 +675,7 @@ fn proptest_bfs() {
     let (op_ctx, fn_map) = get_ops();
 
     proptest!(
-        Config { cases: 1, max_shrink_iters: 100, ..Config::default() },
+        Config { cases: 10, max_shrink_iters: 100, ..Config::default() },
         |((node_vals, edge_gen) in proptest::collection::vec(any::<i32>(), 0..=10).proptest_flat_map_outside_first(|nodes| {
             // directed edge count
             let node_count = nodes.len();
