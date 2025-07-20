@@ -782,8 +782,33 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
                     return Ok((op_ctx, fns_to_ids));
                 }
                 Err(e) => {
-                    // build report with error
+
+                    let detailed_message = format!("{:?}", e);
                     let error_span = e.current_context().span;
+
+                    // the amount of spaces depends on the printed line number of the error.
+                    // this is just for prettier formatting below of the pipe prefix.
+                    // ariadne tracking issue: https://github.com/zesterer/ariadne/issues/68
+                    let target_byte = error_span.start();
+                    let mut total_bytes = 0;
+                    let mut line_num = 0;
+                    for line in src.lines() {
+                        total_bytes += line.len() + 1; // +1 for the newline character
+                        line_num += 1;
+                        if total_bytes > target_byte {
+                            break;
+                        }
+                    }
+                    let num_spaces = format!("{line_num}").len();
+                    let spaces = " ".repeat(num_spaces);
+
+                    let detailed_message_pipe_mapped = detailed_message
+                        .lines()
+                        .map(|line| format!(" [38;5;240m {spaces}│[0m  {line}"))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+
+                    // build report with error
                     return Err(string_of_report(filename.clone(), src, Report::build(
                         ReportKind::Error,
                         (filename.clone(), error_span.into_range()),
@@ -792,7 +817,7 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
                         .with_message(e.to_string())
                         .with_label(
                             Label::new((filename.clone(), error_span.into_range()))
-                                .with_message(format!("detailed message:\n{e:?}"))
+                                .with_message(format!("detailed message:\n{detailed_message_pipe_mapped}"))
                                 .with_color(Color::Red),
                         )
                         .finish()));

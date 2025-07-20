@@ -20,6 +20,7 @@ editor.onDidChangeModelContent((_change_event) => {
         output_pre.innerText = "Code parsed successfully!";
     } catch (e) {
         output_pre.innerHTML = ansi_up.ansi_to_html(e.cause.toString());
+        // output_pre.innerHTML = e.cause.toString();
     }
 })
 
