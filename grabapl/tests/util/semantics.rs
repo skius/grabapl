@@ -18,6 +18,8 @@ use std::str::FromStr;
 use syntax::interpreter::SemanticsWithCustomSyntax;
 use syntax::{CustomSyntax, MacroArgs, MyCustomSyntax, MyCustomType, Span, Token};
 
+pub mod helpers;
+
 pub struct TestSemantics;
 
 fn add_node_args_parser<'src>()

@@ -973,3 +973,12 @@ pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
 macro_rules! grabapl_parse {
     ($semantics:ty, $($t:tt)*) => {syntax::parse_to_op_ctx_and_map::<$semantics>(stringify!($($t)*))};
 }
+
+#[macro_export]
+macro_rules! grabapl_defs {
+    ($fn_name:ident, $semantics:ty, $($t:tt)*) => {
+        fn $fn_name() -> (OperationContext<$semantics>, std::collections::HashMap<&'static str, grabapl::prelude::OperationId>) {
+            grabapl_parse!($semantics, $($t)*)
+        }
+    };
+}

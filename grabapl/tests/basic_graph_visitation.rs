@@ -8,23 +8,8 @@ use std::collections::{HashMap, HashSet};
 mod util;
 use test_log::test;
 use util::semantics::*;
+use util::semantics::helpers;
 use util::shrink_outer_first_extension::StrategyOutsideFirstExtension;
-
-fn list_to_value_vec(graph: &ConcreteGraph<TestSemantics>, head: NodeKey) -> Vec<NodeValue> {
-    let mut values = vec![];
-    let mut current = Some(head);
-    while let Some(current_key) = current.take() {
-        let val = graph.get_node_attr(current_key).unwrap();
-        values.push(val.clone());
-
-        // get next node in the list, if one exists
-        let mut out_nodes_current = graph.out_edges(current_key);
-        if let Some((next_node, _)) = out_nodes_current.next() {
-            current = Some(next_node);
-        }
-    }
-    values
-}
 
 fn get_ops() -> (
     OperationContext<TestSemantics>,
@@ -527,7 +512,7 @@ fn bfs_and_dfs() {
 
     let res = run_from_concrete(&mut g, &op_ctx, fn_map["bfs"], &[l1]).unwrap();
     let head_bfs = res.new_nodes[&"head".into()];
-    let grabapl_bfs_list = list_to_value_vec(&g, head_bfs);
+    let grabapl_bfs_list = helpers::list_to_value_vec(&g, head_bfs);
     let valid = acceptable_bfs.contains(&grabapl_bfs_list);
     println!("grabapl  BFS: {:?} - valid: {valid}", grabapl_bfs_list);
     assert!(
@@ -541,7 +526,7 @@ fn bfs_and_dfs() {
 
     let res = run_from_concrete(&mut g, &op_ctx, fn_map["dfs"], &[l1]).unwrap();
     let head_dfs = res.new_nodes[&"head".into()];
-    let grabapl_dfs_list = list_to_value_vec(&g, head_dfs);
+    let grabapl_dfs_list = helpers::list_to_value_vec(&g, head_dfs);
     let valid = acceptable_dfs.contains(&grabapl_dfs_list);
     println!("grabapl  DFS: {:?} - valid: {valid}", grabapl_dfs_list);
     assert!(
@@ -617,7 +602,7 @@ fn test_bfs(
 
     let res = run_from_concrete(g, &op_ctx, fn_map["bfs"], &[start_node]).unwrap();
     let head_bfs = res.new_nodes[&"head".into()];
-    let grabapl_bfs_list = list_to_value_vec(g, head_bfs);
+    let grabapl_bfs_list = helpers::list_to_value_vec(g, head_bfs);
     assert!(
         valid_bfs_order(&grabapl_bfs_list, bfs_layers.clone()),
         "grabapl BFS result does not match the BFS layers for start_node {:?},
@@ -671,7 +656,7 @@ fn all_siblings_test() {
 
     let res = run_from_concrete(&mut g, &op_ctx, op, &[p2]).unwrap();
     let head = res.new_nodes[&"head".into()];
-    let siblings_list = list_to_value_vec(&g, head);
+    let siblings_list = helpers::list_to_value_vec(&g, head);
     assert_eq!(
         siblings_list,
         vec![
