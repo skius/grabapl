@@ -13,6 +13,7 @@ use std::fmt::Debug;
 use std::io::BufWriter;
 use std::ops::Range;
 use custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
+use grabapl::operation::builder::IntermediateState;
 
 // A few type definitions to be used by our parsers below
 pub type Span = SimpleSpan;
@@ -741,7 +742,7 @@ pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
     src: &'src str,
 ) -> (OperationContext<S>, HashMap<&'src str, OperationId>) {
     match try_parse_to_op_ctx_and_map::<S>(src, true) {
-        Ok(data) => data,
+        Ok((op_ctx, fn_map, _)) => (op_ctx, fn_map),
         Err(output) => {
             panic!("Failed to parse the input source code:\n{output}")
         }
@@ -751,7 +752,7 @@ pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
 pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
     src: &'src str,
     color_enabled: bool,
-) -> Result<(OperationContext<S>, HashMap<&'src str, OperationId>), String> {
+) -> Result<(OperationContext<S>, HashMap<&'src str, OperationId>, HashMap<String, IntermediateState<S>>), String> {
     let filename = "input".to_string();
     let (tokens, errs) = lexer().parse(src).into_output_errors();
 
@@ -778,8 +779,8 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
         if let Some((program, file_span)) = ast.filter(|_| errs.len() + parse_errs.len() == 0) {
             let res = interpret::<S>(program);
             match res {
-                Ok((op_ctx, fns_to_ids)) => {
-                    return Ok((op_ctx, fns_to_ids));
+                Ok((op_ctx, fns_to_ids, state_map)) => {
+                    return Ok((op_ctx, fns_to_ids, state_map));
                 }
                 Err(e) => {
 

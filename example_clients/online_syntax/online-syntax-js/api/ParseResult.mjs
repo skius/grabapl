@@ -35,6 +35,25 @@ export class ParseResult {
     }
 
 
+    dotOfState(state) {
+        let functionCleanupArena = new diplomatRuntime.CleanupArena();
+
+        const stateSlice = diplomatRuntime.DiplomatBuf.str8(wasm, state);
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.ParseResult_dot_of_state(this.ffiValue, ...stateSlice.splat(), write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            functionCleanupArena.free();
+
+            write.free();
+        }
+    }
+
     constructor(symbol, ptr, selfEdge) {
         return this.#internalConstructor(...arguments)
     }

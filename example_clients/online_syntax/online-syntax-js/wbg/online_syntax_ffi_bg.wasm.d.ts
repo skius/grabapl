@@ -5,6 +5,7 @@ export const Context_init: () => void;
 export const Context_parse: (a: number, b: number, c: number) => void;
 export const ParseError_to_string: (a: number, b: number) => void;
 export const ParseError_destroy: (a: number) => void;
+export const ParseResult_dot_of_state: (a: number, b: number, c: number, d: number) => void;
 export const ParseResult_destroy: (a: number) => void;
 export const diplomat_init: () => void;
 export const diplomat_simple_write: (a: number, b: number, c: number) => void;

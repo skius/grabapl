@@ -34,8 +34,10 @@ pub trait CustomSyntax: Clone + Debug + 'static {
     + Clone;
 }
 
+// TODO: figure out how to remove Debug constraint? or is it ok if not?
+// TODO: actually, why does Builder::show_state need Debug? maybe lift that?
 pub trait SemanticsWithCustomSyntax:
-    Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>
+    Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone, NodeAbstract: Debug, EdgeAbstract: Debug>
 {
     type CS: CustomSyntax;
 

@@ -9,6 +9,7 @@ use grabapl::operation::marker::SkipMarkers;
 use grabapl::prelude::*;
 use std::collections::HashMap;
 use thiserror::Error;
+use grabapl::operation::builder::IntermediateState;
 use crate::custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
 
 fn parse_abstract_node_type<S: SemanticsWithCustomSyntax>(
@@ -90,6 +91,8 @@ pub enum InterpreterError {
     NotFoundReturnMarker(String),
     #[error("Failed to parse type: {0}")]
     InvalidType(String),
+    #[error("Error: {0}")]
+    Custom(&'static str),
 }
 
 impl InterpreterError {
@@ -107,15 +110,16 @@ pub struct SpannedInterpreterError {
 
 pub fn interpret<'src, S: SemanticsWithCustomSyntax>(
     prog: Spanned<Program<'src, S::CS>>,
-) -> Result<(OperationContext<S>, HashMap<&'src str, OperationId>), SpannedInterpreterError> {
+) -> Result<(OperationContext<S>, HashMap<&'src str, OperationId>, HashMap<String, IntermediateState<S>>), SpannedInterpreterError> {
     let mut interpreter = Interpreter::<S>::new();
     interpreter.interpret_program(prog)?;
-    Ok((interpreter.built_op_ctx, interpreter.fns_to_op_ids))
+    Ok((interpreter.built_op_ctx, interpreter.fns_to_op_ids, interpreter.state_map))
 }
 
 struct Interpreter<'src, S: SemanticsWithCustomSyntax> {
     fns_to_op_ids: HashMap<&'src str, u32>,
     built_op_ctx: OperationContext<S>,
+    state_map: HashMap<String, IntermediateState<S>>,
 }
 
 impl<'src, S: SemanticsWithCustomSyntax> Interpreter<'src, S> {
@@ -123,6 +127,7 @@ impl<'src, S: SemanticsWithCustomSyntax> Interpreter<'src, S> {
         Self {
             fns_to_op_ids: HashMap::new(),
             built_op_ctx: OperationContext::new(),
+            state_map: HashMap::new(),
         }
     }
 
@@ -154,6 +159,7 @@ impl<'src, S: SemanticsWithCustomSyntax> Interpreter<'src, S> {
             FnInterpreter::new(&mut builder, &self.fns_to_op_ids, fn_def.0.name.0);
         let fn_span = fn_def.1;
         interpreter.interpret_fn_def(fn_def)?;
+        self.state_map.extend(interpreter.state_map);
 
         builder
             .build()
@@ -167,6 +173,7 @@ struct FnInterpreter<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> {
     fn_names_to_op_ids: &'a HashMap<&'src str, u32>,
     single_node_aids: HashMap<&'src str, AbstractNodeId>,
     return_marker_to_av: HashMap<&'src str, S::NodeAbstract>,
+    state_map: HashMap<String, IntermediateState<S>>,
     shape_query_counter: u64,
 }
 
@@ -182,6 +189,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             fn_names_to_op_ids,
             single_node_aids: HashMap::new(),
             return_marker_to_av: HashMap::new(),
+            state_map: HashMap::new(),
             shape_query_counter: 0,
         }
     }
@@ -304,6 +312,24 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             }
             Statement::FnCall(fn_call) => {
                 // println!("Interpreting function call: {:?}", fn_call);
+                // check if we're calling show();
+                if fn_call.0.name.0 == "show_state" {
+                    let arg_ident = fn_call.0.args.get(0)
+                        .ok_or(report!(
+                            InterpreterError::NotFoundNodeId("show_state requires an argument".to_string())
+                                .with_span(fn_call.0.name.1)
+                        ))?;
+                    let as_str = arg_ident.0.single().ok_or(report!(
+                        InterpreterError::Custom("needs a single node id for show_state")
+                            .with_span(arg_ident.1)
+                    ))?;
+                    let state = self.builder.show_state().change_context(
+                        InterpreterError::BuilderError.with_span(fn_call.0.name.1)
+                    )?;
+                    self.state_map.insert(as_str.to_string(), state);
+                    return Ok(());
+                }
+
                 let fn_call_span = fn_call.1;
                 let (op_like, args) = self.call_expr_to_op_like(fn_call)?;
                 self.interpret_op_like(None, op_like, args, fn_call_span)?;

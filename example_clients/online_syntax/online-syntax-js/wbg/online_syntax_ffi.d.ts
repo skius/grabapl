@@ -9,6 +9,7 @@ export interface InitOutput {
   readonly Context_parse: (a: number, b: number, c: number) => void;
   readonly ParseError_to_string: (a: number, b: number) => void;
   readonly ParseError_destroy: (a: number) => void;
+  readonly ParseResult_dot_of_state: (a: number, b: number, c: number, d: number) => void;
   readonly ParseResult_destroy: (a: number) => void;
   readonly diplomat_init: () => void;
   readonly diplomat_simple_write: (a: number, b: number, c: number) => void;

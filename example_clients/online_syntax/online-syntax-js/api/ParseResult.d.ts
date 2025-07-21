@@ -9,4 +9,6 @@ export class ParseResult {
     /** @internal */
     constructor();
 
+
+    dotOfState(state: string): string;
 }
