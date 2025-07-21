@@ -51,6 +51,42 @@ pub mod ffi {
             };
             write!(dot, "{}", state.dot_with_aid()).unwrap();
         }
+
+        pub fn list_states(&self) -> Box<StringIter> {
+            let states: Vec<String> = self.state_map.keys().cloned().collect();
+            Box::new(StringIter(states.into_iter()))
+        }
+
+        #[diplomat::attr(auto, iterable)]
+        pub fn to_state_iterator(&self) -> Box<StringIter> {
+            self.list_states()
+        }
+
+
+    }
+
+    #[diplomat::opaque]
+    pub struct StringIter(std::vec::IntoIter<String>);
+
+    impl StringIter {
+        #[diplomat::attr(auto, iterator)]
+        pub fn next(&mut self) -> Option<Box<StringWrapper>> {
+            self.0.next().map(|s| Box::new(StringWrapper(s)))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct StringWrapper(String);
+
+    impl StringWrapper {
+        pub fn new(s: &str) -> Box<Self> {
+            Box::new(StringWrapper(s.to_string()))
+        }
+
+        #[diplomat::attr(auto, stringifier)]
+        pub fn to_string(&self, out: &mut DiplomatWrite) {
+            write!(out, "{}", self.0).unwrap();
+        }
     }
 
     #[diplomat::opaque]

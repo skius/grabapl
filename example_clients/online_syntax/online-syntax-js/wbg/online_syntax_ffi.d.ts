@@ -10,7 +10,14 @@ export interface InitOutput {
   readonly ParseError_to_string: (a: number, b: number) => void;
   readonly ParseError_destroy: (a: number) => void;
   readonly ParseResult_dot_of_state: (a: number, b: number, c: number, d: number) => void;
+  readonly ParseResult_list_states: (a: number) => number;
+  readonly ParseResult_to_state_iterator: (a: number) => number;
   readonly ParseResult_destroy: (a: number) => void;
+  readonly StringIter_next: (a: number) => number;
+  readonly StringIter_destroy: (a: number) => void;
+  readonly StringWrapper_new: (a: number, b: number) => number;
+  readonly StringWrapper_to_string: (a: number, b: number) => void;
+  readonly StringWrapper_destroy: (a: number) => void;
   readonly diplomat_init: () => void;
   readonly diplomat_simple_write: (a: number, b: number, c: number) => void;
   readonly diplomat_buffer_write_create: (a: number) => number;

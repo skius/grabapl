@@ -1,16 +1,76 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <title>Hello wasm-pack!</title>
-  </head>
-  <body>
-    <noscript>This page contains webassembly and javascript content, please enable javascript in your browser.</noscript>
-    <input id="state_name" type="text" placeholder="State Name" />
-    <button id="state_name_button">Run</button>
-    <div id="svg-container"></div>
-    <div id="container" style="height: 80vh"></div>
-    <pre id="output" style="height: 20vh; width: 100%; border: 1px solid black; overflow: auto;"></pre>
-    <script src="./bootstrap.js"></script>
-  </body>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rust WebAssembly IDE</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for a cleaner look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Use the Inter font family */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Style for the Monaco editor scrollbars to match the dark theme */
+        .monaco-editor .scrollbar .slider {
+            background: rgba(100, 100, 100, 0.4);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+
+<div class="container mx-auto p-4 lg:p-8 space-y-6">
+
+    <header class="text-center">
+        <h1 class="text-3xl lg:text-4xl font-bold text-gray-800 dark:text-white">WebAssembly Code Playground</h1>
+        <p class="text-gray-500 dark:text-gray-400 mt-1">Edit Rust code, see the output, and visualize state graphs.</p>
+    </header>
+
+    <!-- Monaco Editor Card -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
+        <div class="p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+            <h2 class="text-lg font-semibold">Code Editor</h2>
+        </div>
+        <!-- Monaco Editor will be initialized here -->
+        <div id="container" class="w-full" style="height: 50vh;"></div>
+    </div>
+
+    <!-- Output Console Card -->
+    <div class="bg-gray-800 text-white font-mono text-sm rounded-xl shadow-lg">
+        <div class="p-4 border-b border-gray-600">
+            <h2 class="text-lg font-semibold font-sans">Compiler Output</h2>
+        </div>
+        <!-- Error/Success messages will appear here -->
+        <pre id="output" class="w-full p-4 overflow-auto whitespace-pre-wrap min-h-[5rem]"></pre>
+    </div>
+
+    <!-- Graph Preview Card -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-600">
+            <h2 class="text-lg font-semibold">Graph Preview</h2>
+        </div>
+        <div class="p-4 space-y-4">
+            <div class="flex items-center space-x-3">
+                <label for="state-selector" class="font-medium">Select a state to visualize:</label>
+                <select id="state-selector" class="bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <option value="">Compile your code first</option>
+                </select>
+            </div>
+            <!-- SVG will be injected here -->
+            <div id="svg-container" class="w-full p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex justify-center items-center min-h-[250px] bg-gray-50 dark:bg-gray-700/50">
+                <p class="text-gray-500">Your state graph will appear here.</p>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Your compiled JS -->
+<script src="./bootstrap.js"></script>
+
+</body>
 </html>
