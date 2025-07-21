@@ -807,6 +807,7 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
                     let num_spaces = format!("{line_num}").len();
                     let spaces = " ".repeat(num_spaces);
 
+                    // TODO: need to consider here if color is enabled or not.
                     let detailed_message_pipe_mapped = detailed_message
                         .lines()
                         .map(|line| format!(" [38;5;240m {spaces}│[0m  {line}"))

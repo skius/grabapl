@@ -44,8 +44,9 @@ cargo check --target wasm32-unknown-unknown
   - online-syntax
   - [ ] timer for when to save state to avoid lag (1s after typing)
 - [x] syntax multiple return nodes seems to be broken?
-- [ ] show state
+- [x] show state
   - do a map, eg, show!("name"); will return a result with mapping name => intermediatestate at that point.
+  - [ ] First-class show_state? i.e., make it a token or something. Take string as arg.
 - [x] Define builder behavior when running a cache-induced build() that errors (see negative_tests comment)
 - [x] Recursion actually CAN add nodes! Add a test for this (if cond { return 0 } else { return recurse() })
 - [x] Fix web demo (builder now needs an ID in the beginning)
@@ -59,10 +60,11 @@ cargo check --target wasm32-unknown-unknown
   - [ ] Temp nodes could be marked as temp _at result point_, i.e., after an operation is called
     - its results could be marked as temporary
 - [ ] Clean up code
+  - [ ] Tutorial including which tools to install for building
 - [ ] Finish examples/template
 - [ ] Write READMEs and doc comments! Especially on the operation builder and semantics.
 - [ ] Serialization for OpBuilder
-- [ ] Serialization for OpCtx
+- [x] Serialization for OpCtx
 - [ ] Better errors
 - [ ] Scoped AIDs? write tests. What if we rename some outer AID in only one branch of a query?
 - [x] bang-call support for operations that return just one value:
@@ -72,7 +74,7 @@ cargo check --target wasm32-unknown-unknown
 - [kinda x] In the interval type system, try a function like `foo(x) { if x >= 200 { return 200 } else { return foo(x+1) }`
   - and then make the builder actually compute a fixed point (keep constructing new stages until no more changes of signature)
   - Fixed point can maybe be checked by is_isomorphic for the signature graphs? I.e., use that to implement PartialEq on OperationSignature?
-- [ ] textual language
+- [x] textual language
 - [ ] structs in types example semantics?
 - [ ] Lift restriction of not being able to return edges from shape queries. They cannot be aliased, and returning edges from there is actually useful! (eg, add_edge_if_not_exists)
 - [ ] SigCtx for op builder - then we don't actually need a full user defined operation, just a signature, and that
