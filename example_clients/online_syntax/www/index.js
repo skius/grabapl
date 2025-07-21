@@ -132,17 +132,26 @@ function onCodeChanged() {
     try {
         // Attempt to parse/compile the code
         const res = Context.parse(current_content);
-        current_res = res; // Store successful result
+        current_res = res;
 
-        // Update UI for success
-        outputPre.className = "w-full p-4 overflow-auto whitespace-pre-wrap text-green-400";
-        outputPre.innerText = "Code parsed successfully!";
+        // now check if it was parsed successfully
+        let error_msg = res.errorMessage();
+        if (error_msg === "") {
+            // Update UI for success
+            outputPre.className = "w-full p-4 overflow-auto whitespace-pre-wrap text-green-400";
+            outputPre.innerText = "Code parsed successfully!";
+        } else {
+            // error
+            outputPre.className = "w-full p-4 overflow-auto whitespace-pre-wrap text-red-400";
+            outputPre.innerHTML = ansi_up.ansi_to_html(error_msg);
+        }
+
 
         // Populate the dropdown with discovered states
         populateStateSelector(res);
 
     } catch (e) {
-        current_res = null; // Invalidate old results on error
+        current_res = null; // Invalidate old results on crash
 
         // Update UI for error
         const errorMessage = e.cause ? e.cause.toString() : e.toString();

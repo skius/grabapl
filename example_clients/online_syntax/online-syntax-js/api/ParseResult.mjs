@@ -36,6 +36,20 @@ export class ParseResult {
     }
 
 
+    errorMessage() {
+        const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
+
+    wasm.ParseResult_error_message(this.ffiValue, write.buffer);
+
+        try {
+            return write.readString8();
+        }
+
+        finally {
+            write.free();
+        }
+    }
+
     dotOfState(state) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 

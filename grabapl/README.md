@@ -43,7 +43,7 @@ cargo check --target wasm32-unknown-unknown
 - [x] online editor monaco?
   - online-syntax
   - [ ] timer for when to save state to avoid lag (1s after typing)
-- [ ] syntax multiple return nodes seems to be broken?
+- [x] syntax multiple return nodes seems to be broken?
 - [ ] show state
   - do a map, eg, show!("name"); will return a result with mapping name => intermediatestate at that point.
 - [x] Define builder behavior when running a cache-induced build() that errors (see negative_tests comment)

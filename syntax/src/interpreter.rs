@@ -4,7 +4,7 @@ use crate::{
     ShapeQueryParam, ShapeQueryParams, Span, Spanned, Statement,
 };
 use chumsky::prelude::*;
-use error_stack::{report, Result, ResultExt};
+use error_stack::{report, Report, Result, ResultExt};
 use grabapl::operation::marker::SkipMarkers;
 use grabapl::prelude::*;
 use std::collections::HashMap;
@@ -108,12 +108,21 @@ pub struct SpannedInterpreterError {
     pub error: InterpreterError,
 }
 
-pub fn interpret<'src, S: SemanticsWithCustomSyntax>(
-    prog: Spanned<Program<'src, S::CS>>,
-) -> Result<(OperationContext<S>, HashMap<&'src str, OperationId>, HashMap<String, IntermediateState<S>>), SpannedInterpreterError> {
+pub struct InterpreterResult<'src, S: SemanticsWithCustomSyntax, E> {
+    pub op_ctx_and_map: std::result::Result<(OperationContext<S>, HashMap<&'src str, OperationId>), E>,
+    // This is *outside* the result, since we might have a state_map even if the operation context fails to build!
+    pub state_map: HashMap<String, IntermediateState<S>>,
+}
+
+pub fn interpret<S: SemanticsWithCustomSyntax>(
+    prog: Spanned<Program<S::CS>>,
+) -> InterpreterResult<S, Report<SpannedInterpreterError>> {
     let mut interpreter = Interpreter::<S>::new();
-    interpreter.interpret_program(prog)?;
-    Ok((interpreter.built_op_ctx, interpreter.fns_to_op_ids, interpreter.state_map))
+    let res = interpreter.interpret_program(prog);
+    InterpreterResult {
+        op_ctx_and_map: res.map(|_| (interpreter.built_op_ctx, interpreter.fns_to_op_ids)),
+        state_map: interpreter.state_map,
+    }
 }
 
 struct Interpreter<'src, S: SemanticsWithCustomSyntax> {
@@ -136,12 +145,24 @@ impl<'src, S: SemanticsWithCustomSyntax> Interpreter<'src, S> {
         prog: Spanned<Program<'src, S::CS>>,
     ) -> Result<(), SpannedInterpreterError> {
         // we iterate in reverse order such that all functions have their dependencies already parsed
+        let mut err = None;
         for (name, fn_def) in prog.0.functions.into_iter().rev() {
             let op_id = self.fns_to_op_ids.len() as u32;
             self.fns_to_op_ids.insert(name, op_id);
 
-            let user_op = self.interpret_fn_def(op_id, fn_def)?;
-            self.built_op_ctx.add_custom_operation(op_id, user_op);
+            let res_user_op = self.interpret_fn_def(op_id, fn_def);
+            match res_user_op {
+                Ok(user_op) => {
+                    self.built_op_ctx.add_custom_operation(op_id, user_op);
+                }
+                Err(e) => {
+                    // Continue interpreting to get as many state maps as possible
+                    err.get_or_insert(e);
+                }
+            }
+        }
+        if let Some(e) = err {
+            return Err(e);
         }
         Ok(())
     }
@@ -158,8 +179,10 @@ impl<'src, S: SemanticsWithCustomSyntax> Interpreter<'src, S> {
         let mut interpreter =
             FnInterpreter::new(&mut builder, &self.fns_to_op_ids, fn_def.0.name.0);
         let fn_span = fn_def.1;
-        interpreter.interpret_fn_def(fn_def)?;
+        let res = interpreter.interpret_fn_def(fn_def);
+        // get the state maps before returning an error
         self.state_map.extend(interpreter.state_map);
+        let _ = res?;
 
         builder
             .build()
@@ -663,17 +686,16 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                                 .with_span(node.1)
                         ))
                         .attach_printable("return node AID not found")?;
-                    let ret_name = ret_name.0;
+                    let ret_name_str = ret_name.0;
                     let ret_ty = self
                         .return_marker_to_av
-                        .get(ret_name)
+                        .get(ret_name_str)
                         .ok_or(report!(
-                            InterpreterError::NotFoundReturnMarker(ret_name.to_string())
-                                .with_span(node.1)
-                        ))
-                        .attach_printable("Return marker not found")?;
+                            InterpreterError::NotFoundReturnMarker(ret_name_str.to_string())
+                                .with_span(ret_name.1)
+                        ))?;
                     self.builder
-                        .return_node(aid, ret_name.into(), ret_ty.clone())
+                        .return_node(aid, ret_name_str.into(), ret_ty.clone())
                         .change_context(InterpreterError::BuilderError.with_span(mapping_span))?;
                 }
                 ReturnStmtMapping::Edge { .. } => {

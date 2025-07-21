@@ -1,7 +1,7 @@
 pub mod interpreter;
 pub mod custom_syntax;
 
-use crate::interpreter::interpret;
+use crate::interpreter::{interpret, InterpreterResult};
 use ariadne::{sources, Color, Label, Report, ReportKind};
 use chumsky::input::SliceInput;
 use chumsky::{input::ValueInput, prelude::*};
@@ -618,7 +618,8 @@ where
 
         let spanned_return_mappings = spanned_return_node_mapping
             .or(spanned_return_edge_mapping)
-            .repeated()
+            .separated_by(just(Token::Ctrl(',')))
+            .allow_trailing()
             .at_least(1)
             .collect::<Vec<_>>()
             .boxed();
@@ -741,8 +742,8 @@ where
 pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
     src: &'src str,
 ) -> (OperationContext<S>, HashMap<&'src str, OperationId>) {
-    match try_parse_to_op_ctx_and_map::<S>(src, true) {
-        Ok((op_ctx, fn_map, _)) => (op_ctx, fn_map),
+    match try_parse_to_op_ctx_and_map::<S>(src, true).op_ctx_and_map {
+        Ok((op_ctx, fn_map)) => (op_ctx, fn_map),
         Err(output) => {
             panic!("Failed to parse the input source code:\n{output}")
         }
@@ -752,7 +753,7 @@ pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
 pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
     src: &'src str,
     color_enabled: bool,
-) -> Result<(OperationContext<S>, HashMap<&'src str, OperationId>, HashMap<String, IntermediateState<S>>), String> {
+) -> InterpreterResult<'src, S, String> {
     let filename = "input".to_string();
     let (tokens, errs) = lexer().parse(src).into_output_errors();
 
@@ -778,9 +779,12 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
 
         if let Some((program, file_span)) = ast.filter(|_| errs.len() + parse_errs.len() == 0) {
             let res = interpret::<S>(program);
-            match res {
-                Ok((op_ctx, fns_to_ids, state_map)) => {
-                    return Ok((op_ctx, fns_to_ids, state_map));
+            match res.op_ctx_and_map {
+                Ok((op_ctx, fns_to_ids)) => {
+                    return InterpreterResult {
+                        op_ctx_and_map: Ok((op_ctx, fns_to_ids)),
+                        state_map: res.state_map,
+                    }
                 }
                 Err(e) => {
 
@@ -810,7 +814,7 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
                         .join("\n");
 
                     // build report with error
-                    return Err(string_of_report(filename.clone(), src, Report::build(
+                    let err = Err(string_of_report(filename.clone(), src, Report::build(
                         ReportKind::Error,
                         (filename.clone(), error_span.into_range()),
                     )
@@ -822,6 +826,10 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
                                 .with_color(Color::Red),
                         )
                         .finish()));
+                    return InterpreterResult {
+                        op_ctx_and_map: err,
+                        state_map: res.state_map,
+                    }
                 }
             }
         }
@@ -860,7 +868,10 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
         });
 
     let output = String::from_utf8(output_buf.into_inner().unwrap()).unwrap();
-    Err(output)
+    InterpreterResult {
+        op_ctx_and_map: Err(output),
+        state_map: HashMap::new(),
+    }
 }
 
 /// Compared to the syntax_macro, this will only parse at runtime. The syntax_macro will parse at runtime as well,

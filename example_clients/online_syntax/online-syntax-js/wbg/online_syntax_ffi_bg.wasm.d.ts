@@ -2,9 +2,11 @@
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
 export const Context_init: () => void;
-export const Context_parse: (a: number, b: number, c: number) => void;
+export const Context_parse: (a: number, b: number) => number;
+export const OpCtxAndFnNames_destroy: (a: number) => void;
 export const ParseError_to_string: (a: number, b: number) => void;
 export const ParseError_destroy: (a: number) => void;
+export const ParseResult_error_message: (a: number, b: number) => void;
 export const ParseResult_dot_of_state: (a: number, b: number, c: number, d: number) => void;
 export const ParseResult_list_states: (a: number) => number;
 export const ParseResult_destroy: (a: number) => void;

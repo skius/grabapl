@@ -6,9 +6,11 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
   readonly Context_init: () => void;
-  readonly Context_parse: (a: number, b: number, c: number) => void;
+  readonly Context_parse: (a: number, b: number) => number;
+  readonly OpCtxAndFnNames_destroy: (a: number) => void;
   readonly ParseError_to_string: (a: number, b: number) => void;
   readonly ParseError_destroy: (a: number) => void;
+  readonly ParseResult_error_message: (a: number, b: number) => void;
   readonly ParseResult_dot_of_state: (a: number, b: number, c: number, d: number) => void;
   readonly ParseResult_list_states: (a: number) => number;
   readonly ParseResult_destroy: (a: number) => void;
