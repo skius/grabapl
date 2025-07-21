@@ -25,16 +25,53 @@ fn get_ops() -> (
 
         fn bfs(start_node: Integer) -> (head: Object) {
             let! head = mk_list();
-            list_insert_by_copy(head, start_node);
             let! queue = mk_queue();
-            if shape [
-                child: Integer,
-                start_node -> child: *,
-            ] {
-                insert_siblings_to_queue_as_ref(child, queue);
-            }
-            add_values_to_list(queue, head);
+
+            push_queue_by_ref(queue, start_node);
+            hide_node(start_node);
+
+            bfs_helper(queue, head);
+            // add_values_to_list(queue, head);
             return (head: head);
+        }
+
+        fn hide_node(node: Object) {
+            let! one = add_node<int,1>();
+            if is_eq<0>(one) {
+                // statically 'maybe' delete the node, but in practice this is never executed.
+                remove_node(node);
+            }
+        }
+
+        fn bfs_helper(queue: Object, list: Object) {
+            let! is_empty_res = queue_empty(queue);
+            if is_eq<0>(is_empty_res) {
+                // not empty.
+                // let's get a reference to the first element in the queue
+                let! elt = pop_queue(queue);
+                let! attach = add_node<int,1>();
+                extract_ref<int>(elt, attach);
+                if shape [
+                    node: Int,
+                    attach -> node: "attached"
+                ] skipping ["visited"] {
+                    // we have a new node, let's insert it into the list
+                    list_insert_by_copy(list, node);
+                    // mark the node as visited
+                    mark_node<"visited", Int>(node);
+                    // but also, we need to add all *unvisited* children of this node to the queue
+                    if shape [
+                        child: Integer,
+                        node -> child: *,
+                    ] skipping ["visited"] {
+                        // insert all siblings to the queue
+                        insert_siblings_to_queue_as_ref(child, queue);
+                    }
+                }
+                remove_node(attach);
+                remove_node(elt);
+                bfs_helper(queue, list);
+            }
         }
 
         fn add_values_to_list(queue: Object, list: Object) {
@@ -60,14 +97,13 @@ fn get_ops() -> (
         }
 
         fn insert_siblings_to_queue_as_ref(child: Integer, queue: Object) [parent: Integer, parent->child:*] {
+            // mark_node<"visited", Int>(child);
             // insert self
-            let! self_ref = make_ref(child);
-            push_queue_by_copy(queue, self_ref);
-            remove_node(self_ref);
+            push_queue_by_ref(queue, child);
             if shape [
                 sibling: Integer,
                 parent -> sibling: *,
-            ] {
+            ] skipping ["visited"] {
                 // insert all siblings
                 insert_siblings_to_queue_as_ref(sibling, queue);
             }
@@ -125,30 +161,22 @@ fn get_ops() -> (
             return (value: res);
         }
 
+        fn push_queue_by_ref(head: Object, value: Int) {
+            let! ref_node = make_ref(value);
+            push_queue_helper_linking(head, ref_node);
+        }
+
         fn push_queue_by_copy(head: Object, value: Ref<Int>) {
             // insert value at the end of the queue
             let! new_node = add_node<int,0>();
             copy_value_from_to(value, new_node);
-            // TODO: this block could be avoided if Ref were subtypes of Object.
-            if shape [
-                next: Ref<Int>,
-                head -> next: *,
-            ] {
-                add_node<int,2000>();
-
-                push_queue_helper_linking(next, new_node);
-            } else {
-                // we're at the tail of the queue
-                add_node<int,1000>();
-                add_edge<"queue_next">(head, new_node);
-            }
+            push_queue_helper_linking(head, new_node);
         }
 
         // links the given node to the end of the queue.
-        fn push_queue_helper_linking(curr: Ref<Int>, node_to_insert: Ref<Int>) {
-
+        fn push_queue_helper_linking(curr: Object, node_to_insert: Ref<Int>) {
             if shape [
-                next: Ref<Int>,
+                next: Object,
                 curr -> next: *,
             ] {
                 push_queue_helper_linking(next, node_to_insert);
@@ -283,8 +311,6 @@ fn test_bfs(
     );
 }
 
-// TODO: when adding all siblings to a list, add test with a second parent that breaks in algot
-
 #[test_log::test]
 fn diamond_shape_bfs() {
     let (op_ctx, fn_map) = get_ops();
@@ -305,36 +331,29 @@ fn diamond_shape_bfs() {
 }
 
 #[test_log::test]
-fn all_siblings_test() {
+fn edge_case_bfs() {
     let (op_ctx, fn_map) = get_ops();
     let mut g = TestSemantics::new_concrete_graph();
-    let op = fn_map["test_insert_all_siblings_of"];
-    // build a simple graph with siblings
-    // add siblings to list
-    let c1 = g.add_node(NodeValue::Integer(1));
-    // p1 is the parent that would break the algorithm in Algot's semantics
-    let p1 = g.add_node(NodeValue::Integer(-1));
-    g.add_edge(p1, c1, "edge".to_string());
-    // p2 is the parent of which we want to add all siblings to a list
-    let p2 = g.add_node(NodeValue::Integer(-2));
-    g.add_edge(p2, c1, "edge".to_string());
-    let c2 = g.add_node(NodeValue::Integer(2));
-    g.add_edge(p2, c2, "edge".to_string());
+    // build a diamond shape graph with legs
+    let n0 = g.add_node(NodeValue::Integer(0));
+    let n1 = g.add_node(NodeValue::Integer(1));
+    let n2 = g.add_node(NodeValue::Integer(2));
+    let n3 = g.add_node(NodeValue::Integer(3));
+    let n4 = g.add_node(NodeValue::Integer(4));
+    let n5 = g.add_node(NodeValue::Integer(5));
 
-    let res = run_from_concrete(&mut g, &op_ctx, op, &[p2]).unwrap();
-    let head = res.new_nodes[&"head".into()];
-    let siblings_list = helpers::list_to_value_vec_generic::<TestSemantics>(&g, head);
-    assert_eq!(
-        siblings_list,
-        vec![
-            NodeValue::Integer(0), /*list head sentinel*/
-            NodeValue::Integer(1),
-            NodeValue::Integer(2)
-        ],
-        "Expected siblings list to contain 1 and 2, got: {:?}",
-        siblings_list
-    );
+    g.add_edge(n0, n1, "edge".to_string());
+    g.add_edge(n0, n2, "edge".to_string());
+    g.add_edge(n1, n3, "edge".to_string());
+    g.add_edge(n2, n3, "edge".to_string());
+    g.add_edge(n3, n4, "edge".to_string());
+    g.add_edge(n3, n5, "edge".to_string());
+    g.add_edge(n5, n2, "edge".to_string());
+
+    // run BFS from n0
+    test_bfs(&op_ctx, &fn_map, &mut g, n0);
 }
+
 
 #[test_log::test]
 #[test_log(default_log_filter = "warn")]

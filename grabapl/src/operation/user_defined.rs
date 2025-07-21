@@ -377,6 +377,7 @@ struct Runner<'a, 'arg, S: Semantics> {
     /// The argument with which our operation was called.
     arg: &'a OperationArgument<'arg>,
     // Note: should not store AID::Parameter nodes, those are in `arg` already.
+    // TODO: ^ double check this. I'm currently violating it for ForgetAid.
     abstract_to_concrete: HashMap<AbstractNodeId, NodeKey>,
 }
 
@@ -390,7 +391,9 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
             op_ctx,
             g,
             arg,
-            abstract_to_concrete: HashMap::new(),
+            abstract_to_concrete: arg.subst.mapping.iter().map(|(s, n)| {
+                (AbstractNodeId::ParameterMarker(*s), *n)
+            }).collect(),
         }
     }
 
@@ -499,6 +502,15 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
     }
 
     fn aid_to_node_key(&self, aid: AbstractNodeId) -> OperationResult<NodeKey> {
+        // CHANGED SINCE FORGET_AID: EVERYTHING IS IN ABSTRACT_TO_CONCRETE SINCE WE MAY WANT TO FORGET AID.
+
+        self.abstract_to_concrete.get(&aid).copied().ok_or_else(|| {
+            report!(OperationError::UnknownAID(aid))
+        }).attach_printable_lazy(|| {
+            format!("Cannot find concrete node key for abstract node id {aid:?} in mapping: {:#?}", self.abstract_to_concrete)
+        })
+
+        /*
         // Get a param aid from our argument's substitution, and the rest from the map.
         match aid {
             AbstractNodeId::ParameterMarker(subst_marker) => self
@@ -518,7 +530,7 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
                     .ok_or(OperationError::UnknownAID(aid))?;
                 Ok(key)
             }
-        }
+        }*/
     }
 
     // TODO: decide if we really want to have this be fallible, since we may want to instead have some
@@ -555,13 +567,8 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
                 .collect::<OperationResult<_>>()?,
         );
 
-        let hidden_nodes: HashSet<_> = self
-            .arg
-            .subst
-            .mapping
-            .values()
-            .copied()
-            .chain(self.abstract_to_concrete.values().copied())
+        // CHANGED SINCE FORGET_AID: ABSTRACT_TO_CONCRETE CONTAINS PARAM SUBSTITUTION ALREADY.
+        let hidden_nodes: HashSet<_> = self.abstract_to_concrete.values().copied()
             .chain(self.arg.hidden_nodes.iter().copied())
             .collect();
 

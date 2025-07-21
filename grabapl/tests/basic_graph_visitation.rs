@@ -616,8 +616,6 @@ fn test_bfs(
     );
 }
 
-// TODO: when adding all siblings to a list, add test with a second parent that breaks in algot
-
 #[test_log::test]
 fn diamond_shape_bfs() {
     let (op_ctx, fn_map) = get_ops();
