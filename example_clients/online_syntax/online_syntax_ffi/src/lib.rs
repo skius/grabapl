@@ -1,5 +1,7 @@
 use grabapl::prelude::*;
 
+use grabapl::semantics::example_with_ref::ExampleWithRefSemantics as TheSemantics;
+
 #[diplomat::bridge]
 pub mod ffi {
     use std::collections::HashMap;
@@ -18,7 +20,7 @@ pub mod ffi {
         }
 
         pub fn parse(src: &str) -> Box<ParseResult> {
-            let res = syntax::try_parse_to_op_ctx_and_map::<grabapl::semantics::example::ExampleSemantics>(src, true);
+            let res = syntax::try_parse_to_op_ctx_and_map::<super::TheSemantics>(src, true);
 
             let inner_res = match res.op_ctx_and_map {
                 Ok((op_ctx, fn_names)) => {
@@ -42,14 +44,14 @@ pub mod ffi {
 
     #[diplomat::opaque]
     struct OpCtxAndFnNames {
-        op_ctx: grabapl::operation::OperationContext<grabapl::semantics::example::ExampleSemantics>,
+        op_ctx: grabapl::operation::OperationContext<super::TheSemantics>,
         fn_names: HashMap<String, OperationId>,
     }
 
     #[diplomat::opaque]
     pub struct ParseResult {
         result: Result<OpCtxAndFnNames, String>,
-        state_map: HashMap<String, grabapl::operation::builder::IntermediateState<grabapl::semantics::example::ExampleSemantics>>,
+        state_map: HashMap<String, grabapl::operation::builder::IntermediateState<super::TheSemantics>>,
     }
 
     impl ParseResult {

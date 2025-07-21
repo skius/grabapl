@@ -12,7 +12,7 @@ use thiserror::Error;
 use grabapl::operation::builder::IntermediateState;
 use crate::custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
 
-fn parse_abstract_node_type<S: SemanticsWithCustomSyntax>(
+pub fn parse_abstract_node_type<S: SemanticsWithCustomSyntax>(
     src: &str,
 ) -> Option<<S::CS as CustomSyntax>::AbstractNodeType> {
     let tokens = lexer().parse(src).into_result().ok()?;

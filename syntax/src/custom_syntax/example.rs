@@ -78,7 +78,7 @@ impl CustomSyntax for MyCustomSyntax {
 
             let field = field_name
                 .then_ignore(just(Token::Ctrl(':')))
-                .then(field_type)
+                .then(field_type.clone())
                 .map(|(name, typ)| MyCustomStructField {
                     name: name.to_string(),
                     typ,
@@ -94,10 +94,55 @@ impl CustomSyntax for MyCustomSyntax {
             }
             .labelled("struct name");
 
-            let entire_struct = struct_name
-                .then_ignore(just(Token::Ctrl('{')))
-                .then(fields)
+            let struct_braces = just(Token::Ctrl('{'))
+                .ignore_then(fields)
                 .then_ignore(just(Token::Ctrl('}')))
+                .boxed();
+
+            let generics = select! {
+                Token::MacroArgs(s) => s,
+            };
+            let struct_generics = generics.try_map_with(move |args, e| {
+                // // we need to parse `args` with the field_type parser.
+                // // for that we first need to tokenize args
+                // let args_toks = crate::lexer()
+                //     .parse(args)
+                //     .into_result()
+                //     .map_err(|errs| {
+                //         Rich::custom(
+                //             e.span(),
+                //             format!("Failed to parse generic arguments: {}, errs: {:?}", args, errs),
+                //         )
+                //     })?;
+                // field_type_copy.parse(args_toks.as_slice().map((args.len()..args.len()).into(), |(t, s)| (t, s)))
+                //     .into_result()
+                //     .map_err(|errs| {
+                //         Rich::custom(
+                //             e.span(),
+                //             format!("Failed to parse generic type: {}, errs: {:?}", args, errs),
+                //         )
+                //     })
+
+                // welp. above doesn't compile. not sure why.
+                // for now, only support int
+                if args.to_lowercase() == "int" ||
+                    args.to_lowercase() == "integer" {
+                    Ok(MyCustomType::Primitive("int".to_string()))
+                } else {
+                    Err(Rich::custom(
+                        e.span(),
+                        format!("Unsupported generic type: {}", args),
+                    ))
+                }
+            }).map(|typ| {
+                vec![MyCustomStructField {
+                    name: "inner".to_string(),
+                    typ,
+                }]
+            });
+
+            let entire_struct = struct_name
+                .then(struct_braces.or(struct_generics))
                 .map(|(name, fields)| {
                     MyCustomType::Custom(MyCustomStruct {
                         name: name.to_string(),
@@ -105,7 +150,56 @@ impl CustomSyntax for MyCustomSyntax {
                     })
                 });
 
-            entire_struct.or(primitive_type)
+
+
+            //
+            // let field_type_copy = field_type.clone().boxed();
+            // // also allow Struct<OtherType> syntax that gets parsed into Custom { name: "inner", type: "OtherType" }
+            // let generic_struct = struct_name
+            //     .then(generics.try_map_with(move |args, e| {
+            //         // // we need to parse `args` with the field_type parser.
+            //         // // for that we first need to tokenize args
+            //         // let args_toks = crate::lexer()
+            //         //     .parse(args)
+            //         //     .into_result()
+            //         //     .map_err(|errs| {
+            //         //         Rich::custom(
+            //         //             e.span(),
+            //         //             format!("Failed to parse generic arguments: {}, errs: {:?}", args, errs),
+            //         //         )
+            //         //     })?;
+            //         // field_type_copy.parse(args_toks.as_slice().map((args.len()..args.len()).into(), |(t, s)| (t, s)))
+            //         //     .into_result()
+            //         //     .map_err(|errs| {
+            //         //         Rich::custom(
+            //         //             e.span(),
+            //         //             format!("Failed to parse generic type: {}, errs: {:?}", args, errs),
+            //         //         )
+            //         //     })
+            //
+            //         // welp. above doesn't compile. not sure why.
+            //         // for now, only support int
+            //         if args.to_lowercase() == "int" ||
+            //             args.to_lowercase() == "integer" {
+            //             Ok(MyCustomType::Primitive("int".to_string()))
+            //         } else {
+            //             Err(Rich::custom(
+            //                 e.span(),
+            //                 format!("Unsupported generic type: {}", args),
+            //             ))
+            //         }
+            //     }))
+            //     .map(|(name, typ)| {
+            //         MyCustomType::Custom(MyCustomStruct {
+            //             name: name.to_string(),
+            //             fields: vec![MyCustomStructField {
+            //                 name: "inner".to_string(),
+            //                 typ,
+            //             }],
+            //         })
+            //     });
+
+            entire_struct.or(primitive_type).boxed()
         })
     }
 

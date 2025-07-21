@@ -11,6 +11,7 @@ use petgraph::data::Build;
 // }
 
 pub mod example;
+pub mod example_with_ref;
 
 /// This matcher always returns true.
 #[derive(Default)]

@@ -51,6 +51,13 @@ cargo check --target wasm32-unknown-unknown
 - [x] Recursion actually CAN add nodes! Add a test for this (if cond { return 0 } else { return recurse() })
 - [x] Fix web demo (builder now needs an ID in the beginning)
 - [ ] build operations from Sverrir's studies
+- [ ] Shape hidden: If we exit a scope and some abstract node ID falls out of scope, then that node should not be shape-hidden anymore.
+  - [ ] Add a test for this. (eg if shape [child] { .. } .. if shape [child] { .. }  should be entered for both branches if the child from the first query is not raised ('merged') to the outer scope)
+- [ ] Node bloat: Scope: the pattern of let! res = .., then filling res with something in true/false is bad, since res will be overwritten
+  - Delete unconnected, unreturned nodes from the concrete graph after every operation?
+  - in UDOp runner, store which nodes are newly created, and in the end delete all new nodes that are either:
+    - Not connected to the parameter graph
+    - Not connected to a return node/a return node themselves.
 - [ ] Research incremental interpreters/parsers? that show partial type info like local variables?
 - [ ] Include telegram messages
 - [ ] Forget instruction for shape queries

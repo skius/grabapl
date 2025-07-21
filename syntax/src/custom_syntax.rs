@@ -1,4 +1,5 @@
 pub mod example;
+mod example_with_ref;
 
 use std::fmt;
 use std::fmt::Debug;

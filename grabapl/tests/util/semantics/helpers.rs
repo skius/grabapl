@@ -1,8 +1,8 @@
-use grabapl::NodeKey;
+use grabapl::{NodeKey, Semantics};
 use grabapl::prelude::ConcreteGraph;
 use crate::util::semantics::{NodeValue, TestSemantics};
 
-pub fn list_to_value_vec(graph: &ConcreteGraph<TestSemantics>, head: NodeKey) -> Vec<NodeValue> {
+pub fn list_to_value_vec_generic<S: Semantics>(graph: &ConcreteGraph<S>, head: NodeKey) -> Vec<S::NodeConcrete> {
     let mut values = vec![];
     let mut current = Some(head);
     while let Some(current_key) = current.take() {
@@ -16,4 +16,8 @@ pub fn list_to_value_vec(graph: &ConcreteGraph<TestSemantics>, head: NodeKey) ->
         }
     }
     values
+}
+
+pub fn list_to_value_vec(graph: &ConcreteGraph<TestSemantics>, head: NodeKey) -> Vec<NodeValue> {
+    list_to_value_vec_generic::<TestSemantics>(graph, head)
 }
