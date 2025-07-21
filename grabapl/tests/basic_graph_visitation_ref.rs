@@ -33,19 +33,7 @@ fn get_ops() -> (
             ] {
                 insert_siblings_to_queue_as_ref(child, queue);
             }
-            // add_values_to_list(queue, head);
-            let! res1 = pop_queue(queue);
-            let! res2 = pop_queue(queue);
-
-            let! attach1 = add_node<int,501>();
-            extract_ref<int>(res1, attach1);
-            if shape [
-                extracted_node: Int,
-                attach1 -> extracted_node: "attached"
-            ] {
-                list_insert_by_copy(head, extracted_node);
-            }
-
+            add_values_to_list(queue, head);
             return (head: head);
         }
 
@@ -66,6 +54,8 @@ fn get_ops() -> (
                     list_insert_by_copy(list, extracted_node);
                 }
                 remove_node(attach);
+                // repeat
+                add_values_to_list(queue, list);
             }
         }
 
@@ -279,6 +269,7 @@ fn test_bfs(
     let res = run_from_concrete(g, &op_ctx, fn_map["bfs"], &[start_node]).unwrap();
     let head_bfs = res.new_nodes[&"head".into()];
     let grabapl_bfs_list = helpers::list_to_value_vec_generic::<TestSemantics>(g, head_bfs);
+    let grabapl_bfs_list = &grabapl_bfs_list[1..]; // skip the sentinel node
     assert!(
         valid_bfs_order(&grabapl_bfs_list, bfs_layers.clone()),
         "grabapl BFS result does not match the BFS layers for start_node {:?},
