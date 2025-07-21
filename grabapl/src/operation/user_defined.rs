@@ -212,6 +212,10 @@ pub enum Instruction<S: Semantics> {
         old: AbstractNodeId,
         new: AbstractNodeId,
     },
+    // Tells the concrete runner to forget the mapping. This is useful to not have the mapping still be shape-hidden.
+    ForgetAid {
+        aid: AbstractNodeId,
+    },
 }
 
 impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Instruction<S> {
@@ -228,6 +232,7 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Instr
                 old: *old,
                 new: *new,
             },
+            Instruction::ForgetAid { aid } => Instruction::ForgetAid { aid: *aid },
         }
     }
 }
@@ -466,6 +471,15 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
                     };
                     self.abstract_to_concrete.insert(*new, key);
                 }
+                Instruction::ForgetAid {aid} => {
+                    // Remove the aid from the mapping, so it is not used anymore.
+                    if self.abstract_to_concrete.remove(aid).is_none() {
+                        return Err(report!(OperationError::UnknownAID(*aid)))
+                            .attach_printable_lazy(|| {
+                                format!("Cannot forget aid {aid:?}, since it is not in the mapping: {:#?}", self.abstract_to_concrete)
+                            });
+                    }
+                }
             }
         }
         Ok(())
@@ -549,9 +563,6 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
             .copied()
             .chain(self.abstract_to_concrete.values().copied())
             .chain(self.arg.hidden_nodes.iter().copied())
-            // // TODO: in the future a shape query could just hide some markers
-            // // TODO: directly pass the marker_set to run_shape_query to avoid some allocations?
-            // .chain(self.arg.marker_set.borrow().all_marked_nodes())
             .collect();
 
         Ok(OperationArgument {

@@ -1405,6 +1405,12 @@ pub enum QueryPath {
     FalseBranch,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct IntermediateStateAbstractOutputResult {
+    new_aids: Vec<AbstractNodeId>,
+    removed_aids: Vec<AbstractNodeId>,
+}
+
 // TODO: Store more information like:
 //  - Are we still building the parameter graph?
 //  - If we are inside a query, which branches have we not entered yet?
@@ -1629,7 +1635,7 @@ impl<S: Semantics> IntermediateState<S> {
         marker: Option<AbstractOperationResultMarker>,
         op: AbstractOperation<S>,
         args: Vec<AbstractNodeId>,
-    ) -> Result<(AbstractOperationArgument, Vec<AbstractNodeId>), OperationBuilderError> {
+    ) -> Result<(AbstractOperationArgument, IntermediateStateAbstractOutputResult), OperationBuilderError> {
         let param = op.parameter();
         let (subst, abstract_arg) = self.get_substitution(&param, args)?;
 
@@ -1639,9 +1645,9 @@ impl<S: Semantics> IntermediateState<S> {
             op.apply_abstract(op_ctx, &mut gws)
                 .change_context(OperationBuilderError::AbstractApplyOperationError2)?
         };
-        let new_aids = self.handle_abstract_output_changes(marker, operation_output)?;
+        let output = self.handle_abstract_output_changes(marker, operation_output)?;
 
-        Ok((abstract_arg, new_aids))
+        Ok((abstract_arg, output))
     }
 
     fn interpret_builtin_query(
@@ -1662,7 +1668,7 @@ impl<S: Semantics> IntermediateState<S> {
         &mut self,
         marker: Option<AbstractOperationResultMarker>,
         operation_output: AbstractOperationOutput<S>,
-    ) -> Result<Vec<AbstractNodeId>, OperationBuilderError> {
+    ) -> Result<IntermediateStateAbstractOutputResult, OperationBuilderError> {
         // go over new nodes
         let mut new_aids = Vec::new();
         for (node_marker, node_key) in operation_output.new_nodes {
@@ -1676,9 +1682,12 @@ impl<S: Semantics> IntermediateState<S> {
                 self.graph.remove_node(node_key);
             }
         }
-        for node_key in operation_output.removed_nodes {
+        let mut removed_aids = Vec::new();
+        for node_key in &operation_output.removed_nodes {
             // remove the node from the mapping
-            self.node_keys_to_aid.remove_left(&node_key);
+            if let Some(removed_aid) = self.node_keys_to_aid.remove_left(&node_key) {
+                removed_aids.push(removed_aid);
+            }
         }
 
         // collect changes
@@ -1702,7 +1711,10 @@ impl<S: Semantics> IntermediateState<S> {
                 .insert((source_aid, target_aid), edge_abstract);
         }
 
-        Ok(new_aids)
+        Ok(IntermediateStateAbstractOutputResult {
+            new_aids,
+            removed_aids,
+        })
     }
 
     fn get_substitution(
@@ -2900,6 +2912,23 @@ fn merge_states<S: Semantics>(
     state_true: &IntermediateState<S>,
     state_false: &IntermediateState<S>,
 ) -> IntermediateState<S> {
+    merge_states_result(is_true_shape, state_true, state_false)
+        .merged_state
+}
+
+struct MergeStatesResult<S: Semantics> {
+    merged_state: IntermediateState<S>,
+    /// The AIDs that are present in the true state but not in the merged state.
+    missing_from_true: HashSet<AbstractNodeId>,
+    /// The AIDs that are present in the false state but not in the merged state.
+    missing_from_false: HashSet<AbstractNodeId>,
+}
+
+fn merge_states_result<S: Semantics>(
+    is_true_shape: bool,
+    state_true: &IntermediateState<S>,
+    state_false: &IntermediateState<S>,
+) -> MergeStatesResult<S> {
     // TODO: handle `is_true_shape`.
     //  ^ actually, we're doing that in interpret_graph_shape_query, so we don't need to do it here, I think.
 
@@ -2948,8 +2977,8 @@ fn merge_states<S: Semantics>(
             .node_may_originate_from_shape_query
             .contains(&aid)
             || state_false
-                .node_may_originate_from_shape_query
-                .contains(&aid)
+            .node_may_originate_from_shape_query
+            .contains(&aid)
         {
             new_state.node_may_originate_from_shape_query.insert(aid);
         }
@@ -3028,8 +3057,8 @@ fn merge_states<S: Semantics>(
             .edge_may_originate_from_shape_query
             .contains(&edge)
             || state_false
-                .edge_may_originate_from_shape_query
-                .contains(&edge)
+            .edge_may_originate_from_shape_query
+            .contains(&edge)
         {
             new_state.edge_may_originate_from_shape_query.insert(edge);
         }
@@ -3066,5 +3095,26 @@ fn merge_states<S: Semantics>(
         // TODO: edge orders need to be handled here.
     }
 
-    new_state
+    // which AIDs are actually present in the merged state, taking into account everything (names, type join)
+    let final_merged_state_aids = new_state
+        .node_keys_to_aid
+        .right_values()
+        .cloned()
+        .collect::<HashSet<_>>();
+
+    MergeStatesResult {
+        merged_state: new_state,
+        missing_from_true: state_true
+            .node_keys_to_aid
+            .right_values()
+            .cloned()
+            .filter(|aid| !final_merged_state_aids.contains(aid))
+            .collect(),
+        missing_from_false: state_false
+            .node_keys_to_aid
+            .right_values()
+            .cloned()
+            .filter(|aid| !final_merged_state_aids.contains(aid))
+            .collect(),
+    }
 }

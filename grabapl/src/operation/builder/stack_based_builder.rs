@@ -1,7 +1,4 @@
-use crate::operation::builder::{
-    BuilderInstruction, BuilderOpLike, IntermediateState, OperationBuilderError, QueryPath,
-    UDInstructionsWithMarker, merge_states,
-};
+use crate::operation::builder::{BuilderInstruction, BuilderOpLike, IntermediateState, OperationBuilderError, QueryPath, UDInstructionsWithMarker, merge_states, merge_states_result};
 use crate::operation::signature::parameter::{AbstractOutputNodeMarker, OperationParameter};
 use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
 use crate::operation::user_defined::{
@@ -263,7 +260,7 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
         let op = op_like
             .as_abstract_operation(builder_data.op_ctx, &builder_data.expected_self_signature)
             .change_context(BuilderError::OutsideError)?;
-        let (abstract_arg, new_aids) = self
+        let (abstract_arg, output_res) = self
             .current_state
             .interpret_op(builder_data.op_ctx, output_name, op, args)
             .change_context(BuilderError::OutsideError)?;
@@ -274,8 +271,17 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
             output_name,
             Instruction::OpLike(op_like_instr, abstract_arg),
         ));
+        // forget removed aids
+        for aid in output_res.removed_aids {
+            self.instructions.push((
+                None,
+                Instruction::ForgetAid {
+                    aid: aid.clone(),
+                },
+            ));
+        }
 
-        Ok(new_aids)
+        Ok(output_res.new_aids)
     }
 }
 
@@ -397,19 +403,40 @@ impl<S: Semantics> BranchesFrame<S> {
             .as_ref()
             .map(|cif| &cif.current_state)
             .unwrap_or(default_false_state);
-        let merged_branch = merge_states(false, true_branch_state_ref, false_branch_state_ref);
+        let merge_result = merge_states_result(false, true_branch_state_ref, false_branch_state_ref);
+
+        // take into account the missing AIDs from the branches, and insert ForgetAid instructions
+        let mut true_instructions = self
+            .true_branch
+            .map(|cif| cif.instructions)
+            .unwrap_or_default();
+        for aid in merge_result.missing_from_true {
+            true_instructions.push((
+                None,
+                Instruction::ForgetAid {
+                    aid: aid.clone(),
+                },
+            ));
+        }
+
+        let mut false_instructions = self
+            .false_branch
+            .map(|cif| cif.instructions)
+            .unwrap_or_default();
+        for aid in merge_result.missing_from_false {
+            false_instructions.push((
+                None,
+                Instruction::ForgetAid {
+                    aid: aid.clone(),
+                },
+            ));
+        }
 
         let query_instructions = QueryInstructions {
-            taken: self
-                .true_branch
-                .map(|cif| cif.instructions)
-                .unwrap_or_default(),
-            not_taken: self
-                .false_branch
-                .map(|cif| cif.instructions)
-                .unwrap_or_default(),
+            taken: true_instructions,
+            not_taken: false_instructions,
         };
-        Ok((merged_branch, query_instructions))
+        Ok((merge_result.merged_state, query_instructions))
     }
 }
 
