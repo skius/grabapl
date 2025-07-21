@@ -53,16 +53,10 @@ pub mod ffi {
         }
 
         pub fn list_states(&self) -> Box<StringIter> {
-            let states: Vec<String> = self.state_map.keys().cloned().collect();
+            let mut states: Vec<String> = self.state_map.keys().cloned().collect();
+            states.sort_unstable();
             Box::new(StringIter(states.into_iter()))
         }
-
-        #[diplomat::attr(auto, iterable)]
-        pub fn to_state_iterator(&self) -> Box<StringIter> {
-            self.list_states()
-        }
-
-
     }
 
     #[diplomat::opaque]
@@ -72,6 +66,11 @@ pub mod ffi {
         #[diplomat::attr(auto, iterator)]
         pub fn next(&mut self) -> Option<Box<StringWrapper>> {
             self.0.next().map(|s| Box::new(StringWrapper(s)))
+        }
+
+        #[diplomat::attr(auto, iterable)]
+        pub fn to_iterable(&self) -> Box<StringIter> {
+            Box::new(StringIter(self.0.clone()))
         }
     }
 

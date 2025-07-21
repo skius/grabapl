@@ -48,6 +48,18 @@ export class StringIter {
         }
     }
 
+    [Symbol.iterator]() {
+
+        const result = wasm.StringIter_to_iterable(this.ffiValue);
+
+        try {
+            return new StringIter(diplomatRuntime.internalConstructor, result, []);
+        }
+
+        finally {
+        }
+    }
+
     next(){
         const out = this.#iteratorNext();
 

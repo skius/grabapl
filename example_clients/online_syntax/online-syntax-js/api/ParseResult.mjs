@@ -67,18 +67,6 @@ export class ParseResult {
         }
     }
 
-    [Symbol.iterator]() {
-
-        const result = wasm.ParseResult_to_state_iterator(this.ffiValue);
-
-        try {
-            return new StringIter(diplomatRuntime.internalConstructor, result, []);
-        }
-
-        finally {
-        }
-    }
-
     constructor(symbol, ptr, selfEdge) {
         return this.#internalConstructor(...arguments)
     }

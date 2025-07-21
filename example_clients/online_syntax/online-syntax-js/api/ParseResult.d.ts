@@ -14,6 +14,4 @@ export class ParseResult {
     dotOfState(state: string): string;
 
     listStates(): StringIter;
-
-    [Symbol.iterator](): StringIter;
 }

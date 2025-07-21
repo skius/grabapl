@@ -11,5 +11,7 @@ export class StringIter {
     constructor();
 
 
+    [Symbol.iterator](): StringIter;
+
     next(): IteratorResult<StringWrapper>;
 }
