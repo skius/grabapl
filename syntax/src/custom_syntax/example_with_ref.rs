@@ -35,6 +35,9 @@ fn add_node_args_parser<'src>()
         let num_parser = select! {
             Token::Num(num) => num,
         };
+        let str_parser = select! {
+            Token::Str(s) => s,
+        };
 
         let node_value_parser =
             just(Token::Ctrl('-'))
@@ -46,7 +49,7 @@ fn add_node_args_parser<'src>()
                     } else {
                         NodeValue::Integer(num)
                     }
-                });
+                }).or(str_parser.map(|s| NodeValue::String(s.to_string())));
 
         let tuple_parser = node_typ_parser
             .then_ignore(just(Token::Ctrl(',')))

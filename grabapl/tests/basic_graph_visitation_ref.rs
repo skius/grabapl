@@ -18,59 +18,78 @@ fn get_ops() -> (
     syntax::grabapl_parse!(TestSemantics,
         // -------- BFS with Queue --------
         /*
-        Idea is:
-        1. push all siblings to queue.
-        2.
+        Idea is just like a regular BFS algorithm:
+        1. Queue of unprocessed nodes.
+        2. Pop an unvisited node (with magic new checked node references) from the queue
+            a. Add it to the result list.
+            b. Mark it as visited.
+            c. Add all its children to the queue.
+        3. Repeat until the queue is empty.
         */
 
         fn bfs(start_node: Integer) -> (head: Object) {
             let! head = mk_list();
             let! queue = mk_queue();
 
+            // BFS queue initialization: we start with `start_node`.
             push_queue_by_ref(queue, start_node);
+            // need to hide start_node from the abstract graph, since otherwise we will not be able to pop it from the queue, since it is shape-hidden.
+            // (if a node is hidden from the abstract graph, that means it is *not* hidden from shape queries)
             hide_node(start_node);
 
             bfs_helper(queue, head);
-            // add_values_to_list(queue, head);
+
             return (head: head);
         }
 
-        fn hide_node(node: Object) {
-            let! one = add_node<int,1>();
-            if is_eq<0>(one) {
-                // statically 'maybe' delete the node, but in practice this is never executed.
-                remove_node(node);
-            }
-        }
-
+        // BFS helper: recurses until the queue is empty.
         fn bfs_helper(queue: Object, list: Object) {
             let! is_empty_res = queue_empty(queue);
             if is_eq<0>(is_empty_res) {
-                // not empty.
+                // the queue is not empty.
+
                 // let's get a reference to the first element in the queue
-                let! elt = pop_queue(queue);
+                // ref_node is a node reference to a node of the graph we're running BFS on. Let's call that node `next`.
+                let! ref_node = pop_queue(queue);
+                // we need a node to which we can attach `next`.
                 let! attach = add_node<int,1>();
-                extract_ref<int>(elt, attach);
+                // now we actually extract `next` from ref_node. this adds an edge `attach` -> `next`: "attached".
+                extract_ref<int>(ref_node, attach);
+                // now we need to shape query for `next`. Shape querying is necessary to ensure
+                // we don't get a reference to a node that is already in the abstract graph (i.e., to avoid aliasing).
                 if shape [
-                    node: Int,
-                    attach -> node: "attached"
+                    next: Int,
+                    attach -> next: "attached"
                 ] skipping ["visited"] {
-                    // we have a new node, let's insert it into the list
-                    list_insert_by_copy(list, node);
-                    // mark the node as visited
-                    mark_node<"visited", Int>(node);
-                    // but also, we need to add all *unvisited* children of this node to the queue
-                    if shape [
-                        child: Integer,
-                        node -> child: *,
-                    ] skipping ["visited"] {
-                        // insert all siblings to the queue
-                        insert_siblings_to_queue_as_ref(child, queue);
-                    }
+                    // in addition, we can directly check if `next` is already visited, and if so, skip it!
+
+                    // if it's not visited already, we add it to our BFS result list
+                    list_insert_by_copy(list, next);
+                    // then mark it as visited
+                    mark_node<"visited", Int>(next);
+                    // and lastly, we need to add all children of this node to the queue
+                    //  note: if we want to a void unnecessarily adding already visited children that would just get skipped in the shape query above,
+                    //  we can check _at insertion time_ if the child is already visited and skip it if so.
+                    insert_children_into_queue_by_ref(next, queue);
                 }
+                // we do some cleanup
                 remove_node(attach);
-                remove_node(elt);
+                remove_node(ref_node);
+
+                // since the queue was not empty we try again
                 bfs_helper(queue, list);
+            }
+        }
+
+        // inserts all children of the parent node into the queue.
+        fn insert_children_into_queue_by_ref(parent: Integer, queue: Object) {
+            if shape [
+                child: Integer,
+                parent -> child: *,
+            ] /*skipping ["visited"] -- NOTE: uncommenting this is an optional optimization*/ {
+                push_queue_by_ref(queue, child);
+                // try to find more children
+                insert_children_into_queue_by_ref(parent, queue);
             }
         }
 
@@ -96,19 +115,13 @@ fn get_ops() -> (
             }
         }
 
-        fn insert_siblings_to_queue_as_ref(child: Integer, queue: Object) [parent: Integer, parent->child:*] {
-            // mark_node<"visited", Int>(child);
-            // insert self
-            push_queue_by_ref(queue, child);
-            if shape [
-                sibling: Integer,
-                parent -> sibling: *,
-            ] skipping ["visited"] {
-                // insert all siblings
-                insert_siblings_to_queue_as_ref(sibling, queue);
+        fn hide_node(node: Object) {
+            let! one = add_node<int,1>();
+            if is_eq<0>(one) {
+                // statically 'maybe' delete the node, but in practice this is never executed.
+                remove_node(node);
             }
         }
-
 
         // The FIFO queue
 
@@ -129,6 +142,14 @@ fn get_ops() -> (
                 decrement(res);
             }
             return (is_empty: res);
+        }
+
+        fn pop_queue_attach(head: Object) -> (attach: Object) {
+            let! elt = pop_queue(head);
+            let! attach = add_node<int,1>();
+            extract_ref<int>(elt, attach);
+            remove_node(elt);
+            return (attach: attach);
         }
 
         fn pop_queue(head: Object) -> (value: Ref<Int>) {
