@@ -40,6 +40,9 @@ export class ParseResult {
     }
 
 
+    /**
+     * Writes the error message if one exists.
+     */
     errorMessage() {
         const write = new diplomatRuntime.DiplomatWriteBuf(wasm);
 
@@ -54,6 +57,9 @@ export class ParseResult {
         }
     }
 
+    /**
+     * Returns an interable of error spans (if any).
+     */
     errorSpans() {
 
         const result = wasm.ParseResult_error_spans(this.ffiValue);
@@ -66,6 +72,9 @@ export class ParseResult {
         }
     }
 
+    /**
+     * Returns the DOT representation of the intermediate state named `state`.
+     */
     dotOfState(state) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 
@@ -85,6 +94,9 @@ export class ParseResult {
         }
     }
 
+    /**
+     * Lists the available states.
+     */
     listStates() {
 
         const result = wasm.ParseResult_list_states(this.ffiValue);
@@ -97,6 +109,9 @@ export class ParseResult {
         }
     }
 
+    /**
+     * Lists the available operations.
+     */
     listOperations() {
 
         const result = wasm.ParseResult_list_operations(this.ffiValue);
@@ -109,6 +124,9 @@ export class ParseResult {
         }
     }
 
+    /**
+     * Runs the operation with the given name and arguments on the provided concrete graph.
+     */
     runOperation(g, opName, args) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 

@@ -15,15 +15,33 @@ export class ParseResult {
     constructor();
 
 
+    /**
+     * Writes the error message if one exists.
+     */
     errorMessage(): string;
 
+    /**
+     * Returns an interable of error spans (if any).
+     */
     errorSpans(): LineColSpansIter;
 
+    /**
+     * Returns the DOT representation of the intermediate state named `state`.
+     */
     dotOfState(state: string): string;
 
+    /**
+     * Lists the available states.
+     */
     listStates(): StringIter;
 
+    /**
+     * Lists the available operations.
+     */
     listOperations(): StringIter;
 
+    /**
+     * Runs the operation with the given name and arguments on the provided concrete graph.
+     */
     runOperation(g: ConcreteGraph, opName: string, args: Array<number>): NewNodesIter;
 }
