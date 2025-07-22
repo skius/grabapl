@@ -211,6 +211,8 @@ const cancelEdgeBtn = document.getElementById('cancel-edge-btn');
 const edgeValueInput = document.getElementById('edge-value');
 edgeValueInput.required = false;
 
+const runSimulationBtn = document.getElementById('run-simulation-btn');
+
 // --- Core D3 Functions ---
 
 function updateInteractiveGraph() {
@@ -384,11 +386,21 @@ function initInteractiveGraph() {
     drawGrid(gridG, width, height, currentTransform);
 
     simulation = d3.forceSimulation(interactiveNodes)
-        .force("link", d3.forceLink(interactiveEdges).id(d => d.id).distance(150).strength(0))
-        // .force("charge", d3.forceManyBody().strength(-100))
-        // .force("center", d3.forceCenter(/*width / 2, height / 2*/).strength(1));
-        // .force("positionX", d3.forceX(10).strength(0.5))
-        // .force("positionY", d3.forceY(10).strength(0.5))
+        .force("link", d3.forceLink(interactiveEdges).id(d => d.id).distance(150).strength(0.6))
+        .force("charge", d3.forceManyBody().strength(-800))
+        // .force("center", d3.forceCenter(0, 0).strength(0.5))
+        // .stop();
+        .force("positionX", d3.forceX(100))
+        .force("positionY", d3.forceY(100))
+        .stop();
+
+    // tick every 50ms
+    // setInterval(() => {
+    //     if (simulation.alpha() > 0) {
+    //         simulation.tick();
+    //         updateInteractiveGraph();
+    //     }
+    // }, 50);
 
     updateThemeForGraph();
 }
@@ -451,6 +463,11 @@ runOperationBtn.addEventListener('click', () => {
     // if (inputNodeNames.length === 0) { alert("Please provide at least one input node name."); return; }
     executeOperation(operationName, inputNodeNames);
 });
+
+runSimulationBtn.addEventListener('click', () => {
+    simulation.tick(100);
+    updateInteractiveGraph();
+})
 
 // --- User-Adaptable Functions ---
 
