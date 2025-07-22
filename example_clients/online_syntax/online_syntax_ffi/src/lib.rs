@@ -67,12 +67,14 @@ pub mod ffi {
     }
 
     impl ParseResult {
+        /// Writes the error message if one exists.
         pub fn error_message(&self, out: &mut DiplomatWrite) {
             if let Err(ref e) = self.result {
                 write!(out, "{}", e.value).unwrap();
             }
         }
 
+        /// Returns an interable of error spans (if any).
         pub fn error_spans(&self) -> Box<LineColSpansIter> {
             let spans = match &self.result {
                 Ok(_) => {
@@ -92,6 +94,7 @@ pub mod ffi {
             Box::new(LineColSpansIter(spans.into_iter()))
         }
 
+        /// Returns the DOT representation of the intermediate state named `state`.
         pub fn dot_of_state(&self, state: &str, dot: &mut DiplomatWrite) {
             let Some(state) = self.state_map.get(state) else {
                 log::error!("state does not exist in state map");
@@ -100,12 +103,14 @@ pub mod ffi {
             write!(dot, "{}", state.dot_with_aid()).unwrap();
         }
 
+        /// Lists the available states.
         pub fn list_states(&self) -> Box<StringIter> {
             let mut states: Vec<String> = self.state_map.keys().cloned().collect();
             states.sort_unstable();
             Box::new(StringIter(states.into_iter()))
         }
 
+        /// Lists the available operations.
         pub fn list_operations(&self) -> Box<StringIter> {
             let mut operations: Vec<String> = self.result.as_ref()
                 .map(|res| res.fn_names.keys().cloned().collect())
@@ -114,6 +119,7 @@ pub mod ffi {
             Box::new(StringIter(operations.into_iter()))
         }
 
+        /// Runs the operation with the given name and arguments on the provided concrete graph.
         pub fn run_operation(
             &self,
             g: &mut ConcreteGraph,
@@ -192,7 +198,7 @@ pub mod ffi {
             };
             self.graph.add_node(value).0
         }
-        
+
         pub fn delete_node(&mut self, key: u32) {
             self.graph.delete_node(NodeKey(key));
         }
