@@ -39,6 +39,9 @@ fn get_ops() -> (
 
             bfs_helper(queue, head);
 
+            // the queue is not needed anymore.
+            remove_node(queue);
+
             return (head: head);
         }
 
@@ -79,6 +82,8 @@ fn get_ops() -> (
                 // since the queue was not empty we try again
                 bfs_helper(queue, list);
             }
+            // cleanup
+            remove_node(is_empty_res);
         }
 
         // inserts all children of the parent node into the queue.
@@ -121,6 +126,7 @@ fn get_ops() -> (
                 // statically 'maybe' delete the node, but in practice this is never executed.
                 remove_node(node);
             }
+            remove_node(one);
         }
 
         // The FIFO queue
@@ -154,30 +160,33 @@ fn get_ops() -> (
 
         fn pop_queue(head: Object) -> (value: Ref<Int>) {
             // remove the first element from the queue
-            let! res_src = add_node<int,-9999>();
-            // if we don't match any children, we need some form of base-case result. we just create a dangling reference here.
-            let! res = make_ref(res_src);
-            remove_node(res_src);
             if shape [
                 fst: Ref<Int>,
                 snd: Ref<Int>,
                 head -> fst: *,
                 fst -> snd: *,
             ] {
+                let! res = add_node<int,0>();
                 // remove the edge from head to fst and fst to snd
                 remove_edge(head, fst);
                 remove_edge(fst, snd);
                 add_edge<"queue_next">(head, snd);
-                // return fst
+                // return fst (TODO: allow returning from shape queries)
                 copy_value_from_to(fst, res);
+                remove_node(fst);
             } else if shape [
                 fst: Ref<Int>,
                 head -> fst: *
             ] {
+                let! res = add_node<int,0>();
                 remove_edge(head, fst);
                 copy_value_from_to(fst, res);
+                remove_node(fst);
             } else {
-
+                let! res_src = add_node<int,-9999>();
+                // if we don't match any children, we need some form of base-case result. we just create a dangling reference here.
+                let! res = make_ref(res_src);
+                remove_node(res_src);
             }
             return (value: res);
         }
