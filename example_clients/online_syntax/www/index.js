@@ -189,6 +189,8 @@ function onCodeChanged() {
                                     value: "error here",
                                 },
                             ],
+                            // TODO: would be cool if every errorSpan had was more 'rich' in the sense that it also contained a
+                            //  specific message to show. 
                             // glyphMarginHoverMessage: "glyph haha",
                         }
                     }
