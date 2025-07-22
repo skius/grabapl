@@ -1,6 +1,8 @@
 set -e
 
+# name of the folder to put the generated javascript library
 LIB_FOLDER="online-syntax-js"
+# name of the FFI package
 FFI_FOLDER="online_syntax_ffi"
 
 # assert we are in the same directory as this script
@@ -12,7 +14,19 @@ if [ "$SCRIPT_DIR" != "$CUR_DIR" ]; then
 fi
 
 # build #[wasm_bindgen] JS imports as basic JavaScript module into `${LIB_FOLDER}/wbg`
-wasm-pack build -t web -d "../${LIB_FOLDER}/wbg" ${FFI_FOLDER}/
+#wasm-pack build -t web -d "../${LIB_FOLDER}/wbg" ${FFI_FOLDER}/
+# UPDATE: wasm-pack will be archived in the future, so perform the steps manually:
+set -o xtrace
+# TODO: decide if we should use --release or not
+cargo build --lib --target wasm32-unknown-unknown -p $FFI_FOLDER --target-dir=target
+mkdir -p ${LIB_FOLDER}/wbg
+# TODO would need to change debug to release here
+wasm-bindgen target/wasm32-unknown-unknown/debug/${FFI_FOLDER}.wasm --out-dir "${LIB_FOLDER}/wbg" --typescript --target web
+wasm-opt "${LIB_FOLDER}/wbg/${FFI_FOLDER}_bg.wasm" -o "${LIB_FOLDER}/wbg/${FFI_FOLDER}_bg_opt.wasm" -O
+mv "${LIB_FOLDER}/wbg/${FFI_FOLDER}_bg_opt.wasm" "${LIB_FOLDER}/wbg/${FFI_FOLDER}_bg.wasm"
+set +o xtrace
+
+
 
 # run diplomat-tool for #[diplomat::bridge] modules
 # TODO: remove the legacy config once the stable rust compiler switches to the C spec abi
