@@ -31,6 +31,8 @@ const editor = monaco.editor.create(document.getElementById('container'), {
     scrollBeyondLastLine: false,
 });
 
+let editorDecorations = editor.createDecorationsCollection();
+
 // --- Theme Toggle Logic ---
 const themeToggleBtn = document.getElementById('theme-toggle');
 const themeToggleDarkIcon = document.getElementById('theme-toggle-dark-icon');
@@ -120,6 +122,16 @@ function populateStateSelector(res) {
     }
 }
 
+function highlightError(line, column) {
+
+    // Highlight the error in the editor
+    editor.revealLineInCenter(line);
+    editor.focus();
+    editor.setPosition({ lineNumber: line, column: column });
+
+    // show decoration
+}
+
 /**
  * This function is called whenever the content in the Monaco editor changes.
  * It attempts to compile the code and updates the UI accordingly.
@@ -133,6 +145,8 @@ function onCodeChanged() {
         const res = Context.parse(current_content);
         current_res = res;
 
+        // reset the error on the editor
+        editorDecorations.clear()
         // now check if it was parsed successfully
         let error_msg = res.errorMessage();
         if (error_msg === "") {
@@ -142,7 +156,72 @@ function onCodeChanged() {
         } else {
             // error
             outputPre.className = "w-full p-4 overflow-auto whitespace-pre-wrap text-red-400";
-            outputPre.innerHTML = ansi_up.ansi_to_html(error_msg);
+
+            error_msg = ansi_up.ansi_to_html(error_msg);
+
+            // find the portion of the error message that contains the error, it's of the form input:line:column
+            const errorMatch = error_msg.match(/input:(\d+):(\d+)/);
+            if (errorMatch) {
+                const line = parseInt(errorMatch[1], 10);
+                const column = parseInt(errorMatch[2], 10);
+
+                // span length is the length of "────────┬───────",
+                // but every character is wrapped in a <span> tag. So first we need to convert the error_msg to a DOM element
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = error_msg;
+                const forSpanText = tempDiv.innerText;
+                console.log(forSpanText);
+                //remove temp div again
+                tempDiv.remove();
+                const spanLengthMatch = forSpanText.matchAll(/[─┬]+/g);
+                // find longest match of ─ or ┬
+                let longestMatch = 1;
+                for (const match of spanLengthMatch) {
+                    if (match[0].length > longestMatch) {
+                        longestMatch = match[0].length;
+                    }
+                }
+                const spanLength = longestMatch;
+                // const spanLength = spanLengthMatch ? spanLengthMatch[0].length : 1; // Default to 1 if not found
+                console.log(`Highlighting error at line ${line}, column ${column}, span length ${spanLength}, ${spanLengthMatch}`);
+
+                const range = new monaco.Range(line, column, line, column + spanLength);
+                // let decoration = editor.createDecorationsCollection(
+                //     [{
+                //         range: range,
+                //         options: {
+                //             className: 'error-highlight',
+                //             isWholeLine: false
+                //         }
+                //     }]
+                // );
+
+                editorDecorations.append([
+                    {
+                        range: range,
+                        options: {
+                            className: 'error-highlight',
+                            isWholeLine: false
+                        }
+                    }
+                ]);
+
+                // replace the match in the error_msg to be a link that invokes the following function on click:
+                error_msg = error_msg.replace(errorMatch[0], `<a href="#" id="error-span-link" class="text-red-400 underline">input:${line}:${column}</a>`);
+                outputPre.innerHTML = error_msg;
+                // find and attach a click handler to the error span
+                const errorSpanLink = document.getElementById('error-span-link');
+                if (errorSpanLink) {
+                    errorSpanLink.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        highlightError(line, column);
+                    });
+                }
+
+            } else {
+                outputPre.innerHTML = error_msg
+            }
+
         }
 
 
