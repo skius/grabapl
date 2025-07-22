@@ -565,9 +565,6 @@ function executeOperation(operationName, inputNodeNames) {
         return;
     }
 
-    // --- YOUR CUSTOM LOGIC GOES HERE ---
-    // alert(`Running '${operationName}' with inputs: ${inputNodeNames.join(', ')}\n(See console for details. Implement your logic in 'executeOperation')`);
-
     let inputKeys = inputNodes.map(node => node.nodeKey);
 
     try {
@@ -634,19 +631,6 @@ function executeOperation(operationName, inputNodeNames) {
         alert(errorMessage);
         console.error("Error running operation:", e);
     }
-
-
-
-    // // Example: Create a new result node and connect inputs to it.
-    // const resultNodeName = `${operationName}_result_${Date.now() % 1000}`;
-    // const avgX = inputNodes.reduce((sum, n) => sum + (n.x || 0), 0) / inputNodes.length;
-    // const avgY = inputNodes.reduce((sum, n) => sum + (n.y || 0), 0) / inputNodes.length;
-    // const newNode = { id: crypto.randomUUID(), name: resultNodeName, value: "✅", x: avgX + 150, y: avgY };
-    // console.log("Adding node at coordinates:", newNode.x, newNode.y);
-    // interactiveNodes.push(newNode);
-    // inputNodes.forEach(inputNode => {
-    //     interactiveEdges.push({ source: inputNode, target: newNode, value: 'input' });
-    // });
 
     updateInteractiveGraph(); // Refresh the graph to show changes
 }
