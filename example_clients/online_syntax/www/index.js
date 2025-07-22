@@ -152,7 +152,7 @@ function onCodeChanged() {
         if (error_msg === "") {
             // Update UI for success
             outputPre.className = "w-full p-4 overflow-auto whitespace-pre-wrap text-green-400";
-            outputPre.innerText = "Code parsed successfully!";
+            outputPre.innerText = "Code compiled successfully!";
         } else {
             // error
             outputPre.className = "w-full p-4 overflow-auto whitespace-pre-wrap text-red-400";
