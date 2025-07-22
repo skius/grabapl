@@ -7,7 +7,7 @@ use chumsky::input::SliceInput;
 use chumsky::{input::ValueInput, prelude::*};
 use grabapl::operation::marker::SkipMarkers;
 use grabapl::prelude::{OperationContext, OperationId};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::fmt::Debug;
 use std::io::BufWriter;
@@ -717,9 +717,20 @@ where
         .map_with(|fn_def, e| (fn_def, e.span()))
         .repeated()
         .collect::<Vec<_>>()
-        .map_with(|functions_with_span, e| {
+        .validate(|functions_with_span, e, emitter| {
             let mut funcs_list = Vec::new();
+            let mut seen_names = HashSet::new();
             for (func, func_span) in functions_with_span {
+                if seen_names.contains(func.name.0) {
+                    emitter.emit(
+                        Rich::custom(
+                            func.name.1,
+                            format!("Function `{}` is defined multiple times", func.name.0),
+                        )
+                    );
+                    continue;
+                }
+                seen_names.insert(func.name.0);
                 funcs_list.push((func.name.0, (func, func_span)));
             }
             (
