@@ -392,7 +392,7 @@ function initInteractiveGraph() {
         // .stop();
         .force("positionX", d3.forceX(100))
         .force("positionY", d3.forceY(100))
-        .stop();
+        // .stop();
 
     // tick every 50ms
     // setInterval(() => {
@@ -507,15 +507,26 @@ function executeOperation(operationName, inputNodeNames) {
         const avgX = inputNodes.reduce((sum, n) => sum + (n.x || 0), 0) / inputNodes.length;
         const avgY = inputNodes.reduce((sum, n) => sum + (n.y || 0), 0) / inputNodes.length;
 
-        for (const knownNewNode of res) {
+        const addNode = (key, name, value) => {
             let thisX = avgX + Math.random() * 50; // Randomly offset to avoid overlap
             let thisY = avgY + Math.random() * 50; // Randomly offset to avoid overlap
+            // check if the name already exists, if so, append a number to it
+            let foundName = interactiveNodes.find(n => n.name === name);
+            while (foundName) {
+                const parts = name.match(/^(.*?)(\d+)?$/);
+                const baseName = parts[1];
+                const num = parts[2] ? parseInt(parts[2]) + 1 : 1;
+                name = `${baseName}${num}`;
+                foundName = interactiveNodes.find(n => n.name === name);
+            }
+            interactiveNodes.push({ id: crypto.randomUUID(), name, value, x: thisX, y: thisY, nodeKey: key });
+        }
 
-            console.log("Adding new node at coordinates:", thisX, thisY);
+        for (const knownNewNode of res) {
             let nodeKey = knownNewNode.key();
             let name = knownNewNode.name();
             let value = knownNewNode.value();
-            interactiveNodes.push({ id: crypto.randomUUID(), name, value, x: thisX, y: thisY, nodeKey: nodeKey });
+            addNode(nodeKey, name, value);
         }
 
 
@@ -526,10 +537,7 @@ function executeOperation(operationName, inputNodeNames) {
 
             let existingNode = interactiveNodes.find(n => n.nodeKey === key);
             if (!existingNode) {
-                let thisX = avgX + Math.random() * 50; // Randomly offset to avoid overlap
-                let thisY = avgY + Math.random() * 50; // Randomly offset to avoid overlap
-                console.log("Adding new node at coordinates:", thisX, thisY);
-                interactiveNodes.push({ id: crypto.randomUUID(), name: key, value, x: thisX, y: thisY, nodeKey: key });
+                addNode(key, key, value);
             } else {
                 existingNode.value = value; // Update value if it exists
             }
