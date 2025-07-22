@@ -159,83 +159,56 @@ function onCodeChanged() {
 
             error_msg = ansi_up.ansi_to_html(error_msg);
 
+            // for every actual span returned in the error, add a decoration
+            for (const span of res.errorSpans()) {
+                // console.log("Highlighting error span:", span);
+                // create a range for the decoration
+                const range = new monaco.Range(span.lineStart, span.colStart, span.lineEnd, span.colEnd);
+                editorDecorations.append([
+                    {
+                        range: range,
+                        options: {
+                            className: 'error-highlight',
+                            isWholeLine: false
+                        }
+                    }
+                ]);
+            }
+
             // find the portion of the error message that contains the error, it's of the form input:line:column
-            const errorMatch = error_msg.match(/input:(\d+):(\d+)/);
-            if (errorMatch) {
+            outputPre.innerHTML = error_msg;
+            const errorMatches = error_msg.matchAll(/input:(\d+):(\d+)/g);
+            let i = 0;
+            const added_ids_and_spans = [];
+            for (const errorMatch of errorMatches) {
+                // add a link to the editor position
                 const line = parseInt(errorMatch[1], 10);
                 const column = parseInt(errorMatch[2], 10);
 
-                // for every actual span returned in the error, add a decoration
-                for (const span of res.errorSpans()) {
-                    // console.log("Highlighting error span:", span);
-                    // create a range for the decoration
-                    const range = new monaco.Range(span.lineStart, span.colStart, span.lineEnd, span.colEnd);
-                    editorDecorations.append([
-                        {
-                            range: range,
-                            options: {
-                                className: 'error-highlight',
-                                isWholeLine: false
-                            }
-                        }
-                    ]);
-                }
-                //
-                // // span length is the length of "────────┬───────",
-                // // but every character is wrapped in a <span> tag. So first we need to convert the error_msg to a DOM element
-                // const tempDiv = document.createElement('div');
-                // tempDiv.innerHTML = error_msg;
-                // const forSpanText = tempDiv.innerText;
-                // console.log(forSpanText);
-                // //remove temp div again
-                // tempDiv.remove();
-                // const spanLengthMatch = forSpanText.matchAll(/[─┬]+/g);
-                // // find longest match of ─ or ┬
-                // let longestMatch = 1;
-                // for (const match of spanLengthMatch) {
-                //     if (match[0].length > longestMatch) {
-                //         longestMatch = match[0].length;
-                //     }
-                // }
-                // const spanLength = longestMatch;
-                // // const spanLength = spanLengthMatch ? spanLengthMatch[0].length : 1; // Default to 1 if not found
-                // console.log(`Highlighting error at line ${line}, column ${column}, span length ${spanLength}, ${spanLengthMatch}`);
-                //
-                // const range = new monaco.Range(line, column, line, column + spanLength);
-                // // let decoration = editor.createDecorationsCollection(
-                // //     [{
-                // //         range: range,
-                // //         options: {
-                // //             className: 'error-highlight',
-                // //             isWholeLine: false
-                // //         }
-                // //     }]
-                // // );
-                //
-                // editorDecorations.append([
-                //     {
-                //         range: range,
-                //         options: {
-                //             className: 'error-highlight',
-                //             isWholeLine: false
-                //         }
-                //     }
-                // ]);
+                // console.log("Replacing for match: ", errorMatch[0], "at line:", line, "column:", column);
 
                 // replace the match in the error_msg to be a link that invokes the following function on click:
-                error_msg = error_msg.replace(errorMatch[0], `<a href="#" id="error-span-link" class="text-red-400 underline">input:${line}:${column}</a>`);
-                outputPre.innerHTML = error_msg;
+                outputPre.innerHTML = outputPre.innerHTML.replace(errorMatch[0], `<a href="#" id="error-span-link-${i}" class="text-red-400 underline">input:${line}:${column}</a>`);
+                added_ids_and_spans.push({ id: `error-span-link-${i}`, line: line, column: column });
+                i = i + 1;
+            }
+            // now attach event listeners
+            for (const id_and_span of added_ids_and_spans) {
+                const line = id_and_span.line;
+                const column = id_and_span.column;
+                // console.log(`Attaching click handler for error at line ${line}, column ${column}`);
                 // find and attach a click handler to the error span
-                const errorSpanLink = document.getElementById('error-span-link');
+                const errorSpanLink = document.getElementById(id_and_span.id);
+                i = i + 1;
                 if (errorSpanLink) {
+                    // console.log(`IF line ${line}, column ${column}`);
+
                     errorSpanLink.addEventListener('click', (e) => {
+                        // console.log(`Highlighting error at line ${line}, column ${column}`);
                         e.preventDefault();
                         highlightError(line, column);
                     });
                 }
-
-            } else {
-                outputPre.innerHTML = error_msg
             }
 
         }
