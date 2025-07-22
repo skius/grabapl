@@ -255,6 +255,9 @@ function updateInteractiveGraph() {
         updateInteractiveGraph();
     });
 
+    // for (const node of interactiveNodes) {
+    //     console.log(`Node x: ${node.x}, y: ${node.y}, name: ${node.name}, value: ${node.value}`);
+    // }
     simulation.nodes(interactiveNodes).on("tick", ticked);
     simulation.force("link").links(interactiveEdges).id(d => d.id);
     simulation.alpha(0.3).restart();
@@ -339,7 +342,9 @@ function initInteractiveGraph() {
         .on("dblclick", (event) => {
             event.preventDefault();
             const [mx, my] = d3.pointer(event);
-            tempNodeCoords = currentTransform.invert([mx, my]);
+            const tempNodeCoordsArr = currentTransform.invert([mx, my]);
+            tempNodeCoords.x = tempNodeCoordsArr[0];
+            tempNodeCoords.y = tempNodeCoordsArr[1];
             console.log("Adding node at:", tempNodeCoords);
             nodeNameInput.value = `node${interactiveNodes.length + 1}`;
             nodeValueInput.value = "";
