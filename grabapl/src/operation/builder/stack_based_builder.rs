@@ -744,6 +744,7 @@ impl<S: Semantics> ReturnFrame<S> {
                 "cannot return edge with incompatible abstract value"
             ));
         }
+        // TODO: remove this check. see the comment in `include_return_node`.
         if self
             .last_state()
             .edge_may_originate_from_shape_query
