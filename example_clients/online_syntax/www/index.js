@@ -165,46 +165,62 @@ function onCodeChanged() {
                 const line = parseInt(errorMatch[1], 10);
                 const column = parseInt(errorMatch[2], 10);
 
-                // span length is the length of "────────┬───────",
-                // but every character is wrapped in a <span> tag. So first we need to convert the error_msg to a DOM element
-                const tempDiv = document.createElement('div');
-                tempDiv.innerHTML = error_msg;
-                const forSpanText = tempDiv.innerText;
-                console.log(forSpanText);
-                //remove temp div again
-                tempDiv.remove();
-                const spanLengthMatch = forSpanText.matchAll(/[─┬]+/g);
-                // find longest match of ─ or ┬
-                let longestMatch = 1;
-                for (const match of spanLengthMatch) {
-                    if (match[0].length > longestMatch) {
-                        longestMatch = match[0].length;
-                    }
+                // for every actual span returned in the error, add a decoration
+                for (const span of res.errorSpans()) {
+                    // console.log("Highlighting error span:", span);
+                    // create a range for the decoration
+                    const range = new monaco.Range(span.lineStart, span.colStart, span.lineEnd, span.colEnd);
+                    editorDecorations.append([
+                        {
+                            range: range,
+                            options: {
+                                className: 'error-highlight',
+                                isWholeLine: false
+                            }
+                        }
+                    ]);
                 }
-                const spanLength = longestMatch;
-                // const spanLength = spanLengthMatch ? spanLengthMatch[0].length : 1; // Default to 1 if not found
-                console.log(`Highlighting error at line ${line}, column ${column}, span length ${spanLength}, ${spanLengthMatch}`);
-
-                const range = new monaco.Range(line, column, line, column + spanLength);
-                // let decoration = editor.createDecorationsCollection(
-                //     [{
+                //
+                // // span length is the length of "────────┬───────",
+                // // but every character is wrapped in a <span> tag. So first we need to convert the error_msg to a DOM element
+                // const tempDiv = document.createElement('div');
+                // tempDiv.innerHTML = error_msg;
+                // const forSpanText = tempDiv.innerText;
+                // console.log(forSpanText);
+                // //remove temp div again
+                // tempDiv.remove();
+                // const spanLengthMatch = forSpanText.matchAll(/[─┬]+/g);
+                // // find longest match of ─ or ┬
+                // let longestMatch = 1;
+                // for (const match of spanLengthMatch) {
+                //     if (match[0].length > longestMatch) {
+                //         longestMatch = match[0].length;
+                //     }
+                // }
+                // const spanLength = longestMatch;
+                // // const spanLength = spanLengthMatch ? spanLengthMatch[0].length : 1; // Default to 1 if not found
+                // console.log(`Highlighting error at line ${line}, column ${column}, span length ${spanLength}, ${spanLengthMatch}`);
+                //
+                // const range = new monaco.Range(line, column, line, column + spanLength);
+                // // let decoration = editor.createDecorationsCollection(
+                // //     [{
+                // //         range: range,
+                // //         options: {
+                // //             className: 'error-highlight',
+                // //             isWholeLine: false
+                // //         }
+                // //     }]
+                // // );
+                //
+                // editorDecorations.append([
+                //     {
                 //         range: range,
                 //         options: {
                 //             className: 'error-highlight',
                 //             isWholeLine: false
                 //         }
-                //     }]
-                // );
-
-                editorDecorations.append([
-                    {
-                        range: range,
-                        options: {
-                            className: 'error-highlight',
-                            isWholeLine: false
-                        }
-                    }
-                ]);
+                //     }
+                // ]);
 
                 // replace the match in the error_msg to be a link that invokes the following function on click:
                 error_msg = error_msg.replace(errorMatch[0], `<a href="#" id="error-span-link" class="text-red-400 underline">input:${line}:${column}</a>`);

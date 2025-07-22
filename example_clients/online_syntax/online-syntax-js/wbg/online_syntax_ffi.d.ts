@@ -20,6 +20,9 @@ export interface InitOutput {
   readonly EdgesIter_next: (a: number) => number;
   readonly EdgesIter_to_iterable: (a: number) => number;
   readonly EdgesIter_destroy: (a: number) => void;
+  readonly LineColSpansIter_next: (a: number, b: number) => void;
+  readonly LineColSpansIter_to_iterable: (a: number) => number;
+  readonly LineColSpansIter_destroy: (a: number) => void;
   readonly NewNode_key: (a: number) => number;
   readonly NewNode_name: (a: number, b: number) => void;
   readonly NewNode_value: (a: number, b: number) => void;
@@ -35,6 +38,7 @@ export interface InitOutput {
   readonly NodesIter_destroy: (a: number) => void;
   readonly OpCtxAndFnNames_destroy: (a: number) => void;
   readonly ParseResult_error_message: (a: number, b: number) => void;
+  readonly ParseResult_error_spans: (a: number) => number;
   readonly ParseResult_dot_of_state: (a: number, b: number, c: number, d: number) => void;
   readonly ParseResult_list_states: (a: number) => number;
   readonly ParseResult_list_operations: (a: number) => number;

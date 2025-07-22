@@ -2,11 +2,15 @@
 
 export { Context } from "./Context.mjs"
 
+export { LineColSpan } from "./LineColSpan.mjs"
+
 export { ConcreteGraph } from "./ConcreteGraph.mjs"
 
 export { EdgeWrapper } from "./EdgeWrapper.mjs"
 
 export { EdgesIter } from "./EdgesIter.mjs"
+
+export { LineColSpansIter } from "./LineColSpansIter.mjs"
 
 export { NewNode } from "./NewNode.mjs"
 

@@ -19,6 +19,7 @@ pub mod ffi {
     use grabapl::NodeKey;
     use grabapl::prelude::OperationId;
     use grabapl::semantics::example_with_ref::NodeValue;
+    use syntax::WithLineColSpans;
 
     pub struct Context {
         pub i: i32,
@@ -61,15 +62,34 @@ pub mod ffi {
 
     #[diplomat::opaque]
     pub struct ParseResult {
-        result: Result<OpCtxAndFnNames, String>,
+        result: Result<OpCtxAndFnNames, WithLineColSpans<String>>,
         state_map: HashMap<String, grabapl::operation::builder::IntermediateState<super::TheSemantics>>,
     }
 
     impl ParseResult {
         pub fn error_message(&self, out: &mut DiplomatWrite) {
             if let Err(ref e) = self.result {
-                write!(out, "{}", e).unwrap();
+                write!(out, "{}", e.value).unwrap();
             }
+        }
+
+        pub fn error_spans(&self) -> Box<LineColSpansIter> {
+            let spans = match &self.result {
+                Ok(_) => {
+                    vec![]
+                }
+                Err(with_line_col_spans) => {
+                    with_line_col_spans.spans.iter().map(|span| {
+                        LineColSpan {
+                            line_start: span.line_start,
+                            line_end: span.line_end,
+                            col_start: span.col_start,
+                            col_end: span.col_end,
+                        }
+                    }).collect::<Vec<_>>()
+                }
+            };
+            Box::new(LineColSpansIter(spans.into_iter()))
         }
 
         pub fn dot_of_state(&self, state: &str, dot: &mut DiplomatWrite) {
@@ -100,7 +120,7 @@ pub mod ffi {
             op_name: &str,
             args: &[u32],
         ) -> Result<Box<NewNodesIter>, Box<StringError>> {
-            let op_ctx = self.result.as_ref().map_err(|e| Box::new(StringError(e.clone())))?;
+            let op_ctx = self.result.as_ref().map_err(|e| Box::new(StringError(e.value.clone())))?;
             let op_id = op_ctx.fn_names.get(op_name)
                 .ok_or_else(|| Box::new(StringError(format!("Operation '{}' not found", op_name))))?;
 
@@ -307,5 +327,33 @@ pub mod ffi {
         pub fn value(&self, out: &mut DiplomatWrite) {
             write!(out, "{}", self.value).unwrap();
         }
+    }
+
+    #[diplomat::opaque]
+    pub struct LineColSpansIter(std::vec::IntoIter<LineColSpan>);
+
+    impl LineColSpansIter {
+        #[diplomat::attr(auto, iterator)]
+        pub fn next(&mut self) -> Option<LineColSpan> {
+            self.0.next().map(|span| LineColSpan {
+                line_start: span.line_start,
+                line_end: span.line_end,
+                col_start: span.col_start,
+                col_end: span.col_end,
+            })
+        }
+
+        #[diplomat::attr(auto, iterable)]
+        pub fn to_iterable(&self) -> Box<LineColSpansIter> {
+            Box::new(LineColSpansIter(self.0.clone()))
+        }
+    }
+
+    #[derive(Clone)]
+    pub struct LineColSpan {
+        pub line_start: usize,
+        pub line_end: usize,
+        pub col_start: usize,
+        pub col_end: usize,
     }
 }

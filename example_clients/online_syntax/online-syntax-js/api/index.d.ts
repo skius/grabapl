@@ -4,11 +4,15 @@ export { codepoint } from './diplomat-runtime';
 
 export { Context, Context_obj } from "./Context"
 
+export { LineColSpan, LineColSpan_obj } from "./LineColSpan"
+
 export { ConcreteGraph } from "./ConcreteGraph"
 
 export { EdgeWrapper } from "./EdgeWrapper"
 
 export { EdgesIter } from "./EdgesIter"
+
+export { LineColSpansIter } from "./LineColSpansIter"
 
 export { NewNode } from "./NewNode"
 

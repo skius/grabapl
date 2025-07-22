@@ -24,7 +24,6 @@ pub enum Token<'src> {
     // do we want these?
     Bool(bool),
     Num(i32),
-    // TODO: readd str token.
     Str(&'src str),
     // Op(&'src str),
     Arrow,
@@ -744,7 +743,7 @@ pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
 ) -> (OperationContext<S>, HashMap<&'src str, OperationId>) {
     match try_parse_to_op_ctx_and_map::<S>(src, true).op_ctx_and_map {
         Ok((op_ctx, fn_map)) => (op_ctx, fn_map),
-        Err(output) => {
+        Err(WithLineColSpans { value: output, .. }) => {
             panic!("Failed to parse the input source code:\n{output}")
         }
     }
@@ -753,7 +752,7 @@ pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
 pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
     src: &'src str,
     color_enabled: bool,
-) -> InterpreterResult<'src, S, String> {
+) -> InterpreterResult<'src, S, WithLineColSpans<String>> {
     let filename = "input".to_string();
     let (tokens, errs) = lexer().parse(src).into_output_errors();
 
@@ -791,19 +790,12 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
                     let detailed_message = format!("{:?}", e);
                     let error_span = e.current_context().span;
 
+                    let line_col_span = span_into_line_col_start_and_line_col_end(&error_span, src);
+
                     // the amount of spaces depends on the printed line number of the error.
                     // this is just for prettier formatting below of the pipe prefix.
                     // ariadne tracking issue: https://github.com/zesterer/ariadne/issues/68
-                    let target_byte = error_span.start();
-                    let mut total_bytes = 0;
-                    let mut line_num = 0;
-                    for line in src.lines() {
-                        total_bytes += line.len() + 1; // +1 for the newline character
-                        line_num += 1;
-                        if total_bytes > target_byte {
-                            break;
-                        }
-                    }
+                    let line_num = line_col_span.line_end;
                     let num_spaces = format!("{line_num}").len();
                     let spaces = " ".repeat(num_spaces);
 
@@ -815,7 +807,7 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
                         .join("\n");
 
                     // build report with error
-                    let err = Err(string_of_report(filename.clone(), src, Report::build(
+                    let err_string = string_of_report(filename.clone(), src, Report::build(
                         ReportKind::Error,
                         (filename.clone(), error_span.into_range()),
                     )
@@ -826,7 +818,12 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
                                 .with_message(format!("detailed message:\n{detailed_message_pipe_mapped}"))
                                 .with_color(Color::Red),
                         )
-                        .finish()));
+                        .finish());
+
+                    let err = Err(WithLineColSpans {
+                        value: err_string,
+                        spans: vec![line_col_span],
+                    });
                     return InterpreterResult {
                         op_ctx_and_map: err,
                         state_map: res.state_map,
@@ -842,6 +839,8 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
 
     let mut output_buf = BufWriter::new(Vec::new());
 
+    let mut line_col_spans = Vec::new();
+
     errs.into_iter()
         .map(|e| e.map_token(|c| c.to_string()))
         .chain(
@@ -850,6 +849,7 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
                 .map(|e| e.map_token(|tok| tok.to_string())),
         )
         .for_each(|e| {
+            line_col_spans.push(span_into_line_col_start_and_line_col_end(&e.span(), src));
             Report::build(ReportKind::Error, (filename.clone(), e.span().into_range()))
                 .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte).with_color(color_enabled))
                 .with_message(e.to_string())
@@ -870,8 +870,64 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
 
     let output = String::from_utf8(output_buf.into_inner().unwrap()).unwrap();
     InterpreterResult {
-        op_ctx_and_map: Err(output),
+        op_ctx_and_map: Err(WithLineColSpans {
+            value: output,
+            spans: line_col_spans,
+        }),
         state_map: HashMap::new(),
+    }
+}
+
+#[derive(Clone)]
+pub struct WithLineColSpans<T> {
+    pub value: T,
+    pub spans: Vec<LineColSpan>,
+}
+
+#[derive(Clone)]
+pub struct LineColSpan {
+    pub line_start: usize,
+    pub col_start: usize,
+    pub line_end: usize,
+    pub col_end: usize,
+}
+
+fn span_into_line_col_start_and_line_col_end(span: &Span, src: &str) -> LineColSpan {
+    let start = span.start();
+    let end = span.end();
+    let mut line_start = 1;
+    let mut col_start = 1;
+    let mut line_end = 1;
+    let mut col_end = 1;
+
+    for (i, c) in src.bytes().enumerate() {
+        if i < start {
+            if c == b'\n' {
+                line_start += 1;
+                col_start = 1;
+            } else {
+                col_start += 1;
+            }
+            // line_end and col_end must be at least this.
+            line_end = line_start;
+            col_end = col_start;
+        } else if i < end {
+            if c == b'\n' {
+                line_end += 1;
+                col_end = 1;
+            } else {
+                col_end += 1;
+            }
+        } else {
+            break;
+        }
+    }
+
+    LineColSpan {
+        line_start,
+        col_start,
+        line_end,
+        col_end,
     }
 }
 
