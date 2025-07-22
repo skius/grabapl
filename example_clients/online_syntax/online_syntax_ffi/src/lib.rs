@@ -192,6 +192,10 @@ pub mod ffi {
             };
             self.graph.add_node(value).0
         }
+        
+        pub fn delete_node(&mut self, key: u32) {
+            self.graph.delete_node(NodeKey(key));
+        }
 
         pub fn add_edge(&mut self, src: u32, dst: u32, weight: &str) {
             self.graph.add_edge(src, dst, weight.to_string());

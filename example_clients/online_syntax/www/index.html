@@ -181,12 +181,22 @@
         const resizer = document.getElementById('editor-resizer');
         const editorContainer = document.getElementById('container');
 
+        // 🚀 Load saved height from localStorage
+        const savedHeight = localStorage.getItem('editorHeight');
+        if (savedHeight) {
+            editorContainer.style.height = savedHeight;
+        }
+
         // We need to check if the Monaco editor instance is available.
         // This script runs before bootstrap.js, so we'll poll for the `editor` variable.
         let monacoEditor = null;
         const findEditorInterval = setInterval(() => {
             if (window.editor) {
                 monacoEditor = window.editor;
+                // If we loaded a height, we need to relayout the editor once it's available
+                if(savedHeight) {
+                    monacoEditor.layout();
+                }
                 clearInterval(findEditorInterval);
             }
         }, 100);
@@ -226,6 +236,9 @@
             // Re-enable text selection and pointer events
             document.body.style.userSelect = '';
             document.body.style.pointerEvents = '';
+
+            // 🚀 Save the new height to localStorage
+            localStorage.setItem('editorHeight', editorContainer.style.height);
         }
     });
 </script>
