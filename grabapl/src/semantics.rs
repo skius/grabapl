@@ -78,6 +78,10 @@ pub trait AbstractJoin {
 
     /// Returns the abstract type that is the join of the two abstract types, i.e.,
     /// the most specific type that is a supertype of both, if it exists.
+    ///
+    /// The default implementation assumes no join exists, returning `None`.
+    /// This is generally a bad idea, since at the very least equivalent types should be joined to themselves.
+    // TODO: remove default implementation?
     fn join(a: &Self::Abstract, b: &Self::Abstract) -> Option<Self::Abstract> {
         // Default implementation returns None, meaning no join exists.
         // Note that this is probably a bit absurd, as in the very least if two nodes are equal

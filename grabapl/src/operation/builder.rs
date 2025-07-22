@@ -3078,6 +3078,13 @@ fn merge_states_result<S: Semantics>(
                 // we'd unsoundly skip returning information about potential changes to the edge.
                 // I.e., we expect client semantics to support written-av merges if the branch merge succeeded in the first place.
                 // this should generally be the case.
+                // Update: Below cannot panic for transitive client type systems.
+                //  since we were able to join the edge, that means the inferred AVs for both branches
+                //  were compatible. We *know* that a written_av *must be* a subtype of the inferred AVs,
+                //  since whenever we write we join that write to the current abstract graph AV.
+                //  So, we know that some super type of av_true and some super type of av_false
+                //  were joinable, and in a transitive type system, that means that av_true and av_false
+                //  must be joinable as well. QED.
                 Some(S::join_edges(&av_true, &av_false).expect(
                     "client semantics error: expected to be able to merge written edge attributes",
                 ))

@@ -1,3 +1,5 @@
+//! Grabapl docs. Todo.
+
 extern crate core;
 
 mod experimental;
@@ -46,7 +48,7 @@ pub mod prelude {
     pub use crate::operation::{
         BuiltinOperation, Operation, OperationContext, OperationId, run_from_concrete,
     };
-    pub use crate::semantics::{AbstractGraph, ConcreteGraph, Semantics};
+    pub use crate::semantics::{AbstractGraph, ConcreteGraph, Semantics, AbstractJoin, AbstractMatcher, ConcreteToAbstract};
 }
 
 #[cfg(test)]

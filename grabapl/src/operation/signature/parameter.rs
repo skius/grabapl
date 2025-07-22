@@ -307,6 +307,12 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
                 .insert(node_key, maybe_written_av.clone());
             // Merge the current AV with the new value.
             let merged_av = join(old_av, &maybe_written_av)
+                // TODO: expect is bad here and for edges.
+                //  We need to hide the node (just like when merging IntermediateStates) if the join does not exist.
+                //  This unwrap means semantics like the following will panic:
+                //  `int` type, `str` type, no join. Function takes `str`, maybe-writes `int` to it.
+                //  at the call-site of the outer operation, we must now join (i.e., this function) the `int` and `str` types.
+                //  This is something that makes sense, and should be supported.
                 .expect("must be able to join. TODO: think about if this requirement makes sense");
             // merged_av is the new value we want to set.
             self.graph.set_node_attr(node_key, merged_av)
