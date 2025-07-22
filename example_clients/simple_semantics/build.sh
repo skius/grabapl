@@ -1,5 +1,8 @@
 set -e
 
+LIB_FOLDER="simple-semantics-js"
+FFI_FOLDER="simple_semantics_ffi"
+
 # assert we are in the same directory as this script
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 CUR_DIR=$(pwd)
@@ -8,21 +11,21 @@ if [ "$SCRIPT_DIR" != "$CUR_DIR" ]; then
   exit 1
 fi
 
-# build #[wasm_bindgen] JS imports as basic JavaScript module into `simple-semantics-js/wbg`
-wasm-pack build -t web -d "../simple-semantics-js/wbg" simple_semantics_ffi/
+# build #[wasm_bindgen] JS imports as basic JavaScript module into `${LIB_FOLDER}/wbg`
+wasm-pack build -t web -d "../${LIB_FOLDER}/wbg" ${FFI_FOLDER}/
 
 # run diplomat-tool for #[diplomat::bridge] modules
 # TODO: remove the legacy config once the stable rust compiler switches to the C spec abi
-diplomat-tool --config js.abi="legacy" -e simple_semantics_ffi/src/lib.rs js "simple-semantics-js/api"
+diplomat-tool --config js.abi="legacy" -e ${FFI_FOLDER}/src/lib.rs js "${LIB_FOLDER}/api"
 
 # fix diplomat generated code
-cp simple-semantics-js/diplomat-wasm.mjs.template simple-semantics-js/api/diplomat-wasm.mjs
+cp ${LIB_FOLDER}/diplomat-wasm.mjs.template ${LIB_FOLDER}/api/diplomat-wasm.mjs
 
 # fix wasm-bindgen generated code
 # fix .gitignore
-cp simple-semantics-js/wbg/.gitignore.template simple-semantics-js/wbg/.gitignore
-# fix `simple_semantics_ffi.js
-file="simple-semantics-js/wbg/simple_semantics_ffi.js"
+cp ${LIB_FOLDER}/wbg/.gitignore.template ${LIB_FOLDER}/wbg/.gitignore
+# fix `${FFI_FOLDER}.js
+file="${LIB_FOLDER}/wbg/${FFI_FOLDER}.js"
 
 # Remove the line: import * as __wbg_star0 from 'env';
 sed -i "/^import \* as __wbg_star0 from 'env';$/d" "$file"
