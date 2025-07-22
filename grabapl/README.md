@@ -74,6 +74,7 @@ cargo check --target wasm32-unknown-unknown
 - [x] Serialization for OpCtx
 - [ ] Better errors
 - [ ] Scoped AIDs? write tests. What if we rename some outer AID in only one branch of a query?
+  - As part of this: synchronization between the builder's visible AIDs and the concrete runner's AID mapping. There are no tests for that. 
 - [x] bang-call support for operations that return just one value:
    * take the name of the operation and immediately rename the _single_ output node to that name.
    * Crash if the operation returns multiple nodes.

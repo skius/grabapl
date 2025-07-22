@@ -80,6 +80,8 @@ pub enum NodeValue {
     Integer(i32),
     /// Represents a string value.
     String(String),
+    // TODO: decide if we want NodeReferences here.
+    //  ah: node references can be simulated via a node that may or may not have an edge to the pointee.
 }
 
 /// The node types used in our example semantics.
