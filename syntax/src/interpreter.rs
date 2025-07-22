@@ -274,6 +274,8 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         }
 
         // then interpret the body
+        // TODO: we need an explicit "force build parameter" command that does the validation, because otherwise
+        //  we get a builder error when adding the first instruction if our parameter is invalid. That gives us a weird span and bad UX.
         self.interpret_block(fn_def.body)?;
         Ok(())
     }

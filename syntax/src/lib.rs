@@ -327,7 +327,8 @@ where
     let ident_str = select! {
         Token::Ident(ident) => ident,
     }
-    .map_with(|ident, e| (ident, e.span()));
+    .map_with(|ident, e| (ident, e.span()))
+        .labelled("identifier");
 
     let spanned_output_node_id = ident_str
         .then_ignore(just(Token::Ctrl('.')))
@@ -339,13 +340,14 @@ where
 
     let spanned_node_id = spanned_output_node_id
         .or(ident_str.map(|(name, span)| (NodeId::Single(name), span)))
-        .boxed();
+        .boxed()
+        .labelled("node identifier");
 
     let spanned_fn_implicit_edge_param = ident_str
         .then_ignore(just(Token::Arrow))
         .then(ident_str)
         .then_ignore(just(Token::Ctrl(':')))
-        .then(CS::get_edge_type_parser().map_with(|s, e| (s, e.span())))
+        .then(CS::get_edge_type_parser().labelled("edge type").map_with(|s, e| (s, e.span())))
         .map_with(
             |(((src, src_span), (dst, dst_span)), (edge_type, edge_type_span)), overall_span| {
                 (
@@ -358,11 +360,12 @@ where
                 )
             },
         )
-        .boxed();
+        .boxed()
+        .labelled("implicit edge function parameter");
 
     let spanned_fn_explicit_param = ident_str
         .then_ignore(just(Token::Ctrl(':')))
-        .then(CS::get_node_type_parser().map_with(|s, e| (s, e.span())))
+        .then(CS::get_node_type_parser().labelled("node type").map_with(|s, e| (s, e.span())))
         .map_with(
             |((name, n_span), (node_type, node_type_span)), overall_span| {
                 (
@@ -374,13 +377,15 @@ where
                 )
             },
         )
-        .boxed();
+        .boxed()
+        .labelled("explicit function parameter");
 
     let spanned_fn_implicit_param = spanned_fn_explicit_param
         .clone()
         .map(|(explicit_param, span)| (FnImplicitParam::Node(explicit_param), span))
         .or(spanned_fn_implicit_edge_param)
-        .boxed();
+        .boxed()
+        .labelled("implicit function parameter");
 
     let fn_implicit_params = spanned_fn_implicit_param
         .separated_by(just(Token::Ctrl(',')))
@@ -390,21 +395,22 @@ where
     let shape_node_param = spanned_node_id
         .clone()
         .then_ignore(just(Token::Ctrl(':')))
-        .then(CS::get_node_type_parser().map_with(|s, e| (s, e.span())))
+        .then(CS::get_node_type_parser().labelled("node type").map_with(|s, e| (s, e.span())))
         .map(
             |((name, name_span), (node_type, node_type_span))| ShapeNodeParam {
                 name: (name, name_span),
                 node_type: (node_type, node_type_span),
             },
         )
-        .boxed();
+        .boxed()
+        .labelled("shape query node parameter");
 
     let shape_edge_param = spanned_node_id
         .clone()
         .then_ignore(just(Token::Arrow))
         .then(spanned_node_id.clone())
         .then_ignore(just(Token::Ctrl(':')))
-        .then(CS::get_edge_type_parser().map_with(|s, e| (s, e.span())))
+        .then(CS::get_edge_type_parser().labelled("edge type").map_with(|s, e| (s, e.span())))
         .map(
             |(((src, src_span), (dst, dst_span)), (edge_type, edge_type_span))| ShapeEdgeParam {
                 src: (src, src_span),
@@ -412,7 +418,8 @@ where
                 edge_type: (edge_type, edge_type_span),
             },
         )
-        .boxed();
+        .boxed()
+        .labelled("shape query edge parameter");
 
     let spanned_shape_param = shape_node_param
         .map(|node_param| ShapeQueryParam::Node(node_param))
@@ -467,20 +474,21 @@ where
         let optional_skipping_markers = select! {
             Token::Ident("skipping") => (),
         }
-        .ignore_then(just(Token::Ctrl('[')))
-        .ignore_then(
-            select! { Token::Str(s) => s }
-                .separated_by(just(Token::Ctrl(',')))
-                .allow_trailing()
-                .collect::<Vec<_>>(),
-        )
-        .then_ignore(just(Token::Ctrl(']')))
-        .or_not()
-        .map(|opt| {
-            opt.map(|marker_names| SkipMarkers::new(marker_names))
-                .unwrap_or(SkipMarkers::default())
-        })
-        .boxed();
+            .ignore_then(just(Token::Ctrl('[')))
+            .ignore_then(
+                select! { Token::Str(s) => s }
+                    .separated_by(just(Token::Ctrl(',')))
+                    .allow_trailing()
+                    .collect::<Vec<_>>(),
+            )
+            .then_ignore(just(Token::Ctrl(']')))
+            .or_not()
+            .map(|opt| {
+                opt.map(|marker_names| SkipMarkers::new(marker_names))
+                    .unwrap_or(SkipMarkers::default())
+            })
+            .boxed()
+            .labelled("skipping markers");
 
         let if_cond_shape = just(Token::Shape)
             .ignore_then(just(Token::Ctrl('[')))
@@ -603,7 +611,7 @@ where
             .then_ignore(just(Token::Arrow))
             .then(spanned_node_id.clone())
             .then_ignore(just(Token::Ctrl(':')))
-            .then(CS::get_edge_type_parser().map_with(|s, e| (s, e.span())))
+            .then(CS::get_edge_type_parser().labelled("edge type").map_with(|s, e| (s, e.span())))
             .map_with(|((src, dst), edge_typ), e| {
                 (
                     ReturnStmtMapping::Edge {
@@ -613,7 +621,9 @@ where
                     },
                     e.span(),
                 )
-            });
+            })
+            .boxed()
+            .labelled("return edge mapping");
 
         let spanned_return_mappings = spanned_return_node_mapping
             .or(spanned_return_edge_mapping)
@@ -676,7 +686,8 @@ where
         .then_ignore(just(Token::Ctrl(')'))))
     .or_not()
     .map(|opt| opt.unwrap_or_default())
-    .boxed();
+    .boxed()
+    .labelled("function return signature");
 
     let fn_explicit_params = spanned_fn_explicit_param
         .separated_by(just(Token::Ctrl(',')))
@@ -688,7 +699,8 @@ where
         .then_ignore(just(Token::Ctrl(']'))))
     .or_not()
     .map(|opt| opt.unwrap_or_default())
-    .boxed();
+    .boxed()
+    .labelled("implicit function parameters");
 
     let fn_def = just(Token::Fn)
         .ignore_then(ident_str)
@@ -711,7 +723,9 @@ where
                 return_signature,
                 body: spanned_body,
             },
-        );
+        )
+        .boxed()
+        .labelled("function definition");
 
     let program = fn_def
         .map_with(|fn_def, e| (fn_def, e.span()))
@@ -787,6 +801,8 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
             )
             .into_output_errors();
 
+        // Note: if we wanted to also proceed with a error-recovered AST, this filter predicate needs to be changed, and the errors would still need
+        // to be propagated somehow.
         if let Some((program, file_span)) = ast.filter(|_| errs.len() + parse_errs.len() == 0) {
             let res = interpret::<S>(program);
             match res.op_ctx_and_map {
