@@ -1,13 +1,24 @@
 use grabapl::prelude::*;
 
-use grabapl::semantics::example_with_ref::ExampleWithRefSemantics as TheSemantics;
+use grabapl::semantics::example_with_ref::{ExampleWithRefSemantics as TheSemantics, NodeValue};
+
+fn node_value_to_string(value: &NodeValue) -> String {
+    match value {
+        NodeValue::Integer(i) => i.to_string(),
+        NodeValue::String(s) => s.clone(),
+        NodeValue::Reference(nk, _) => format!("ref({nk:?})"),
+    }
+}
 
 #[diplomat::bridge]
 pub mod ffi {
     use std::collections::HashMap;
     use std::result::Result;
     use std::fmt::Write;
+    use grabapl::graph::GraphTrait;
+    use grabapl::NodeKey;
     use grabapl::prelude::OperationId;
+    use grabapl::semantics::example_with_ref::NodeValue;
 
     pub struct Context {
         pub i: i32,
@@ -74,6 +85,31 @@ pub mod ffi {
             states.sort_unstable();
             Box::new(StringIter(states.into_iter()))
         }
+
+        pub fn list_operations(&self) -> Box<StringIter> {
+            let mut operations: Vec<String> = self.result.as_ref()
+                .map(|res| res.fn_names.keys().cloned().collect())
+                .unwrap_or_default();
+            operations.sort_unstable();
+            Box::new(StringIter(operations.into_iter()))
+        }
+
+        pub fn run_operation(
+            &self,
+            g: &mut ConcreteGraph,
+            op_name: &str,
+            args: &[u32],
+        ) -> Result<Box<NewNodesIter>, Box<StringError>> {
+            let op_ctx = self.result.as_ref().map_err(|e| Box::new(StringError(e.clone())))?;
+            let op_id = op_ctx.fn_names.get(op_name)
+                .ok_or_else(|| Box::new(StringError(format!("Operation '{}' not found", op_name))))?;
+
+            let res = grabapl::prelude::run_from_concrete(&mut g.graph, &op_ctx.op_ctx, *op_id, &args.iter().copied().map(NodeKey).collect::<Vec<_>>());
+            match res {
+                Ok(output) => Ok(Box::new(NewNodesIter(output.new_nodes.into_iter().map(|(marker, key)| (key.0, marker.0.to_string(), super::node_value_to_string(g.graph.get_node_attr(key).unwrap()))).collect::<Vec<_>>().into_iter()))),
+                Err(e) => Err(Box::new(StringError(e.to_string()))),
+            }
+        }
     }
 
     #[diplomat::opaque]
@@ -106,13 +142,170 @@ pub mod ffi {
     }
 
     #[diplomat::opaque]
-    pub struct ParseError(String);
+    pub struct StringError(String);
 
-    impl ParseError {
+    impl StringError {
         pub fn to_string(&self, out: &mut DiplomatWrite) {
             write!(out, "{}", self.0).unwrap();
         }
     }
 
+    // === Concrete Graph and Execution ===
+    #[diplomat::opaque]
+    pub struct ConcreteGraph {
+        graph: grabapl::prelude::ConcreteGraph<super::TheSemantics>,
+    }
 
+    impl ConcreteGraph {
+        pub fn new() -> Box<Self> {
+            Box::new(ConcreteGraph {
+                graph: grabapl::prelude::ConcreteGraph::<super::TheSemantics>::new(),
+            })
+        }
+
+        /// Returns the node key of the newly added node
+        pub fn add_node(&mut self, value: &str) -> u32 {
+            let value = if let Ok(v) = value.parse::<i32>() {
+                NodeValue::Integer(v)
+            } else {
+                NodeValue::String(value.to_string())
+            };
+            self.graph.add_node(value).0
+        }
+
+        pub fn add_edge(&mut self, src: u32, dst: u32, weight: &str) {
+            self.graph.add_edge(src, dst, weight.to_string());
+        }
+
+        pub fn get_nodes(&self) -> Box<NodesIter> {
+            let nodes: Vec<(u32, String)> = self.graph.nodes()
+                .map(|(k, v)| (k.0, match v {
+                    NodeValue::Integer(i) => i.to_string(),
+                    NodeValue::String(s) => s.to_string(),
+                    NodeValue::Reference(nk, _) => format!("ref({nk:?})"), // Handle Ref type if needed
+                }))
+                .collect();
+            Box::new(NodesIter(nodes.into_iter()))
+        }
+
+        pub fn get_edges(&self) -> Box<EdgesIter> {
+            let edges: Vec<(u32, u32, String)> = self.graph.edges()
+                .map(|(src, dst, weight)| (src.0, dst.0, weight.to_string()))
+                .collect();
+            Box::new(EdgesIter(edges.into_iter()))
+        }
+
+        // pub fn dot(&self) -> String {
+        //     self.graph.dot()
+        // }
+    }
+
+    #[diplomat::opaque]
+    pub struct NodesIter(std::vec::IntoIter<(u32, String)>);
+
+    impl NodesIter {
+        #[diplomat::attr(auto, iterator)]
+        pub fn next(&mut self) -> Option<Box<NodeWrapper>> {
+            self.0.next().map(|(k, v)| Box::new(NodeWrapper { key: k, value: v }))
+        }
+
+        #[diplomat::attr(auto, iterable)]
+        pub fn to_iterable(&self) -> Box<NodesIter> {
+            Box::new(NodesIter(self.0.clone()))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct NodeWrapper {
+        key: u32,
+        value: String,
+    }
+
+    impl NodeWrapper {
+        pub fn key(&self) -> u32 {
+            self.key
+        }
+
+        pub fn value(&self, out: &mut DiplomatWrite) {
+            write!(out, "{}", self.value).unwrap();
+        }
+
+        // #[diplomat::attr(auto, stringifier)]
+        // pub fn to_string(&self, out: &mut DiplomatWrite) {
+        //     write!(out, "Node(key: {}, value: {})", self.key, self.value).unwrap();
+        // }
+    }
+
+    #[diplomat::opaque]
+    pub struct EdgesIter(std::vec::IntoIter<(u32, u32, String)>);
+
+    impl EdgesIter {
+        #[diplomat::attr(auto, iterator)]
+        pub fn next(&mut self) -> Option<Box<EdgeWrapper>> {
+            self.0.next().map(|(src, dst, weight)| Box::new(EdgeWrapper { src, dst, weight }))
+        }
+
+        #[diplomat::attr(auto, iterable)]
+        pub fn to_iterable(&self) -> Box<EdgesIter> {
+            Box::new(EdgesIter(self.0.clone()))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct EdgeWrapper {
+        src: u32,
+        dst: u32,
+        weight: String,
+    }
+
+    impl EdgeWrapper {
+        pub fn src(&self) -> u32 {
+            self.src
+        }
+
+        pub fn dst(&self) -> u32 {
+            self.dst
+        }
+
+        pub fn weight(&self, out: &mut DiplomatWrite) {
+            write!(out, "{}", self.weight).unwrap();
+        }
+    }
+
+
+    #[diplomat::opaque]
+    pub struct NewNodesIter(std::vec::IntoIter<(u32, String, String)>);
+
+    impl NewNodesIter {
+        #[diplomat::attr(auto, iterator)]
+        pub fn next(&mut self) -> Option<Box<NewNode>> {
+            self.0.next().map(|(k, name, value)| Box::new(NewNode { key: k, name, value }))
+        }
+
+        #[diplomat::attr(auto, iterable)]
+        pub fn to_iterable(&self) -> Box<NewNodesIter> {
+            Box::new(NewNodesIter(self.0.clone()))
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct NewNode {
+        key: u32,
+        name: String,
+        value: String,
+    }
+
+    impl NewNode {
+        pub fn key(&self) -> u32 {
+            self.key
+        }
+
+        pub fn name(&self, out: &mut DiplomatWrite) {
+            write!(out, "{}", self.name).unwrap();
+        }
+
+        pub fn value(&self, out: &mut DiplomatWrite) {
+            write!(out, "{}", self.value).unwrap();
+        }
+    }
 }

@@ -1,5 +1,5 @@
 import {Graphviz} from "@hpcc-js/wasm";
-import {Context} from "online-syntax-js";
+import {ConcreteGraph, Context} from "online-syntax-js";
 import * as monaco from 'monaco-editor';
 import { AnsiUp } from 'ansi_up';
 import * as d3 from 'd3';
@@ -187,6 +187,7 @@ themeToggleBtn.addEventListener('click', () => {
 // --- State and Variables ---
 let interactiveNodes = [];
 let interactiveEdges = [];
+let concreteGraph = ConcreteGraph.new_()
 let simulation, svg, svgRoot, gridG, zoomableContainer;
 let selectedSourceNode = null;
 let currentTransform = d3.zoomIdentity;
@@ -385,8 +386,6 @@ function initInteractiveGraph() {
         // .force("positionY", d3.forceY(10).strength(0.5))
 
     updateThemeForGraph();
-
-    console.log(simulation.toString())
 }
 
 // --- Event Handlers for UI ---
@@ -399,14 +398,21 @@ nodeForm.addEventListener('submit', () => {
         return;
     }
     console.log("Adding node:", name, "with value:", value, "at coordinates:", tempNodeCoords);
-    interactiveNodes.push({ id: crypto.randomUUID(), name, value, x: tempNodeCoords.x, y: tempNodeCoords.y });
+    let nodeKey = concreteGraph.addNode(value);
+    interactiveNodes.push({ id: crypto.randomUUID(), name, value, x: tempNodeCoords.x, y: tempNodeCoords.y, nodeKey: nodeKey });
     updateInteractiveGraph();
 });
 cancelNodeBtn.addEventListener('click', () => nodeModal.close());
 
 edgeForm.addEventListener('submit', () => {
     if (!pendingEdge) return;
+    // if interactiveEdges already contains this edge, remove it first
+    const existingEdgeIndex = interactiveEdges.findIndex(e => e.source.id === pendingEdge.source.id && e.target.id === pendingEdge.target.id);
+    if (existingEdgeIndex !== -1) {
+        interactiveEdges.splice(existingEdgeIndex, 1);
+    }
     interactiveEdges.push({ source: pendingEdge.source, target: pendingEdge.target, value: edgeValueInput.value.trim() });
+    concreteGraph.addEdge(pendingEdge.source.nodeKey, pendingEdge.target.nodeKey, edgeValueInput.value.trim());
     pendingEdge = null;
     updateInteractiveGraph();
 });
@@ -430,26 +436,25 @@ addNodeInputBtn.addEventListener('click', () => {
     inputWrapper.appendChild(newInput);
     inputWrapper.appendChild(removeBtn);
     operationInputsContainer.appendChild(inputWrapper);
+    return removeBtn.onclick;
 });
 
 runOperationBtn.addEventListener('click', () => {
     const operationName = operationSelector.value;
     if (!operationName) { alert("Please select an operation to run."); return; }
     const inputNodeNames = Array.from(operationInputsContainer.querySelectorAll('input')).map(input => input.value.trim()).filter(name => name !== "");
-    if (inputNodeNames.length === 0) { alert("Please provide at least one input node name."); return; }
+    // if (inputNodeNames.length === 0) { alert("Please provide at least one input node name."); return; }
     executeOperation(operationName, inputNodeNames);
 });
 
 // --- User-Adaptable Functions ---
 
 /**
- * ⚠️ Populates the operation selector dropdown.
- * You may need to adapt `res.listStates()` to your actual API for listing functions.
+ * Populates the operation selector dropdown.
  */
 function populateOperationSelector(res) {
     operationSelector.innerHTML = '';
-    // ⚠️ Replace `res.listStates()` if your library has a different method for functions.
-    const opNames = [...res.listStates()].map(op => op.toString());
+    const opNames = [...res.listOperations()].map(op => op.toString());
 
     if (opNames.length === 0) {
         operationSelector.add(new Option('No operations found', '', true, true));
@@ -459,7 +464,6 @@ function populateOperationSelector(res) {
 }
 
 /**
- * ⚠️ Placeholder for your execution logic.
  * This is called when the "Run" button is clicked. You have access to `interactiveNodes` and `interactiveEdges`.
  */
 function executeOperation(operationName, inputNodeNames) {
@@ -472,18 +476,79 @@ function executeOperation(operationName, inputNodeNames) {
     }
 
     // --- YOUR CUSTOM LOGIC GOES HERE ---
-    alert(`Running '${operationName}' with inputs: ${inputNodeNames.join(', ')}\n(See console for details. Implement your logic in 'executeOperation')`);
+    // alert(`Running '${operationName}' with inputs: ${inputNodeNames.join(', ')}\n(See console for details. Implement your logic in 'executeOperation')`);
 
-    // Example: Create a new result node and connect inputs to it.
-    const resultNodeName = `${operationName}_result_${Date.now() % 1000}`;
-    const avgX = inputNodes.reduce((sum, n) => sum + (n.x || 0), 0) / inputNodes.length;
-    const avgY = inputNodes.reduce((sum, n) => sum + (n.y || 0), 0) / inputNodes.length;
-    const newNode = { id: crypto.randomUUID(), name: resultNodeName, value: "✅", x: avgX + 150, y: avgY };
-    console.log("Adding node at coordinates:", newNode.x, newNode.y);
-    interactiveNodes.push(newNode);
-    inputNodes.forEach(inputNode => {
-        interactiveEdges.push({ source: inputNode, target: newNode, value: 'input' });
-    });
+    let inputKeys = inputNodes.map(node => node.nodeKey);
+
+    try {
+        let res = current_res.runOperation(concreteGraph, operationName, inputKeys);
+        const avgX = inputNodes.reduce((sum, n) => sum + (n.x || 0), 0) / inputNodes.length;
+        const avgY = inputNodes.reduce((sum, n) => sum + (n.y || 0), 0) / inputNodes.length;
+
+        for (const knownNewNode of res) {
+            let thisX = avgX + Math.random() * 50; // Randomly offset to avoid overlap
+            let thisY = avgY + Math.random() * 50; // Randomly offset to avoid overlap
+
+            console.log("Adding new node at coordinates:", thisX, thisY);
+            let nodeKey = knownNewNode.key();
+            let name = knownNewNode.name();
+            let value = knownNewNode.value();
+            interactiveNodes.push({ id: crypto.randomUUID(), name, value, x: thisX, y: thisY, nodeKey: nodeKey });
+        }
+
+
+        // now make the current interactiveEdges and interactiveNodes synchronized with concreteGraph
+        for (const node of concreteGraph.getNodes()) {
+            let key = node.key();
+            let value = node.value();
+
+            let existingNode = interactiveNodes.find(n => n.nodeKey === key);
+            if (!existingNode) {
+                let thisX = avgX + Math.random() * 50; // Randomly offset to avoid overlap
+                let thisY = avgY + Math.random() * 50; // Randomly offset to avoid overlap
+                console.log("Adding new node at coordinates:", thisX, thisY);
+                interactiveNodes.push({ id: crypto.randomUUID(), name: key, value, x: thisX, y: thisY, nodeKey: key });
+            } else {
+                existingNode.value = value; // Update value if it exists
+            }
+        }
+        for (const edge of concreteGraph.getEdges()) {
+            let sourceKey = edge.src();
+            let targetKey = edge.dst();
+            let value = edge.weight();
+
+            let sourceNode = interactiveNodes.find(n => n.nodeKey === sourceKey);
+            let targetNode = interactiveNodes.find(n => n.nodeKey === targetKey);
+
+            if (sourceNode && targetNode) {
+                // Check if the edge already exists
+                let existingEdge = interactiveEdges.find(e => e.source.nodeKey === sourceKey && e.target.nodeKey === targetKey);
+                if (!existingEdge) {
+                    interactiveEdges.push({ source: sourceNode, target: targetNode, value });
+                } else {
+                    // Update the value of the existing edge if it already exists
+                    existingEdge.value = value;
+                }
+            }
+        }
+    } catch (e) {
+        let errorMessage = e.cause ? e.cause.toString() : e.toString();
+        alert(errorMessage);
+        console.error("Error running operation:", e);
+    }
+
+
+
+    // // Example: Create a new result node and connect inputs to it.
+    // const resultNodeName = `${operationName}_result_${Date.now() % 1000}`;
+    // const avgX = inputNodes.reduce((sum, n) => sum + (n.x || 0), 0) / inputNodes.length;
+    // const avgY = inputNodes.reduce((sum, n) => sum + (n.y || 0), 0) / inputNodes.length;
+    // const newNode = { id: crypto.randomUUID(), name: resultNodeName, value: "✅", x: avgX + 150, y: avgY };
+    // console.log("Adding node at coordinates:", newNode.x, newNode.y);
+    // interactiveNodes.push(newNode);
+    // inputNodes.forEach(inputNode => {
+    //     interactiveEdges.push({ source: inputNode, target: newNode, value: 'input' });
+    // });
 
     updateInteractiveGraph(); // Refresh the graph to show changes
 }
