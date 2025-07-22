@@ -19,6 +19,9 @@ const initialCode = localStorage.getItem('last_code') ||
     `// Welcome! Type your Grabapl code here.
 fn foo(x: Int) -> (result: Int) {
     show_state(foo_state);
+    // try returning a node!
+    // let! new_node = add_node<int, 1>();
+    // return (result: new_node);
 }`;
 
 const editor = monaco.editor.create(document.getElementById('container'), {
