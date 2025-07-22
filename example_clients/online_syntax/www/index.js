@@ -152,8 +152,8 @@ function onCodeChanged() {
         // reset the error on the editor
         editorDecorations.clear()
         // now check if it was parsed successfully
-        let error_msg = res.errorMessage();
-        if (error_msg === "") {
+        let error_msg_raw = res.errorMessage();
+        if (error_msg_raw === "") {
             // Update UI for success
             outputPre.className = "w-full p-4 overflow-auto whitespace-pre-wrap text-green-400";
             outputPre.innerText = "Code compiled successfully!";
@@ -161,7 +161,17 @@ function onCodeChanged() {
             // error
             outputPre.className = "w-full p-4 overflow-auto whitespace-pre-wrap text-red-400";
 
-            error_msg = ansi_up.ansi_to_html(error_msg);
+            let error_msg = ansi_up.ansi_to_html(error_msg_raw);
+
+            // raw error_msg text:
+            // const tempDiv = document.createElement('div');
+            // tempDiv.innerHTML = error_msg;
+            // let error_msg_text_form = tempDiv.innerText; // Get the raw text without HTML tags
+            // // delete
+            // tempDiv.remove();
+            //
+            // let line_arr = error_msg_text_form.split("\n").map((line) => {return {value: line}});
+
 
             // for every actual span returned in the error, add a decoration
             for (const span of res.errorSpans()) {
@@ -173,7 +183,13 @@ function onCodeChanged() {
                         range: range,
                         options: {
                             className: 'error-highlight',
-                            isWholeLine: false
+                            isWholeLine: false,
+                            hoverMessage: [
+                                {
+                                    value: "error here",
+                                },
+                            ],
+                            // glyphMarginHoverMessage: "glyph haha",
                         }
                     }
                 ]);
