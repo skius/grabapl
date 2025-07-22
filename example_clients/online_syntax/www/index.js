@@ -209,6 +209,7 @@ const edgeModal = document.getElementById('edge-modal');
 const edgeForm = document.getElementById('edge-form');
 const cancelEdgeBtn = document.getElementById('cancel-edge-btn');
 const edgeValueInput = document.getElementById('edge-value');
+edgeValueInput.required = false;
 
 // --- Core D3 Functions ---
 
@@ -350,8 +351,12 @@ function initInteractiveGraph() {
             nodeNameInput.value = `node${interactiveNodes.length + 1}`;
             nodeValueInput.value = "";
             nodeModal.showModal();
-            nodeNameInput.focus();
-            nodeNameInput.select();
+            // nodeNameInput.focus();
+            // nodeNameInput.select();
+            nodeValueInput.focus();
+            nodeValueInput.select();
+            // disallow browser dropdown for node values
+            nodeValueInput.setAttribute("autocomplete", "off");
         })
         .on("click", () => {
             if (selectedSourceNode) {
