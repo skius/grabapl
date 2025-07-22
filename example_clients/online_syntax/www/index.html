@@ -127,6 +127,8 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
                     </button>
                     <button id="run-operation-btn" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-800 focus:ring-green-500">Run</button>
+                    <!-- Delete Node Button -->
+                    <button id="delete-node-btn" class="hidden ml-auto px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-800 focus:ring-red-500">Delete Selected Node</button>
                     <!-- button right-align that runs the d3 simulation for a couple ticks -->
                     <button style="display: none" id="run-simulation-btn" class="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-800 focus:ring-yellow-500">Physically Adjust Nodes</button>
                 </div>
@@ -169,6 +171,18 @@
         <div class="mt-6 flex justify-end space-x-3">
             <button type="button" id="cancel-edge-btn" class="px-4 py-2 rounded-md text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500">Cancel</button>
             <button type="submit" class="px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700">Create</button>
+        </div>
+    </form>
+</dialog>
+
+<!-- Delete Confirmation Modal -->
+<dialog id="delete-confirm-modal" class="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-sm text-gray-900 dark:text-gray-100 backdrop:bg-black/50">
+    <form method="dialog">
+        <h3 class="text-lg font-medium mb-2">Confirm Deletion</h3>
+        <p class="text-gray-600 dark:text-gray-400 mb-6">Are you sure you want to delete this node and all its connected edges?</p>
+        <div class="flex justify-end space-x-3">
+            <button type="button" id="cancel-delete-btn" class="px-4 py-2 rounded-md text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500">Cancel</button>
+            <button id="confirm-delete-btn" class="px-4 py-2 rounded-md text-white bg-red-600 hover:bg-red-700">Delete</button>
         </div>
     </form>
 </dialog>

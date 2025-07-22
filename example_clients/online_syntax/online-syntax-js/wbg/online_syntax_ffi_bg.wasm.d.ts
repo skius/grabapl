@@ -3,6 +3,7 @@
 export const memory: WebAssembly.Memory;
 export const ConcreteGraph_new: () => number;
 export const ConcreteGraph_add_node: (a: number, b: number, c: number) => number;
+export const ConcreteGraph_delete_node: (a: number, b: number) => void;
 export const ConcreteGraph_add_edge: (a: number, b: number, c: number, d: number, e: number) => void;
 export const ConcreteGraph_get_nodes: (a: number) => number;
 export const ConcreteGraph_get_edges: (a: number) => number;

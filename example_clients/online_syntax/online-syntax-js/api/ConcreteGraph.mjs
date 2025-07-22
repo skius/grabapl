@@ -69,6 +69,15 @@ export class ConcreteGraph {
         }
     }
 
+    deleteNode(key) {
+    wasm.ConcreteGraph_delete_node(this.ffiValue, key);
+
+        try {}
+
+        finally {
+        }
+    }
+
     addEdge(src, dst, weight) {
         let functionCleanupArena = new diplomatRuntime.CleanupArena();
 

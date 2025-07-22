@@ -19,6 +19,8 @@ export class ConcreteGraph {
      */
     addNode(value: string): number;
 
+    deleteNode(key: number): void;
+
     addEdge(src: number, dst: number, weight: string): void;
 
     getNodes(): NodesIter;

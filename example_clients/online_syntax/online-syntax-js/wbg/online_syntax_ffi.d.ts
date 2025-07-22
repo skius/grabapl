@@ -7,6 +7,7 @@ export interface InitOutput {
   readonly memory: WebAssembly.Memory;
   readonly ConcreteGraph_new: () => number;
   readonly ConcreteGraph_add_node: (a: number, b: number, c: number) => number;
+  readonly ConcreteGraph_delete_node: (a: number, b: number) => void;
   readonly ConcreteGraph_add_edge: (a: number, b: number, c: number, d: number, e: number) => void;
   readonly ConcreteGraph_get_nodes: (a: number) => number;
   readonly ConcreteGraph_get_edges: (a: number) => number;

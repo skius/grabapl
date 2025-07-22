@@ -33,6 +33,7 @@ const editor = monaco.editor.create(document.getElementById('container'), {
     roundedSelection: false,
     scrollBeyondLastLine: false,
 });
+window.editor = editor; // Expose editor for resizer script
 
 let editorDecorations = editor.createDecorationsCollection();
 
@@ -284,6 +285,36 @@ edgeValueInput.required = false;
 
 const runSimulationBtn = document.getElementById('run-simulation-btn');
 
+// --- Delete Node Elements and Logic ---
+const deleteNodeBtn = document.getElementById('delete-node-btn');
+const deleteConfirmModal = document.getElementById('delete-confirm-modal');
+const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
+const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
+
+
+/**
+ * Deletes the currently selected node and its connected edges.
+ */
+function deleteSelectedNode() {
+    if (!selectedSourceNode) return;
+
+    // Remove from the underlying graph representation
+    concreteGraph.deleteNode(selectedSourceNode.nodeKey);
+
+    // Filter out the node and its edges from the D3 data arrays
+    interactiveNodes = interactiveNodes.filter(n => n.id !== selectedSourceNode.id);
+    interactiveEdges = interactiveEdges.filter(e => e.source.id !== selectedSourceNode.id && e.target.id !== selectedSourceNode.id);
+
+    // Reset selection state
+    selectedSourceNode = null;
+    deleteNodeBtn.classList.add('hidden');
+
+    // Re-render the graph and close the modal
+    updateInteractiveGraph();
+    deleteConfirmModal.close();
+}
+
+
 // --- Core D3 Functions ---
 
 function updateInteractiveGraph() {
@@ -318,6 +349,7 @@ function updateInteractiveGraph() {
         event.stopPropagation();
         if (!selectedSourceNode) {
             selectedSourceNode = d;
+            deleteNodeBtn.classList.remove('hidden'); // Show delete button
         } else {
             if (selectedSourceNode.id !== d.id) {
                 pendingEdge = { source: selectedSourceNode, target: d };
@@ -326,13 +358,11 @@ function updateInteractiveGraph() {
                 edgeValueInput.focus();
             }
             selectedSourceNode = null;
+            deleteNodeBtn.classList.add('hidden'); // Hide delete button
         }
         updateInteractiveGraph();
     });
 
-    // for (const node of interactiveNodes) {
-    //     console.log(`Node x: ${node.x}, y: ${node.y}, name: ${node.name}, value: ${node.value}`);
-    // }
     simulation.nodes(interactiveNodes).on("tick", ticked);
     simulation.force("link").links(interactiveEdges).id(d => d.id);
     simulation.alpha(0.3).restart();
@@ -349,12 +379,6 @@ function updateInteractiveGraph() {
 
 /**
  * Draws a smooth, pannable, and zoomable grid background.
- * This function should be called from within the D3 zoom event handler.
- *
- * @param {d3.Selection} gridG The D3 selection of the <g> element for the grid.
- * @param {number} width The width of the SVG viewport.
- * @param {number} height The height of the SVG viewport.
- * @param {d3.ZoomTransform} transform The current transform from the D3 zoom event.
  */
 function drawGrid(gridG, width, height, transform) {
     const isDark = document.documentElement.classList.contains('dark');
@@ -373,29 +397,9 @@ function drawGrid(gridG, width, height, transform) {
     // Generate the data for the new line positions.
     const xLines = d3.range(offsetX, width + 1, lineSpacing);
     const yLines = d3.range(offsetY, height + 1, lineSpacing);
-
-    // Draw the vertical lines.
-    gridG.selectAll(".grid-line-v")
-        .data(xLines)
-        .enter().append("line")
-        .attr("x1", d => d)
-        .attr("y1", 0)
-        .attr("x2", d => d)
-        .attr("y2", height);
-
-    // Draw the horizontal lines.
-    gridG.selectAll(".grid-line-h")
-        .data(yLines)
-        .enter().append("line")
-        .attr("x1", 0)
-        .attr("y1", d => d)
-        .attr("x2", width)
-        .attr("y2", d => d);
-
-    // Style all the new lines. The stroke width is constant for a crisp look.
-    gridG.selectAll("line")
-        .attr("stroke", gridColor)
-        .attr("stroke-width", 1);
+    gridG.selectAll(".grid-line-v").data(xLines).enter().append("line").attr("x1", d => d).attr("y1", 0).attr("x2", d => d).attr("y2", height);
+    gridG.selectAll(".grid-line-h").data(yLines).enter().append("line").attr("x1", 0).attr("y1", d => d).attr("x2", width).attr("y2", d => d);
+    gridG.selectAll("line").attr("stroke", gridColor).attr("stroke-width", 1);
 }
 
 function updateThemeForGraph() {
@@ -420,12 +424,9 @@ function initInteractiveGraph() {
             const tempNodeCoordsArr = currentTransform.invert([mx, my]);
             tempNodeCoords.x = tempNodeCoordsArr[0];
             tempNodeCoords.y = tempNodeCoordsArr[1];
-            console.log("Adding node at:", tempNodeCoords);
             nodeNameInput.value = `node${interactiveNodes.length + 1}`;
             nodeValueInput.value = "";
             nodeModal.showModal();
-            // nodeNameInput.focus();
-            // nodeNameInput.select();
             nodeValueInput.focus();
             nodeValueInput.select();
             // disallow browser dropdown for node values
@@ -434,6 +435,7 @@ function initInteractiveGraph() {
         .on("click", () => {
             if (selectedSourceNode) {
                 selectedSourceNode = null;
+                deleteNodeBtn.classList.add('hidden'); // Hide on deselect
                 updateInteractiveGraph();
             }
         });
@@ -459,19 +461,8 @@ function initInteractiveGraph() {
     simulation = d3.forceSimulation(interactiveNodes)
         .force("link", d3.forceLink(interactiveEdges).id(d => d.id).distance(150).strength(0.6))
         .force("charge", d3.forceManyBody().strength(-800))
-        // .force("center", d3.forceCenter(0, 0).strength(0.5))
-        // .stop();
         .force("positionX", d3.forceX(100))
-        .force("positionY", d3.forceY(100))
-        // .stop();
-
-    // tick every 50ms
-    // setInterval(() => {
-    //     if (simulation.alpha() > 0) {
-    //         simulation.tick();
-    //         updateInteractiveGraph();
-    //     }
-    // }, 50);
+        .force("positionY", d3.forceY(100));
 
     updateThemeForGraph();
 }
@@ -485,10 +476,11 @@ nodeForm.addEventListener('submit', () => {
         alert("A node with this name already exists.");
         return;
     }
-    console.log("Adding node:", name, "with value:", value, "at coordinates:", tempNodeCoords);
     let nodeKey = concreteGraph.addNode(value);
-    interactiveNodes.push({ id: crypto.randomUUID(), name, value, x: tempNodeCoords.x, y: tempNodeCoords.y, nodeKey: nodeKey });
+    const newNode = { id: crypto.randomUUID(), name, value, x: tempNodeCoords.x, y: tempNodeCoords.y, nodeKey: nodeKey, fx: tempNodeCoords.x, fy: tempNodeCoords.y };
+    interactiveNodes.push(newNode);
     updateInteractiveGraph();
+    setTimeout(() => { newNode.fx = null; newNode.fy = null; }, 150);
 });
 cancelNodeBtn.addEventListener('click', () => nodeModal.close());
 
@@ -531,7 +523,6 @@ runOperationBtn.addEventListener('click', () => {
     const operationName = operationSelector.value;
     if (!operationName) { alert("Please select an operation to run."); return; }
     const inputNodeNames = Array.from(operationInputsContainer.querySelectorAll('input')).map(input => input.value.trim()).filter(name => name !== "");
-    // if (inputNodeNames.length === 0) { alert("Please provide at least one input node name."); return; }
     executeOperation(operationName, inputNodeNames);
 });
 
@@ -539,6 +530,27 @@ runSimulationBtn.addEventListener('click', () => {
     simulation.tick(100);
     updateInteractiveGraph();
 })
+
+// --- Delete Node Event Listeners ---
+deleteNodeBtn.addEventListener('click', () => {
+    if (selectedSourceNode) {
+        deleteConfirmModal.showModal();
+    }
+});
+cancelDeleteBtn.addEventListener('click', () => deleteConfirmModal.close());
+confirmDeleteBtn.addEventListener('click', deleteSelectedNode);
+
+window.addEventListener('keydown', (e) => {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedSourceNode) {
+        // Prevent typing 'Backspace' in an input field from triggering deletion
+        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
+            return;
+        }
+        e.preventDefault();
+        deleteConfirmModal.showModal();
+    }
+});
+
 
 // --- User-Adaptable Functions ---
 
@@ -575,6 +587,10 @@ function executeOperation(operationName, inputNodeNames) {
         const avgX = inputNodes.reduce((sum, n) => sum + (n.x || 0), 0) / inputNodes.length;
         const avgY = inputNodes.reduce((sum, n) => sum + (n.y || 0), 0) / inputNodes.length;
 
+        // now make the current interactiveEdges and interactiveNodes synchronized with concreteGraph
+        let newInteractiveNodes = [];
+        let newInteractiveEdges = [];
+
         const addNode = (key, name, value) => {
             let thisX = avgX + Math.random() * 50; // Randomly offset to avoid overlap
             let thisY = avgY + Math.random() * 50; // Randomly offset to avoid overlap
@@ -587,7 +603,7 @@ function executeOperation(operationName, inputNodeNames) {
                 name = `${baseName}${num}`;
                 foundName = interactiveNodes.find(n => n.name === name);
             }
-            interactiveNodes.push({ id: crypto.randomUUID(), name, value, x: thisX, y: thisY, nodeKey: key });
+            newInteractiveNodes.push({ id: crypto.randomUUID(), name, value, x: thisX, y: thisY, nodeKey: key });
         }
 
         for (const knownNewNode of res) {
@@ -598,7 +614,6 @@ function executeOperation(operationName, inputNodeNames) {
         }
 
 
-        // now make the current interactiveEdges and interactiveNodes synchronized with concreteGraph
         for (const node of concreteGraph.getNodes()) {
             let key = node.key();
             let value = node.value();
@@ -608,6 +623,7 @@ function executeOperation(operationName, inputNodeNames) {
                 addNode(key, key, value);
             } else {
                 existingNode.value = value; // Update value if it exists
+                newInteractiveNodes.push(existingNode); // Keep existing nodes
             }
         }
         for (const edge of concreteGraph.getEdges()) {
@@ -615,20 +631,24 @@ function executeOperation(operationName, inputNodeNames) {
             let targetKey = edge.dst();
             let value = edge.weight();
 
-            let sourceNode = interactiveNodes.find(n => n.nodeKey === sourceKey);
-            let targetNode = interactiveNodes.find(n => n.nodeKey === targetKey);
+            let sourceNode = newInteractiveNodes.find(n => n.nodeKey === sourceKey);
+            let targetNode = newInteractiveNodes.find(n => n.nodeKey === targetKey);
 
             if (sourceNode && targetNode) {
                 // Check if the edge already exists
                 let existingEdge = interactiveEdges.find(e => e.source.nodeKey === sourceKey && e.target.nodeKey === targetKey);
                 if (!existingEdge) {
-                    interactiveEdges.push({ source: sourceNode, target: targetNode, value });
+                    newInteractiveEdges.push({ source: sourceNode, target: targetNode, value });
                 } else {
                     // Update the value of the existing edge if it already exists
                     existingEdge.value = value;
+                    newInteractiveEdges.push(existingEdge);
                 }
             }
         }
+        // update the interactive nodes and edges
+        interactiveNodes = newInteractiveNodes;
+        interactiveEdges = newInteractiveEdges;
     } catch (e) {
         let errorMessage = e.cause ? e.cause.toString() : e.toString();
         alert(errorMessage);
