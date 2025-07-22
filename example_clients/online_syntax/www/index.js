@@ -618,6 +618,12 @@ function executeOperation(operationName, inputNodeNames) {
             let key = node.key();
             let value = node.value();
 
+            let alreadyExists = newInteractiveNodes.find(n => n.nodeKey === key);
+            if (alreadyExists) {
+                // we added this already with a proper name
+                continue;
+            }
+
             let existingNode = interactiveNodes.find(n => n.nodeKey === key);
             if (!existingNode) {
                 addNode(key, key, value);
