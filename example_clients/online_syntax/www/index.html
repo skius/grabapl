@@ -36,6 +36,23 @@
             border-radius: 4px;
             padding: 0.25rem;
         }
+
+        /* 🚀 Styles for the resizable editor container */
+        #editor-resizer {
+            height: 10px;
+            background-color: #e5e7eb; /* gray-200 */
+            cursor: ns-resize;
+            transition: background-color 0.2s;
+        }
+        #editor-resizer:hover {
+            background-color: #d1d5db; /* gray-300 */
+        }
+        .dark #editor-resizer {
+            background-color: #374151; /* gray-700 */
+        }
+        .dark #editor-resizer:hover {
+            background-color: #4b5563; /* gray-600 */
+        }
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
@@ -54,12 +71,15 @@
     </header>
 
     <!-- Monaco Editor Card -->
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
+    <!-- 🚀 This wrapper now contains the editor and the resizer handle -->
+    <div id="editor-wrapper" class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
         <div class="p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
             <h2 class="text-lg font-semibold">Code Editor</h2>
         </div>
         <!-- Monaco Editor will be initialized here -->
-        <div id="container" class="w-full" style="height: 80vh;"></div>
+        <div id="container" class="w-full" style="height: 50vh;"></div>
+        <!-- 🚀 This is the drag handle for resizing the editor -->
+        <div id="editor-resizer"></div>
     </div>
 
     <!-- Output Console Card -->
@@ -154,6 +174,61 @@
 </dialog>
 
 <script src="./bootstrap.js"></script>
+
+<!-- 🚀 Script for editor resizing logic -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const resizer = document.getElementById('editor-resizer');
+        const editorContainer = document.getElementById('container');
+
+        // We need to check if the Monaco editor instance is available.
+        // This script runs before bootstrap.js, so we'll poll for the `editor` variable.
+        let monacoEditor = null;
+        const findEditorInterval = setInterval(() => {
+            if (window.editor) {
+                monacoEditor = window.editor;
+                clearInterval(findEditorInterval);
+            }
+        }, 100);
+
+        let isResizing = false;
+
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            // Add listeners to the document to capture mouse movement everywhere on the page
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', stopResizing);
+            // Prevent text selection while dragging
+            document.body.style.userSelect = 'none';
+            document.body.style.pointerEvents = 'none';
+        });
+
+        function handleMouseMove(e) {
+            if (!isResizing) return;
+
+            // Calculate new height
+            const newHeight = e.clientY - editorContainer.getBoundingClientRect().top;
+
+            // Apply new height with min/max constraints
+            if (newHeight > 100 && newHeight < window.innerHeight * 0.9) {
+                editorContainer.style.height = `${newHeight}px`;
+                // Crucially, tell the Monaco editor to relayout itself to fit the new container size
+                if (monacoEditor) {
+                    monacoEditor.layout();
+                }
+            }
+        }
+
+        function stopResizing() {
+            isResizing = false;
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', stopResizing);
+            // Re-enable text selection and pointer events
+            document.body.style.userSelect = '';
+            document.body.style.pointerEvents = '';
+        }
+    });
+</script>
 
 </body>
 </html>
