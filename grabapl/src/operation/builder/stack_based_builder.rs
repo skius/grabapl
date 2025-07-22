@@ -675,6 +675,10 @@ impl<S: Semantics> ReturnFrame<S> {
                 "cannot return node with incompatible abstract value"
             ));
         }
+        // TODO: I think we can uncomment this and actually allow returning nodes that originate from a shape query.
+        //  Reason: an invariant of the abstract graph is that there is at most one abstract handle to any given node at any point.
+        //  In other words, since we were able to match a node in the shape query, that means we have that single handle to the node,
+        //  and we can do with it whatever we want. Including returning it.
         if self
             .last_state()
             .node_may_originate_from_shape_query
