@@ -30,6 +30,7 @@
     "@hpcc-js/wasm": "^2.22.4",
     "ansi_up": "^6.0.6",
     "css-loader": "^7.1.2",
+    "d3": "^7.9.0",
     "monaco-editor": "^0.52.2",
     "monaco-editor-webpack-plugin": "^7.1.0",
     "style-loader": "^4.0.0"

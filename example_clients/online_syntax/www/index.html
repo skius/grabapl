@@ -24,6 +24,11 @@
         .monaco-editor .scrollbar .slider {
             background: rgba(100, 100, 100, 0.4);
         }
+        /* Style for modal backdrop */
+        dialog::backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px);
+        }
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
@@ -78,9 +83,67 @@
         </div>
     </div>
 
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-600">
+            <h2 class="text-lg font-semibold">Dynamic Graph Builder</h2>
+        </div>
+        <div class="p-4 space-y-4">
+            <div class="p-4 border border-gray-200 dark:border-gray-700 rounded-lg space-y-3">
+                <h3 class="font-medium">Run Operation</h3>
+                <div class="flex flex-wrap items-center gap-4">
+                    <select id="operation-selector" class="bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        <option value="">Compile code first</option>
+                    </select>
+                    <div id="operation-inputs" class="flex items-center gap-2 flex-wrap">
+                    </div>
+                    <button id="add-node-input-btn" title="Add input node" class="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-800 focus:ring-blue-500">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                    </button>
+                    <button id="run-operation-btn" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-800 focus:ring-green-500">Run</button>
+                </div>
+            </div>
+            <div id="interactive-graph-container" class="w-full h-[60vh] border border-dashed border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden relative bg-gray-50 dark:bg-gray-900/50 cursor-grab">
+                <div class="absolute top-2 left-2 text-xs text-gray-400 dark:text-gray-500 z-10 pointer-events-none">Double-click to create a node. Click two nodes to create an edge. Drag to pan.</div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
-<!-- Your compiled JS -->
+<dialog id="node-modal" class="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-sm text-gray-900 dark:text-gray-100 backdrop:bg-black/50">
+    <form id="node-form" method="dialog">
+        <h3 class="text-lg font-medium mb-4">Create New Node</h3>
+        <div class="space-y-4">
+            <div>
+                <label for="node-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Node Name (unique)</label>
+                <input type="text" id="node-name" name="node-name" required class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <div>
+                <label for="node-value" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Node Value</label>
+                <input type="text" id="node-value" name="node-value" required class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+        </div>
+        <div class="mt-6 flex justify-end space-x-3">
+            <button type="button" id="cancel-node-btn" class="px-4 py-2 rounded-md text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500">Cancel</button>
+            <button type="submit" class="px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700">Create</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="edge-modal" class="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-sm text-gray-900 dark:text-gray-100 backdrop:bg-black/50">
+    <form id="edge-form" method="dialog">
+        <h3 class="text-lg font-medium mb-4">Create New Edge</h3>
+        <div>
+            <label for="edge-value" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Edge Value</label>
+            <input type="text" id="edge-value" name="edge-value" required class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+        <div class="mt-6 flex justify-end space-x-3">
+            <button type="button" id="cancel-edge-btn" class="px-4 py-2 rounded-md text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500">Cancel</button>
+            <button type="submit" class="px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700">Create</button>
+        </div>
+    </form>
+</dialog>
+
 <script src="./bootstrap.js"></script>
 
 </body>
