@@ -1,0 +1,12 @@
+[package]
+name = "semantics"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# main basic functionality
+grabapl = { path = "../../../grabapl" }
+# in case we want to parse a textual representation of user defined operations
+syntax = { path = "../../../syntax" }
+# in case we want to serialize and deserialize our operations
+serde = { version = "1.0", features = ["derive"] }
