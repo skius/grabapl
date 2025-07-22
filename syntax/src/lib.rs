@@ -473,10 +473,10 @@ where
         // TODO: add support for `skipping all` in addition to the current `skipping [...]` syntax.
         let optional_skipping_markers = select! {
             Token::Ident("skipping") => (),
-        }
+        }.labelled("'skipping'")
             .ignore_then(just(Token::Ctrl('[')))
             .ignore_then(
-                select! { Token::Str(s) => s }
+                select! { Token::Str(s) => s }.labelled("marker literal (e.g., '\"visited\"')")
                     .separated_by(just(Token::Ctrl(',')))
                     .allow_trailing()
                     .collect::<Vec<_>>(),
