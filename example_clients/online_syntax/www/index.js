@@ -340,6 +340,7 @@ function initInteractiveGraph() {
             event.preventDefault();
             const [mx, my] = d3.pointer(event);
             tempNodeCoords = currentTransform.invert([mx, my]);
+            console.log("Adding node at:", tempNodeCoords);
             nodeNameInput.value = `node${interactiveNodes.length + 1}`;
             nodeValueInput.value = "";
             nodeModal.showModal();
@@ -392,6 +393,7 @@ nodeForm.addEventListener('submit', () => {
         alert("A node with this name already exists.");
         return;
     }
+    console.log("Adding node:", name, "with value:", value, "at coordinates:", tempNodeCoords);
     interactiveNodes.push({ id: crypto.randomUUID(), name, value, x: tempNodeCoords.x, y: tempNodeCoords.y });
     updateInteractiveGraph();
 });
@@ -472,6 +474,7 @@ function executeOperation(operationName, inputNodeNames) {
     const avgX = inputNodes.reduce((sum, n) => sum + (n.x || 0), 0) / inputNodes.length;
     const avgY = inputNodes.reduce((sum, n) => sum + (n.y || 0), 0) / inputNodes.length;
     const newNode = { id: crypto.randomUUID(), name: resultNodeName, value: "✅", x: avgX + 150, y: avgY };
+    console.log("Adding node at coordinates:", newNode.x, newNode.y);
     interactiveNodes.push(newNode);
     inputNodes.forEach(inputNode => {
         interactiveEdges.push({ source: inputNode, target: newNode, value: 'input' });
