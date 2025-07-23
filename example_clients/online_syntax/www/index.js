@@ -685,6 +685,8 @@ function executeOperation(operationName, inputNodeNames) {
 
 // --- Initial Load ---
 async function main() {
+    // Initialize panic hooks
+    Context.init();
     // Load Graphviz WASM module
     outputPre.innerText = "Loading Graphviz WASM module...";
     graphviz = await Graphviz.load();

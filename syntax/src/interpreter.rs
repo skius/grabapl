@@ -399,13 +399,15 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         // TODO: if queries could create nodes, this would need to be handled.
         let initial_nodes = self.single_node_aids.clone();
 
-        self.interpret_if_cond_and_start(if_stmt.cond)?;
+        let rename_instructions_then_branch = self.interpret_if_cond_and_start(if_stmt.cond)?;
 
         self.builder
             .enter_true_branch()
             .change_context(InterpreterError::BuilderError.with_span(if_stmt.then_block.1))
             .attach_printable_lazy(|| "Failed to enter true branch")?;
         // interpret the true branch
+        // rename
+        self.rename_many(rename_instructions_then_branch)?;
         self.interpret_block(if_stmt.then_block)?;
         self.builder
             .enter_false_branch()
@@ -425,10 +427,27 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         Ok(())
     }
 
+    fn rename_many(&mut self,
+        rename_instructions: HashMap<Spanned<&'src str>, AbstractNodeId>,
+    ) -> Result<(), SpannedInterpreterError> {
+        for (name, aid) in rename_instructions {
+            let name_span = name.1;
+            let name = name.0;
+            let new_aid = AbstractNodeId::named(name);
+            self.builder
+                .rename_node(aid, name)
+                .change_context(InterpreterError::BuilderError.with_span(name_span))
+                .attach_printable_lazy(|| format!("Failed to rename node {aid:?} to {name}"))?;
+            self.single_node_aids.insert(name, new_aid);
+        }
+        Ok(())
+    }
+
+    /// Returns rename instructions for the beginning of the then branch
     fn interpret_if_cond_and_start(
         &mut self,
         (cond, _): Spanned<IfCond<'src, S::CS>>,
-    ) -> Result<(), SpannedInterpreterError> {
+    ) -> Result<HashMap<Spanned<&'src str>, AbstractNodeId>, SpannedInterpreterError> {
         // starts either a builtin query or a shape query
         match cond {
             IfCond::Query((fn_call, fn_call_span)) => {
@@ -446,18 +465,19 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                 self.builder
                     .start_query(query, args)
                     .change_context(InterpreterError::BuilderError.with_span(fn_call_span))?;
+                Ok(HashMap::new())
             }
             IfCond::Shape(shape_query_params) => {
-                self.interpret_and_start_shape_query(shape_query_params)?;
+                self.interpret_and_start_shape_query(shape_query_params)
             }
         }
-        Ok(())
     }
 
+    /// Returns the required rename instructions at the start of the then branch
     fn interpret_and_start_shape_query(
         &mut self,
         (shape_query_params, sqp_span): Spanned<ShapeQueryParams<'src, S::CS>>,
-    ) -> Result<(), SpannedInterpreterError> {
+    ) -> Result<HashMap<Spanned<&'src str>, AbstractNodeId>, SpannedInterpreterError> {
         // need to invent a marker.
         let marker = self.get_new_shape_query_marker()?;
         let marker = marker.as_str();
@@ -487,6 +507,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             }
         }
         // then interpret the shape query parameters
+        let mut new_nodes_to_rename = HashMap::new();
         for (param, param_span) in shape_query_params.params {
             match param {
                 ShapeQueryParam::Node(node_param) => {
@@ -500,10 +521,6 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                     // we differentiate between an existing node, in which case we issue an expected value change,
                     // or a new one, in which case it must be a single.
 
-                    // TODO: since we are scoping the identifiers here,
-                    //  we need to enter a new scope and reset a scope when entering if/else branches. (i guess in interpret_block?)
-                    //  since we should *not* expect a value change for a node defined in a distinct scope.
-
                     if let Some(aid) = self.node_id_to_aid(node_id) {
                         // issue an expected value change
                         self.builder
@@ -516,7 +533,8 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                         self.builder
                             .expect_shape_node(name.into(), param_type)
                             .change_context(InterpreterError::BuilderError.with_span(param_span))?;
-                        self.single_node_aids.insert(name, aid);
+                        // we need to rename these as soon as we enter the then branch.
+                        new_nodes_to_rename.insert((name, node_param.name.1), aid);
                     }
                 }
                 ShapeQueryParam::Edge(edge_param) => {
@@ -549,7 +567,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                 }
             }
         }
-        Ok(())
+        Ok(new_nodes_to_rename)
     }
 
     fn get_new_shape_query_marker(&mut self) -> Result<String, SpannedInterpreterError> {

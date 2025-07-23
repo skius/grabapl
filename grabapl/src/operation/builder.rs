@@ -259,6 +259,8 @@ pub enum OperationBuilderError {
     AlreadyVisitedBranch(bool),
     #[error("Could not find abstract node id: {0:?}")]
     NotFoundAid(AbstractNodeId),
+    #[error("AID {0:?} already exists")]
+    AlreadyExistsAid(AbstractNodeId),
     #[error("Could not find operation ID: {0}")]
     NotFoundOperationId(OperationId),
     #[error("Could not apply operation due to mismatched arguments: {0}")]
@@ -1589,6 +1591,10 @@ impl<S: Semantics> IntermediateState<S> {
         old_aid: AbstractNodeId,
         new_aid: AbstractNodeId,
     ) -> Result<(), OperationBuilderError> {
+        // if we already have the new AID, return error
+        if self.node_keys_to_aid.contains_right(&new_aid) {
+            bail!(OperationBuilderError::AlreadyExistsAid(new_aid));
+        }
         // Update the mappings
         if let Some(node_key) = self.node_keys_to_aid.remove_right(&old_aid) {
             self.node_keys_to_aid.insert(node_key, new_aid);
