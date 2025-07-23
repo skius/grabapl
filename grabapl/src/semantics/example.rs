@@ -594,6 +594,12 @@ impl Semantics for ExampleSemantics {
     type EdgeConcreteToAbstract = EdgeConcreteToAbstract;
     type BuiltinOperation = ExampleOperation;
     type BuiltinQuery = ExampleQuery;
+
+    fn top_node_abstract() -> Option<Self::NodeAbstract> {
+        // despite us not having a top node due to `Separate`, we can still return Object as the default.
+        // TODO: we should really document whether or not the library makes any assumptions about the top node wrt soundness. Right now it doesnt.
+        Some(NodeType::Object)
+    }
 }
 
 // additions for serde support

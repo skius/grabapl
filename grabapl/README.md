@@ -98,6 +98,8 @@ cargo check --target wasm32-unknown-unknown
 - [ ] Shape query skipping marker: should work on ExpectShapeNode*Change*, i.e., if we have a skipping "visited" 
       and an in-scope node with that marker on it, then the change shape query should not enter. 
       (It would still have the node in scope though.)
+- [ ] Explicit input node parameters should have a "expected this abstract value, got this" error message. Actually all parameters.
+    - ==> need debug constraint
 
 # TODOs for handover/documentation:
 - [ ] Finish template client

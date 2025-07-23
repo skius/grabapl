@@ -22,37 +22,78 @@ pub fn parse_abstract_node_type<S: SemanticsWithCustomSyntax>(
 }
 
 fn find_lib_builtin_op<S: SemanticsWithCustomSyntax>(
-    name: &str,
-    args: Option<MacroArgs>,
-) -> Option<LibBuiltinOperation<S>> {
+    name: Spanned<&str>,
+    args: Option<Spanned<MacroArgs>>,
+) -> Option<Result<LibBuiltinOperation<S>, SpannedInterpreterError>> {
+    let name_span = name.1;
+    let name = name.0;
     match name {
         "mark_node" => {
-            let args = args?;
-            let args_src = args.0;
-            // parse something of the form: `"color_name", NodeType`
-            let first_quote = args_src.find('"')?;
-            let args_src = &args_src[first_quote + 1..];
-            let second_quote = args_src.find('"')?;
-            let color_name = &args_src[..second_quote];
-            let rest = &args_src[second_quote + 1..];
-            let comma_pos = rest.find(',')?;
-            let rest = &rest[comma_pos + 1..];
+            // wrap everything below inside a closure that returns a Result, since we guarantee we'll return a Some() in this branch.
+            let result = (|| {
+                let args = args.ok_or(
+                    InterpreterError::Custom("mark_node requires macro arguments")
+                        .with_span(name_span)
+                )?;
+                let args_src = args.0.0;
+                let args_span = args.1;
+                // parse something of the form: `"color_name", NodeType`
+                // let first_quote = args_src.find('"')?;
+                // let args_src = &args_src[first_quote + 1..];
+                // let second_quote = args_src.find('"')?;
+                // let color_name = &args_src[..second_quote];
+                // let rest = &args_src[second_quote + 1..];
+                // let comma_pos = rest.find(',')?;
+                // let rest = &rest[comma_pos + 1..];
 
-            // parse S::CS::AbstractNodeType
-            let syntax_typ = parse_abstract_node_type::<S>(rest)?;
-            // TODO: these functions should return errors. Something like Option<Result<>>, so that a Some() indicates "we're responsible for this op name", and a Some(Err())
-            //  indicates "we are responsible, and we're telling you that this is an error".
-            let node_type = S::convert_node_type(syntax_typ)?;
+                // // parse S::CS::AbstractNodeType
+                // let syntax_typ = parse_abstract_node_type::<S>(rest)?;
+                // // TODO: these functions should return errors. Something like Option<Result<>>, so that a Some() indicates "we're responsible for this op name", and a Some(Err())
+                // //  indicates "we are responsible, and we're telling you that this is an error".
+                // let node_type = S::convert_node_type(syntax_typ)?;
 
-            let marker = color_name.into();
-            Some(LibBuiltinOperation::MarkNode {
-                marker,
-                param: node_type,
-            })
+                // let marker = color_name.into();
+
+                let parser = {
+                    let color_name = select! {
+                        Token::Str(s) => s,
+                    };
+                    let syntax_node_type = S::CS::get_node_type_parser();
+                    let semantics_node_type = syntax_node_type.try_map_with(|syntax_type, e| {
+                        let node_type = S::convert_node_type(syntax_type.clone())
+                            .ok_or_else(|| {
+                                Rich::custom(e.span(), format!("Node type not supported: {syntax_type:?}"))
+                            })?;
+                        Ok(node_type)
+                    });
+                    let optional_node_type = just(Token::Ctrl(',')).ignore_then(semantics_node_type).or_not().try_map_with(|type_, e| {
+                        match type_ {
+                            Some(typ) => Ok(typ),
+                            None => S::top_node_abstract().ok_or(
+                                Rich::custom(e.span(), "No node type provided, and no top node abstract defined".to_string())
+                            ),
+                        }
+                    });
+                    color_name.then(optional_node_type)
+                };
+                let (color_name, node_type) = lex_then_parse(args_src, parser).change_context(
+                    InterpreterError::Custom("Failed to parse arguments for mark_node").with_span(args_span)
+                )?;
+
+
+                Ok(LibBuiltinOperation::MarkNode {
+                    marker: color_name.into(),
+                    param: node_type,
+                })
+            })();
+            match result {
+                Ok(op) => Some(Ok(op)),
+                Err(e) => Some(Err(e)),
+            }
         }
         "remove_marker" => {
             let args = args?;
-            let args_src = args.0;
+            let args_src = args.0.0;
             // parse something of the form: `"color_name"`
             let first_quote = args_src.find('"')?;
             let args_src = &args_src[first_quote + 1..];
@@ -65,7 +106,7 @@ fn find_lib_builtin_op<S: SemanticsWithCustomSyntax>(
             }
 
             let marker = color_name.into();
-            Some(LibBuiltinOperation::RemoveMarker { marker })
+            Some(Ok(LibBuiltinOperation::RemoveMarker { marker }))
         }
         _ => {
             // TODO: add more.
@@ -656,19 +697,20 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
 
     fn op_name_to_op_like(
         &self,
-        op_name: &str,
+        spanned_op_name: Spanned<&str>,
         args: Option<Spanned<MacroArgs>>,
         err_span: Span,
     ) -> Result<BuilderOpLike<S>, SpannedInterpreterError> {
         // TODO: do we want to enforce consumption of a Some(macro_args)?
 
-        // we don't care about the span
-        let args = args.map(|(args, _)| args);
-
         // first try lib builtin
-        if let Some(op) = find_lib_builtin_op::<S>(op_name, args) {
-            return Ok(BuilderOpLike::LibBuiltin(op));
+        if let Some(op) = find_lib_builtin_op::<S>(spanned_op_name, args) {
+            return Ok(BuilderOpLike::LibBuiltin(op?));
         }
+
+        // we don't care about the spans here yet
+        let args = args.map(|(args, _)| args);
+        let op_name = spanned_op_name.0;
 
         // then try client builtin
         if let Some(op) = S::find_builtin_op(op_name, args) {
@@ -729,7 +771,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let op_name = call_expr.name.0;
+        let op_name = call_expr.name;
         let macro_args = call_expr.macro_args;
 
         let op_like = self.op_name_to_op_like(op_name, macro_args, call_expr.name.1)?;

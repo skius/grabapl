@@ -125,6 +125,20 @@ pub trait Semantics {
     /// Queries are of this type
     type BuiltinQuery: BuiltinQuery<S = Self>;
 
+    /// Returns the top node of the abstract graph, if the semantics defines one.
+    /// This is mainly used for added ergonomics on LibBuiltinOperations, since they require explicit parameters.
+    /// If a semantics defines a top abstract node value, some of the LibBuiltinOperations can default to that abstract value.
+    fn top_node_abstract() -> Option<Self::NodeAbstract> {
+        None
+    }
+
+    /// Returns the top edge of the abstract graph, if the semantics defines one.
+    /// This is mainly used for added ergonomics on LibBuiltinOperations, since they require explicit parameters.
+    /// If a semantics defines a top abstract edge value, some of the LibBuiltinOperations can default to that abstract value.
+    fn top_edge_abstract() -> Option<Self::EdgeAbstract> {
+        None
+    }
+
     fn new_concrete_graph() -> ConcreteGraph<Self> {
         Graph::new()
     }
