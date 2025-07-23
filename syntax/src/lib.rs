@@ -6,7 +6,6 @@ use ariadne::{Color, Label, Report, ReportKind, sources};
 use chumsky::input::SliceInput;
 use chumsky::{input::ValueInput, prelude::*};
 use custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
-use grabapl::operation::builder::IntermediateState;
 use grabapl::operation::marker::SkipMarkers;
 use grabapl::prelude::{OperationContext, OperationId};
 use std::collections::{HashMap, HashSet};

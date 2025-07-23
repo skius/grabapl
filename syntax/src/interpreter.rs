@@ -4,7 +4,7 @@ use crate::{
     NodeId, Program, RenameStmt, ReturnStmt, ReturnStmtMapping, ShapeQueryParam, ShapeQueryParams,
     Span, Spanned, Statement, Token, lexer,
 };
-use chumsky::input::{IterInput, SliceInput, Stream, ValueInput};
+use chumsky::input::Stream;
 use chumsky::prelude::*;
 use error_stack::{Report, Result, ResultExt, report};
 use grabapl::operation::builder::IntermediateState;

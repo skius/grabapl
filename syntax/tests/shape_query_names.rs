@@ -1,6 +1,4 @@
-use grabapl::Semantics;
-use grabapl::prelude::run_from_concrete;
-use grabapl::semantics::example::{ExampleSemantics as TestSemantics, NodeValue};
+use grabapl::semantics::example::ExampleSemantics as TestSemantics;
 
 const SRC: &'static str = stringify!(
     fn test(

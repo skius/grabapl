@@ -3,9 +3,8 @@ use crate::custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
 use crate::interpreter::parse_abstract_node_type;
 use crate::{MacroArgs, Span, Token};
 use chumsky::error::Rich;
-use chumsky::input::ValueInput;
 use chumsky::prelude::*;
-use chumsky::{IterParser, Parser, extra, select};
+use chumsky::{Parser, extra, select};
 use grabapl::semantics::example_with_ref::{
     EdgeType, ExampleOperation, ExampleQuery, ExampleWithRefSemantics, NodeType, NodeValue,
 };

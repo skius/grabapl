@@ -4,7 +4,7 @@ mod example_with_ref;
 use crate::{MacroArgs, Span, Token};
 use chumsky::error::Rich;
 use chumsky::input::ValueInput;
-use chumsky::{IterParser, Parser, extra};
+use chumsky::{Parser, extra};
 use grabapl::Semantics;
 use std::fmt;
 use std::fmt::Debug;
