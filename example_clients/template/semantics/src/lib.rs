@@ -352,19 +352,19 @@ pub enum TheOperation {
     },
     /// Removes the argument node from the graph.
     ///
-    /// Signature: `(Any) -> ()`
+    /// Signature: `(input: Any) -> ()`
     RemoveNode,
     /// Appends the string contained in the second node value to the first node value.
     ///
-    /// Signature: `(String, String) -> ()`
+    /// Signature: `(first: String, second: String) -> ()`
     AppendSndToFst,
     /// Add the integer contained in the second node value to the first node value.
     ///
-    /// Signature: `(Integer, Integer) -> ()`
+    /// Signature: `(first: Integer, second: Integer) -> ()`
     AddSndToFst,
     /// Adds the constant to the argument node's value.
     ///
-    /// Signature: `(Integer) -> ()`
+    /// Signature: `(input: Integer) -> ()`
     AddConstant {
         /// The constant value to add to the first node value.
         constant: i32,
@@ -378,16 +378,20 @@ pub enum TheOperation {
     ///
     /// If the edge already exists, it is replaced with the new value.
     ///
-    /// Signature: `(Any, Any) -> ()`, adds an edge of the value's type between the two nodes.
+    /// Signature: `(first: Any, second: Any) -> ()`, adds an edge of the value's type between the two nodes.
     NewEdge {
         /// The edge's value.
         value: EdgeValue,
     },
     /// Removes the edge from the first node to the second node.
     ///
-    /// Signature: `(Any, Any) -> ()`, removes the edge between the two nodes.
+    /// Signature: `(from: Any, to: Any) -> ()`, removes the edge between the two nodes, if one exists.
     RemoveEdge,
-    // TODO: add extract edge value to node operation
+    /// Extracts the value from the edge between the first two nodes into the output node.
+    /// If the edge is a unit edge, the return node's value is 0.
+    ///
+    /// Signature: `(from: Any, to: Any, from -> to: Any) -> (value: Any)`, changes `value`'s specific type to the edge's specific type.
+    ExtractEdgeToNode
 }
 
 impl BuiltinOperation for TheOperation {
@@ -459,6 +463,18 @@ impl BuiltinOperation for TheOperation {
                 // then we could uncomment the following line:
                 // param_builder.expect_edge("from", "to", EdgeType::Any).unwrap();
             }
+            TheOperation::ExtractEdgeToNode => {
+                param_builder
+                    .expect_explicit_input_node("from", NodeType::Any)
+                    .unwrap();
+                param_builder
+                    .expect_explicit_input_node("to", NodeType::Any)
+                    .unwrap();
+                // this time we _must_ have an edge in order to extract its value.
+                param_builder
+                    .expect_edge("from", "to", EdgeType::Any)
+                    .unwrap();
+            }
         }
         // we `expect` here, because we know that our parameters should always be valid.
         param_builder.build().expect("Failed to build operation parameter")
@@ -493,25 +509,162 @@ impl BuiltinOperation for TheOperation {
                 // Now we tell the caller that we added a new node under the name "new". The name "some_name" is just a local placeholder for us.
                 local_names_to_output_names.insert("some_name".into(), "new".into());
             }
-            TheOperation::RemoveNode => {}
-            TheOperation::AppendSndToFst => {}
-            TheOperation::AddSndToFst => {}
-            TheOperation::AddConstant { .. } => {}
-            TheOperation::CopyValueFromTo => {}
-            TheOperation::NewEdge { .. } => {}
-            TheOperation::RemoveEdge => {}
+            TheOperation::RemoveNode => {
+                // We remove the node that is passed to the parameter we have called "input".
+                // Nodes from parameters (as opposed to newly added nodes within this method call) are indicated by `SubstMarker`.
+                g.delete_node(SubstMarker::from("input"));
+            }
+            TheOperation::AppendSndToFst => {
+                // Abstractly we don't do any changes here. The second node will still be a String node.
+            }
+            TheOperation::AddSndToFst => {
+                // Abstractly we don't do any changes here. The second node will still be an Integer node.
+            }
+            TheOperation::AddConstant { .. } => {
+                // Abstractly we don't do any changes here. The node will still be an Integer node.
+            }
+            TheOperation::CopyValueFromTo => {
+                // We know that in the concrete, we will copy the value from the first node to the second node.
+                // This means that the type from the first node will be valid to be used for the second node.
+                // Note: don't be confused by this function being called `get_node_*value*`.
+                // The "value" in the name is simply because the wrapper type is also used in the concrete graph,
+                // so it refers to [abstract] or [concrete] values, depending on the context.
+                // Note: We unwrap here, because we know the node must exist, since we have asked for it in the parameter.
+                let first_node_type = g.get_node_value(SubstMarker::from("first")).unwrap();
+                // We change the second node's type to the first node's type.
+                g.set_node_value(SubstMarker::from("second"), first_node_type.clone());
+            }
+            TheOperation::NewEdge { value } => {
+                // We add a new edge with the given value from the first node to the second node.
+                g.add_edge(SubstMarker::from("from"), SubstMarker::from("to"), value.to_type());
+                // Note that contrary to the `NewNode` operation, we do not need to return a new edge by name here,
+                // since an edge will always be unique between two nodes. Also, we cannot name edges directly.
+            }
+            TheOperation::RemoveEdge => {
+                // We remove the edge from the first node to the second node.
+                g.delete_edge(SubstMarker::from("from"), SubstMarker::from("to"));
+            }
+            TheOperation::ExtractEdgeToNode => {
+                // We extract the edge from the first node to the second node.
+                let edge_type = g.get_edge_value(SubstMarker::from("from"), SubstMarker::from("to")).unwrap();
+                let node_type = match edge_type {
+                    // We said () edges get turned into 0
+                    EdgeType::Unit | EdgeType::Integer => NodeType::Integer,
+                    EdgeType::ExactString(_) | EdgeType::String => NodeType::String,
+                    EdgeType::Any => NodeType::Any,
+                };
+                g.add_node("value", node_type);
+                local_names_to_output_names.insert("value".into(), "value".into());
+            }
         }
         g.get_abstract_output(local_names_to_output_names)
     }
 
+    /// Defines the operation's behavior on a concrete graph.
+    ///
+    /// This must always execute a 'subset of effects' of the [`TheOperation::apply_abstract`] method.
+    /// For example, if the abstract effect says that a node may receive a new integer value, then
+    /// we're not allowed to write a string to the node.
     fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>, concrete_data: &mut ConcreteData) -> OperationOutput {
-        todo!()
+        let mut local_names_to_output_names = HashMap::new();
+        match self {
+            TheOperation::NewNode { value } => {
+                // We add a new node with the given value to the graph.
+                g.add_node("some_name", value.clone());
+                // Now we tell the caller that we added a new node under the name "new". The name "some_name" is just a local placeholder for us.
+                // "new" must be the same name as we gave in the abstract operation.
+                local_names_to_output_names.insert("some_name".into(), "new".into());
+            }
+            TheOperation::RemoveNode => {
+                // We remove the node that is passed to the parameter we have called "input".
+                g.delete_node(SubstMarker::from("input"));
+            }
+            TheOperation::AppendSndToFst => {
+                // We append the second node's string value to the first node's string value.
+                let first_value = g.get_node_value(SubstMarker::from("first")).unwrap();
+                let second_value = g.get_node_value(SubstMarker::from("second")).unwrap();
+                if let (NodeValue::String(first), NodeValue::String(second)) = (first_value, second_value) {
+                    let new_value = format!("{}{}", first, second);
+                    g.set_node_value(SubstMarker::from("first"), NodeValue::String(new_value));
+                } else {
+                    log::error!("AppendSndToFst: expected both nodes to be strings, but got {:?} and {:?}", first_value, second_value);
+                }
+            }
+            TheOperation::AddSndToFst => {
+                // We add the second node's integer value to the first node's integer value.
+                let first_value = g.get_node_value(SubstMarker::from("first")).unwrap();
+                let second_value = g.get_node_value(SubstMarker::from("second")).unwrap();
+                if let (NodeValue::Integer(first), NodeValue::Integer(second)) = (first_value, second_value) {
+                    let new_value = first + second;
+                    g.set_node_value(SubstMarker::from("first"), NodeValue::Integer(new_value));
+                } else {
+                    log::error!("AddSndToFst: expected both nodes to be integers, but got {:?} and {:?}", first_value, second_value);
+                }
+            }
+            TheOperation::AddConstant { constant } => {
+                // We add the constant to the first node's integer value.
+                let input_value = g.get_node_value(SubstMarker::from("input")).unwrap();
+                if let NodeValue::Integer(input) = input_value {
+                    let new_value = input + constant;
+                    g.set_node_value(SubstMarker::from("input"), NodeValue::Integer(new_value));
+                } else {
+                    log::error!("AddConstant: expected input node to be an integer, but got {:?}", input_value);
+                }
+            }
+            TheOperation::CopyValueFromTo => {
+                // We copy the value from the first node to the second node.
+                let first_value = g.get_node_value(SubstMarker::from("first")).unwrap();
+                g.set_node_value(SubstMarker::from("second"), first_value.clone());
+            }
+            TheOperation::NewEdge { value } => {
+                // We add a new edge with the given value from the first node to the second node.
+                g.add_edge(SubstMarker::from("from"), SubstMarker::from("to"), value.clone());
+                // Note that contrary to the `NewNode` operation, we do not need to return a new edge by name here,
+                // since an edge will always be unique between two nodes. Also, we cannot name edges directly.
+            }
+            TheOperation::RemoveEdge => {
+                // We remove the edge from the first node to the second node.
+                g.delete_edge(SubstMarker::from("from"), SubstMarker::from("to"));
+            }
+            TheOperation::ExtractEdgeToNode => {
+                // We extract the edge from the first node to the second node.
+                let edge_value = g.get_edge_value(SubstMarker::from("from"), SubstMarker::from("to")).unwrap();
+                let node_value = match edge_value {
+                    EdgeValue::Unit => NodeValue::Integer(0), // unit edges are represented as 0
+                    EdgeValue::String(s) => NodeValue::String(s.clone()),
+                    EdgeValue::Integer(i) => NodeValue::Integer(*i),
+                };
+                g.add_node("value", node_value);
+                local_names_to_output_names.insert("value".into(), "value".into());
+            }
+        }
+        g.get_concrete_output(local_names_to_output_names)
     }
 }
 
+/// A value of this type represents a specific builtin query in the semantics.
+///
+/// For example, `TheQuery::IsEq(5)` represents a query that checks if a node's value is equal to 5.
+/// On the other hand, `TheQuery::Equal` is a singleton variant, because it checks if two nodes are equal without any additional parameters.
+///
+/// The implementation of such a specific builtin query is given in this type's implementation of the [`BuiltinQuery`] trait.
+/// See the documentation on each variant for more details on what the query checks and what its signature is.
+///
+/// For operations that are supposed to modify the graph and/or return new nodes or edges, see [`TheOperation`].
 #[derive(Debug, Clone)]
 pub enum TheQuery {
-
+    /// Checks if the node's value is equal to the given value.
+    ///
+    /// Signature: `(input: Any)`
+    IsEq {
+        /// The value to compare the node's value to.
+        value: NodeValue,
+    },
+    /// Checks if the two nodes are equal.
+    ///
+    /// Signature: `(first: Any, second: Any)`
+    Equal,
+    // TODO: add int comparison operators and maybe a string length operation?
 }
 
 impl BuiltinQuery for TheQuery {

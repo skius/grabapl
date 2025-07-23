@@ -1091,6 +1091,7 @@ name = "semantics"
 version = "0.1.0"
 dependencies = [
  "grabapl",
+ "log",
  "serde",
  "syntax",
 ]

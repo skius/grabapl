@@ -53,11 +53,13 @@ pub trait BuiltinOperation: Debug {
 /// Additional, global data that can be used and modified by operations.
 #[derive(Debug, Clone)]
 pub struct ConcreteData<'a> {
+    /// A set of markers that is natively used by shape queries.
     marker_set: &'a RefCell<MarkerSet>,
 }
 
 impl ConcreteData<'_> {
     pub fn marker_set_mut(&mut self) -> RefMut<MarkerSet> {
+        // note: self could be taken as &self, but there shouldn't be a situation where we don't have a mutable reference to ConcreteData.
         self.marker_set.borrow_mut()
     }
 

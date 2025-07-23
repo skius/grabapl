@@ -10,3 +10,5 @@ grabapl = { path = "../../../grabapl" }
 syntax = { path = "../../../syntax" }
 # in case we want to serialize and deserialize our operations
 serde = { version = "1.0", features = ["derive"] }
+# for logging
+log = "0.4"

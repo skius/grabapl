@@ -127,6 +127,7 @@ cargo check --target wasm32-unknown-unknown
 - [ ] Document the language core semantics itself
   - [ ] Document shape queries and link that to the template query docs
   - [ ] user defined operations, including abstract changes
+  - [ ] Document the different markers in use (substmarker, graphwithsubst markers, output markers, etc)
 - [ ] Document the syntax
 - [ ] Main entrypoint README
 - [ ] example template README
