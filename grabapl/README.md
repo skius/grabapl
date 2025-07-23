@@ -108,8 +108,25 @@ cargo check --target wasm32-unknown-unknown
   - [ ] NPM web client (javascript only) with some examples
     - [ ] Typescript?
       - won't update the existing demos to be typescript
+  - [ ] README, document cargo.toml and grabapl relative link
 - [ ] Document operation builder and what the function calls do
+- [ ] Document the semantics trait and the required associated type traits.
+  - [ ] semantics
+  - [ ] abstractgraph? 
+  - [ ] builtinop
+  - [ ] builtinquery
+  - [ ] Matcher
+  - [ ] Joiner
+  - [ ] ConcreteToAbstract
+  - [ ] GraphWithSubstitution
+  - [ ] OperationParameter and builder
+  - [ ] Signature
+  - [ ] ConcreteData
+  - [ ] (abstract) operation output
+  - [ ] ConcreteQueryOutput]
 - [ ] Document the language core semantics itself
+  - [ ] Document shape queries and link that to the template query docs
+  - [ ] user defined operations, including abstract changes
 - [ ] Document the syntax
 - [ ] Main entrypoint README
 - [ ] example template README

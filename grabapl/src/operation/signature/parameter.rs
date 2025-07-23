@@ -423,6 +423,7 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         &self,
         desired_node_output_names: HashMap<NewNodeMarker, AbstractOutputNodeMarker>,
     ) -> AbstractOperationOutput<S> {
+        // TODO: does this make sense? why would an operation abstractly add a node but then not return it?
         let (new_nodes, new_edges) =
             self.get_new_nodes_and_edges_from_desired_names(&desired_node_output_names);
 

@@ -722,6 +722,8 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
     ) -> Result<BuilderOpLike<S>, SpannedInterpreterError> {
         // TODO: do we want to enforce consumption of a Some(macro_args)?
 
+        // TODO: the order should be different. first: UDF, then builtin, then lib builtin.
+
         // first try lib builtin
         if let Some(op) = find_lib_builtin_op::<S>(spanned_op_name, args) {
             return Ok(BuilderOpLike::LibBuiltin(op?));

@@ -33,6 +33,8 @@ pub trait BuiltinOperation: Debug {
     type S: Semantics;
 
     /// The pattern to match against the graph.
+    // TODO: in theory we could have the apply_abstract function do what parameter is doing, if we wanted
+    //  to provide clients with more power to match the abstract graph against their parameter with more freedom.
     fn parameter(&self) -> OperationParameter<Self::S>;
 
     /// *If the operation argument matches*, what happens to the abstract graph?
