@@ -267,6 +267,7 @@ fn get_custom_op_new_node_in_shape_query_branches() -> UserDefinedOperation<Test
     builder
         .expect_shape_node("new".into(), NodeType::String)
         .unwrap();
+    // TODO: we will need an edge here.
 
     // True branch
     builder.enter_true_branch().unwrap();
@@ -289,10 +290,12 @@ fn get_custom_op_new_node_in_shape_query_branches() -> UserDefinedOperation<Test
 
     let output_aid = AbstractNodeId::DynamicOutputMarker("new".into(), "new".into());
     let res = builder.return_node(output_aid, "output".into(), NodeType::Object);
-    assert!(
-        res.is_err(),
-        "`output_aid` partially originates from a shape query, hence it may not be returned"
-    );
+    // UPDATE: we're allowed to return shape query nodes now
+    // assert!(
+    //     res.is_err(),
+    //     "`output_aid` partially originates from a shape query, hence it may not be returned"
+    // );
+    assert!(res.is_ok());
 
     builder.build().unwrap()
 }
@@ -369,7 +372,13 @@ fn new_node_from_both_branches_is_invisible_for_shape_query() {
     let state_after = builder.show_state().unwrap();
     let num_before = state_before.graph.nodes().count();
     let num_after = state_after.graph.nodes().count();
-    assert_eq!(num_after, num_before, "Expected no new nodes to be visible");
+    // UPDATE: we're allowed to return shape query nodes now, so the number of nodes should change by one
+    // assert_eq!(num_after, num_before, "Expected no new nodes to be visible");
+    assert_eq!(
+        num_after,
+        num_before + 1,
+        "Expected a new node to be visible"
+    );
 }
 
 // TODO: Add test for the "additive changes in the shape query true branch" header from problems-testcases.md
@@ -409,10 +418,13 @@ fn return_node_partially_from_shape_query_fails() {
 
         // Return the child node
         let res = builder.return_node(child_aid, "child".into(), NodeType::String);
-        assert!(
-            res.is_err(),
-            "Expected returning a node partially originating from a shape query to fail"
-        );
+        // UPDATE: returning a node from shape queries is now allowed
+        // assert!(
+        //     res.is_err(),
+        //     "Expected returning a node partially originating from a shape query to fail"
+        // );
+        assert!(res.is_ok());
+
         builder.build().unwrap()
     };
     op_ctx.add_custom_operation(0, helper_op);
@@ -445,13 +457,20 @@ fn return_node_partially_from_shape_query_fails() {
         .node_keys_to_aid
         .right_values()
         .collect::<HashSet<_>>();
+    // UPDATE: we're allowed to return shape query nodes now, so the number of nodes should change by one
+    // assert_eq!(
+    //     aids_before, aids_after,
+    //     "Expected no new nodes to be created in the graph"
+    // );
     assert_eq!(
-        aids_before, aids_after,
-        "Expected no new nodes to be created in the graph"
+        aids_after.len(),
+        aids_before.len() + 1,
+        "Expected a new node to be created in the graph"
     );
 
-    if false {
+    if true {
         // NOTE: this only exhibits the desired crash if the problem this test is checking against is not fixed.
+        // UPDATE: indeed ^ is fixed, since the shape query will not match against a 'visible' node. So the problem is fixed, and we can run this without crashes
 
         // for fun, see what happens when we delete the returned node and then try to use c0
         let returned_node = AbstractNodeId::DynamicOutputMarker("helper".into(), "child".into());
@@ -1345,11 +1364,13 @@ fn rename_nodes_and_merge_test() {
         "Expected node 'b' to be a merge of the two nodes with the same operation marker, but different output markers"
     );
     // assert that we cannot return these nodes
+    // UPDATE: we're allowed to return shape query nodes now
     let res = builder.return_node(b_aid.clone(), "b".into(), NodeType::Object);
-    assert!(
-        res.is_err(),
-        "Expected to not be able to return a renamed node that partially comes from a shape query",
-    );
+    // assert!(
+    //     res.is_err(),
+    //     "Expected to not be able to return a renamed node that partially comes from a shape query",
+    // );
+    assert!(res.is_ok());
 }
 
 #[test_log::test]
