@@ -27,11 +27,11 @@ fn foo(x: Int) -> (result: Int) {
 const editor = monaco.editor.create(document.getElementById('container'), {
     value: initialCode,
     language: 'rust',
-    theme: 'vs-dark', // A dark theme is often preferred for code
+    theme: 'vs-light',
     automaticLayout: true, // Ensures the editor resizes responsively
     minimap: { enabled: false },
-    roundedSelection: false,
-    scrollBeyondLastLine: false,
+    roundedSelection: true,
+    scrollBeyondLastLine: true,
 });
 window.editor = editor; // Expose editor for resizer script
 
