@@ -2964,6 +2964,8 @@ fn merge_states_result<S: Semantics>(
     //  ^ actually, we're doing that in interpret_graph_shape_query, so we don't need to do it here, I think.
 
     // check if either is diverged, if so, copy the other
+    // TODO: warning, if divergence can ever be 'recovered', then we need to make sure the effects of
+    //  the diverged branch are not lost _up to divergence point_.
     if state_true.has_diverged {
         return MergeStatesResult {
             merged_state: state_false.clone(),

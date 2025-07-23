@@ -628,7 +628,15 @@ function executeOperation(operationName, inputNodeNames) {
             let nodeKey = knownNewNode.key();
             let name = knownNewNode.name();
             let value = knownNewNode.value();
-            addNode(nodeKey, name, value);
+            // if "new node" is actually an existing, shape matched node, then we need to just update its name
+            let existingNode = interactiveNodes.find(n => n.nodeKey === nodeKey);
+            if (existingNode) {
+                existingNode.name = name; //Update name if it exists
+                existingNode.value = value; // Update value if it exists
+                newInteractiveNodes.push(existingNode); // Keep existing nodes
+            } else {
+                addNode(nodeKey, name, value);
+            }
         }
 
 
@@ -666,6 +674,9 @@ function executeOperation(operationName, inputNodeNames) {
                 } else {
                     // Update the value of the existing edge if it already exists
                     existingEdge.value = value;
+                    // also update the source and target nodes
+                    existingEdge.source = sourceNode;
+                    existingEdge.target = targetNode;
                     newInteractiveEdges.push(existingEdge);
                 }
             }
