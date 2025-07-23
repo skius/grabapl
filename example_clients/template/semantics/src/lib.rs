@@ -81,6 +81,9 @@
 //!
 //! For queries that are supposed to change the statically known abstract graph, see [TODO: link to GraphShapeQuery
 //!
+//! # Your Turn!
+//! Feel free to copy this crate and adjust it to your liking.
+//!
 //! [`grabapl`]: grabapl
 //! [refinement types]: https://en.wikipedia.org/wiki/Refinement_type
 
