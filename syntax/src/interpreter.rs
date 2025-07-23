@@ -4,7 +4,7 @@ use error_stack::{report, Report, Result, ResultExt};
 use grabapl::operation::marker::SkipMarkers;
 use grabapl::prelude::*;
 use std::collections::HashMap;
-use chumsky::input::{SliceInput, ValueInput};
+use chumsky::input::{IterInput, SliceInput, ValueInput, Stream};
 use thiserror::Error;
 use grabapl::operation::builder::IntermediateState;
 use crate::custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
@@ -390,17 +390,18 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             let args_src = args.0.0;
             let args_span = args.1;
             // must parse a double-quote delimited string.
-            let mut container = vec![];
-            let value_inpt = parse_with_lexer(args_src, &mut container).ok_or(report!(
-                InterpreterError::Custom("diverge requires a string argument")
-                    .with_span(args_span)
-            ))?;
-            let inner_msg = Parser::<_, _, extra::Default>::parse(&select! {
-                Token::Str(s) => s,
-            }, value_inpt).into_result().map_err(|_| report!(
-                InterpreterError::Custom("diverge requires a string argument")
-                    .with_span(args_span)
-            ))?;
+            // let mut container = vec![];
+            // let value_inpt = parse_with_lexer(args_src, &mut container).ok_or(report!(
+            //     InterpreterError::Custom("diverge requires a string argument")
+            //         .with_span(args_span)
+            // ))?;
+            // let inner_msg = Parser::<_, _, extra::Default>::parse(&select! {
+            //     Token::Str(s) => s,
+            // }, value_inpt).into_result().map_err(|_| report!(
+            //     InterpreterError::Custom("diverge requires a string argument")
+            //         .with_span(args_span)
+            // ))?;
+            let inner_msg = lex_then_parse(args_src, select! { Token::Str(s) => s }).change_context(InterpreterError::Custom("invalid diverge arguments").with_span(args_span))?;
             // now we can diverge
             self.builder.diverge(inner_msg).change_context(
                 InterpreterError::BuilderError.with_span(fn_call.0.name.1)
@@ -808,17 +809,37 @@ fn merge_node_aids<'a>(
 }
 
 // wow this is terrible
-fn parse_with_lexer<'container, 'src: 'container>(src: &'src str, container: &'container mut Vec<Spanned<Token<'src>>>) -> Option<impl ValueInput<'container, Token = Token<'src>, Span = Span> + SliceInput<
-    'container,
-    Token = Token<'src>,
-    Span = Span,
-    Slice = &'container [Spanned<Token<'src>>],
->>
-{
-    let toks = lexer().parse(src).into_result().ok()?;
-    container.extend(toks);
-    let toks_input = container
-        .map((src.len()..src.len()).into(), |(t, s)| (t, s));
-    Some(toks_input)
+// fn parse_with_lexer<'container, 'src: 'container>(src: &'src str, container: &'container mut Vec<Spanned<Token<'src>>>) -> Option<impl ValueInput<'container, Token = Token<'src>, Span = Span> + SliceInput<
+//     'container,
+//     Token = Token<'src>,
+//     Span = Span,
+//     Slice = &'container [Spanned<Token<'src>>],
+// >>
+// {
+//     let toks = lexer().parse(src).into_result().ok()?;
+//     container.extend(toks);
+//     let toks_input = container
+//         .map((src.len()..src.len()).into(), |(t, s)| (t, s));
+//     Some(toks_input)
+//
+// }
 
+
+
+// ugly inside, but much better outside I think
+fn lex_then_parse<'tokens, 'src: 'tokens, P, O>(src: &'src str, parser: P) -> std::result::Result<O, InterpreterError>
+where
+    P: Parser<'tokens, Stream<std::vec::IntoIter<Token<'src>>>, O, extra::Err<Rich<'tokens, Token<'src>, Span>>>,
+{
+    let tokens = lexer().parse(src).into_result().map_err(|e|
+        e.into_iter().map(|e| e.to_string()).collect::<Vec<_>>().join(" ")
+    ).map_err(InterpreterError::CustomOwned)?;
+    let tokens = tokens.into_iter().map(|(t, s)| t).collect::<Vec<_>>();
+    let input = Stream::from_iter(tokens.into_iter());
+    parser.parse(input).into_result().map_err(|e| {
+        e.into_iter()
+            .map(|e| e.to_string())
+            .collect::<Vec<_>>()
+            .join(" ")
+    }).map_err(InterpreterError::CustomOwned)
 }
