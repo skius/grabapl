@@ -368,6 +368,8 @@ pub enum OperationError {
     UnknownOutputNodeMarker(AbstractOutputNodeMarker),
     #[error("Unknown AID: {0:?}")]
     UnknownAID(AbstractNodeId),
+    #[error("user crash: {0}")]
+    UserCrash(String),
 }
 
 impl From<SubstitutionError> for OperationError {

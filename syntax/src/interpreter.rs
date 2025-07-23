@@ -1,13 +1,10 @@
-use crate::{
-    lexer, Block, FnCallExpr, FnDef, FnImplicitParam, FnNodeParam, IfCond, IfStmt,
-    LetStmt, MacroArgs, NodeId, Program, RenameStmt, ReturnStmt, ReturnStmtMapping,
-    ShapeQueryParam, ShapeQueryParams, Span, Spanned, Statement,
-};
+use crate::{lexer, Block, FnCallExpr, FnDef, FnImplicitParam, FnNodeParam, IfCond, IfStmt, LetStmt, MacroArgs, NodeId, Program, RenameStmt, ReturnStmt, ReturnStmtMapping, ShapeQueryParam, ShapeQueryParams, Span, Spanned, Statement, Token};
 use chumsky::prelude::*;
 use error_stack::{report, Report, Result, ResultExt};
 use grabapl::operation::marker::SkipMarkers;
 use grabapl::prelude::*;
 use std::collections::HashMap;
+use chumsky::input::{SliceInput, ValueInput};
 use thiserror::Error;
 use grabapl::operation::builder::IntermediateState;
 use crate::custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
@@ -93,6 +90,8 @@ pub enum InterpreterError {
     InvalidType(String),
     #[error("Error: {0}")]
     Custom(&'static str),
+    #[error("Error: {0}")]
+    CustomOwned(String),
 }
 
 impl InterpreterError {
@@ -198,6 +197,7 @@ struct FnInterpreter<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> {
     return_marker_to_av: HashMap<&'src str, S::NodeAbstract>,
     state_map: HashMap<String, IntermediateState<S>>,
     shape_query_counter: u64,
+    current_path_diverged: bool,
 }
 
 impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'op_ctx, S> {
@@ -214,6 +214,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             return_marker_to_av: HashMap::new(),
             state_map: HashMap::new(),
             shape_query_counter: 0,
+            current_path_diverged: false,
         }
     }
 
@@ -337,21 +338,8 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             }
             Statement::FnCall(fn_call) => {
                 // println!("Interpreting function call: {:?}", fn_call);
-                // check if we're calling show();
-                if fn_call.0.name.0 == "show_state" {
-                    let arg_ident = fn_call.0.args.get(0)
-                        .ok_or(report!(
-                            InterpreterError::NotFoundNodeId("show_state requires an argument".to_string())
-                                .with_span(fn_call.0.name.1)
-                        ))?;
-                    let as_str = arg_ident.0.single().ok_or(report!(
-                        InterpreterError::Custom("needs a single node id for show_state")
-                            .with_span(arg_ident.1)
-                    ))?;
-                    let state = self.builder.show_state().change_context(
-                        InterpreterError::BuilderError.with_span(fn_call.0.name.1)
-                    )?;
-                    self.state_map.insert(as_str.to_string(), state);
+                if self.interpret_hardcoded(&fn_call)? {
+                    // if this was a hardcoded function call, we don't need to interpret it further
                     return Ok(());
                 }
 
@@ -370,6 +358,58 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             }
         }
         Ok(())
+    }
+
+    /// Returns if this was a hardcoded function call that was successfully interpreted
+    fn interpret_hardcoded(&mut self, fn_call: &Spanned<FnCallExpr<'src>>) -> Result<bool, SpannedInterpreterError> {
+        // check if we're calling show();
+        if fn_call.0.name.0 == "show_state" {
+            let arg_ident = fn_call.0.args.get(0)
+                .ok_or(report!(
+                            InterpreterError::NotFoundNodeId("show_state requires an argument".to_string())
+                                .with_span(fn_call.0.name.1)
+                        ))?;
+            let as_str = arg_ident.0.single().ok_or(report!(
+                        InterpreterError::Custom("needs a single node id for show_state")
+                            .with_span(arg_ident.1)
+                    ))?;
+            let state = self.builder.show_state().change_context(
+                InterpreterError::BuilderError.with_span(fn_call.0.name.1)
+            )?;
+            self.state_map.insert(as_str.to_string(), state);
+            return Ok(true);
+        }
+
+        if fn_call.0.name.0 == "diverge" {
+            // expect a string macro args
+            let args = fn_call.0.macro_args;
+            let args = args.ok_or(report!(
+                InterpreterError::Custom("diverge requires a string argument")
+                    .with_span(fn_call.0.name.1)
+            ))?;
+            let args_src = args.0.0;
+            let args_span = args.1;
+            // must parse a double-quote delimited string.
+            let mut container = vec![];
+            let value_inpt = parse_with_lexer(args_src, &mut container).ok_or(report!(
+                InterpreterError::Custom("diverge requires a string argument")
+                    .with_span(args_span)
+            ))?;
+            let inner_msg = Parser::<_, _, extra::Default>::parse(&select! {
+                Token::Str(s) => s,
+            }, value_inpt).into_result().map_err(|_| report!(
+                InterpreterError::Custom("diverge requires a string argument")
+                    .with_span(args_span)
+            ))?;
+            // now we can diverge
+            self.builder.diverge(inner_msg).change_context(
+                InterpreterError::BuilderError.with_span(fn_call.0.name.1)
+            )?;
+            self.current_path_diverged = true;
+            return Ok(true);
+        }
+
+        Ok(false)
     }
 
     fn interpret_rename(
@@ -398,6 +438,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
 
         // TODO: if queries could create nodes, this would need to be handled.
         let initial_nodes = self.single_node_aids.clone();
+        let initial_diverged = self.current_path_diverged;
 
         let rename_instructions_then_branch = self.interpret_if_cond_and_start(if_stmt.cond)?;
 
@@ -415,6 +456,8 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             .attach_printable_lazy(|| "Failed to enter false branch")?;
 
         let true_branch_aids = std::mem::replace(&mut self.single_node_aids, initial_nodes);
+        let true_branch_diverged = self.current_path_diverged;
+        self.current_path_diverged = initial_diverged;
 
         // interpret the false branch
         self.interpret_block(if_stmt.else_block)?;
@@ -423,7 +466,8 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             .change_context(InterpreterError::BuilderError.with_span(if_stmt_span))
             .attach_printable_lazy(|| "Failed to end query")?;
 
-        self.single_node_aids = merge_node_aids(&true_branch_aids, &self.single_node_aids);
+        let false_branch_diverged = self.current_path_diverged;
+        (self.single_node_aids, self.current_path_diverged) = merge_node_aids(&true_branch_aids, true_branch_diverged, &self.single_node_aids, false_branch_diverged);
         Ok(())
     }
 
@@ -737,10 +781,21 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
 }
 
 // merges entries only if they're the same in both maps
+/// Returns the merged single nodes and whether the merged paths diverged
 fn merge_node_aids<'a>(
     true_branch: &HashMap<&'a str, AbstractNodeId>,
+    true_diverged: bool,
     false_branch: &HashMap<&'a str, AbstractNodeId>,
-) -> HashMap<&'a str, AbstractNodeId> {
+    false_diverged: bool,
+) -> (HashMap<&'a str, AbstractNodeId>, bool) {
+    // if either branch diverged, just return the nodes from the other branch
+    if true_diverged {
+        return (false_branch.clone(), false_diverged);
+    }
+    if false_diverged {
+        return (true_branch.clone(), true_diverged);
+    }
+
     let mut merged = HashMap::new();
     for (name, aid) in true_branch.iter() {
         if let Some(false_aid) = false_branch.get(name) {
@@ -749,5 +804,21 @@ fn merge_node_aids<'a>(
             }
         }
     }
-    merged
+    (merged, false)
+}
+
+// wow this is terrible
+fn parse_with_lexer<'container, 'src: 'container>(src: &'src str, container: &'container mut Vec<Spanned<Token<'src>>>) -> Option<impl ValueInput<'container, Token = Token<'src>, Span = Span> + SliceInput<
+    'container,
+    Token = Token<'src>,
+    Span = Span,
+    Slice = &'container [Spanned<Token<'src>>],
+>>
+{
+    let toks = lexer().parse(src).into_result().ok()?;
+    container.extend(toks);
+    let toks_input = container
+        .map((src.len()..src.len()).into(), |(t, s)| (t, s));
+    Some(toks_input)
+
 }

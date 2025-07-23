@@ -237,6 +237,15 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
                 // push it onto the stack
                 builder.push_frame(shape_query_frame);
             }
+            BI::Diverge(msg) => {
+                this.current_state.diverge();
+                this.instructions.push((
+                    None,
+                    Instruction::Diverge {
+                        crash_message: msg.to_string(),
+                    },
+                ));
+            }
             _ => {
                 bail_unexpected_instruction!(
                     instruction,
@@ -1784,6 +1793,10 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
             output_marker.into(),
             node,
         ))
+    }
+
+    pub fn diverge(&mut self, message: impl Into<String>) -> Result<(), OperationBuilderError> {
+        self.push_instruction(BuilderInstruction::Diverge(message.into()))
     }
 
     // TODO: This should run further post processing checks.

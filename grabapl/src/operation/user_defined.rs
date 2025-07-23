@@ -216,6 +216,10 @@ pub enum Instruction<S: Semantics> {
     ForgetAid {
         aid: AbstractNodeId,
     },
+    /// Crashes the operation with a message.
+    Diverge {
+        crash_message: String,
+    }
 }
 
 impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Instruction<S> {
@@ -233,6 +237,9 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Instr
                 new: *new,
             },
             Instruction::ForgetAid { aid } => Instruction::ForgetAid { aid: *aid },
+            Instruction::Diverge { crash_message } => Instruction::Diverge {
+                crash_message: crash_message.clone(),
+            },
         }
     }
 }
@@ -482,6 +489,9 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
                                 format!("Cannot forget aid {aid:?}, since it is not in the mapping: {:#?}", self.abstract_to_concrete)
                             });
                     }
+                }
+                Instruction::Diverge { crash_message } => {
+                    return Err(report!(OperationError::UserCrash(crash_message.clone())));
                 }
             }
         }

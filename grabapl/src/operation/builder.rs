@@ -30,6 +30,7 @@ use std::marker::PhantomData;
 use std::mem;
 use std::slice::Iter;
 use thiserror::Error;
+use crate::util::log;
 
 mod programming_by_demonstration;
 pub mod stack_based_builder;
@@ -189,6 +190,10 @@ pub enum BuilderInstruction<S: Semantics> {
     /// Asserts that the current operation will return a node with the given abstract value and name.
     #[debug("SelfReturnNode({_0:?}, ???)")]
     SelfReturnNode(AbstractOutputNodeMarker, S::NodeAbstract),
+    /// Diverge with a crash message.
+    /// Has a static effect: The branch is considered to never return, hence merges will always take the other branch.
+    #[debug("Diverge({_0})")]
+    Diverge(String),
 }
 
 impl<S: Semantics> BuilderInstruction<S> {
@@ -239,6 +244,7 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Build
             RenameNode(old_aid, new_name) => RenameNode(old_aid.clone(), new_name.clone()),
             Finalize => Finalize,
             SelfReturnNode(marker, node) => SelfReturnNode(marker.clone(), node.clone()),
+            Diverge(msg) => Diverge(msg.clone()),
         }
     }
 }
@@ -1441,6 +1447,8 @@ pub struct IntermediateState<S: Semantics> {
     pub query_path: Vec<QueryPath>,
 
     pub op_marker_counter: u64,
+
+    pub has_diverged: bool,
 }
 
 // TODO: unfortunately, we cannot derive Clone, since it implies a `S: Clone` bound.
@@ -1456,6 +1464,7 @@ impl<S: Semantics> Clone for IntermediateState<S> {
             edge_may_be_written_to: self.edge_may_be_written_to.clone(),
             query_path: self.query_path.clone(),
             op_marker_counter: self.op_marker_counter,
+            has_diverged: self.has_diverged,
         }
     }
 }
@@ -1471,6 +1480,7 @@ impl<S: Semantics> IntermediateState<S> {
             edge_may_be_written_to: HashMap::new(),
             query_path: Vec::new(),
             op_marker_counter: 50000,
+            has_diverged: false,
         }
     }
 
@@ -1493,6 +1503,7 @@ impl<S: Semantics> IntermediateState<S> {
             edge_may_be_written_to: HashMap::new(),
             query_path: Vec::new(),
             op_marker_counter: 50000,
+            has_diverged: false,
         }
     }
 
@@ -1637,6 +1648,13 @@ impl<S: Semantics> IntermediateState<S> {
         Ok(())
     }
 
+    fn diverge(&mut self) {
+        // set our diverged flag
+        if !self.has_diverged {
+            self.has_diverged = true;
+        }
+    }
+
     /// Returns the abstract changes from applying the op as well as the new AIDs
     fn interpret_op(
         &mut self,
@@ -1645,6 +1663,10 @@ impl<S: Semantics> IntermediateState<S> {
         op: AbstractOperation<S>,
         args: Vec<AbstractNodeId>,
     ) -> Result<(AbstractOperationArgument, IntermediateStateAbstractOutputResult), OperationBuilderError> {
+        // if we've diverged, issue a warning
+        if self.has_diverged {
+            log::warn!("Trying to issue new instruction with name {marker:?} after path has diverged. This may lead to unexpected results regarding available node names.");
+        }
         let param = op.parameter();
         let (subst, abstract_arg) = self.get_substitution(&param, args)?;
 
@@ -2940,6 +2962,26 @@ fn merge_states_result<S: Semantics>(
 ) -> MergeStatesResult<S> {
     // TODO: handle `is_true_shape`.
     //  ^ actually, we're doing that in interpret_graph_shape_query, so we don't need to do it here, I think.
+
+    // check if either is diverged, if so, copy the other
+    if state_true.has_diverged {
+        return MergeStatesResult {
+            merged_state: state_false.clone(),
+            // everything from true is "missing". these IDs will get a ForgetAid inserted into the true branch.
+            // since true has diverged, that shouldn't be a problem.
+            missing_from_true: state_true.node_keys_to_aid.right_values().copied().collect(),
+            missing_from_false: HashSet::new(),
+        };
+    }
+    if state_false.has_diverged {
+        return MergeStatesResult {
+            merged_state: state_true.clone(),
+            // everything from false is "missing". these IDs will get a ForgetAid inserted into the false branch.
+            // since false has diverged, that shouldn't be a problem.
+            missing_from_true: HashSet::new(),
+            missing_from_false: state_false.node_keys_to_aid.right_values().copied().collect(),
+        };
+    }
 
     let mut new_state = IntermediateState::new();
 
