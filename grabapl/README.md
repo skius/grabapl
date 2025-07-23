@@ -51,7 +51,7 @@ cargo check --target wasm32-unknown-unknown
 - [x] Recursion actually CAN add nodes! Add a test for this (if cond { return 0 } else { return recurse() })
 - [x] Fix web demo (builder now needs an ID in the beginning)
 - [ ] build operations from Sverrir's studies
-- [ ] Shape hidden: If we exit a scope and some abstract node ID falls out of scope, then that node should not be shape-hidden anymore.
+- [x] Shape hidden: If we exit a scope and some abstract node ID falls out of scope, then that node should not be shape-hidden anymore.
   - [ ] Add a test for this. (eg if shape [child] { .. } .. if shape [child] { .. }  should be entered for both branches if the child from the first query is not raised ('merged') to the outer scope)
 - [ ] Node bloat: Scope: the pattern of let! res = .., then filling res with something in true/false is bad, since res will be overwritten
   - Delete unconnected, unreturned nodes from the concrete graph after every operation?
@@ -61,7 +61,9 @@ cargo check --target wasm32-unknown-unknown
 - [ ] Research incremental interpreters/parsers? that show partial type info like local variables?
 - [ ] Include telegram messages
 - [ ] Forget instruction for shape queries
-- [ ] Edge orders
+  - Exists semantically, can be implemented via a UDOp that maybe deletes a node, but in practice never enters the branch where the node would be deleted.
+- [x] ~~Edge orders~~
+  - Nope! markers and hiding them in shape queries is powerful enough and more readable.
 - [ ] "is callable" function to determine which operations of operation context can be called!
 - [ ] Temporary nodes
   - [ ] Temp nodes could be marked as temp _at result point_, i.e., after an operation is called
