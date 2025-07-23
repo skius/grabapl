@@ -105,6 +105,7 @@ cargo check --target wasm32-unknown-unknown
   - [ ] FFI library + docs, exposing everything
   - [ ] NPM web client (javascript only) with some examples
     - [ ] Typescript?
+      - won't update the existing demos to be typescript
 - [ ] Document operation builder and what the function calls do
 - [ ] Document the language core semantics itself
 - [ ] Document the syntax
