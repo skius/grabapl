@@ -629,6 +629,8 @@ function executeOperation(operationName, inputNodeNames) {
             let name = knownNewNode.name();
             let value = knownNewNode.value();
             // if "new node" is actually an existing, shape matched node, then we need to just update its name
+            // NOTE: this is a special case we only need to handle here, in the _concrete_ setting,
+            //  since abstractly a returned node can never already exist in the abstract graph.
             let existingNode = interactiveNodes.find(n => n.nodeKey === nodeKey);
             if (existingNode) {
                 existingNode.name = name; //Update name if it exists
