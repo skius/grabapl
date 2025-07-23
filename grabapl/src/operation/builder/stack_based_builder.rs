@@ -1,6 +1,6 @@
 use crate::operation::builder::{
     BuilderInstruction, BuilderOpLike, IntermediateState, OperationBuilderError, QueryPath,
-    UDInstructionsWithMarker, merge_states, merge_states_result,
+    UDInstructionsWithMarker, merge_states_result,
 };
 use crate::operation::signature::parameter::{AbstractOutputNodeMarker, OperationParameter};
 use crate::operation::signature::parameterbuilder::OperationParameterBuilder;

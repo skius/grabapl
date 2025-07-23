@@ -9,10 +9,8 @@ use crate::prelude::*;
 use crate::semantics::*;
 use derive_more::From;
 use serde::{Deserialize, Serialize};
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ops::Deref;
-use std::str::FromStr;
 
 pub struct ExampleSemantics;
 
