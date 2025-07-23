@@ -1,4 +1,3 @@
-
 use grabapl::semantics::example_with_ref::{ExampleWithRefSemantics as TheSemantics, NodeValue};
 
 fn node_value_to_string(value: &NodeValue) -> String {
