@@ -11,7 +11,15 @@ use grabapl::semantics::example_with_ref::{*, ExampleWithRefSemantics as TestSem
 use util::semantics::helpers;
 use util::shrink_outer_first_extension::StrategyOutsideFirstExtension;
 
-fn get_ops() -> (
+// fn get_ops() -> (
+//     OperationContext<TestSemantics>,
+//     HashMap<&'static str, OperationId>,
+// ) {
+//     get_ops_manual_ref()
+//     // get_ops_magic_ref()
+// }
+
+fn get_ops_magic_ref() -> (
     OperationContext<TestSemantics>,
     HashMap<&'static str, OperationId>,
 ) {
@@ -342,8 +350,16 @@ fn test_bfs(
 }
 
 #[test_log::test]
-fn diamond_shape_bfs() {
-    let (op_ctx, fn_map) = get_ops();
+fn diamond_shape_bfs_magic() {
+    diamond_shape_bfs_inner(get_ops_magic_ref())
+}
+
+#[test_log::test]
+fn diamond_shape_bfs_manual() {
+    diamond_shape_bfs_inner(get_ops_manual_ref())
+}
+
+fn diamond_shape_bfs_inner((op_ctx, fn_map): (OperationContext<TestSemantics>, HashMap<&'static str, OperationId>)) {
     let mut g = TestSemantics::new_concrete_graph();
     // build a diamond shape graph
     let n0 = g.add_node(NodeValue::Integer(0));
@@ -361,8 +377,16 @@ fn diamond_shape_bfs() {
 }
 
 #[test_log::test]
-fn edge_case_bfs() {
-    let (op_ctx, fn_map) = get_ops();
+fn edge_case_bfs_magic() {
+    edge_case_bfs_inner(get_ops_magic_ref())
+}
+
+#[test_log::test]
+fn edge_case_bfs_manual() {
+    edge_case_bfs_inner(get_ops_manual_ref())
+}
+
+fn edge_case_bfs_inner((op_ctx, fn_map): (OperationContext<TestSemantics>, HashMap<&'static str, OperationId>)) {
     let mut g = TestSemantics::new_concrete_graph();
     // build a diamond shape graph with legs
     let n0 = g.add_node(NodeValue::Integer(0));
@@ -384,13 +408,20 @@ fn edge_case_bfs() {
     test_bfs(&op_ctx, &fn_map, &mut g, n0);
 }
 
+#[test_log::test]
+#[test_log(default_log_filter = "warn")]
+fn proptest_bfs_magic() {
+    proptest_bfs_inner(get_ops_magic_ref());
+}
 
 #[test_log::test]
 #[test_log(default_log_filter = "warn")]
-fn proptest_bfs() {
-    // Generate a random graph and test BFS on it
-    let (op_ctx, fn_map) = get_ops();
+fn proptest_bfs_manual() {
+    proptest_bfs_inner(get_ops_manual_ref());
+}
 
+fn proptest_bfs_inner((op_ctx, fn_map): (OperationContext<TestSemantics>, HashMap<&'static str, OperationId>)) {
+    // Generate a random graph and test BFS on it
     proptest!(
         Config { cases: 10, max_shrink_iters: 100, ..Config::default() },
         |((node_vals, edge_gen) in proptest::collection::vec(any::<i32>(), 0..=10).proptest_flat_map_outside_first(|nodes| {
@@ -423,5 +454,186 @@ fn proptest_bfs() {
 
             // assert!(false);
         }
+    )
+}
+
+
+fn get_ops_manual_ref() -> (
+    OperationContext<TestSemantics>,
+    HashMap<&'static str, OperationId>,
+) {
+    syntax::grabapl_parse!(TestSemantics,
+        // -------- BFS with Queue --------
+        /*
+        Idea is just like a regular BFS algorithm:
+        1. Queue of unprocessed nodes.
+        2. Pop an unvisited node (with *manual* checked node references!) from the queue
+            a. Add it to the result list.
+            b. Mark it as visited.
+            c. Add all its children to the queue.
+        3. Repeat until the queue is empty.
+        */
+
+
+        fn bfs(start_node: Integer) -> (head: Object) {
+            let! head = mk_list();
+            let! queue = mk_queue();
+
+            // BFS queue initialization: we start with `start_node`.
+            push_queue_by_ref(queue, start_node);
+            // need to hide start_node from the abstract graph, since otherwise we will not be able to pop it from the queue, since it is shape-hidden.
+            // (if a node is hidden from the abstract graph, that means it is *not* hidden from shape queries)
+            hide_node(start_node);
+
+            bfs_helper(queue, head);
+
+            // the queue is not needed anymore.
+            remove_node(queue);
+
+            return (head: head);
+        }
+
+        // BFS helper: recurses until the queue is empty.
+        fn bfs_helper(queue: Object, list: Object) {
+            let! is_empty_res = queue_empty(queue);
+            if is_eq<0>(is_empty_res) {
+                // the queue is not empty.
+
+                let! attach = pop_queue(queue);
+                // now we need to shape query for `next`. Shape querying is necessary to ensure
+                // we don't get a reference to a node that is already in the abstract graph (i.e., to avoid aliasing).
+                if shape [
+                    next: Int,
+                    attach -> next: "attached"
+                ] skipping ["visited"] {
+                    // in addition, we can directly check if `next` is already visited, and if so, skip it!
+
+                    // if it's not visited already, we add it to our BFS result list
+                    list_insert_by_copy(list, next);
+                    // then mark it as visited
+                    mark_node<"visited", Int>(next);
+                    // and lastly, we need to add all children of this node to the queue
+                    //  note: if we want to a void unnecessarily adding already visited children that would just get skipped in the shape query above,
+                    //  we can check _at insertion time_ if the child is already visited and skip it if so.
+                    insert_children_into_queue_by_ref(next, queue);
+                }
+                // we do some cleanup
+                remove_node(attach);
+
+                // since the queue was not empty we try again
+                bfs_helper(queue, list);
+            }
+            // cleanup
+            remove_node(is_empty_res);
+        }
+
+        // inserts all children of the parent node into the queue.
+        fn insert_children_into_queue_by_ref(parent: Integer, queue: Object) {
+            if shape [
+                child: Integer,
+                parent -> child: *,
+            ] /*skipping ["visited"] -- NOTE: uncommenting this is an optional optimization*/ {
+                push_queue_by_ref(queue, child);
+                // try to find more children
+                insert_children_into_queue_by_ref(parent, queue);
+            }
+        }
+
+        fn hide_node(node: Object) {
+            let! one = add_node<int,1>();
+            if is_eq<0>(one) {
+                // statically 'maybe' delete the node, but in practice this is never executed.
+                remove_node(node);
+            }
+            remove_node(one);
+        }
+
+        // The FIFO queue
+
+        fn mk_queue() -> (head: Object) {
+            let! head = add_node<int,0>();
+            return (head: head);
+        }
+
+        // return value = 0: non-empty, >0: empty
+        fn queue_empty(head: Object) -> (is_empty: Integer) {
+            let! res = add_node<int,1>();
+            // check if the queue is empty
+            if shape [
+                next: Object,
+                head -> next: *,
+            ] {
+                // set res to false by decrementing if we have a next node
+                decrement(res);
+            }
+            return (is_empty: res);
+        }
+
+        // Returns a node that potentially has attached to it a value of the BFS graph.
+        fn pop_queue(head: Object) -> (value: Int) {
+            // remove the first element from the queue
+            if shape [
+                fst: Int,
+                snd: Int,
+                head -> fst: "queue_next",
+                fst -> snd: "queue_next",
+            ] {
+                // remove the edge from head to fst and fst to snd
+                remove_edge(head, fst);
+                remove_edge(fst, snd);
+                add_edge<"queue_next">(head, snd);
+                // return fst
+                res <- fst;
+            } else if shape [
+                fst: Int,
+                head -> fst: "queue_next"
+            ] {
+                remove_edge(head, fst);
+                res <- fst;
+            } else {
+                // if we don't match any children, we need some form of base-case result. we just create a dangling reference here.
+                let! res = add_node<int,-9999>();
+            }
+            return (value: res);
+        }
+
+        fn push_queue_by_ref(head: Object, value: Int) {
+            let! ref_node = add_node<int,0>();
+            add_edge<"attached">(ref_node, value);
+            push_queue_helper_linking(head, ref_node);
+        }
+
+        // links the given node to the end of the queue.
+        fn push_queue_helper_linking(curr: Object, node_to_insert: Int) {
+            if shape [
+                next: Object,
+                curr -> next: "queue_next",
+            ] {
+                push_queue_helper_linking(next, node_to_insert);
+            } else {
+                // we're at the tail of the queue
+                add_edge<"queue_next">(curr, node_to_insert);
+            }
+        }
+
+        fn mk_list() -> (head: Object) {
+            let! head = add_node<int,42>();
+            return (head: head);
+        }
+
+        fn list_insert_by_copy(head: Object, value: Integer) {
+            if shape [
+                child: Integer,
+                head -> child: *,
+            ] {
+                list_insert_by_copy(child, value);
+            } else {
+                // we're at the tail
+                let! new_node = add_node<int,0>();
+                copy_value_from_to(value, new_node);
+                add_edge<"next">(head, new_node);
+            }
+        }
+
     )
 }
