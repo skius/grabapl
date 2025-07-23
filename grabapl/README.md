@@ -95,3 +95,6 @@ cargo check --target wasm32-unknown-unknown
       - has the name of the operation, as well as the parts of the concrete graph that were passed to it as argument colored. context: light blue, param: dark blue
 - [ ] VF2++ for faster isomorphisms? https://lemon.cs.elte.hu/trac/lemon/browser/lemon/lemon/vf2pp.h
 - [ ] concrete graph dot parsing using dot_parser crate
+- [ ] Shape query skipping marker: should work on ExpectShapeNode*Change*, i.e., if we have a skipping "visited" 
+      and an in-scope node with that marker on it, then the change shape query should not enter. 
+      (It would still have the node in scope though.)
