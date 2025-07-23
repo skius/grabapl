@@ -7,8 +7,8 @@ use std::collections::{HashMap, HashSet};
 
 mod util;
 use test_log::test;
-use util::semantics::*;
 use util::semantics::helpers;
+use util::semantics::*;
 use util::shrink_outer_first_extension::StrategyOutsideFirstExtension;
 
 fn get_ops() -> (

@@ -5,9 +5,9 @@
 //! Reminder: A binary search tree is a tree where for each node, all the values in the left subtree are smaller, and
 //! all the values in the right subtree are greater than the node's number value.
 
+use crate::util::semantics::{NodeValue, TestSemantics, helpers};
 use grabapl::prelude::*;
 use syntax::{grabapl_defs, grabapl_parse};
-use crate::util::semantics::{NodeValue, TestSemantics, helpers};
 
 grabapl_defs!(get_ops, TestSemantics,
     fn tree_serialize(root: Integer) -> (list: Integer) {
@@ -91,16 +91,18 @@ fn task3() {
     let list = res.new_nodes[&"list".into()];
     let values_with_sentinel = helpers::list_to_value_vec(&g, list);
     let values = &values_with_sentinel[1..]; // skip the sentinel node
-    assert_eq!(values, &[
-        NodeValue::Integer(1),
-        NodeValue::Integer(2),
-        NodeValue::Integer(3),
-        NodeValue::Integer(4),
-        NodeValue::Integer(5),
-        NodeValue::Integer(6),
-        NodeValue::Integer(7),
-        NodeValue::Integer(8),
-    ], "Serialized tree does not match expected order");
-
-
+    assert_eq!(
+        values,
+        &[
+            NodeValue::Integer(1),
+            NodeValue::Integer(2),
+            NodeValue::Integer(3),
+            NodeValue::Integer(4),
+            NodeValue::Integer(5),
+            NodeValue::Integer(6),
+            NodeValue::Integer(7),
+            NodeValue::Integer(8),
+        ],
+        "Serialized tree does not match expected order"
+    );
 }

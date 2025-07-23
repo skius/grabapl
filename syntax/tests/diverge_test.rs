@@ -1,7 +1,6 @@
 use grabapl::Semantics;
 use grabapl::prelude::run_from_concrete;
-use grabapl::semantics::example::{NodeValue, ExampleSemantics as TestSemantics};
-
+use grabapl::semantics::example::{ExampleSemantics as TestSemantics, NodeValue};
 
 const SRC: &'static str = stringify!(
     fn force_child(
@@ -22,8 +21,6 @@ const SRC: &'static str = stringify!(
 #[test]
 fn diverge_test() {
     let (op_ctx, fn_map) = syntax::parse_to_op_ctx_and_map::<TestSemantics>(SRC);
-
-
 
     // assert!(false);
 }

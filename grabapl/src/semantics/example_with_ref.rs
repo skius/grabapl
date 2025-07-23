@@ -2,18 +2,18 @@
 //!
 //! Defined here for easy reusability elsewhere without running into cyclic crate dependency issues.
 
-use derive_more::From;
+use crate::operation::ConcreteData;
+use crate::operation::query::ConcreteQueryOutput;
+use crate::operation::signature::parameter::{AbstractOperationOutput, OperationOutput};
 use crate::prelude::*;
+use crate::semantics::*;
+use crate::util::log;
+use derive_more::From;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::str::FromStr;
-use crate::operation::ConcreteData;
-use crate::operation::query::ConcreteQueryOutput;
-use crate::operation::signature::parameter::{AbstractOperationOutput, OperationOutput};
-use crate::semantics::*;
-use crate::util::log;
 
 pub struct ExampleWithRefSemantics;
 
@@ -190,7 +190,7 @@ pub enum ExampleOperation {
     //  Actually! We would get type safety if there's no "change type" operations. i.e., if write_str and write_int both require a node of correct type.
     ExtractRef {
         expected_inner_typ: NodeType,
-    }
+    },
 }
 
 impl BuiltinOperation for ExampleOperation {
@@ -302,15 +302,24 @@ impl BuiltinOperation for ExampleOperation {
             ExampleOperation::MakeRef => {
                 // We expect any node.
                 // TODO: node refs are not subtypes of object, so maybe this is too restrictive?
-                param_builder.expect_explicit_input_node("src", NodeType::Object).unwrap();
+                param_builder
+                    .expect_explicit_input_node("src", NodeType::Object)
+                    .unwrap();
             }
             ExampleOperation::ExtractRef { expected_inner_typ } => {
                 // we expect the reference node
                 // TODO: actually, we don't need to expect the expected inner type here,
                 //  what we want is to say "we expect a reference node of any type"
-                param_builder.expect_explicit_input_node("ref_node", NodeType::Ref(Box::new(expected_inner_typ.clone()))).unwrap();
+                param_builder
+                    .expect_explicit_input_node(
+                        "ref_node",
+                        NodeType::Ref(Box::new(expected_inner_typ.clone())),
+                    )
+                    .unwrap();
                 // and a node to which we will potentially attach the resulting node.
-                param_builder.expect_explicit_input_node("attach_to", NodeType::Object).unwrap();
+                param_builder
+                    .expect_explicit_input_node("attach_to", NodeType::Object)
+                    .unwrap();
             }
         }
         param_builder.build().unwrap()
@@ -409,7 +418,7 @@ impl BuiltinOperation for ExampleOperation {
                 g.add_node("result", NodeType::Ref(Box::new(src_type)));
                 new_node_names.insert("result".into(), "result".into());
             }
-            ExampleOperation::ExtractRef {..} => {
+            ExampleOperation::ExtractRef { .. } => {
                 // no abstract changes.
             }
         }
@@ -544,7 +553,9 @@ impl BuiltinOperation for ExampleOperation {
                     panic!("type unsoundness: expected a reference node value");
                 };
 
-                let attach_to_key = g.get_node_key(&SubstMarker::from("attach_to").into()).unwrap();
+                let attach_to_key = g
+                    .get_node_key(&SubstMarker::from("attach_to").into())
+                    .unwrap();
 
                 // TODO: check if node is shape hidden.
                 if g.graph.node_attr_map.contains_key(ref_node_key) {
@@ -556,15 +567,22 @@ impl BuiltinOperation for ExampleOperation {
                         // we match. (we allow subtypes: if the stored node is a Int, then a Ref(Obj) still works.
                         // TODO: check if shape hidden
                         // if not shape hidden:
-                        g.graph.add_edge(attach_to_key, *ref_node_key, "attached".to_string());
+                        g.graph
+                            .add_edge(attach_to_key, *ref_node_key, "attached".to_string());
                     } else {
-                        log::info!("ExtractRef operation: reference node key {:?} has type {:?}, expected subtype of {:?}", ref_node_key, actual_type, expected_inner_typ);
+                        log::info!(
+                            "ExtractRef operation: reference node key {:?} has type {:?}, expected subtype of {:?}",
+                            ref_node_key,
+                            actual_type,
+                            expected_inner_typ
+                        );
                     }
                 } else {
-                    log::info!("ExtractRef operation: reference node key {:?} does not exist in the graph, skipping attachment", ref_node_key);
+                    log::info!(
+                        "ExtractRef operation: reference node key {:?} does not exist in the graph, skipping attachment",
+                        ref_node_key
+                    );
                 }
-
-
             }
         }
         g.get_concrete_output(new_node_names)

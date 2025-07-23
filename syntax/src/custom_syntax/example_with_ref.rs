@@ -1,14 +1,16 @@
+use crate::custom_syntax::example::{CustomEdgeType, MyCustomSyntax, MyCustomType};
+use crate::custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
+use crate::interpreter::parse_abstract_node_type;
+use crate::{MacroArgs, Span, Token};
+use chumsky::error::Rich;
+use chumsky::input::ValueInput;
+use chumsky::prelude::*;
+use chumsky::{IterParser, Parser, extra, select};
+use grabapl::semantics::example_with_ref::{
+    EdgeType, ExampleOperation, ExampleQuery, ExampleWithRefSemantics, NodeType, NodeValue,
+};
 use std::cmp::Ordering;
 use std::str::FromStr;
-use chumsky::{extra, select, IterParser, Parser};
-use chumsky::error::Rich;
-use chumsky::prelude::*;
-use chumsky::input::ValueInput;
-use grabapl::semantics::example_with_ref::{EdgeType, ExampleOperation, ExampleQuery, ExampleWithRefSemantics, NodeType, NodeValue};
-use crate::custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
-use crate::{MacroArgs, Span, Token};
-use crate::custom_syntax::example::{CustomEdgeType, MyCustomSyntax, MyCustomType};
-use crate::interpreter::parse_abstract_node_type;
 // Hooking it up to ExampleWithRefSemantics:
 
 fn add_node_args_parser<'src>()
@@ -21,13 +23,11 @@ fn add_node_args_parser<'src>()
             )
         })?;
 
-        let node_typ_parser = MyCustomSyntax::get_node_type_parser()
-            .try_map_with(|custom_typ, e| ExampleWithRefSemantics::convert_node_type(custom_typ).ok_or_else(|| {
-                Rich::custom(
-                    e.span(),
-                    format!("node type not supported"),
-                )
-            }));
+        let node_typ_parser =
+            MyCustomSyntax::get_node_type_parser().try_map_with(|custom_typ, e| {
+                ExampleWithRefSemantics::convert_node_type(custom_typ)
+                    .ok_or_else(|| Rich::custom(e.span(), format!("node type not supported")))
+            });
         // let node_value_parser = select! {
         //     Token::Num(num) => NodeValue::Integer(num),
         // };
@@ -39,17 +39,17 @@ fn add_node_args_parser<'src>()
             Token::Str(s) => s,
         };
 
-        let node_value_parser =
-            just(Token::Ctrl('-'))
-                .or_not()
-                .then(num_parser)
-                .map(|(sign, num)| {
-                    if sign.is_some() {
-                        NodeValue::Integer(-num)
-                    } else {
-                        NodeValue::Integer(num)
-                    }
-                }).or(str_parser.map(|s| NodeValue::String(s.to_string())));
+        let node_value_parser = just(Token::Ctrl('-'))
+            .or_not()
+            .then(num_parser)
+            .map(|(sign, num)| {
+                if sign.is_some() {
+                    NodeValue::Integer(-num)
+                } else {
+                    NodeValue::Integer(num)
+                }
+            })
+            .or(str_parser.map(|s| NodeValue::String(s.to_string())));
 
         let tuple_parser = node_typ_parser
             .then_ignore(just(Token::Ctrl(',')))
@@ -112,7 +112,9 @@ impl SemanticsWithCustomSyntax for ExampleWithRefSemantics {
                 // must parse node type
                 let node_type = parse_abstract_node_type::<ExampleWithRefSemantics>(args_src)?;
                 let node_type = ExampleWithRefSemantics::convert_node_type(node_type)?;
-                Some(ExampleOperation::ExtractRef { expected_inner_typ: node_type })
+                Some(ExampleOperation::ExtractRef {
+                    expected_inner_typ: node_type,
+                })
             }
             _ => None,
         }
@@ -151,14 +153,15 @@ impl SemanticsWithCustomSyntax for ExampleWithRefSemantics {
                 "integer" | "int" => Some(NodeType::Integer),
                 "object" => Some(NodeType::Object),
                 "separate" => Some(NodeType::Separate),
-                _ => {
-                    None
-                }
+                _ => None,
             },
             MyCustomType::Custom(custom) => {
                 if custom.name.to_lowercase() == "ref" {
-                    if let [field] = custom.fields.as_slice() && field.name.to_lowercase() == "inner" {
-                        let inner_typ = ExampleWithRefSemantics::convert_node_type(field.typ.clone())?;
+                    if let [field] = custom.fields.as_slice()
+                        && field.name.to_lowercase() == "inner"
+                    {
+                        let inner_typ =
+                            ExampleWithRefSemantics::convert_node_type(field.typ.clone())?;
                         return Some(NodeType::Ref(Box::new(inner_typ)));
                     }
                 }

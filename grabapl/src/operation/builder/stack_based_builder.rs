@@ -1,4 +1,7 @@
-use crate::operation::builder::{BuilderInstruction, BuilderOpLike, IntermediateState, OperationBuilderError, QueryPath, UDInstructionsWithMarker, merge_states, merge_states_result};
+use crate::operation::builder::{
+    BuilderInstruction, BuilderOpLike, IntermediateState, OperationBuilderError, QueryPath,
+    UDInstructionsWithMarker, merge_states, merge_states_result,
+};
 use crate::operation::signature::parameter::{AbstractOutputNodeMarker, OperationParameter};
 use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
 use crate::operation::user_defined::{
@@ -282,12 +285,8 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
         ));
         // forget removed aids
         for aid in output_res.removed_aids {
-            self.instructions.push((
-                None,
-                Instruction::ForgetAid {
-                    aid: aid.clone(),
-                },
-            ));
+            self.instructions
+                .push((None, Instruction::ForgetAid { aid: aid.clone() }));
         }
 
         Ok(output_res.new_aids)
@@ -412,7 +411,8 @@ impl<S: Semantics> BranchesFrame<S> {
             .as_ref()
             .map(|cif| &cif.current_state)
             .unwrap_or(default_false_state);
-        let merge_result = merge_states_result(false, true_branch_state_ref, false_branch_state_ref);
+        let merge_result =
+            merge_states_result(false, true_branch_state_ref, false_branch_state_ref);
 
         // take into account the missing AIDs from the branches, and insert ForgetAid instructions
         let mut true_instructions = self
@@ -420,12 +420,7 @@ impl<S: Semantics> BranchesFrame<S> {
             .map(|cif| cif.instructions)
             .unwrap_or_default();
         for aid in merge_result.missing_from_true {
-            true_instructions.push((
-                None,
-                Instruction::ForgetAid {
-                    aid: aid.clone(),
-                },
-            ));
+            true_instructions.push((None, Instruction::ForgetAid { aid: aid.clone() }));
         }
 
         let mut false_instructions = self
@@ -433,12 +428,7 @@ impl<S: Semantics> BranchesFrame<S> {
             .map(|cif| cif.instructions)
             .unwrap_or_default();
         for aid in merge_result.missing_from_false {
-            false_instructions.push((
-                None,
-                Instruction::ForgetAid {
-                    aid: aid.clone(),
-                },
-            ));
+            false_instructions.push((None, Instruction::ForgetAid { aid: aid.clone() }));
         }
 
         let query_instructions = QueryInstructions {

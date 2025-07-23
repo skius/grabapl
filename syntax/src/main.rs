@@ -3,14 +3,14 @@
 //! Run it with the following command:
 //! cargo run --features="label" --example nano_rust -- examples/sample.nrs
 
-use ariadne::{sources, Color, Label, Report, ReportKind};
+use ariadne::{Color, Label, Report, ReportKind, sources};
 use chumsky::prelude::*;
 use std::{env, fs};
 
-use syntax::interpreter::interpret;
 use grabapl::semantics::example::ExampleSemantics;
-use syntax::*;
 use syntax::custom_syntax::example::MyCustomSyntax;
+use syntax::interpreter::interpret;
+use syntax::*;
 
 fn main() {
     // println!("{:?}", ascii_ident_fixed::<&str, extra::Err<Rich<char>>>().map(|x: &str| x).parse("field1").unwrap());
@@ -38,7 +38,9 @@ fn main() {
             println!("Parsed: {program:#?}");
             println!("interpreting...");
 
-            let (op_ctx, fns_to_ids) = interpret::<ExampleSemantics>(program).op_ctx_and_map.unwrap();
+            let (op_ctx, fns_to_ids) = interpret::<ExampleSemantics>(program)
+                .op_ctx_and_map
+                .unwrap();
 
             let json = serde_json::to_string_pretty(&op_ctx)
                 .expect("Failed to serialize operation context to JSON");

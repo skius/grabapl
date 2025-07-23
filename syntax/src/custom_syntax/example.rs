@@ -1,12 +1,14 @@
-use std::cmp::Ordering;
-use std::str::FromStr;
-use chumsky::{extra, select, IterParser, Parser};
-use chumsky::error::Rich;
-use chumsky::prelude::*;
-use chumsky::input::ValueInput;
-use grabapl::semantics::example::{EdgeType, ExampleOperation, ExampleQuery, ExampleSemantics, NodeType, NodeValue};
 use crate::custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
 use crate::{MacroArgs, Span, Token};
+use chumsky::error::Rich;
+use chumsky::input::ValueInput;
+use chumsky::prelude::*;
+use chumsky::{IterParser, Parser, extra, select};
+use grabapl::semantics::example::{
+    EdgeType, ExampleOperation, ExampleQuery, ExampleSemantics, NodeType, NodeValue,
+};
+use std::cmp::Ordering;
+use std::str::FromStr;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MyCustomSyntax;
@@ -102,55 +104,55 @@ impl CustomSyntax for MyCustomSyntax {
             let generics = select! {
                 Token::MacroArgs(s) => s,
             };
-            let struct_generics = generics.try_map_with(move |args, e| {
-                // // we need to parse `args` with the field_type parser.
-                // // for that we first need to tokenize args
-                // let args_toks = crate::lexer()
-                //     .parse(args)
-                //     .into_result()
-                //     .map_err(|errs| {
-                //         Rich::custom(
-                //             e.span(),
-                //             format!("Failed to parse generic arguments: {}, errs: {:?}", args, errs),
-                //         )
-                //     })?;
-                // field_type_copy.parse(args_toks.as_slice().map((args.len()..args.len()).into(), |(t, s)| (t, s)))
-                //     .into_result()
-                //     .map_err(|errs| {
-                //         Rich::custom(
-                //             e.span(),
-                //             format!("Failed to parse generic type: {}, errs: {:?}", args, errs),
-                //         )
-                //     })
+            let struct_generics = generics
+                .try_map_with(move |args, e| {
+                    // // we need to parse `args` with the field_type parser.
+                    // // for that we first need to tokenize args
+                    // let args_toks = crate::lexer()
+                    //     .parse(args)
+                    //     .into_result()
+                    //     .map_err(|errs| {
+                    //         Rich::custom(
+                    //             e.span(),
+                    //             format!("Failed to parse generic arguments: {}, errs: {:?}", args, errs),
+                    //         )
+                    //     })?;
+                    // field_type_copy.parse(args_toks.as_slice().map((args.len()..args.len()).into(), |(t, s)| (t, s)))
+                    //     .into_result()
+                    //     .map_err(|errs| {
+                    //         Rich::custom(
+                    //             e.span(),
+                    //             format!("Failed to parse generic type: {}, errs: {:?}", args, errs),
+                    //         )
+                    //     })
 
-                // welp. above doesn't compile. not sure why.
-                // for now, only support int
-                if args.to_lowercase() == "int" ||
-                    args.to_lowercase() == "integer" {
-                    Ok(MyCustomType::Primitive("int".to_string()))
-                } else {
-                    Err(Rich::custom(
-                        e.span(),
-                        format!("Unsupported generic type: {}", args),
-                    ))
-                }
-            }).map(|typ| {
-                vec![MyCustomStructField {
-                    name: "inner".to_string(),
-                    typ,
-                }]
-            });
-
-            let entire_struct = struct_name
-                .then(struct_braces.or(struct_generics))
-                .map(|(name, fields)| {
-                    MyCustomType::Custom(MyCustomStruct {
-                        name: name.to_string(),
-                        fields,
-                    })
+                    // welp. above doesn't compile. not sure why.
+                    // for now, only support int
+                    if args.to_lowercase() == "int" || args.to_lowercase() == "integer" {
+                        Ok(MyCustomType::Primitive("int".to_string()))
+                    } else {
+                        Err(Rich::custom(
+                            e.span(),
+                            format!("Unsupported generic type: {}", args),
+                        ))
+                    }
+                })
+                .map(|typ| {
+                    vec![MyCustomStructField {
+                        name: "inner".to_string(),
+                        typ,
+                    }]
                 });
 
-
+            let entire_struct =
+                struct_name
+                    .then(struct_braces.or(struct_generics))
+                    .map(|(name, fields)| {
+                        MyCustomType::Custom(MyCustomStruct {
+                            name: name.to_string(),
+                            fields,
+                        })
+                    });
 
             //
             // let field_type_copy = field_type.clone().boxed();
@@ -240,13 +242,11 @@ fn add_node_args_parser<'src>()
             )
         })?;
 
-        let node_typ_parser = MyCustomSyntax::get_node_type_parser()
-            .try_map_with(|custom_typ, e| ExampleSemantics::convert_node_type(custom_typ).ok_or_else(|| {
-                Rich::custom(
-                    e.span(),
-                    format!("node type not supported"),
-                )
-            }));
+        let node_typ_parser =
+            MyCustomSyntax::get_node_type_parser().try_map_with(|custom_typ, e| {
+                ExampleSemantics::convert_node_type(custom_typ)
+                    .ok_or_else(|| Rich::custom(e.span(), format!("node type not supported")))
+            });
         // let node_value_parser = select! {
         //     Token::Num(num) => NodeValue::Integer(num),
         // };
@@ -359,13 +359,9 @@ impl SemanticsWithCustomSyntax for ExampleSemantics {
                 "integer" | "int" => Some(NodeType::Integer),
                 "object" => Some(NodeType::Object),
                 "separate" => Some(NodeType::Separate),
-                _ => {
-                    None
-                }
+                _ => None,
             },
-            MyCustomType::Custom(_) => {
-                None
-            }
+            MyCustomType::Custom(_) => None,
         }
     }
 

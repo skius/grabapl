@@ -18,6 +18,7 @@ use crate::operation::{
 use crate::prelude::*;
 use crate::semantics::{AbstractGraph, AbstractMatcher};
 use crate::util::bimap::BiMap;
+use crate::util::log;
 use crate::{NodeKey, Semantics, SubstMarker};
 use error_stack::{FutureExt, Result, ResultExt, bail, report};
 use petgraph::dot;
@@ -30,7 +31,6 @@ use std::marker::PhantomData;
 use std::mem;
 use std::slice::Iter;
 use thiserror::Error;
-use crate::util::log;
 
 mod programming_by_demonstration;
 pub mod stack_based_builder;
@@ -1662,10 +1662,18 @@ impl<S: Semantics> IntermediateState<S> {
         marker: Option<AbstractOperationResultMarker>,
         op: AbstractOperation<S>,
         args: Vec<AbstractNodeId>,
-    ) -> Result<(AbstractOperationArgument, IntermediateStateAbstractOutputResult), OperationBuilderError> {
+    ) -> Result<
+        (
+            AbstractOperationArgument,
+            IntermediateStateAbstractOutputResult,
+        ),
+        OperationBuilderError,
+    > {
         // if we've diverged, issue a warning
         if self.has_diverged {
-            log::warn!("Trying to issue new instruction with name {marker:?} after path has diverged. This may lead to unexpected results regarding available node names.");
+            log::warn!(
+                "Trying to issue new instruction with name {marker:?} after path has diverged. This may lead to unexpected results regarding available node names."
+            );
         }
         let param = op.parameter();
         let (subst, abstract_arg) = self.get_substitution(&param, args)?;
@@ -2943,8 +2951,7 @@ fn merge_states<S: Semantics>(
     state_true: &IntermediateState<S>,
     state_false: &IntermediateState<S>,
 ) -> IntermediateState<S> {
-    merge_states_result(is_true_shape, state_true, state_false)
-        .merged_state
+    merge_states_result(is_true_shape, state_true, state_false).merged_state
 }
 
 struct MergeStatesResult<S: Semantics> {
@@ -2971,7 +2978,11 @@ fn merge_states_result<S: Semantics>(
             merged_state: state_false.clone(),
             // everything from true is "missing". these IDs will get a ForgetAid inserted into the true branch.
             // since true has diverged, that shouldn't be a problem.
-            missing_from_true: state_true.node_keys_to_aid.right_values().copied().collect(),
+            missing_from_true: state_true
+                .node_keys_to_aid
+                .right_values()
+                .copied()
+                .collect(),
             missing_from_false: HashSet::new(),
         };
     }
@@ -2981,7 +2992,11 @@ fn merge_states_result<S: Semantics>(
             // everything from false is "missing". these IDs will get a ForgetAid inserted into the false branch.
             // since false has diverged, that shouldn't be a problem.
             missing_from_true: HashSet::new(),
-            missing_from_false: state_false.node_keys_to_aid.right_values().copied().collect(),
+            missing_from_false: state_false
+                .node_keys_to_aid
+                .right_values()
+                .copied()
+                .collect(),
         };
     }
 
@@ -3030,8 +3045,8 @@ fn merge_states_result<S: Semantics>(
             .node_may_originate_from_shape_query
             .contains(&aid)
             || state_false
-            .node_may_originate_from_shape_query
-            .contains(&aid)
+                .node_may_originate_from_shape_query
+                .contains(&aid)
         {
             new_state.node_may_originate_from_shape_query.insert(aid);
         }
@@ -3110,8 +3125,8 @@ fn merge_states_result<S: Semantics>(
             .edge_may_originate_from_shape_query
             .contains(&edge)
             || state_false
-            .edge_may_originate_from_shape_query
-            .contains(&edge)
+                .edge_may_originate_from_shape_query
+                .contains(&edge)
         {
             new_state.edge_may_originate_from_shape_query.insert(edge);
         }

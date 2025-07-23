@@ -12,13 +12,13 @@ fn node_value_to_string(value: &NodeValue) -> String {
 
 #[diplomat::bridge]
 pub mod ffi {
-    use std::collections::HashMap;
-    use std::result::Result;
-    use std::fmt::Write;
-    use grabapl::graph::GraphTrait;
     use grabapl::NodeKey;
+    use grabapl::graph::GraphTrait;
     use grabapl::prelude::OperationId;
     use grabapl::semantics::example_with_ref::NodeValue;
+    use std::collections::HashMap;
+    use std::fmt::Write;
+    use std::result::Result;
     use syntax::WithLineColSpans;
 
     pub struct Context {
@@ -28,7 +28,6 @@ pub mod ffi {
     impl Context {
         pub fn init() {
             console_error_panic_hook::set_once();
-
         }
 
         pub fn parse(src: &str) -> Box<ParseResult> {
@@ -38,13 +37,14 @@ pub mod ffi {
                 Ok((op_ctx, fn_names)) => {
                     let op_ctx_and_fn_names = OpCtxAndFnNames {
                         op_ctx,
-                        fn_names: fn_names.into_iter().map(|(k, v)| (k.to_string(), v)).collect(),
+                        fn_names: fn_names
+                            .into_iter()
+                            .map(|(k, v)| (k.to_string(), v))
+                            .collect(),
                     };
                     Ok(op_ctx_and_fn_names)
                 }
-                Err(e) => {
-                    Err(e)
-                }
+                Err(e) => Err(e),
             };
 
             Box::new(ParseResult {
@@ -63,7 +63,8 @@ pub mod ffi {
     #[diplomat::opaque]
     pub struct ParseResult {
         result: Result<OpCtxAndFnNames, WithLineColSpans<String>>,
-        state_map: HashMap<String, grabapl::operation::builder::IntermediateState<super::TheSemantics>>,
+        state_map:
+            HashMap<String, grabapl::operation::builder::IntermediateState<super::TheSemantics>>,
     }
 
     impl ParseResult {
@@ -80,16 +81,16 @@ pub mod ffi {
                 Ok(_) => {
                     vec![]
                 }
-                Err(with_line_col_spans) => {
-                    with_line_col_spans.spans.iter().map(|span| {
-                        LineColSpan {
-                            line_start: span.line_start,
-                            line_end: span.line_end,
-                            col_start: span.col_start,
-                            col_end: span.col_end,
-                        }
-                    }).collect::<Vec<_>>()
-                }
+                Err(with_line_col_spans) => with_line_col_spans
+                    .spans
+                    .iter()
+                    .map(|span| LineColSpan {
+                        line_start: span.line_start,
+                        line_end: span.line_end,
+                        col_start: span.col_start,
+                        col_end: span.col_end,
+                    })
+                    .collect::<Vec<_>>(),
             };
             Box::new(LineColSpansIter(spans.into_iter()))
         }
@@ -112,7 +113,9 @@ pub mod ffi {
 
         /// Lists the available operations.
         pub fn list_operations(&self) -> Box<StringIter> {
-            let mut operations: Vec<String> = self.result.as_ref()
+            let mut operations: Vec<String> = self
+                .result
+                .as_ref()
                 .map(|res| res.fn_names.keys().cloned().collect())
                 .unwrap_or_default();
             operations.sort_unstable();
@@ -126,13 +129,35 @@ pub mod ffi {
             op_name: &str,
             args: &[u32],
         ) -> Result<Box<NewNodesIter>, Box<StringError>> {
-            let op_ctx = self.result.as_ref().map_err(|e| Box::new(StringError(e.value.clone())))?;
-            let op_id = op_ctx.fn_names.get(op_name)
-                .ok_or_else(|| Box::new(StringError(format!("Operation '{}' not found", op_name))))?;
+            let op_ctx = self
+                .result
+                .as_ref()
+                .map_err(|e| Box::new(StringError(e.value.clone())))?;
+            let op_id = op_ctx.fn_names.get(op_name).ok_or_else(|| {
+                Box::new(StringError(format!("Operation '{}' not found", op_name)))
+            })?;
 
-            let res = grabapl::prelude::run_from_concrete(&mut g.graph, &op_ctx.op_ctx, *op_id, &args.iter().copied().map(NodeKey).collect::<Vec<_>>());
+            let res = grabapl::prelude::run_from_concrete(
+                &mut g.graph,
+                &op_ctx.op_ctx,
+                *op_id,
+                &args.iter().copied().map(NodeKey).collect::<Vec<_>>(),
+            );
             match res {
-                Ok(output) => Ok(Box::new(NewNodesIter(output.new_nodes.into_iter().map(|(marker, key)| (key.0, marker.0.to_string(), super::node_value_to_string(g.graph.get_node_attr(key).unwrap()))).collect::<Vec<_>>().into_iter()))),
+                Ok(output) => Ok(Box::new(NewNodesIter(
+                    output
+                        .new_nodes
+                        .into_iter()
+                        .map(|(marker, key)| {
+                            (
+                                key.0,
+                                marker.0.to_string(),
+                                super::node_value_to_string(g.graph.get_node_attr(key).unwrap()),
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .into_iter(),
+                ))),
                 Err(e) => Err(Box::new(StringError(e.to_string()))),
             }
         }
@@ -208,18 +233,27 @@ pub mod ffi {
         }
 
         pub fn get_nodes(&self) -> Box<NodesIter> {
-            let nodes: Vec<(u32, String)> = self.graph.nodes()
-                .map(|(k, v)| (k.0, match v {
-                    NodeValue::Integer(i) => i.to_string(),
-                    NodeValue::String(s) => s.to_string(),
-                    NodeValue::Reference(nk, _) => format!("ref({nk:?})"), // Handle Ref type if needed
-                }))
+            let nodes: Vec<(u32, String)> = self
+                .graph
+                .nodes()
+                .map(|(k, v)| {
+                    (
+                        k.0,
+                        match v {
+                            NodeValue::Integer(i) => i.to_string(),
+                            NodeValue::String(s) => s.to_string(),
+                            NodeValue::Reference(nk, _) => format!("ref({nk:?})"), // Handle Ref type if needed
+                        },
+                    )
+                })
                 .collect();
             Box::new(NodesIter(nodes.into_iter()))
         }
 
         pub fn get_edges(&self) -> Box<EdgesIter> {
-            let edges: Vec<(u32, u32, String)> = self.graph.edges()
+            let edges: Vec<(u32, u32, String)> = self
+                .graph
+                .edges()
                 .map(|(src, dst, weight)| (src.0, dst.0, weight.to_string()))
                 .collect();
             Box::new(EdgesIter(edges.into_iter()))
@@ -236,7 +270,9 @@ pub mod ffi {
     impl NodesIter {
         #[diplomat::attr(auto, iterator)]
         pub fn next(&mut self) -> Option<Box<NodeWrapper>> {
-            self.0.next().map(|(k, v)| Box::new(NodeWrapper { key: k, value: v }))
+            self.0
+                .next()
+                .map(|(k, v)| Box::new(NodeWrapper { key: k, value: v }))
         }
 
         #[diplomat::attr(auto, iterable)]
@@ -272,7 +308,9 @@ pub mod ffi {
     impl EdgesIter {
         #[diplomat::attr(auto, iterator)]
         pub fn next(&mut self) -> Option<Box<EdgeWrapper>> {
-            self.0.next().map(|(src, dst, weight)| Box::new(EdgeWrapper { src, dst, weight }))
+            self.0
+                .next()
+                .map(|(src, dst, weight)| Box::new(EdgeWrapper { src, dst, weight }))
         }
 
         #[diplomat::attr(auto, iterable)]
@@ -302,14 +340,19 @@ pub mod ffi {
         }
     }
 
-
     #[diplomat::opaque]
     pub struct NewNodesIter(std::vec::IntoIter<(u32, String, String)>);
 
     impl NewNodesIter {
         #[diplomat::attr(auto, iterator)]
         pub fn next(&mut self) -> Option<Box<NewNode>> {
-            self.0.next().map(|(k, name, value)| Box::new(NewNode { key: k, name, value }))
+            self.0.next().map(|(k, name, value)| {
+                Box::new(NewNode {
+                    key: k,
+                    name,
+                    value,
+                })
+            })
         }
 
         #[diplomat::attr(auto, iterable)]

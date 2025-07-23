@@ -63,7 +63,6 @@
 //! [`grabapl`]: grabapl
 //! [refinement types]: https://en.wikipedia.org/wiki/Refinement_type
 
-
 use grabapl::prelude::*;
 
 /// Defines the semantics of a client implementation via its `Semantics` implementation.
@@ -136,7 +135,7 @@ impl AbstractMatcher for NodeSubtyping {
     fn matches(argument: &Self::Abstract, parameter: &Self::Abstract) -> bool {
         match (argument, parameter) {
             // [anything] <: Any
-            (_ , NodeType::Any) => true,
+            (_, NodeType::Any) => true,
             // parameter is not Any, hence the only remaining subtyping case is Integer <: Integer and String <: String,
             // i.e., the types must be equal
             _ => argument == parameter,
@@ -211,7 +210,9 @@ impl AbstractJoin for EdgeJoiner {
             (EdgeType::ExactString(_), EdgeType::String) => Some(EdgeType::String),
             (EdgeType::String, EdgeType::ExactString(_)) => Some(EdgeType::String),
             // The most specific supertype of two ExactString is either themselves, if they are equal, or String, if they are not.
-            (EdgeType::ExactString(s1), EdgeType::ExactString(s2)) if s1 == s2 => Some(EdgeType::ExactString(s1.clone())),
+            (EdgeType::ExactString(s1), EdgeType::ExactString(s2)) if s1 == s2 => {
+                Some(EdgeType::ExactString(s1.clone()))
+            }
             (EdgeType::ExactString(_), EdgeType::ExactString(_)) => Some(EdgeType::String),
             // all remaining possibilities are either themselves, if they are equal, or Any, if they are not
             _ if a == b => Some(a.clone()),
@@ -261,7 +262,7 @@ pub enum BuiltinOperation {
     AddNode {
         /// The node value to add.
         value: NodeValue,
-    }
+    },
 }
 
 // impl Semantics for TheSemantics {

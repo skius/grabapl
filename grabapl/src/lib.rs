@@ -48,7 +48,9 @@ pub mod prelude {
     pub use crate::operation::{
         BuiltinOperation, Operation, OperationContext, OperationId, run_from_concrete,
     };
-    pub use crate::semantics::{AbstractGraph, ConcreteGraph, Semantics, AbstractJoin, AbstractMatcher, ConcreteToAbstract};
+    pub use crate::semantics::{
+        AbstractGraph, AbstractJoin, AbstractMatcher, ConcreteGraph, ConcreteToAbstract, Semantics,
+    };
 }
 
 #[cfg(test)]

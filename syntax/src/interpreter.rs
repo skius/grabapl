@@ -1,13 +1,17 @@
-use crate::{lexer, Block, FnCallExpr, FnDef, FnImplicitParam, FnNodeParam, IfCond, IfStmt, LetStmt, MacroArgs, NodeId, Program, RenameStmt, ReturnStmt, ReturnStmtMapping, ShapeQueryParam, ShapeQueryParams, Span, Spanned, Statement, Token};
+use crate::custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
+use crate::{
+    Block, FnCallExpr, FnDef, FnImplicitParam, FnNodeParam, IfCond, IfStmt, LetStmt, MacroArgs,
+    NodeId, Program, RenameStmt, ReturnStmt, ReturnStmtMapping, ShapeQueryParam, ShapeQueryParams,
+    Span, Spanned, Statement, Token, lexer,
+};
+use chumsky::input::{IterInput, SliceInput, Stream, ValueInput};
 use chumsky::prelude::*;
-use error_stack::{report, Report, Result, ResultExt};
+use error_stack::{Report, Result, ResultExt, report};
+use grabapl::operation::builder::IntermediateState;
 use grabapl::operation::marker::SkipMarkers;
 use grabapl::prelude::*;
 use std::collections::HashMap;
-use chumsky::input::{IterInput, SliceInput, ValueInput, Stream};
 use thiserror::Error;
-use grabapl::operation::builder::IntermediateState;
-use crate::custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
 
 pub fn parse_abstract_node_type<S: SemanticsWithCustomSyntax>(
     src: &str,
@@ -33,7 +37,7 @@ fn find_lib_builtin_op<S: SemanticsWithCustomSyntax>(
             let result = (|| {
                 let args = args.ok_or(
                     InterpreterError::Custom("mark_node requires macro arguments")
-                        .with_span(name_span)
+                        .with_span(name_span),
                 )?;
                 let args_src = args.0.0;
                 let args_span = args.1;
@@ -60,26 +64,32 @@ fn find_lib_builtin_op<S: SemanticsWithCustomSyntax>(
                     };
                     let syntax_node_type = S::CS::get_node_type_parser();
                     let semantics_node_type = syntax_node_type.try_map_with(|syntax_type, e| {
-                        let node_type = S::convert_node_type(syntax_type.clone())
-                            .ok_or_else(|| {
-                                Rich::custom(e.span(), format!("Node type not supported: {syntax_type:?}"))
+                        let node_type =
+                            S::convert_node_type(syntax_type.clone()).ok_or_else(|| {
+                                Rich::custom(
+                                    e.span(),
+                                    format!("Node type not supported: {syntax_type:?}"),
+                                )
                             })?;
                         Ok(node_type)
                     });
-                    let optional_node_type = just(Token::Ctrl(',')).ignore_then(semantics_node_type).or_not().try_map_with(|type_, e| {
-                        match type_ {
+                    let optional_node_type = just(Token::Ctrl(','))
+                        .ignore_then(semantics_node_type)
+                        .or_not()
+                        .try_map_with(|type_, e| match type_ {
                             Some(typ) => Ok(typ),
-                            None => S::top_node_abstract().ok_or(
-                                Rich::custom(e.span(), "No node type provided, and no top node abstract defined".to_string())
-                            ),
-                        }
-                    });
+                            None => S::top_node_abstract().ok_or(Rich::custom(
+                                e.span(),
+                                "No node type provided, and no top node abstract defined"
+                                    .to_string(),
+                            )),
+                        });
                     color_name.then(optional_node_type)
                 };
                 let (color_name, node_type) = lex_then_parse(args_src, parser).change_context(
-                    InterpreterError::Custom("Failed to parse arguments for mark_node").with_span(args_span)
+                    InterpreterError::Custom("Failed to parse arguments for mark_node")
+                        .with_span(args_span),
                 )?;
-
 
                 Ok(LibBuiltinOperation::MarkNode {
                     marker: color_name.into(),
@@ -149,7 +159,8 @@ pub struct SpannedInterpreterError {
 }
 
 pub struct InterpreterResult<'src, S: SemanticsWithCustomSyntax, E> {
-    pub op_ctx_and_map: std::result::Result<(OperationContext<S>, HashMap<&'src str, OperationId>), E>,
+    pub op_ctx_and_map:
+        std::result::Result<(OperationContext<S>, HashMap<&'src str, OperationId>), E>,
     // This is *outside* the result, since we might have a state_map even if the operation context fails to build!
     pub state_map: HashMap<String, IntermediateState<S>>,
 }
@@ -278,8 +289,8 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                 FnImplicitParam::Edge(edge_param) => {
                     let src = edge_param.src.0;
                     let dst = edge_param.dst.0;
-                    let typ = S::convert_edge_type(edge_param.edge_type.0.clone())
-                        .ok_or(report!(
+                    let typ =
+                        S::convert_edge_type(edge_param.edge_type.0.clone()).ok_or(report!(
                             InterpreterError::InvalidType(format!("{:?}", edge_param.edge_type.0))
                                 .with_span(edge_param.edge_type.1)
                         ))?;
@@ -295,12 +306,10 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             match return_sig {
                 FnImplicitParam::Node(node_sig) => {
                     let name = node_sig.name.0;
-                    let param_type = S::convert_node_type(node_sig.node_type.0.clone())
-                        .ok_or(report!(
-                            InterpreterError::InvalidType(format!(
-                                "{:?}",
-                                node_sig.node_type.0
-                            )).with_span(node_sig.node_type.1)
+                    let param_type =
+                        S::convert_node_type(node_sig.node_type.0.clone()).ok_or(report!(
+                            InterpreterError::InvalidType(format!("{:?}", node_sig.node_type.0))
+                                .with_span(node_sig.node_type.1)
                         ))?;
                     self.return_marker_to_av.insert(name, param_type.clone());
                     self.builder
@@ -329,10 +338,8 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
     ) -> Result<(), SpannedInterpreterError> {
         let name = param.name.0;
         let param_type = S::convert_node_type(param.node_type.0.clone()).ok_or(report!(
-            InterpreterError::InvalidType(format!(
-                "{:?}",
-                param.node_type.0)
-            ).with_span(param.node_type.1)
+            InterpreterError::InvalidType(format!("{:?}", param.node_type.0))
+                .with_span(param.node_type.1)
         ))?;
         // TODO: instead of unwrap, should be returning results?
         if explicit {
@@ -402,21 +409,24 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
     }
 
     /// Returns if this was a hardcoded function call that was successfully interpreted
-    fn interpret_hardcoded(&mut self, fn_call: &Spanned<FnCallExpr<'src>>) -> Result<bool, SpannedInterpreterError> {
+    fn interpret_hardcoded(
+        &mut self,
+        fn_call: &Spanned<FnCallExpr<'src>>,
+    ) -> Result<bool, SpannedInterpreterError> {
         // check if we're calling show();
         if fn_call.0.name.0 == "show_state" {
-            let arg_ident = fn_call.0.args.get(0)
-                .ok_or(report!(
-                            InterpreterError::NotFoundNodeId("show_state requires an argument".to_string())
-                                .with_span(fn_call.0.name.1)
-                        ))?;
+            let arg_ident = fn_call.0.args.get(0).ok_or(report!(
+                InterpreterError::NotFoundNodeId("show_state requires an argument".to_string())
+                    .with_span(fn_call.0.name.1)
+            ))?;
             let as_str = arg_ident.0.single().ok_or(report!(
-                        InterpreterError::Custom("needs a single node id for show_state")
-                            .with_span(arg_ident.1)
-                    ))?;
-            let state = self.builder.show_state().change_context(
-                InterpreterError::BuilderError.with_span(fn_call.0.name.1)
-            )?;
+                InterpreterError::Custom("needs a single node id for show_state")
+                    .with_span(arg_ident.1)
+            ))?;
+            let state = self
+                .builder
+                .show_state()
+                .change_context(InterpreterError::BuilderError.with_span(fn_call.0.name.1))?;
             self.state_map.insert(as_str.to_string(), state);
             return Ok(true);
         }
@@ -442,11 +452,14 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             //     InterpreterError::Custom("diverge requires a string argument")
             //         .with_span(args_span)
             // ))?;
-            let inner_msg = lex_then_parse(args_src, select! { Token::Str(s) => s }).change_context(InterpreterError::Custom("invalid diverge arguments").with_span(args_span))?;
+            let inner_msg = lex_then_parse(args_src, select! { Token::Str(s) => s })
+                .change_context(
+                    InterpreterError::Custom("invalid diverge arguments").with_span(args_span),
+                )?;
             // now we can diverge
-            self.builder.diverge(inner_msg).change_context(
-                InterpreterError::BuilderError.with_span(fn_call.0.name.1)
-            )?;
+            self.builder
+                .diverge(inner_msg)
+                .change_context(InterpreterError::BuilderError.with_span(fn_call.0.name.1))?;
             self.current_path_diverged = true;
             return Ok(true);
         }
@@ -509,11 +522,17 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             .attach_printable_lazy(|| "Failed to end query")?;
 
         let false_branch_diverged = self.current_path_diverged;
-        (self.single_node_aids, self.current_path_diverged) = merge_node_aids(&true_branch_aids, true_branch_diverged, &self.single_node_aids, false_branch_diverged);
+        (self.single_node_aids, self.current_path_diverged) = merge_node_aids(
+            &true_branch_aids,
+            true_branch_diverged,
+            &self.single_node_aids,
+            false_branch_diverged,
+        );
         Ok(())
     }
 
-    fn rename_many(&mut self,
+    fn rename_many(
+        &mut self,
         rename_instructions: HashMap<Spanned<&'src str>, AbstractNodeId>,
     ) -> Result<(), SpannedInterpreterError> {
         for (name, aid) in rename_instructions {
@@ -598,8 +617,8 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             match param {
                 ShapeQueryParam::Node(node_param) => {
                     let node_id = node_param.name.0;
-                    let param_type = S::convert_node_type(node_param.node_type.0.clone())
-                        .ok_or(report!(
+                    let param_type =
+                        S::convert_node_type(node_param.node_type.0.clone()).ok_or(report!(
                             InterpreterError::InvalidType(format!("{:?}", node_param.node_type.0))
                                 .with_span(node_param.node_type.1)
                         ))?;
@@ -642,8 +661,8 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                                 .with_span(edge_param.dst.1)
                         ))?;
 
-                    let typ = S::convert_edge_type(edge_param.edge_type.0.clone())
-                        .ok_or(report!(
+                    let typ =
+                        S::convert_edge_type(edge_param.edge_type.0.clone()).ok_or(report!(
                             InterpreterError::InvalidType(format!("{:?}", edge_param.edge_type.0))
                                 .with_span(edge_param.edge_type.1)
                         ))?;
@@ -761,13 +780,9 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             .args
             .into_iter()
             .map(|(arg, span)| {
-                self.node_id_to_aid(arg)
-                    .ok_or(
-                        report!(
-                            InterpreterError::NotFoundNodeId(format!("{:?}", arg))
-                                .with_span(span)
-                    )
-                )
+                self.node_id_to_aid(arg).ok_or(report!(
+                    InterpreterError::NotFoundNodeId(format!("{:?}", arg)).with_span(span)
+                ))
             })
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -794,13 +809,10 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                         ))
                         .attach_printable("return node AID not found")?;
                     let ret_name_str = ret_name.0;
-                    let ret_ty = self
-                        .return_marker_to_av
-                        .get(ret_name_str)
-                        .ok_or(report!(
-                            InterpreterError::NotFoundReturnMarker(ret_name_str.to_string())
-                                .with_span(ret_name.1)
-                        ))?;
+                    let ret_ty = self.return_marker_to_av.get(ret_name_str).ok_or(report!(
+                        InterpreterError::NotFoundReturnMarker(ret_name_str.to_string())
+                            .with_span(ret_name.1)
+                    ))?;
                     self.builder
                         .return_node(aid, ret_name_str.into(), ret_ty.clone())
                         .change_context(InterpreterError::BuilderError.with_span(mapping_span))?;
@@ -866,22 +878,39 @@ fn merge_node_aids<'a>(
 //
 // }
 
-
-
 // ugly inside, but much better outside I think
-fn lex_then_parse<'tokens, 'src: 'tokens, P, O>(src: &'src str, parser: P) -> std::result::Result<O, InterpreterError>
+fn lex_then_parse<'tokens, 'src: 'tokens, P, O>(
+    src: &'src str,
+    parser: P,
+) -> std::result::Result<O, InterpreterError>
 where
-    P: Parser<'tokens, Stream<std::vec::IntoIter<Token<'src>>>, O, extra::Err<Rich<'tokens, Token<'src>, Span>>>,
+    P: Parser<
+            'tokens,
+            Stream<std::vec::IntoIter<Token<'src>>>,
+            O,
+            extra::Err<Rich<'tokens, Token<'src>, Span>>,
+        >,
 {
-    let tokens = lexer().parse(src).into_result().map_err(|e|
-        e.into_iter().map(|e| e.to_string()).collect::<Vec<_>>().join(" ")
-    ).map_err(InterpreterError::CustomOwned)?;
+    let tokens = lexer()
+        .parse(src)
+        .into_result()
+        .map_err(|e| {
+            e.into_iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .map_err(InterpreterError::CustomOwned)?;
     let tokens = tokens.into_iter().map(|(t, s)| t).collect::<Vec<_>>();
     let input = Stream::from_iter(tokens.into_iter());
-    parser.parse(input).into_result().map_err(|e| {
-        e.into_iter()
-            .map(|e| e.to_string())
-            .collect::<Vec<_>>()
-            .join(" ")
-    }).map_err(InterpreterError::CustomOwned)
+    parser
+        .parse(input)
+        .into_result()
+        .map_err(|e| {
+            e.into_iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .map_err(InterpreterError::CustomOwned)
 }

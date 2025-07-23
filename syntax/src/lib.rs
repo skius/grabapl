@@ -1,10 +1,12 @@
-pub mod interpreter;
 pub mod custom_syntax;
+pub mod interpreter;
 
-use crate::interpreter::{interpret, InterpreterResult};
-use ariadne::{sources, Color, Label, Report, ReportKind};
+use crate::interpreter::{InterpreterResult, interpret};
+use ariadne::{Color, Label, Report, ReportKind, sources};
 use chumsky::input::SliceInput;
 use chumsky::{input::ValueInput, prelude::*};
+use custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
+use grabapl::operation::builder::IntermediateState;
 use grabapl::operation::marker::SkipMarkers;
 use grabapl::prelude::{OperationContext, OperationId};
 use std::collections::{HashMap, HashSet};
@@ -12,8 +14,6 @@ use std::fmt;
 use std::fmt::Debug;
 use std::io::BufWriter;
 use std::ops::Range;
-use custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
-use grabapl::operation::builder::IntermediateState;
 
 // A few type definitions to be used by our parsers below
 pub type Span = SimpleSpan;
@@ -328,7 +328,7 @@ where
         Token::Ident(ident) => ident,
     }
     .map_with(|ident, e| (ident, e.span()))
-        .labelled("identifier");
+    .labelled("identifier");
 
     let spanned_output_node_id = ident_str
         .then_ignore(just(Token::Ctrl('.')))
@@ -347,7 +347,11 @@ where
         .then_ignore(just(Token::Arrow))
         .then(ident_str)
         .then_ignore(just(Token::Ctrl(':')))
-        .then(CS::get_edge_type_parser().labelled("edge type").map_with(|s, e| (s, e.span())))
+        .then(
+            CS::get_edge_type_parser()
+                .labelled("edge type")
+                .map_with(|s, e| (s, e.span())),
+        )
         .map_with(
             |(((src, src_span), (dst, dst_span)), (edge_type, edge_type_span)), overall_span| {
                 (
@@ -365,7 +369,11 @@ where
 
     let spanned_fn_explicit_param = ident_str
         .then_ignore(just(Token::Ctrl(':')))
-        .then(CS::get_node_type_parser().labelled("node type").map_with(|s, e| (s, e.span())))
+        .then(
+            CS::get_node_type_parser()
+                .labelled("node type")
+                .map_with(|s, e| (s, e.span())),
+        )
         .map_with(
             |((name, n_span), (node_type, node_type_span)), overall_span| {
                 (
@@ -395,7 +403,11 @@ where
     let shape_node_param = spanned_node_id
         .clone()
         .then_ignore(just(Token::Ctrl(':')))
-        .then(CS::get_node_type_parser().labelled("node type").map_with(|s, e| (s, e.span())))
+        .then(
+            CS::get_node_type_parser()
+                .labelled("node type")
+                .map_with(|s, e| (s, e.span())),
+        )
         .map(
             |((name, name_span), (node_type, node_type_span))| ShapeNodeParam {
                 name: (name, name_span),
@@ -410,7 +422,11 @@ where
         .then_ignore(just(Token::Arrow))
         .then(spanned_node_id.clone())
         .then_ignore(just(Token::Ctrl(':')))
-        .then(CS::get_edge_type_parser().labelled("edge type").map_with(|s, e| (s, e.span())))
+        .then(
+            CS::get_edge_type_parser()
+                .labelled("edge type")
+                .map_with(|s, e| (s, e.span())),
+        )
         .map(
             |(((src, src_span), (dst, dst_span)), (edge_type, edge_type_span))| ShapeEdgeParam {
                 src: (src, src_span),
@@ -473,22 +489,24 @@ where
         // TODO: add support for `skipping all` in addition to the current `skipping [...]` syntax.
         let optional_skipping_markers = select! {
             Token::Ident("skipping") => (),
-        }.labelled("'skipping'")
-            .ignore_then(just(Token::Ctrl('[')))
-            .ignore_then(
-                select! { Token::Str(s) => s }.labelled("marker literal (e.g., '\"visited\"')")
-                    .separated_by(just(Token::Ctrl(',')))
-                    .allow_trailing()
-                    .collect::<Vec<_>>(),
-            )
-            .then_ignore(just(Token::Ctrl(']')))
-            .or_not()
-            .map(|opt| {
-                opt.map(|marker_names| SkipMarkers::new(marker_names))
-                    .unwrap_or(SkipMarkers::default())
-            })
-            .boxed()
-            .labelled("skipping markers");
+        }
+        .labelled("'skipping'")
+        .ignore_then(just(Token::Ctrl('[')))
+        .ignore_then(
+            select! { Token::Str(s) => s }
+                .labelled("marker literal (e.g., '\"visited\"')")
+                .separated_by(just(Token::Ctrl(',')))
+                .allow_trailing()
+                .collect::<Vec<_>>(),
+        )
+        .then_ignore(just(Token::Ctrl(']')))
+        .or_not()
+        .map(|opt| {
+            opt.map(|marker_names| SkipMarkers::new(marker_names))
+                .unwrap_or(SkipMarkers::default())
+        })
+        .boxed()
+        .labelled("skipping markers");
 
         let if_cond_shape = just(Token::Shape)
             .ignore_then(just(Token::Ctrl('[')))
@@ -611,7 +629,11 @@ where
             .then_ignore(just(Token::Arrow))
             .then(spanned_node_id.clone())
             .then_ignore(just(Token::Ctrl(':')))
-            .then(CS::get_edge_type_parser().labelled("edge type").map_with(|s, e| (s, e.span())))
+            .then(
+                CS::get_edge_type_parser()
+                    .labelled("edge type")
+                    .map_with(|s, e| (s, e.span())),
+            )
             .map_with(|((src, dst), edge_typ), e| {
                 (
                     ReturnStmtMapping::Edge {
@@ -736,12 +758,10 @@ where
             let mut seen_names = HashSet::new();
             for (func, func_span) in functions_with_span {
                 if seen_names.contains(func.name.0) {
-                    emitter.emit(
-                        Rich::custom(
-                            func.name.1,
-                            format!("Function `{}` is defined multiple times", func.name.0),
-                        )
-                    );
+                    emitter.emit(Rich::custom(
+                        func.name.1,
+                        format!("Function `{}` is defined multiple times", func.name.0),
+                    ));
                     continue;
                 }
                 seen_names.insert(func.name.0);
@@ -781,7 +801,11 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
     let filename = "input".to_string();
     let (tokens, errs) = lexer().parse(src).into_output_errors();
 
-    fn string_of_report(filename: String, src: &str, report: Report<(String, Range<usize>)>) -> String {
+    fn string_of_report(
+        filename: String,
+        src: &str,
+        report: Report<(String, Range<usize>)>,
+    ) -> String {
         let mut output_buf = BufWriter::new(Vec::new());
         report
             .write(sources([(filename, src)]), &mut output_buf)
@@ -810,10 +834,9 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
                     return InterpreterResult {
                         op_ctx_and_map: Ok((op_ctx, fns_to_ids)),
                         state_map: res.state_map,
-                    }
+                    };
                 }
                 Err(e) => {
-
                     let detailed_message = format!("{:?}", e);
                     let error_span = e.current_context().span;
 
@@ -834,18 +857,28 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
                         .join("\n");
 
                     // build report with error
-                    let err_string = string_of_report(filename.clone(), src, Report::build(
-                        ReportKind::Error,
-                        (filename.clone(), error_span.into_range()),
-                    )
-                        .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte).with_color(color_enabled))
+                    let err_string = string_of_report(
+                        filename.clone(),
+                        src,
+                        Report::build(
+                            ReportKind::Error,
+                            (filename.clone(), error_span.into_range()),
+                        )
+                        .with_config(
+                            ariadne::Config::new()
+                                .with_index_type(ariadne::IndexType::Byte)
+                                .with_color(color_enabled),
+                        )
                         .with_message(e.to_string())
                         .with_label(
                             Label::new((filename.clone(), error_span.into_range()))
-                                .with_message(format!("detailed message:\n{detailed_message_pipe_mapped}"))
+                                .with_message(format!(
+                                    "detailed message:\n{detailed_message_pipe_mapped}"
+                                ))
                                 .with_color(Color::Red),
                         )
-                        .finish());
+                        .finish(),
+                    );
 
                     let err = Err(WithLineColSpans {
                         value: err_string,
@@ -854,7 +887,7 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
                     return InterpreterResult {
                         op_ctx_and_map: err,
                         state_map: res.state_map,
-                    }
+                    };
                 }
             }
         }
@@ -878,7 +911,11 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
         .for_each(|e| {
             line_col_spans.push(span_into_line_col_start_and_line_col_end(&e.span(), src));
             Report::build(ReportKind::Error, (filename.clone(), e.span().into_range()))
-                .with_config(ariadne::Config::new().with_index_type(ariadne::IndexType::Byte).with_color(color_enabled))
+                .with_config(
+                    ariadne::Config::new()
+                        .with_index_type(ariadne::IndexType::Byte)
+                        .with_color(color_enabled),
+                )
                 .with_message(e.to_string())
                 .with_label(
                     Label::new((filename.clone(), e.span().into_range()))

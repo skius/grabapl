@@ -3,9 +3,9 @@
 //! For example, [1, 2, 3] would return 1, and [3, 2, 1, 4] would return 3.
 //! f uses an auxiliary function aux.
 
+use crate::util::semantics::*;
 use grabapl::prelude::*;
 use syntax::grabapl_defs;
-use crate::util::semantics::*;
 
 grabapl_defs!(get_ops, TestSemantics,
     fn min_dist_of_consecutive_integers(list: Integer) -> (min_dist: Integer) {
@@ -20,6 +20,4 @@ grabapl_defs!(get_ops, TestSemantics,
 );
 
 #[test_log::test]
-fn task4() {
-
-}
+fn task4() {}

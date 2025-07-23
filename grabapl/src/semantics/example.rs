@@ -2,17 +2,17 @@
 //!
 //! Defined here for easy reusability elsewhere without running into cyclic crate dependency issues.
 
-use derive_more::From;
+use crate::operation::ConcreteData;
+use crate::operation::query::ConcreteQueryOutput;
+use crate::operation::signature::parameter::{AbstractOperationOutput, OperationOutput};
 use crate::prelude::*;
+use crate::semantics::*;
+use derive_more::From;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::str::FromStr;
-use crate::operation::ConcreteData;
-use crate::operation::query::ConcreteQueryOutput;
-use crate::operation::signature::parameter::{AbstractOperationOutput, OperationOutput};
-use crate::semantics::*;
 
 pub struct ExampleSemantics;
 

@@ -219,7 +219,7 @@ pub enum Instruction<S: Semantics> {
     /// Crashes the operation with a message.
     Diverge {
         crash_message: String,
-    }
+    },
 }
 
 impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Instruction<S> {
@@ -398,9 +398,12 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
             op_ctx,
             g,
             arg,
-            abstract_to_concrete: arg.subst.mapping.iter().map(|(s, n)| {
-                (AbstractNodeId::ParameterMarker(*s), *n)
-            }).collect(),
+            abstract_to_concrete: arg
+                .subst
+                .mapping
+                .iter()
+                .map(|(s, n)| (AbstractNodeId::ParameterMarker(*s), *n))
+                .collect(),
         }
     }
 
@@ -481,7 +484,7 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
                     };
                     self.abstract_to_concrete.insert(*new, key);
                 }
-                Instruction::ForgetAid {aid} => {
+                Instruction::ForgetAid { aid } => {
                     // Remove the aid from the mapping, so it is not used anymore.
                     if self.abstract_to_concrete.remove(aid).is_none() {
                         return Err(report!(OperationError::UnknownAID(*aid)))
@@ -514,11 +517,16 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
     fn aid_to_node_key(&self, aid: AbstractNodeId) -> OperationResult<NodeKey> {
         // CHANGED SINCE FORGET_AID: EVERYTHING IS IN ABSTRACT_TO_CONCRETE SINCE WE MAY WANT TO FORGET AID.
 
-        self.abstract_to_concrete.get(&aid).copied().ok_or_else(|| {
-            report!(OperationError::UnknownAID(aid))
-        }).attach_printable_lazy(|| {
-            format!("Cannot find concrete node key for abstract node id {aid:?} in mapping: {:#?}", self.abstract_to_concrete)
-        })
+        self.abstract_to_concrete
+            .get(&aid)
+            .copied()
+            .ok_or_else(|| report!(OperationError::UnknownAID(aid)))
+            .attach_printable_lazy(|| {
+                format!(
+                    "Cannot find concrete node key for abstract node id {aid:?} in mapping: {:#?}",
+                    self.abstract_to_concrete
+                )
+            })
 
         /*
         // Get a param aid from our argument's substitution, and the rest from the map.
@@ -578,7 +586,10 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
         );
 
         // CHANGED SINCE FORGET_AID: ABSTRACT_TO_CONCRETE CONTAINS PARAM SUBSTITUTION ALREADY.
-        let hidden_nodes: HashSet<_> = self.abstract_to_concrete.values().copied()
+        let hidden_nodes: HashSet<_> = self
+            .abstract_to_concrete
+            .values()
+            .copied()
             .chain(self.arg.hidden_nodes.iter().copied())
             .collect();
 

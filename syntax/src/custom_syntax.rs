@@ -1,14 +1,13 @@
 pub mod example;
 mod example_with_ref;
 
-use std::fmt;
-use std::fmt::Debug;
-use chumsky::{extra, IterParser, Parser};
+use crate::{MacroArgs, Span, Token};
 use chumsky::error::Rich;
 use chumsky::input::ValueInput;
+use chumsky::{IterParser, Parser, extra};
 use grabapl::Semantics;
-use crate::{MacroArgs, Span, Token};
-
+use std::fmt;
+use std::fmt::Debug;
 
 pub trait CustomSyntax: Clone + Debug + 'static {
     type MacroArgType: Clone + fmt::Debug + Default + PartialEq;

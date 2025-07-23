@@ -6,8 +6,8 @@ use proptest::test_runner::Config;
 use std::collections::{HashMap, HashSet};
 
 mod util;
+use grabapl::semantics::example_with_ref::{ExampleWithRefSemantics as TestSemantics, *};
 use test_log::test;
-use grabapl::semantics::example_with_ref::{*, ExampleWithRefSemantics as TestSemantics};
 use util::semantics::helpers;
 use util::shrink_outer_first_extension::StrategyOutsideFirstExtension;
 
@@ -359,7 +359,12 @@ fn diamond_shape_bfs_manual() {
     diamond_shape_bfs_inner(get_ops_manual_ref())
 }
 
-fn diamond_shape_bfs_inner((op_ctx, fn_map): (OperationContext<TestSemantics>, HashMap<&'static str, OperationId>)) {
+fn diamond_shape_bfs_inner(
+    (op_ctx, fn_map): (
+        OperationContext<TestSemantics>,
+        HashMap<&'static str, OperationId>,
+    ),
+) {
     let mut g = TestSemantics::new_concrete_graph();
     // build a diamond shape graph
     let n0 = g.add_node(NodeValue::Integer(0));
@@ -386,7 +391,12 @@ fn edge_case_bfs_manual() {
     edge_case_bfs_inner(get_ops_manual_ref())
 }
 
-fn edge_case_bfs_inner((op_ctx, fn_map): (OperationContext<TestSemantics>, HashMap<&'static str, OperationId>)) {
+fn edge_case_bfs_inner(
+    (op_ctx, fn_map): (
+        OperationContext<TestSemantics>,
+        HashMap<&'static str, OperationId>,
+    ),
+) {
     let mut g = TestSemantics::new_concrete_graph();
     // build a diamond shape graph with legs
     let n0 = g.add_node(NodeValue::Integer(0));
@@ -420,7 +430,12 @@ fn proptest_bfs_manual() {
     proptest_bfs_inner(get_ops_manual_ref());
 }
 
-fn proptest_bfs_inner((op_ctx, fn_map): (OperationContext<TestSemantics>, HashMap<&'static str, OperationId>)) {
+fn proptest_bfs_inner(
+    (op_ctx, fn_map): (
+        OperationContext<TestSemantics>,
+        HashMap<&'static str, OperationId>,
+    ),
+) {
     // Generate a random graph and test BFS on it
     proptest!(
         Config { cases: 10, max_shrink_iters: 100, ..Config::default() },
@@ -456,7 +471,6 @@ fn proptest_bfs_inner((op_ctx, fn_map): (OperationContext<TestSemantics>, HashMa
         }
     )
 }
-
 
 fn get_ops_manual_ref() -> (
     OperationContext<TestSemantics>,
