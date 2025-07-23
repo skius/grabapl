@@ -11,6 +11,12 @@ For example:
 2. Shape query that checks if `a` has a child `child`
 3. False branch of that query that adds a new node `child` to `a`
 
+**UPDATE FROM FUTURE**: We have decided that shape queries can only match on nodes that no other operation has a handle to.
+Hence, we can actually return a node from a shape query. In effect, the `add_child_if_not_exists` operation would just be a
+`add_child_if_handle_already_exists_otherwise_return_handle` operation. for an input p -> c it would return a new child c2.
+for an input p it would return a child c that is either new or already existed in the concrete before.
+**UPDATE END**
+
 One might say that the least change is that `a` now has a child `child`.
 This is true only for the builder - we can call operations on that child.
 However, the abstract graph is not changed by this operation.

@@ -1425,6 +1425,9 @@ pub struct IntermediateState<S: Semantics> {
     // TODO: Somehow remove AIDs from this set if they're completely overwritten by something non-shape-query.
     //  could be done by, whenever adding a new node, unconditionally removing the AID from this set as long as we're not in a shape query.
     //  since we have a different state at that point, it would get merged correctly (assuming we take the union).
+    // *UPDATE*: these are currently being populated, but not used, since I realized nodes from shape queries are actually
+    //  allowed to be returned. In the future these might be used again, e.g., when a shape query can read-only match an *already existing*
+    //  outer node. In that case, the node would not be allowed to be returned, since it may exist in the caller.
     pub node_may_originate_from_shape_query: HashSet<AbstractNodeId>,
     pub edge_may_originate_from_shape_query: HashSet<(AbstractNodeId, AbstractNodeId)>,
 
@@ -1510,7 +1513,7 @@ impl<S: Semantics> IntermediateState<S> {
         if from_shape_query {
             self.node_may_originate_from_shape_query.insert(aid);
         } else {
-            // TODO: might be able to remove the AID.
+            // TODO: might be able to remove the AID from shape query.
         }
     }
 
