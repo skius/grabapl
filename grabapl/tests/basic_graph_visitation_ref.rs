@@ -575,6 +575,7 @@ fn get_ops_manual_ref() -> (
             if shape [
                 fst: Int,
                 snd: Int,
+                // NOTE: in the manual version of references, named edges are crucial! since a queue element could point with "attached" to any BFS graph node.
                 head -> fst: "queue_next",
                 fst -> snd: "queue_next",
             ] {
