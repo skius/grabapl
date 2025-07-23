@@ -98,3 +98,16 @@ cargo check --target wasm32-unknown-unknown
 - [ ] Shape query skipping marker: should work on ExpectShapeNode*Change*, i.e., if we have a skipping "visited" 
       and an in-scope node with that marker on it, then the change shape query should not enter. 
       (It would still have the node in scope though.)
+
+# TODOs for handover/documentation:
+- [ ] Finish template client
+  - [ ] Rust semantics implementation + docs
+  - [ ] FFI library + docs, exposing everything
+  - [ ] NPM web client (javascript only) with some examples
+    - [ ] Typescript?
+- [ ] Document operation builder and what the function calls do
+- [ ] Document the language core semantics itself
+- [ ] Document the syntax
+- [ ] Main entrypoint README
+- [ ] example template README
+- [ ] Change package.json author attributes to examples in the webpack thing
