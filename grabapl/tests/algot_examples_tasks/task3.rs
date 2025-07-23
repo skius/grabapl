@@ -7,7 +7,7 @@
 
 use crate::util::semantics::{NodeValue, TestSemantics, helpers};
 use grabapl::prelude::*;
-use syntax::{grabapl_defs, grabapl_parse};
+use syntax::grabapl_defs;
 
 grabapl_defs!(get_ops, TestSemantics,
     fn tree_serialize(root: Integer) -> (list: Integer) {

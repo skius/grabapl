@@ -7,7 +7,6 @@ use std::collections::{HashMap, HashSet};
 
 mod util;
 use grabapl::semantics::example_with_ref::{ExampleWithRefSemantics as TestSemantics, *};
-use test_log::test;
 use util::semantics::helpers;
 use util::shrink_outer_first_extension::StrategyOutsideFirstExtension;
 
