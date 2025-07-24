@@ -740,6 +740,11 @@ async function main() {
         MS_BETWEEN_CODE_CHANGES = parseInt(localStorage.getItem("auto_compile_timeout"), 10);
         autoCompileInput.value = MS_BETWEEN_CODE_CHANGES;
     }
+
+    // add a Ctrl-S event listener to the monaco editor that immediately runs onCodeChangedInner()
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+        onCodeChangedInner();
+    });
 }
 
 await main();

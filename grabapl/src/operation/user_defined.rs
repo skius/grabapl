@@ -386,6 +386,12 @@ struct Runner<'a, 'arg, S: Semantics> {
     // Note: should not store AID::Parameter nodes, those are in `arg` already.
     // TODO: ^ double check this. I'm currently violating it for ForgetAid.
     abstract_to_concrete: HashMap<AbstractNodeId, NodeKey>,
+    /// A hack for the following scenario:
+    /// We maybe_delete a parameter node.
+    /// Our argument has that parameter node as a hidden_node, because it must have been present at the call-site.
+    /// However, since we maybe_delete the node, the call-site will not have that node anymore.
+    /// Hence we should not have it in our hidden_nodes when we call other operation.
+    forgotten_params: HashSet<NodeKey>,
 }
 
 impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
@@ -404,6 +410,7 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
                 .iter()
                 .map(|(s, n)| (AbstractNodeId::ParameterMarker(*s), *n))
                 .collect(),
+            forgotten_params: HashSet::new(),
         }
     }
 
@@ -485,13 +492,22 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
                     self.abstract_to_concrete.insert(*new, key);
                 }
                 Instruction::ForgetAid { aid } => {
+
                     // Remove the aid from the mapping, so it is not used anymore.
-                    if self.abstract_to_concrete.remove(aid).is_none() {
+                    let Some(removed_key) = self.abstract_to_concrete.remove(aid) else {
                         return Err(report!(OperationError::UnknownAID(*aid)))
                             .attach_printable_lazy(|| {
                                 format!("Cannot forget aid {aid:?}, since it is not in the mapping: {:#?}", self.abstract_to_concrete)
                             });
+                    };
+                    if let AbstractNodeId::ParameterMarker(_) = aid {
+                        // hack
+                        self.forgotten_params.insert(removed_key);
                     }
+                    log::trace!(
+                        "Forgot aid {aid:?} from mapping: {:#?}",
+                        self.abstract_to_concrete
+                    );
                 }
                 Instruction::Diverge { crash_message } => {
                     return Err(report!(OperationError::UserCrash(crash_message.clone())));
@@ -586,12 +602,18 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
         );
 
         // CHANGED SINCE FORGET_AID: ABSTRACT_TO_CONCRETE CONTAINS PARAM SUBSTITUTION ALREADY.
-        let hidden_nodes: HashSet<_> = self
+        let mut hidden_nodes: HashSet<_> = self
             .abstract_to_concrete
             .values()
             .copied()
             .chain(self.arg.hidden_nodes.iter().copied())
             .collect();
+
+        // hack
+        // parameters that were forgotten in the meantime need to be removed from the hidden nodes to make our language more powerful
+        for key in self.forgotten_params.iter() {
+            hidden_nodes.remove(key);
+        }
 
         Ok(OperationArgument {
             selected_input_nodes: selected_keys.into(),
