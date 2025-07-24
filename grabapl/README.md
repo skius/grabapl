@@ -102,6 +102,7 @@ cargo check --target wasm32-unknown-unknown
     - ==> need debug constraint
 
 # TODOs for handover/documentation:
+- [ ] Push the petgraph subgraph_monomorphism branch to a fork and depend on that instead.
 - [ ] Finish template client
   - [ ] Rust semantics implementation + docs
   - [ ] FFI library + docs, exposing everything
