@@ -136,11 +136,23 @@ function highlightError(line, column) {
     // show decoration
 }
 
+let MS_BETWEEN_CODE_CHANGES = 200; // Throttle code change events to avoid excessive parsing
+
+/**
+ * Wrapper around onCodeChangedInner to throttle calls.
+ */
+function onCodeChanged() {
+    if (onCodeChanged.timeout) {
+        clearTimeout(onCodeChanged.timeout);
+    }
+    onCodeChanged.timeout = setTimeout(onCodeChangedInner, MS_BETWEEN_CODE_CHANGES);
+}
+
 /**
  * This function is called whenever the content in the Monaco editor changes.
  * It attempts to compile the code and updates the UI accordingly.
  */
-function onCodeChanged() {
+function onCodeChangedInner() {
     const current_content = editor.getValue();
     localStorage.setItem('last_code', current_content);
 
@@ -309,6 +321,19 @@ const deleteConfirmModal = document.getElementById('delete-confirm-modal');
 const cancelDeleteBtn = document.getElementById('cancel-delete-btn');
 const confirmDeleteBtn = document.getElementById('confirm-delete-btn');
 
+
+// --- auto compile input and logic
+
+const autoCompileInput = document.getElementById('auto-compile-timeout');
+autoCompileInput.addEventListener('change', (e) => {
+    const newValue = parseInt(e.target.value, 10);
+    if (isNaN(newValue) || newValue < 0) {
+        alert("Please enter a valid positive number for auto-compile timeout.");
+        return;
+    }
+    MS_BETWEEN_CODE_CHANGES = newValue;
+    localStorage.setItem('auto_compile_timeout', newValue);
+});
 
 /**
  * Deletes the currently selected node and its connected edges.
@@ -710,6 +735,10 @@ async function main() {
 
     if (localStorage.getItem("theme")) {
         setTheme(localStorage.getItem("theme"));
+    }
+    if (localStorage.getItem("auto_compile_timeout")) {
+        MS_BETWEEN_CODE_CHANGES = parseInt(localStorage.getItem("auto_compile_timeout"), 10);
+        autoCompileInput.value = MS_BETWEEN_CODE_CHANGES;
     }
 }
 

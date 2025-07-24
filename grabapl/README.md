@@ -114,7 +114,9 @@ cargo check --target wasm32-unknown-unknown
   - [ ] semantics
   - [ ] abstractgraph? 
   - [ ] builtinop
-  - [ ] builtinquery
+    - [ ] Document that apply_abstract might be called a surprising amount of times
+    - [ ] but that apply() is guaranteed to only be called the expected number of times.
+- [ ] builtinquery
   - [ ] Matcher
   - [ ] Joiner
   - [ ] ConcreteToAbstract
