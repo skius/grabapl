@@ -87,11 +87,11 @@
 //! [`grabapl`]: grabapl
 //! [refinement types]: https://en.wikipedia.org/wiki/Refinement_type
 
-use std::collections::HashMap;
 use grabapl::operation::ConcreteData;
 use grabapl::operation::query::{BuiltinQuery, ConcreteQueryOutput};
 use grabapl::operation::signature::parameter::{AbstractOperationOutput, OperationOutput};
 use grabapl::prelude::*;
+use std::collections::HashMap;
 
 /// Defines the semantics of a client implementation via its `Semantics` implementation.
 ///
@@ -391,7 +391,7 @@ pub enum TheOperation {
     /// If the edge is a unit edge, the return node's value is 0.
     ///
     /// Signature: `(from: Any, to: Any, from -> to: Any) -> (value: Any)`, changes `value`'s specific type to the edge's specific type.
-    ExtractEdgeToNode
+    ExtractEdgeToNode,
 }
 
 impl BuiltinOperation for TheOperation {
@@ -413,7 +413,9 @@ impl BuiltinOperation for TheOperation {
         match self {
             TheOperation::NewNode { .. } => {}
             TheOperation::RemoveNode => {
-                param_builder.expect_explicit_input_node("input", NodeType::Any).unwrap();
+                param_builder
+                    .expect_explicit_input_node("input", NodeType::Any)
+                    .unwrap();
             }
             TheOperation::AppendSndToFst => {
                 param_builder
@@ -477,7 +479,9 @@ impl BuiltinOperation for TheOperation {
             }
         }
         // we `expect` here, because we know that our parameters should always be valid.
-        param_builder.build().expect("Failed to build operation parameter")
+        param_builder
+            .build()
+            .expect("Failed to build operation parameter")
     }
 
     /// Defines the operation's behavior on an abstract graph.
@@ -500,7 +504,10 @@ impl BuiltinOperation for TheOperation {
     /// only change the second node's type to `Any`, due to how modularity works in the language.
     /// I.e., the builtin operation can turn a `(Int, String)` argument into `(Int, Int)`, while a user defined operation can
     /// only turn it into `(Int, Any)`. (Note that read-only nodes do not change their type, even in user defined operations).
-    fn apply_abstract(&self, g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>) -> AbstractOperationOutput<Self::S> {
+    fn apply_abstract(
+        &self,
+        g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>,
+    ) -> AbstractOperationOutput<Self::S> {
         let mut local_names_to_output_names = HashMap::new();
         match self {
             TheOperation::NewNode { value } => {
@@ -536,7 +543,11 @@ impl BuiltinOperation for TheOperation {
             }
             TheOperation::NewEdge { value } => {
                 // We add a new edge with the given value from the first node to the second node.
-                g.add_edge(SubstMarker::from("from"), SubstMarker::from("to"), value.to_type());
+                g.add_edge(
+                    SubstMarker::from("from"),
+                    SubstMarker::from("to"),
+                    value.to_type(),
+                );
                 // Note that contrary to the `NewNode` operation, we do not need to return a new edge by name here,
                 // since an edge will always be unique between two nodes. Also, we cannot name edges directly.
             }
@@ -546,7 +557,9 @@ impl BuiltinOperation for TheOperation {
             }
             TheOperation::ExtractEdgeToNode => {
                 // We extract the edge from the first node to the second node.
-                let edge_type = g.get_edge_value(SubstMarker::from("from"), SubstMarker::from("to")).unwrap();
+                let edge_type = g
+                    .get_edge_value(SubstMarker::from("from"), SubstMarker::from("to"))
+                    .unwrap();
                 let node_type = match edge_type {
                     // We said () edges get turned into 0
                     EdgeType::Unit | EdgeType::Integer => NodeType::Integer,
@@ -565,7 +578,11 @@ impl BuiltinOperation for TheOperation {
     /// This must always execute a 'subset of effects' of the [`TheOperation::apply_abstract`] method.
     /// For example, if the abstract effect says that a node may receive a new integer value, then
     /// we're not allowed to write a string to the node.
-    fn apply(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>, concrete_data: &mut ConcreteData) -> OperationOutput {
+    fn apply(
+        &self,
+        g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>,
+        concrete_data: &mut ConcreteData,
+    ) -> OperationOutput {
         let mut local_names_to_output_names = HashMap::new();
         match self {
             TheOperation::NewNode { value } => {
@@ -583,22 +600,34 @@ impl BuiltinOperation for TheOperation {
                 // We append the second node's string value to the first node's string value.
                 let first_value = g.get_node_value(SubstMarker::from("first")).unwrap();
                 let second_value = g.get_node_value(SubstMarker::from("second")).unwrap();
-                if let (NodeValue::String(first), NodeValue::String(second)) = (first_value, second_value) {
+                if let (NodeValue::String(first), NodeValue::String(second)) =
+                    (first_value, second_value)
+                {
                     let new_value = format!("{}{}", first, second);
                     g.set_node_value(SubstMarker::from("first"), NodeValue::String(new_value));
                 } else {
-                    log::error!("AppendSndToFst: expected both nodes to be strings, but got {:?} and {:?}", first_value, second_value);
+                    log::error!(
+                        "AppendSndToFst: expected both nodes to be strings, but got {:?} and {:?}",
+                        first_value,
+                        second_value
+                    );
                 }
             }
             TheOperation::AddSndToFst => {
                 // We add the second node's integer value to the first node's integer value.
                 let first_value = g.get_node_value(SubstMarker::from("first")).unwrap();
                 let second_value = g.get_node_value(SubstMarker::from("second")).unwrap();
-                if let (NodeValue::Integer(first), NodeValue::Integer(second)) = (first_value, second_value) {
+                if let (NodeValue::Integer(first), NodeValue::Integer(second)) =
+                    (first_value, second_value)
+                {
                     let new_value = first + second;
                     g.set_node_value(SubstMarker::from("first"), NodeValue::Integer(new_value));
                 } else {
-                    log::error!("AddSndToFst: expected both nodes to be integers, but got {:?} and {:?}", first_value, second_value);
+                    log::error!(
+                        "AddSndToFst: expected both nodes to be integers, but got {:?} and {:?}",
+                        first_value,
+                        second_value
+                    );
                 }
             }
             TheOperation::AddConstant { constant } => {
@@ -608,7 +637,10 @@ impl BuiltinOperation for TheOperation {
                     let new_value = input + constant;
                     g.set_node_value(SubstMarker::from("input"), NodeValue::Integer(new_value));
                 } else {
-                    log::error!("AddConstant: expected input node to be an integer, but got {:?}", input_value);
+                    log::error!(
+                        "AddConstant: expected input node to be an integer, but got {:?}",
+                        input_value
+                    );
                 }
             }
             TheOperation::CopyValueFromTo => {
@@ -618,7 +650,11 @@ impl BuiltinOperation for TheOperation {
             }
             TheOperation::NewEdge { value } => {
                 // We add a new edge with the given value from the first node to the second node.
-                g.add_edge(SubstMarker::from("from"), SubstMarker::from("to"), value.clone());
+                g.add_edge(
+                    SubstMarker::from("from"),
+                    SubstMarker::from("to"),
+                    value.clone(),
+                );
                 // Note that contrary to the `NewNode` operation, we do not need to return a new edge by name here,
                 // since an edge will always be unique between two nodes. Also, we cannot name edges directly.
             }
@@ -628,7 +664,9 @@ impl BuiltinOperation for TheOperation {
             }
             TheOperation::ExtractEdgeToNode => {
                 // We extract the edge from the first node to the second node.
-                let edge_value = g.get_edge_value(SubstMarker::from("from"), SubstMarker::from("to")).unwrap();
+                let edge_value = g
+                    .get_edge_value(SubstMarker::from("from"), SubstMarker::from("to"))
+                    .unwrap();
                 let node_value = match edge_value {
                     EdgeValue::Unit => NodeValue::Integer(0), // unit edges are represented as 0
                     EdgeValue::String(s) => NodeValue::String(s.clone()),

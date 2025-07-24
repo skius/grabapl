@@ -4,10 +4,10 @@ use grabapl::operation::builder::{BuilderOpLike, OperationBuilder};
 use grabapl::operation::run_from_concrete;
 use grabapl::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
 use grabapl::prelude::*;
+use grabapl::semantics::example_with_ref::{ExampleWithRefSemantics, NodeValue};
 use proptest::proptest;
 use proptest::test_runner::Config;
 use std::cmp::Ordering::Greater;
-use grabapl::semantics::example_with_ref::{ExampleWithRefSemantics, NodeValue};
 syntax::grabapl_defs!(get_ops, ExampleWithRefSemantics,
  // -------- BFS with Queue --------
         /*
@@ -433,7 +433,6 @@ fn hide_node(node: Object) {
 
 );
 
-
 fn sort_using_grabapl(
     values: &[i32],
     op_ctx: &OperationContext<ExampleWithRefSemantics>,
@@ -468,7 +467,6 @@ fn sort_using_grabapl(
 }
 
 // do a proptest with this
-
 
 #[test_log::test]
 fn bubble_sort_proptest() {

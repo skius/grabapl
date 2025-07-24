@@ -492,7 +492,6 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
                     self.abstract_to_concrete.insert(*new, key);
                 }
                 Instruction::ForgetAid { aid } => {
-
                     // Remove the aid from the mapping, so it is not used anymore.
                     let Some(removed_key) = self.abstract_to_concrete.remove(aid) else {
                         return Err(report!(OperationError::UnknownAID(*aid)))
