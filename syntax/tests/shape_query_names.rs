@@ -21,7 +21,7 @@ const SRC: &'static str = stringify!(
 
 #[test]
 fn shape_query_node_is_merged() {
-    let (op_ctx, fn_map) = syntax::parse_to_op_ctx_and_map::<TestSemantics>(SRC);
+    let (op_ctx, fn_map) = grabapl_syntax::parse_to_op_ctx_and_map::<TestSemantics>(SRC);
 
     // assert!(false);
 }

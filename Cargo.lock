@@ -470,10 +470,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
-name = "ffi"
-version = "0.1.0"
-
-[[package]]
 name = "fixedbitset"
 version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -505,12 +501,13 @@ dependencies = [
 
 [[package]]
 name = "grabapl"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "chumsky 0.10.1",
  "criterion",
  "derive_more",
  "error-stack",
+ "grabapl_syntax",
  "internment",
  "log",
  "petgraph",
@@ -519,9 +516,39 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_json_any_key",
- "syntax",
  "test-log",
  "thiserror",
+]
+
+[[package]]
+name = "grabapl_syntax"
+version = "0.0.0"
+dependencies = [
+ "ariadne",
+ "chumsky 0.10.1",
+ "derive_more",
+ "error-stack",
+ "grabapl",
+ "proptest",
+ "serde",
+ "serde_json",
+ "test-log",
+ "thiserror",
+]
+
+[[package]]
+name = "grabapl_template_ffi"
+version = "0.0.0"
+
+[[package]]
+name = "grabapl_template_semantics"
+version = "0.0.0"
+dependencies = [
+ "chumsky 0.10.1",
+ "grabapl",
+ "grabapl_syntax",
+ "log",
+ "serde",
 ]
 
 [[package]]
@@ -724,10 +751,10 @@ dependencies = [
  "diplomat-runtime",
  "error-stack",
  "grabapl",
+ "grabapl_syntax",
  "log",
  "serde",
  "serde_json",
- "syntax",
  "wasm-bindgen",
 ]
 
@@ -1088,17 +1115,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
-name = "semantics"
-version = "0.1.0"
-dependencies = [
- "chumsky 0.10.1",
- "grabapl",
- "log",
- "serde",
- "syntax",
-]
-
-[[package]]
 name = "semver"
 version = "1.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1243,30 +1259,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "syntax"
-version = "0.1.0"
-dependencies = [
- "ariadne",
- "chumsky 0.10.1",
- "derive_more",
- "error-stack",
- "grabapl",
- "proptest",
- "serde",
- "serde_json",
- "test-log",
- "thiserror",
-]
-
-[[package]]
 name = "syntax_macro"
 version = "0.1.0"
 dependencies = [
+ "grabapl_syntax",
  "proc-macro2",
  "quote",
  "serde_json",
  "syn",
- "syntax",
 ]
 
 [[package]]

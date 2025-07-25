@@ -29,9 +29,9 @@ const SRC: &'static str = stringify!(
 
 #[test]
 fn rename_scope() {
-    let (op_ctx, fn_map) = syntax::parse_to_op_ctx_and_map::<TestSemantics>(SRC);
+    let (op_ctx, fn_map) = grabapl_syntax::parse_to_op_ctx_and_map::<TestSemantics>(SRC);
 
-    let _ = syntax::grabapl_parse!(TestSemantics, fn test() []{});
+    let _ = grabapl_syntax::grabapl_parse!(TestSemantics, fn test() []{});
 
     let op_id = fn_map["test"];
 

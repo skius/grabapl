@@ -8,9 +8,9 @@ use chumsky::prelude::*;
 use std::{env, fs};
 
 use grabapl::semantics::example::ExampleSemantics;
-use syntax::custom_syntax::example::MyCustomSyntax;
-use syntax::interpreter::interpret;
-use syntax::*;
+use grabapl_syntax::custom_syntax::example::MyCustomSyntax;
+use grabapl_syntax::interpreter::interpret;
+use grabapl_syntax::*;
 
 fn main() {
     // println!("{:?}", ascii_ident_fixed::<&str, extra::Err<Rich<char>>>().map(|x: &str| x).parse("field1").unwrap());

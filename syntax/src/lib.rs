@@ -1006,7 +1006,7 @@ fn span_into_line_col_start_and_line_col_end(span: &Span, src: &str) -> LineColS
 /// but will compile-error if the syntax is invalid.
 #[macro_export]
 macro_rules! grabapl_parse {
-    ($semantics:ty, $($t:tt)*) => {syntax::parse_to_op_ctx_and_map::<$semantics>(stringify!($($t)*))};
+    ($semantics:ty, $($t:tt)*) => {$crate::parse_to_op_ctx_and_map::<$semantics>(stringify!($($t)*))};
 }
 
 #[macro_export]

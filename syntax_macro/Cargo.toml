@@ -10,7 +10,7 @@ proc-macro = true
 proc-macro2 = "1.0"
 quote = "1.0"
 syn = { version = "2.0", features = ["full"] }
-syntax = { path = "../syntax" }
+grabapl_syntax = { path = "../syntax" }
 
 [dev-dependencies]
 serde_json = "1.0"
