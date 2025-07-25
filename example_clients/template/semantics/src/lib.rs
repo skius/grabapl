@@ -392,6 +392,10 @@ pub enum TheOperation {
     ///
     /// Signature: `(from: Any, to: Any, from -> to: Any) -> (value: Any)`, changes `value`'s specific type to the edge's specific type.
     ExtractEdgeToNode,
+    /// Returns the length of the string contained in the first node.
+    ///
+    /// Signature: `(input: String) -> (length: Integer)`, where `length` is the length of the string in the input node.
+    StringLength,
 }
 
 impl BuiltinOperation for TheOperation {
@@ -475,6 +479,11 @@ impl BuiltinOperation for TheOperation {
                 // this time we _must_ have an edge in order to extract its value.
                 param_builder
                     .expect_edge("from", "to", EdgeType::Any)
+                    .unwrap();
+            }
+            TheOperation::StringLength => {
+                param_builder
+                    .expect_explicit_input_node("input", NodeType::String)
                     .unwrap();
             }
         }
@@ -568,6 +577,11 @@ impl BuiltinOperation for TheOperation {
                 };
                 g.add_node("value", node_type);
                 local_names_to_output_names.insert("value".into(), "value".into());
+            }
+            TheOperation::StringLength => {
+                // We add a new node that will hold the length of the string in the input node.
+                g.add_node("length", NodeType::Integer);
+                local_names_to_output_names.insert("length".into(), "length".into());
             }
         }
         g.get_abstract_output(local_names_to_output_names)
@@ -675,6 +689,23 @@ impl BuiltinOperation for TheOperation {
                 g.add_node("value", node_value);
                 local_names_to_output_names.insert("value".into(), "value".into());
             }
+            TheOperation::StringLength => {
+                // We get the string value from the input node and calculate its length.
+                let input_value = g.get_node_value(SubstMarker::from("input")).unwrap();
+                let length = if let NodeValue::String(s) = input_value {
+                    s.len() as i32 // convert to i32
+                } else {
+                    log::error!(
+                        "StringLength: expected input node to be a string, but got {:?}",
+                        input_value
+                    );
+                    // note: we would be fine to panic and crash here. The static guarantees of grabapl
+                    // are enough to ensure that this operation is only called on a string node.
+                    0
+                };
+                g.add_node("length", NodeValue::Integer(length));
+                local_names_to_output_names.insert("length".into(), "length".into());
+            }
         }
         g.get_concrete_output(local_names_to_output_names)
     }
@@ -687,6 +718,9 @@ impl BuiltinOperation for TheOperation {
 ///
 /// The implementation of such a specific builtin query is given in this type's implementation of the [`BuiltinQuery`] trait.
 /// See the documentation on each variant for more details on what the query checks and what its signature is.
+///
+/// Note that the signatures of the variants do not include a return type: the "return type" is always
+/// whether the then branch or the else branch is taken.
 ///
 /// For operations that are supposed to modify the graph and/or return new nodes or edges, see [`TheOperation`].
 #[derive(Debug, Clone)]
@@ -702,22 +736,129 @@ pub enum TheQuery {
     ///
     /// Signature: `(first: Any, second: Any)`
     Equal,
-    // TODO: add int comparison operators and maybe a string length operation?
+    /// Compares the first node's integer value to the second node's integer value according to the given comparison.
+    ///
+    /// Signature: `(first: Integer, second: Integer)`
+    CompareInt {
+        /// Which comparison to perform.
+        cmp: IntComparison,
+    }
+}
+
+/// The different ways to compare integer values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IntComparison {
+    /// Checks if the first integer is less than the second.
+    Lt,
+    /// Checks if the first integer is greater than the second.
+    Gt,
+    /// Checks if the first integer is equal to the second.
+    Eq,
+    /// Checks if the first integer is less than or equal to the second.
+    Lte,
+    /// Checks if the first integer is greater than or equal to the second.
+    Gte,
 }
 
 impl BuiltinQuery for TheQuery {
     type S = TheSemantics;
 
+    /// The query's parameter.
+    ///
+    /// See [`TheOperation::parameter`] for more details on parameters.
     fn parameter(&self) -> OperationParameter<Self::S> {
-        todo!()
+        let mut param_builder = OperationParameterBuilder::new();
+        // Note: many operations on the param_builder are fallible, but since we know our parameters are valid, we just unwrap.
+        match self {
+            TheQuery::IsEq { value } => {
+                // we could decide to request the value's specific type here, but taking `Any` instead
+                // potentially makes for a better user experience.
+                param_builder
+                    .expect_explicit_input_node("input", NodeType::Any)
+                    .unwrap();
+            }
+            TheQuery::Equal => {
+                param_builder
+                    .expect_explicit_input_node("first", NodeType::Any)
+                    .unwrap();
+                param_builder
+                    .expect_explicit_input_node("second", NodeType::Any)
+                    .unwrap();
+            }
+            TheQuery::CompareInt { cmp } => {
+                param_builder
+                    .expect_explicit_input_node("first", NodeType::Integer)
+                    .unwrap();
+                param_builder
+                    .expect_explicit_input_node("second", NodeType::Integer)
+                    .unwrap();
+            }
+        }
+        // we `expect` here, because we know that our parameters should always be valid.
+        param_builder
+            .build()
+            .expect("Failed to build query parameter")
     }
 
+    /// Defines the query's behavior on an abstract graph.
+    ///
+    /// Our query does not modify the abstract graph, so this method does not do anything.
+    ///
+    /// See [`TheOperation::apply_abstract`] for more details on abstract changes.
     fn apply_abstract(&self, g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>) {
-        todo!()
+        // We probably want to enforce non-modifying queries across the entire language, but I have not
+        // asserted that position yet.
+        // So for now, this method exists.
     }
 
+    /// Defines the query's behavior on a concrete graph and returns which branch to take of the query.
+    ///
+    /// See [`TheOperation::apply`] for more details on concrete changes.
     fn query(&self, g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>) -> ConcreteQueryOutput {
-        todo!()
+        // `true` if we take the then branch, `false` if we take the else branch.
+        let mut taken = false;
+
+        match self {
+            TheQuery::IsEq { value } => {
+                // We check if the node's value is equal to the given value.
+                let input_value = g.get_node_value(SubstMarker::from("input")).unwrap();
+                taken = input_value == value;
+            }
+            TheQuery::Equal => {
+                // We check if the two nodes are equal.
+                let first_value = g.get_node_value(SubstMarker::from("first")).unwrap();
+                let second_value = g.get_node_value(SubstMarker::from("second")).unwrap();
+                taken = first_value == second_value;
+            }
+            TheQuery::CompareInt { cmp } => {
+                // We compare the first node's integer value to the second node's integer value according to the given comparison.
+                let first_value = g.get_node_value(SubstMarker::from("first")).unwrap();
+                let second_value = g.get_node_value(SubstMarker::from("second")).unwrap();
+
+                if let (NodeValue::Integer(first), NodeValue::Integer(second)) =
+                    (first_value, second_value)
+                {
+                    taken = match cmp {
+                        IntComparison::Lt => first < second,
+                        IntComparison::Gt => first > second,
+                        IntComparison::Eq => first == second,
+                        IntComparison::Lte => first <= second,
+                        IntComparison::Gte => first >= second,
+                    };
+                } else {
+                    log::error!(
+                        "CompareInt: expected both nodes to be integers, but got {:?} and {:?}",
+                        first_value,
+                        second_value
+                    );
+                    // again, would be fine to crash here, since we should never enter this.
+                }
+            }
+        }
+
+        ConcreteQueryOutput {
+            taken,
+        }
     }
 }
 
@@ -742,6 +883,9 @@ impl Semantics for TheSemantics {
         Some(NodeType::Any)
     }
 
+    /// Returns `Some(EdgeType::Any)`, because that is the top edge type in our example semantics.
+    ///
+    /// See the [crate-level documentation](self) for more details on the edge type system.
     fn top_edge_abstract() -> Option<Self::EdgeAbstract> {
         Some(EdgeType::Any)
     }
