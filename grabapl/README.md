@@ -100,6 +100,7 @@ cargo check --target wasm32-unknown-unknown
       (It would still have the node in scope though.)
 - [ ] Explicit input node parameters should have a "expected this abstract value, got this" error message. Actually all parameters.
     - ==> need debug constraint
+- [ ] add icu-like crate `grabapl` that re-exports grabapl_core (current grabapl) and grabapl_syntax.
 
 # TODOs for handover/documentation:
 - [ ] Push the petgraph subgraph_monomorphism branch to a fork and depend on that instead.

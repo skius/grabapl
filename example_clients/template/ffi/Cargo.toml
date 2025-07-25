@@ -4,3 +4,6 @@ version = "0.0.0"
 edition = "2024"
 
 [dependencies]
+grabapl = { path = "../../../grabapl" }
+# we need to depend on our semantics
+grabapl_template_semantics = { path = "../semantics" }

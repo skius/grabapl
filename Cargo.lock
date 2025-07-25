@@ -539,6 +539,10 @@ dependencies = [
 [[package]]
 name = "grabapl_template_ffi"
 version = "0.0.0"
+dependencies = [
+ "grabapl",
+ "grabapl_template_semantics",
+]
 
 [[package]]
 name = "grabapl_template_semantics"
