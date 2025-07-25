@@ -103,14 +103,15 @@ cargo check --target wasm32-unknown-unknown
 - [ ] add icu-like crate `grabapl` that re-exports grabapl_core (current grabapl) and grabapl_syntax.
 
 # TODOs for handover/documentation:
-- [ ] Push the petgraph subgraph_monomorphism branch to a fork and depend on that instead.
+- [x] Push the petgraph subgraph_monomorphism branch to a fork and depend on that instead.
 - [ ] Finish template client
-  - [ ] Rust semantics implementation + docs
+  - [x] Rust semantics implementation + docs
   - [ ] FFI library + docs, exposing everything
   - [ ] NPM web client (javascript only) with some examples
     - [ ] Typescript?
       - won't update the existing demos to be typescript
   - [ ] README, document cargo.toml and grabapl relative link
+  - [ ] push to crates.io?
 - [ ] Document operation builder and what the function calls do
 - [ ] Document the semantics trait and the required associated type traits.
   - [ ] semantics
@@ -136,6 +137,9 @@ cargo check --target wasm32-unknown-unknown
   - [ ] Document the different markers in use (substmarker, graphwithsubst markers, output markers, etc)
 - [ ] Document the syntax
 - [ ] Main entrypoint README
+  - Link to that readme in the grabapl docs entrypoint
 - [ ] example template README
 - [ ] Change package.json author attributes to examples in the webpack thing
 - [ ] publish crates as grabapl_... ?can keep subfolder names the same just change in lib
+- [ ] mdBook for main thing
+  - [ ] can link to the example clients that we dont publish on crates.io
