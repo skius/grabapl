@@ -137,3 +137,4 @@ cargo check --target wasm32-unknown-unknown
 - [ ] Main entrypoint README
 - [ ] example template README
 - [ ] Change package.json author attributes to examples in the webpack thing
+- [ ] publish crates as grabapl_... ?can keep subfolder names the same just change in lib
