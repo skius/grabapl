@@ -881,7 +881,7 @@ fn merge_node_aids<'a>(
 // }
 
 // ugly inside, but much better outside I think
-fn lex_then_parse<'tokens, 'src: 'tokens, P, O>(
+pub fn lex_then_parse<'tokens, 'src: 'tokens, P, O>(
     src: &'src str,
     parser: P,
 ) -> std::result::Result<O, InterpreterError>

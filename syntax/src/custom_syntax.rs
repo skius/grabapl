@@ -10,13 +10,10 @@ use std::fmt;
 use std::fmt::Debug;
 
 pub trait CustomSyntax: Clone + Debug + 'static {
-    type MacroArgType: Clone + fmt::Debug + Default + PartialEq;
 
     type AbstractNodeType: Clone + Debug + PartialEq;
     type AbstractEdgeType: Clone + Debug + PartialEq;
 
-    fn get_macro_arg_parser<'src>()
-    -> impl Parser<'src, &'src str, Self::MacroArgType, extra::Err<Rich<'src, char, Span>>> + Clone;
 
     fn get_node_type_parser<
         'src: 'tokens,

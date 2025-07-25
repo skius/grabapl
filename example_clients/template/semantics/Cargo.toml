@@ -12,3 +12,5 @@ syntax = { path = "../../../syntax" }
 serde = { version = "1.0", features = ["derive"] }
 # for logging
 log = "0.4"
+# in case we want to support a text representation of our semantics
+chumsky = "0.10"

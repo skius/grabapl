@@ -39,24 +39,10 @@ pub enum CustomEdgeType {
 }
 
 impl CustomSyntax for MyCustomSyntax {
-    type MacroArgType = Vec<String>;
     type AbstractNodeType = MyCustomType;
     type AbstractEdgeType = CustomEdgeType;
 
-    fn get_macro_arg_parser<'src>()
-    -> impl Parser<'src, &'src str, Self::MacroArgType, extra::Err<Rich<'src, char, Span>>> + Clone
-    {
-        // a comma separated list of strings
 
-        any::<&'src str, extra::Err<Rich<'src, char, Span>>>()
-            .filter(|c| *c != ']' && *c != ',')
-            .repeated()
-            .to_slice()
-            .separated_by(just(','))
-            .collect()
-            .map(|args: Vec<&'src str>| args.into_iter().map(String::from).collect())
-            .padded()
-    }
 
     fn get_node_type_parser<
         'src: 'tokens,

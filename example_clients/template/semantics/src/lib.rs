@@ -81,11 +81,23 @@
 //!
 //! For queries that are supposed to change the statically known abstract graph, see [TODO: link to GraphShapeQuery
 //!
-//! # Your Turn!
-//! Feel free to copy this crate and adjust it to your liking.
+//! # Optional Features
+//! See the [`syntax`](self::syntax) module if you want to use this semantics in concjuction with `grabapl`'s  pluggable
+//! syntax parser and interpreter.
+//!
+//! # Usage
+//! Once the semantics is defined, it can be used to build user defined operations and run operations
+//! on concrete graphs.
+//!
+//! Continue in `template/README.md` for the next steps.
+//!
+//! # Your Turn
+//! Feel free to copy this crate and adjust the semantics to your liking!
 //!
 //! [`grabapl`]: grabapl
 //! [refinement types]: https://en.wikipedia.org/wiki/Refinement_type
+
+mod syntax;
 
 use grabapl::operation::ConcreteData;
 use grabapl::operation::query::{BuiltinQuery, ConcreteQueryOutput};
@@ -372,7 +384,6 @@ pub enum TheOperation {
     /// Copies the value from the first node to the second node.
     ///
     /// Signature: `(Any, Any) -> ()`, changes the second node's specific type to the first node's specific type.
-    // TODO: document how this node is special in how it affects the abstract graph (and how an UDOp can not do that)
     CopyValueFromTo,
     /// Adds an edge with the given value from the first node to the second node.
     ///

@@ -9,8 +9,9 @@ use custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
 use grabapl::operation::marker::SkipMarkers;
 use grabapl::prelude::{OperationContext, OperationId};
 use std::collections::{HashMap, HashSet};
+use std::error::Error;
 use std::fmt;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 use std::io::BufWriter;
 use std::ops::Range;
 
@@ -22,6 +23,7 @@ pub type Spanned<T> = (T, Span);
 pub enum Token<'src> {
     // do we want these?
     Bool(bool),
+    // TODO: support parsing negative numbers
     Num(i32),
     Str(&'src str),
     // Op(&'src str),
@@ -947,7 +949,13 @@ pub struct WithLineColSpans<T> {
     pub spans: Vec<LineColSpan>,
 }
 
-#[derive(Clone)]
+impl<T: Display> Debug for WithLineColSpans<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WithLineColSpans {{ value: \n{}\n, spans: {:?} }}", self.value, self.spans)
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct LineColSpan {
     pub line_start: usize,
     pub col_start: usize,
