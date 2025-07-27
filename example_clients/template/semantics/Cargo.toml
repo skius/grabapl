@@ -1,6 +1,6 @@
 [package]
 name = "grabapl_template_semantics"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2024"
 license = { workspace = true }
 authors = { workspace = true }
