@@ -52,7 +52,7 @@ fn parse_edge_type(s: &str) -> Result<EdgeType, String> {
 ///
 /// [The Diplomat Book]: https://rust-diplomat.github.io/diplomat/
 #[diplomat::bridge]
-mod ffi {
+pub mod ffi {
     use std::collections::HashMap;
     // we need to import this to use the write! macro
     use std::fmt::Write as _;
