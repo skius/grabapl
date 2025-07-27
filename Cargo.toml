@@ -9,7 +9,7 @@ members = [
     "syntax_macro",
     "example_clients/online_syntax/online_syntax_ffi",
     "example_clients/template/semantics",
-    "example_clients/template/grabapl_template_ffi",
+    "example_clients/template/ffi",
 ]
 exclude = ["playground", "wasm-game-of-life"]
 

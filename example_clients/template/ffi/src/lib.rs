@@ -22,12 +22,12 @@ use grabapl::prelude::*;
 /// [The Diplomat Book]: https://rust-diplomat.github.io/diplomat/
 #[diplomat::bridge]
 mod ffi {
-    // #[diplomat::opaque]
-    // pub struct Grabapl(i32);
-    //
-    // impl Grabapl {
-    //     pub fn create() -> Box<Grabapl> {
-    //         Box::new(Grabapl(0))
-    //     }
-    // }
+    #[diplomat::opaque]
+    pub struct Grabapl;
+
+    impl Grabapl {
+        pub fn init() {
+            console_error_panic_hook::set_once();
+        }
+    }
 }

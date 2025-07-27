@@ -5,7 +5,7 @@ LIB_FOLDER="js"
 # name of the FFI package
 FFI_PACKAGE="grabapl_template_ffi"
 # location of the FFI package
-FFI_FOLDER="grabapl_template_ffi"
+FFI_FOLDER="ffi"
 
 # assert we are in the same directory as this script
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
