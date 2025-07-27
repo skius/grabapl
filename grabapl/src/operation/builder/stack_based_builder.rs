@@ -1567,6 +1567,9 @@ impl<'a, S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> Debug for Build
     }
 }
 
+// TODO: avoid having an explicit reference to the operation context.
+//  maybe a refcell? and when building immediately add the operation to it?
+//  maybe we could actually on-the-fly store a signature of self in the operation context for other operation builders.
 pub struct OperationBuilder2<'a, S: Semantics> {
     op_ctx: &'a OperationContext<S>,
     instructions: Vec<BuilderInstruction<S>>,

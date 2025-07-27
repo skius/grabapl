@@ -1,11 +1,16 @@
 set -e
 
+### CONFIGURATION START ###
+
 # name of the folder to put the generated javascript library
 LIB_FOLDER="js"
 # name of the FFI package
 FFI_PACKAGE="grabapl_template_ffi"
 # location of the FFI package
 FFI_FOLDER="ffi"
+
+### CONFIGURATION END ###
+
 
 # assert we are in the same directory as this script
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")

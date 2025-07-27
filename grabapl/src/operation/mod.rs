@@ -123,6 +123,16 @@ impl<S: Semantics> OperationContext<S> {
     }
 }
 
+impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for OperationContext<S> {
+    fn clone(&self) -> Self {
+        OperationContext {
+            builtins: self.builtins.clone(),
+            libbuiltins: self.libbuiltins.clone(),
+            custom: self.custom.clone(),
+        }
+    }
+}
+
 pub enum Operation<'a, S: Semantics> {
     Builtin(&'a S::BuiltinOperation),
     LibBuiltin(&'a LibBuiltinOperation<S>),

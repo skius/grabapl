@@ -5,8 +5,27 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
+  readonly CompileResult_dot_of_state: (a: number, b: number, c: number, d: number) => void;
+  readonly CompileResult_get_program: (a: number, b: number) => void;
+  readonly CompileResult_destroy: (a: number) => void;
+  readonly ConcreteGraph_create: () => number;
+  readonly ConcreteGraph_dot: (a: number, b: number) => void;
+  readonly ConcreteGraph_add_node: (a: number, b: number, c: number, d: number) => void;
+  readonly ConcreteGraph_add_edge: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+  readonly ConcreteGraph_destroy: (a: number) => void;
   readonly Grabapl_init: () => void;
+  readonly Grabapl_parse: (a: number, b: number) => number;
   readonly Grabapl_destroy: (a: number) => void;
+  readonly OperationBuilder_create: (a: number, b: number) => number;
+  readonly OperationBuilder_expect_parameter_node: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+  readonly OperationBuilder_destroy: (a: number) => void;
+  readonly OperationContext_create: () => number;
+  readonly OperationContext_destroy: (a: number) => void;
+  readonly Program_op_ctx: (a: number) => number;
+  readonly Program_run_operation: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+  readonly Program_destroy: (a: number) => void;
+  readonly StringError_to_string: (a: number, b: number) => void;
+  readonly StringError_destroy: (a: number) => void;
   readonly diplomat_init: () => void;
   readonly diplomat_simple_write: (a: number, b: number, c: number) => void;
   readonly diplomat_buffer_write_create: (a: number) => number;

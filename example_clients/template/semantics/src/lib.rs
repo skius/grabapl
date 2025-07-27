@@ -100,7 +100,7 @@
 //! [`grabapl`]: grabapl
 //! [refinement types]: https://en.wikipedia.org/wiki/Refinement_type
 
-mod syntax;
+pub mod syntax;
 
 use grabapl::operation::ConcreteData;
 use grabapl::operation::query::{BuiltinQuery, ConcreteQueryOutput};

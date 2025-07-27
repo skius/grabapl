@@ -543,8 +543,11 @@ dependencies = [
  "console_error_panic_hook",
  "diplomat",
  "diplomat-runtime",
+ "error-stack",
  "grabapl",
+ "grabapl_syntax",
  "grabapl_template_semantics",
+ "log",
  "wasm-bindgen",
 ]
 

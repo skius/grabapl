@@ -9,8 +9,9 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 grabapl = { path = "../../../grabapl" }
+grabapl_syntax = { path = "../../../syntax", package = "grabapl_syntax", version = "0.0.0" }
 # we need to depend on our semantics
-semantics = { path = "../semantics", package = "grabapl_template_semantics" }
+semantics = { path = "../semantics", package = "grabapl_template_semantics", version = "0.0.0" }
 # for nicer error messages
 console_error_panic_hook = "0.1.7"
 # if we wanted to call JavaScript functions from Rust
@@ -18,3 +19,7 @@ wasm-bindgen = "0.2"
 # the main FFI toolkit we use
 diplomat = "0.12.0"
 diplomat-runtime = { version = "0.12.0", features = ["log"] }
+# for logging
+log = "0.4"
+# for specifying error-stack behavior
+error-stack = "0.5"
