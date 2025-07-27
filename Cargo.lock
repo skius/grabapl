@@ -508,9 +508,9 @@ dependencies = [
  "derive_more",
  "error-stack",
  "grabapl_syntax",
+ "grabapl_temp_petgraph_crate_not_namesquatting_i_promise",
  "internment",
  "log",
- "petgraph",
  "proptest",
  "rand",
  "serde",
@@ -534,6 +534,18 @@ dependencies = [
  "serde_json",
  "test-log",
  "thiserror",
+]
+
+[[package]]
+name = "grabapl_temp_petgraph_crate_not_namesquatting_i_promise"
+version = "0.0.0"
+source = "git+https://github.com/skius/petgraph.git?branch=partial_isos#33d282122d772513a1ab1d19389ce7693b4efd93"
+dependencies = [
+ "fixedbitset",
+ "hashbrown",
+ "indexmap",
+ "serde",
+ "serde_derive",
 ]
 
 [[package]]
@@ -786,18 +798,6 @@ name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
-
-[[package]]
-name = "petgraph"
-version = "0.8.1"
-source = "git+https://github.com/skius/petgraph.git?branch=partial_isos#2efe77f5e3eab595579408726aafe5d0f008a4d4"
-dependencies = [
- "fixedbitset",
- "hashbrown",
- "indexmap",
- "serde",
- "serde_derive",
-]
 
 [[package]]
 name = "pin-project-lite"

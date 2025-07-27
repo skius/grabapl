@@ -11,7 +11,7 @@ name = "grabapl"
 #petgraph = { git = "https://github.com/petgraph/petgraph.git", rev = "e2b28e59d0c37a8db9037997e84cc483ca94afc9"}
 #petgraph = { path = "../playground/petgraph", features = ["serde-1"] }
 # TODO: this will break on crates.io since crates.io petgraph does not have the necessary features we need
-petgraph = { git = "https://github.com/skius/petgraph.git", branch = "partial_isos", features = ["serde-1"], version = "0.8" }
+petgraph = { git = "https://github.com/skius/petgraph.git", branch = "partial_isos", features = ["serde-1"], version = "0.0.0", package = "grabapl_temp_petgraph_crate_not_namesquatting_i_promise" }
 derive_more = { version = "2.0.1", features = ["from", "into", "try_from", "try_into", "debug", "add", "add_assign"]}
 thiserror = "2.0.12"
 internment = "0.8.6"
