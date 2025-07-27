@@ -86,13 +86,13 @@ fn takes_context_nodes(child: Integer) [
       child -> some_node: "child2",
       map.new: Integer,
     ] {
-        node_to_ret <- map.new;
+        node_to_ret := map.new;
     } else if shape []  {
-        node_to_ret <- some_int_node.new;
+        node_to_ret := some_int_node.new;
     } else if cmp_fst_snd`<`(parent, child) {
-        node_to_ret <- some_int_node.new;
+        node_to_ret := some_int_node.new;
     } else {
-        node_to_ret <- some_other_int_node;
+        node_to_ret := some_other_int_node;
     }
     return (new_node: node_to_ret);
 }

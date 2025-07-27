@@ -597,13 +597,13 @@ fn get_ops_manual_ref() -> (
                 remove_edge(fst, snd);
                 add_edge<"queue_next">(head, snd);
                 // return fst
-                res <- fst;
+                res := fst;
             } else if shape [
                 fst: Int,
                 head -> fst: "queue_next"
             ] {
                 remove_edge(head, fst);
-                res <- fst;
+                res := fst;
             } else {
                 // if we don't match any children, we need some form of base-case result. we just create a dangling reference here.
                 let! res = add_node<int,-9999>();

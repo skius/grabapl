@@ -16,11 +16,11 @@ const SRC: &'static str = stringify!(
             // p1 < new_node
             let new_map = add_node%int,10%();
             copy_value_from_to(p1, new_map.new);
-            renamed <- new_map.new;
+            renamed := new_map.new;
 
         } else {
             // p1 >= new_node
-            renamed <- new_node;
+            renamed := new_node;
         }
         remove_node(p1);
         return (ret_node: renamed);

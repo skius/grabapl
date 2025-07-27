@@ -28,7 +28,9 @@ pub enum Token<'src> {
     Str(&'src str),
     // Op(&'src str),
     Arrow,
-    RevArrow,
+    // note: conflicts with call<-1>() ...
+    // RevArrow
+    ColonEq,
     Ctrl(char),
     Ident(&'src str),
     Fn,
@@ -50,7 +52,7 @@ impl fmt::Display for Token<'_> {
             Token::Str(s) => write!(f, "\"{}\"", s),
             // Token::Op(op) => write!(f, "{}", op),
             Token::Arrow => write!(f, "->"),
-            Token::RevArrow => write!(f, "<-"),
+            Token::ColonEq => write!(f, ":="),
             Token::Ctrl(c) => write!(f, "{}", c),
             Token::Ident(i) => write!(f, "{}", i),
             Token::Fn => write!(f, "fn"),
@@ -72,14 +74,21 @@ pub fn lexer<'src>()
     let num = text::int(10)
         .to_slice()
         .from_str()
-        .unwrapped()
-        .map(Token::Num);
+        .unwrapped();
+
+    // allow negative numbers
+    let num = just('-')
+        .ignore_then(num.clone())
+        .map(|num: i32| -num)
+        .or(num)
+        .map(|num: i32| Token::Num(num))
+        .boxed();
 
     // A parser for control characters (delimiters, semicolons, etc.)
     let ctrl = one_of("-()[]{};,?:*=/<>\"'.").map(Token::Ctrl);
 
     let arrow = just("->").to(Token::Arrow);
-    let rev_arrow = just("<-").to(Token::RevArrow);
+    let colon_eq = just(":=").to(Token::ColonEq);
 
     let let_bang = just("let!").to(Token::LetBang);
 
@@ -125,7 +134,7 @@ pub fn lexer<'src>()
     let token = let_bang
         .or(num)
         .or(arrow)
-        .or(rev_arrow)
+        .or(colon_eq)
         .or(macro_args)
         .or(macro_args_opt2)
         .or(macro_args_opt3)
@@ -667,7 +676,7 @@ where
             .labelled("return statement");
 
         let spanned_rename_stmt = ident_str
-            .then_ignore(just(Token::RevArrow))
+            .then_ignore(just(Token::ColonEq))
             .then(spanned_node_id.clone())
             .then_ignore(just(Token::Ctrl(';')))
             .map_with(|((new_name, new_name_span), (src, src_span)), e| {
@@ -1016,4 +1025,18 @@ macro_rules! grabapl_defs {
             $crate::grabapl_parse!($semantics, $($t)*)
         }
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use grabapl::semantics::example_with_ref::ExampleWithRefSemantics;
+
+    #[test]
+    fn negative_token() {
+        let _ = grabapl_parse!(ExampleWithRefSemantics,
+        fn foo(x: int) {
+            add_node<int,-1>();
+        }
+        );
+    }
 }
