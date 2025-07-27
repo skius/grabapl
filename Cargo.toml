@@ -13,6 +13,10 @@ members = [
 ]
 exclude = ["playground", "wasm-game-of-life"]
 
+[workspace.package]
+license = "MIT or Apache-2.0"
+authors = ["Niels Saurer <me@nielssaurer.com>"]
+
 [profile.release]
 # TODO: remove again?
 debug = true
