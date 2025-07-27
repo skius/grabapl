@@ -75,7 +75,7 @@ fn bubble_sort(curr_elt: Int, direction: Int) {
             bubble_sort(next, direction);
         } else {
             // we have reached the end. Since we were going down, that means `curr_elt` is now in the right position.
-            mark_node<"fixed", int>(curr_elt);
+            mark_node<"fixed">(curr_elt);
             // now we need to check if we can go back up again
             increment(direction);
             if shape [
