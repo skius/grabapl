@@ -156,3 +156,4 @@ cargo check --target wasm32-unknown-unknown
   - [ ] can link to the example clients that we dont publish on crates.io
 - [ ] build.sh should also adjust the FFI folder name in templates for js bindings (gitignore and diplomat-wasm.mjs.template)
 - [ ] Write in some README that the template_... crates are for documentation and link to them
+- [ ] Include "shape-safe, type-safe, extensible" somewhere in the main selling points?
