@@ -101,6 +101,7 @@ cargo check --target wasm32-unknown-unknown
 - [ ] Explicit input node parameters should have a "expected this abstract value, got this" error message. Actually all parameters.
     - ==> need debug constraint
 - [ ] add icu-like crate `grabapl` that re-exports grabapl_core (current grabapl) and grabapl_syntax.
+- [ ] use template semantics in online-syntax demo
 
 # TODOs for handover/documentation:
 - [x] Push the petgraph subgraph_monomorphism branch to a fork and depend on that instead.
@@ -144,3 +145,4 @@ cargo check --target wasm32-unknown-unknown
 - [ ] mdBook for main thing
   - [ ] can link to the example clients that we dont publish on crates.io
 - [ ] build.sh should also adjust the FFI folder name in templates for js bindings (gitignore and diplomat-wasm.mjs.template)
+- [ ] Write in some README that the template_... crates are for documentation and link to them

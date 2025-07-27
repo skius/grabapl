@@ -78,6 +78,8 @@ mod ffi {
             console_error_panic_hook::set_once();
             // change error-stack's color mode
             error_stack::Report::set_color_mode(ColorMode::None);
+            // print something to console to indicate that the library has been initialized
+            log::info!("Grabapl FFI initialized");
         }
 
         /// Parses a source file.

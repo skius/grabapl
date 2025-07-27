@@ -1,0 +1,33 @@
+{
+  "name": "ffi-web-demo",
+  "version": "0.1.0",
+  "description": "example JavaScript target for a grabapl client",
+  "main": "index.js",
+  "scripts": {
+    "build": "webpack --config webpack.config.js",
+    "start": "webpack-dev-server"
+  },
+  "keywords": [
+    "webassembly",
+    "wasm",
+    "rust",
+    "webpack"
+  ],
+  "author": "Niels Saurer <contact@nielssaurer.com>",
+  "license": "(MIT OR Apache-2.0)",
+  "dependencies": {
+    "@hpcc-js/wasm": "^2.22.4",
+    "css-loader": "^7.1.2",
+    "style-loader": "^4.0.0",
+    "template-ffi": "file:../js"
+  },
+  "devDependencies": {
+    "copy-webpack-plugin": "^5.0.0",
+    "online-syntax-js": "file:../online-syntax-js",
+    "ts-loader": "^9.5.2",
+    "typescript": "^5.8.3",
+    "webpack": "^5.99.8",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.1"
+  }
+}
