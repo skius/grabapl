@@ -775,6 +775,7 @@ dependencies = [
  "error-stack",
  "grabapl",
  "grabapl_syntax",
+ "grabapl_template_semantics",
  "log",
  "serde",
  "serde_json",

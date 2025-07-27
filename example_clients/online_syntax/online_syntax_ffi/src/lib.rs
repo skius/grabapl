@@ -1,10 +1,45 @@
-use grabapl::semantics::example_with_ref::{ExampleWithRefSemantics as TheSemantics, NodeValue};
+use grabapl_template_semantics::{TheSemantics, NodeValue, NodeType, EdgeValue, EdgeType};
+use syntax::interpreter::lex_then_parse;
+use syntax::custom_syntax::CustomSyntax;
+
+fn parse_node_value(s: &str) -> Option<NodeValue> {
+    let parser = grabapl_template_semantics::syntax::node_value_parser();
+    lex_then_parse(s, parser).ok()
+}
+
+fn parse_edge_value(s: &str) -> Option<EdgeValue> {
+    let parser = grabapl_template_semantics::syntax::edge_value_parser();
+    lex_then_parse(s, parser).ok()
+}
+
+fn parse_node_type(s: &str) -> Result<NodeType, String> {
+    let parser = grabapl_template_semantics::syntax::TheCustomSyntax::get_node_type_parser();
+    lex_then_parse(s, parser).map_err(|e| e.to_string())
+}
+
+fn parse_edge_type(s: &str) -> Result<EdgeType, String> {
+    let parser = grabapl_template_semantics::syntax::TheCustomSyntax::get_edge_type_parser();
+    lex_then_parse(s, parser).map_err(|e| e.to_string())
+}
 
 fn node_value_to_string(value: &NodeValue) -> String {
     match value {
-        NodeValue::Integer(i) => i.to_string(),
-        NodeValue::String(s) => s.clone(),
-        NodeValue::Reference(nk, _) => format!("ref({nk:?})"),
+        NodeValue::Integer(x) => { x.to_string() }
+        NodeValue::String(x) => {
+            // debug, since we want surrounding quotes
+            format!("{x:?}")
+        }
+    }
+}
+
+fn edge_value_to_string(value: &EdgeValue) -> String {
+    match value {
+        EdgeValue::Unit => { "()".to_string() }
+        EdgeValue::String(x) => {
+            // debug, since we want surrounding quotes
+            format!("{x:?}")
+        }
+        EdgeValue::Integer(x) => { x.to_string() }
     }
 }
 
@@ -13,10 +48,11 @@ pub mod ffi {
     use grabapl::NodeKey;
     use grabapl::graph::GraphTrait;
     use grabapl::prelude::OperationId;
-    use grabapl::semantics::example_with_ref::NodeValue;
+    use super::NodeValue;
     use std::collections::HashMap;
     use std::fmt::Write;
     use std::result::Result;
+    use grabapl_template_semantics::EdgeValue;
     use syntax::WithLineColSpans;
 
     pub struct Context {
@@ -214,11 +250,9 @@ pub mod ffi {
 
         /// Returns the node key of the newly added node
         pub fn add_node(&mut self, value: &str) -> u32 {
-            let value = if let Ok(v) = value.parse::<i32>() {
-                NodeValue::Integer(v)
-            } else {
-                NodeValue::String(value.to_string())
-            };
+            let value = super::parse_node_value(value)
+                // if we failed a parse, assume it's just a string
+                .unwrap_or(NodeValue::String(value.to_string()));
             self.graph.add_node(value).0
         }
 
@@ -227,7 +261,9 @@ pub mod ffi {
         }
 
         pub fn add_edge(&mut self, src: u32, dst: u32, weight: &str) {
-            self.graph.add_edge(src, dst, weight.to_string());
+            self.graph.add_edge(src, dst, super::parse_edge_value(weight)
+                // if we failed a parse, assume it's just a string
+                .unwrap_or(EdgeValue::String(weight.to_string())));
         }
 
         pub fn get_nodes(&self) -> Box<NodesIter> {
@@ -237,11 +273,7 @@ pub mod ffi {
                 .map(|(k, v)| {
                     (
                         k.0,
-                        match v {
-                            NodeValue::Integer(i) => i.to_string(),
-                            NodeValue::String(s) => s.to_string(),
-                            NodeValue::Reference(nk, _) => format!("ref({nk:?})"), // Handle Ref type if needed
-                        },
+                        super::node_value_to_string(v),
                     )
                 })
                 .collect();
@@ -252,7 +284,7 @@ pub mod ffi {
             let edges: Vec<(u32, u32, String)> = self
                 .graph
                 .edges()
-                .map(|(src, dst, weight)| (src.0, dst.0, weight.to_string()))
+                .map(|(src, dst, weight)| (src.0, dst.0, super::edge_value_to_string(weight)))
                 .collect();
             Box::new(EdgesIter(edges.into_iter()))
         }
