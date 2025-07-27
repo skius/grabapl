@@ -1,5 +1,9 @@
 # grabapl
 
+<div align="center">
+[![Crate Badge]][Crate] [![Docs Badge]][Docs]
+</div>
+
 A library for **gra**ph-**ba**sed **p**rogramming **l**anguages with static analysis.
 
 Playground: [https://skius.github.io/grabapl/](https://skius.github.io/grabapl/)
@@ -147,3 +151,7 @@ fn hide_node(node: any) {
 
 [`grabapl_template_semantics`]: https://crates.io/crates/grabapl_template_semantics
 [`grabapl_syntax`]: https://crates.io/crates/grabapl_syntax
+[Docs]: https://docs.rs/grabapl/latest/grabapl/
+[Crate]: https://crates.io/crates/grabapl
+[Crate Badge]: https://img.shields.io/crates/v/grabapl?logo=rust&style=flat-square&color=E05D44
+[Docs Badge]: https://img.shields.io/badge/docs-grabapl-1370D3?style=flat-square&logo=rust
