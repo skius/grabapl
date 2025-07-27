@@ -522,7 +522,7 @@ dependencies = [
 
 [[package]]
 name = "grabapl_syntax"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "ariadne",
  "chumsky 0.10.1",
@@ -550,7 +550,7 @@ dependencies = [
 
 [[package]]
 name = "grabapl_template_ffi"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "console_error_panic_hook",
  "diplomat",
@@ -565,7 +565,7 @@ dependencies = [
 
 [[package]]
 name = "grabapl_template_semantics"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "chumsky 0.10.1",
  "grabapl",
