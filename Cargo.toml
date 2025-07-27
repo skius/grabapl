@@ -18,8 +18,8 @@ license = "MIT OR Apache-2.0"
 authors = ["Niels Saurer <me@nielssaurer.com>"]
 
 [workspace.dependencies]
-grabapl = { path = "grabapl", version = "0.0.3" }
-syntax = { path = "syntax", package = "grabapl_syntax", version = "0.0.3" }
+grabapl = { path = "grabapl", version = "0.0.4" }
+syntax = { path = "syntax", package = "grabapl_syntax", version = "0.0.4" }
 
 [profile.release]
 # TODO: remove again?

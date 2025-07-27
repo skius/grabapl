@@ -1,6 +1,6 @@
 [package]
 name = "grabapl_template_ffi"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2024"
 license = { workspace = true }
 authors = { workspace = true }
@@ -16,7 +16,7 @@ crate-type = ["cdylib", "rlib"]
 grabapl = { workspace = true }
 syntax = { workspace = true }
 # we need to depend on our semantics
-semantics = { path = "../semantics", package = "grabapl_template_semantics", version = "0.0.3" }
+semantics = { path = "../semantics", package = "grabapl_template_semantics", version = "0.0.4" }
 # for nicer error messages
 console_error_panic_hook = "0.1.7"
 # if we wanted to call JavaScript functions from Rust
