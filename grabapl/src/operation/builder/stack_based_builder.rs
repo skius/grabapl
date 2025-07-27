@@ -1007,6 +1007,7 @@ impl<S: Semantics> BuiltShapeQueryFrame<S> {
 #[try_into(owned, ref, ref_mut)]
 enum Frame<S: Semantics> {
     BuildingParameter(BuildingParameterFrame<S>),
+    // TODO: unfortunate name - 'instructions' is also builder instructions. maybe CollectingStatements?
     CollectingInstructions(CollectingInstructionsFrame<S>),
     Query(QueryFrame<S>),
     Branches(BranchesFrame<S>),
@@ -1584,6 +1585,9 @@ pub struct OperationBuilder2<'a, S: Semantics> {
 }
 
 impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBuilder2<'a, S> {
+    // TODO: for every instruction, specify in which context it is valid.
+    //  then maybe make sure the FrameStack frames above are named consistently?
+
     /// Creates a new operation builder with the given operation context and self operation ID.
     ///
     /// The operation context is used to access other available operations.
@@ -1598,6 +1602,18 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         }
     }
 
+    /// Renames a node with the given abstract node ID to the new name.
+    ///
+    /// After this instruction, the node can not be accessed by the old name anymore, and instead
+    /// must be accessed via `AbstractNodeId::named(new_name)`.
+    ///
+    /// Because branch merging is based on node names, this instruction can be used if
+    /// a node from one branch should be merged with a node of a different name in the other branch.
+    ///
+    /// Parameter nodes cannot be renamed.
+    ///
+    /// Valid in:
+    /// * statement context
     pub fn rename_node(
         &mut self,
         old_aid: AbstractNodeId,
@@ -1607,6 +1623,14 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         self.push_instruction(BuilderInstruction::RenameNode(old_aid, new_name))
     }
 
+    /// Adds an explicit parameter node with the given type to the operation.
+    ///
+    /// Explicit parameter nodes are ordered by the order in which they were added via this instruction.
+    ///
+    /// After this instruction, the node can be accessed via `AbstractNodeId::param(marker)`.
+    ///
+    /// Valid in:
+    /// * parameter context
     pub fn expect_parameter_node(
         &mut self,
         marker: impl Into<SubstMarker>,
@@ -1616,6 +1640,19 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         self.push_instruction(BuilderInstruction::ExpectParameterNode(marker, node))
     }
 
+    /// Adds an implicit parameter node with the given type to the operation.
+    ///
+    /// Implicit parameter nodes are not ordered, and are used to represent nodes that are
+    /// automatically, statically, and implicitly matched from the abstract graph whenever an
+    /// operation is called.
+    ///
+    /// Implicit parameter nodes must be connected to explicit parameter nodes via
+    /// [`OperationBuilder::expect_parameter_edge`].
+    ///
+    /// After this instruction, the node can be accessed via `AbstractNodeId::param(marker)`.
+    ///
+    /// Valid in:
+    /// * parameter context
     pub fn expect_context_node(
         &mut self,
         marker: impl Into<SubstMarker>,
@@ -1625,6 +1662,10 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         self.push_instruction(BuilderInstruction::ExpectContextNode(marker, node))
     }
 
+    /// Adds an edge between two parameter nodes.
+    ///
+    /// Valid in:
+    /// * parameter context
     pub fn expect_parameter_edge(
         &mut self,
         source_marker: impl Into<SubstMarker>,
@@ -1640,20 +1681,47 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         ))
     }
 
+    /// Starts the given query with the given arguments.
+    ///
+    /// This enters query context, which must either be exited with [`OperationBuilder::end_query`]
+    /// or the branches must be entered with [`OperationBuilder::enter_true_branch`] or [`OperationBuilder::enter_false_branch`].
+    ///
+    /// Valid in:
+    /// * statement context
     pub fn start_query(
         &mut self,
         query: S::BuiltinQuery,
         args: Vec<AbstractNodeId>,
     ) -> Result<(), OperationBuilderError> {
-        // todo!()
         self.push_instruction(BuilderInstruction::StartQuery(query, args))
     }
 
+    // TODO: can we lift the restriction of never entering the same branch more than once?
+    /// Enters the true branch of the current query.
+    ///
+    /// Can be executed immediately after starting a query or in the statement context
+    /// after [`OperationBuilder::enter_false_branch`] as well, but never twice for the same query.
+    ///
+    /// This enters statement context. Statements in that context will be sent to the true branch of the currently active query.
+    ///
+    /// Valid in:
+    /// * query context
+    /// * statement context
     pub fn enter_true_branch(&mut self) -> Result<(), OperationBuilderError> {
         // todo!()
         self.push_instruction(BuilderInstruction::EnterTrueBranch)
     }
 
+    /// Enters the false branch of the current query.
+    ///
+    /// Can be executed immediately after starting a query or in the statement context
+    /// after [`OperationBuilder::enter_true_branch`] as well, but never twice for the same query.
+    ///
+    /// This enters statement context. Statements in that context will be sent to the false branch of the currently active query.
+    ///
+    /// Valid in:
+    /// * query context
+    /// * statement context
     pub fn enter_false_branch(&mut self) -> Result<(), OperationBuilderError> {
         // todo!()
         self.push_instruction(BuilderInstruction::EnterFalseBranch)
@@ -1661,6 +1729,12 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
 
     // TODO: get rid of AbstractOperationResultMarker requirement. Either completely or make it optional and autogenerate one.
     //  How to specify which shape node? ==> the shape node markers should be unique per path
+    /// Starts a shape query whose newly matched nodes will be bound to the map of the given marker.
+    ///
+    /// This enters shape query parameter context, in which the shape query can be built.
+    ///
+    /// Valid in:
+    /// * statement context
     pub fn start_shape_query(
         &mut self,
         op_marker: impl Into<AbstractOperationResultMarker>,
@@ -1668,12 +1742,26 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         self.push_instruction(BuilderInstruction::StartShapeQuery(op_marker.into()))
     }
 
+    /// Ends the current query.
+    ///
+    /// Returns to the outer statement context.
+    ///
+    /// Valid in:
+    /// * query context
+    /// * statement context
     pub fn end_query(&mut self) -> Result<(), OperationBuilderError> {
         self.push_instruction(BuilderInstruction::EndQuery)
     }
 
     // TODO: should expect_*_node really expect a marker? maybe it should instead return a marker?
     //  it could also take an Option<Marker> so that it can autogenerate one if it's none so the caller doesn't have to deal with it.
+    /// Adds the requirement to match a shape node with the given abstract value in order to enter the true branch.
+    ///
+    /// If the current shape query was started with `"shape_query_marker"`, in the true branch,
+    /// the node will be available as `AbstractNodeId::dynamic_output("shape_query_marker", marker)`.
+    ///
+    /// Valid in:
+    /// * shape query parameter context
     pub fn expect_shape_node(
         &mut self,
         marker: AbstractOutputNodeMarker,
@@ -1682,6 +1770,14 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         self.push_instruction(BuilderInstruction::ExpectShapeNode(marker, node))
     }
 
+    /// Adds the requirement to match an existing node with a new abstract value in order to enter the true branch.
+    ///
+    /// Inside the true branch, the node will be visible with the changed abstract value.
+    ///
+    /// Ideally, the new abstract value is a subtype of the old abstract value, giving new information about the node.
+    ///
+    /// Valid in:
+    /// * shape query parameter context
     pub fn expect_shape_node_change(
         &mut self,
         aid: AbstractNodeId,
@@ -1690,6 +1786,12 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         self.push_instruction(BuilderInstruction::ExpectShapeNodeChange(aid, node))
     }
 
+    /// Adds the requirement to match an edge with the given abstract value in order to enter the true branch.
+    ///
+    /// Inside the true branch, the edge will be visible with the given abstract value.
+    ///
+    /// Valid in:
+    /// * shape query parameter context
     pub fn expect_shape_edge(
         &mut self,
         source: AbstractNodeId,
@@ -1699,14 +1801,31 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         self.push_instruction(BuilderInstruction::ExpectShapeEdge(source, target, edge))
     }
 
+    /// Adds a node marker that the currently active shape query will skip.
+    ///
+    /// For example, we may want to mark nodes as "visited", and then skip all visited nodes
+    /// in the shape query.
+    ///
+    /// Valid in:
+    /// * shape query parameter context
     pub fn skip_marker(&mut self, marker: impl Into<Marker>) -> Result<(), OperationBuilderError> {
         self.push_instruction(BuilderInstruction::SkipMarker(marker.into()))
     }
 
+    /// Tells the currently active shape query to skip all nodes that are marked with any marker.
+    ///
+    /// Valid in:
+    /// * shape query parameter context
     pub fn skip_all_markers(&mut self) -> Result<(), OperationBuilderError> {
         self.push_instruction(BuilderInstruction::SkipAllMarkers)
     }
 
+    /// Issues a call to the specified operation with the given arguments and binds the returned nodes to the map of the given name.
+    ///
+    /// After this instruction, if the called operation returned nodes `"a"`, `"b"`, and `"c"`, those are
+    /// accessible via [`AbstractNodeId`]'s
+    /// `AbstractNodeId::dynamic_output(name, "a")`, `AbstractNodeId::dynamic_output(name, "b")`,
+    /// and `AbstractNodeId::dynamic_output(name, "c")`, respectively.
     pub fn add_named_operation(
         &mut self,
         name: AbstractOperationResultMarker,
@@ -1716,6 +1835,10 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         self.push_instruction(BuilderInstruction::AddNamedOperation(name, op, args))
     }
 
+    /// Issues a call to the specified operation with the given arguments and binds the single returned node
+    /// to [`AbstractNodeId`]'s `AbstractNodeId::named(name)`.
+    ///
+    /// Returns an error if the operation does not return exactly one node.
     pub fn add_bang_operation(
         &mut self,
         name: impl Into<NamedMarker>,
@@ -1840,9 +1963,7 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         self.push_instruction(BuilderInstruction::Diverge(message.into()))
     }
 
-    // TODO: This should run further post processing checks.
-    //  Stuff like Context nodes must be connected, etc.
-    // TODO: remove self_op_id since that is actually not used here.
+    /// Builds the user defined operation from the collected instructions.
     pub fn build(&mut self) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
         // build on a clone
         let res = self.active.clone().build();
