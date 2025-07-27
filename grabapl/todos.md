@@ -107,6 +107,7 @@ cargo check --target wasm32-unknown-unknown
     2. from sentinel, shape query for a non-fixed node, go down list taking the max with us, and in the end mark node as fixed and stop recursion calls.
     3. repeat that from sentinel until the shape query for non-fixed nodes returns nothing.
 - [ ] add support for shape node change checking for markers. Or just add a has_marker libbuiltin query.
+- [ ] make a lot more types private. eg the AST from the syntax crate.
 
 # TODOs for handover/documentation:
 - [x] Push the petgraph subgraph_monomorphism branch to a fork and depend on that instead.
