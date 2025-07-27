@@ -102,6 +102,11 @@ cargo check --target wasm32-unknown-unknown
     - ==> need debug constraint
 - [ ] add icu-like crate `grabapl` that re-exports grabapl_core (current grabapl) and grabapl_syntax.
 - [ ] use template semantics in online-syntax demo
+- [ ] todo: make bubble sort that just goes down
+    1. add sentinel that points to head of list
+    2. from sentinel, shape query for a non-fixed node, go down list taking the max with us, and in the end mark node as fixed and stop recursion calls.
+    3. repeat that from sentinel until the shape query for non-fixed nodes returns nothing.
+- [ ] add support for shape node change checking for markers. Or just add a has_marker libbuiltin query.
 
 # TODOs for handover/documentation:
 - [x] Push the petgraph subgraph_monomorphism branch to a fork and depend on that instead.
@@ -132,10 +137,11 @@ cargo check --target wasm32-unknown-unknown
   - [ ] ConcreteData
   - [ ] (abstract) operation output
   - [ ] ConcreteQueryOutput]
-  - [ ] syntax
+  - [ ] SemanticsWithSyntax trait
 - [ ] Document the language core semantics itself
   - [ ] maybe use mdBook
   - [ ] Document shape queries and link that to the template query docs
+    - [ ] in particular shape-hidden nodes
   - [ ] user defined operations, including abstract changes
   - [ ] Document the different markers in use (substmarker, graphwithsubst markers, output markers, etc)
 - [ ] Document the syntax
