@@ -107,11 +107,11 @@ cargo check --target wasm32-unknown-unknown
 - [x] Push the petgraph subgraph_monomorphism branch to a fork and depend on that instead.
 - [ ] Finish template client
   - [x] Rust semantics implementation + docs
-  - [ ] FFI library + docs, exposing everything
-  - [ ] NPM web client (javascript only) with some examples
-    - [ ] Typescript?
+  - [x] FFI library + docs, exposing everything
+  - [x] NPM web client (javascript only) with some examples
+    - [x] Typescript?
       - won't update the existing demos to be typescript
-  - [ ] README, document cargo.toml and grabapl relative link
+  - [x] README, document cargo.toml and grabapl relative link
   - [ ] push to crates.io?
 - [ ] Document operation builder and what the function calls do
 - [ ] Document the semantics trait and the required associated type traits.

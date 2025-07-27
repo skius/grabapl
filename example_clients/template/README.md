@@ -2,6 +2,10 @@
 
 This directory contains a documented example of how to write a grabapl semantics and optionally use it over FFI.
 
+## Prerequisites
+
+If you want to use this client as-is, you need to clone the main repository and work in the `example_clients/template` directory.
+
 ## Components
 
 ### Rust
