@@ -18,7 +18,7 @@ license = "MIT OR Apache-2.0"
 authors = ["Niels Saurer <me@nielssaurer.com>"]
 
 [workspace.dependencies]
-grabapl = { path = "grabapl", version = "0.0.0" }
+grabapl = { path = "grabapl", version = ">=0.0.0" }
 syntax = { path = "syntax", package = "grabapl_syntax", version = "0.0.0" }
 
 [profile.release]
