@@ -1598,13 +1598,6 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         }
     }
 
-    pub fn undo_last_instruction(&mut self) {
-        if !self.instructions.is_empty() {
-            self.instructions.pop();
-        }
-        self.rebuild_active_from_instructions()
-    }
-
     pub fn rename_node(
         &mut self,
         old_aid: AbstractNodeId,
@@ -1668,19 +1661,14 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
 
     // TODO: get rid of AbstractOperationResultMarker requirement. Either completely or make it optional and autogenerate one.
     //  How to specify which shape node? ==> the shape node markers should be unique per path
-    // TODO: Shape queries cannot shape-test for abstract values of existing nodes yet!
-    // TODO: Also add test for existing edges between existing nodes.
-    // ^ i think all of these are resolved and can be deleted.
     pub fn start_shape_query(
         &mut self,
         op_marker: impl Into<AbstractOperationResultMarker>,
     ) -> Result<(), OperationBuilderError> {
-        // todo!()
         self.push_instruction(BuilderInstruction::StartShapeQuery(op_marker.into()))
     }
 
     pub fn end_query(&mut self) -> Result<(), OperationBuilderError> {
-        // todo!()
         self.push_instruction(BuilderInstruction::EndQuery)
     }
 
@@ -1691,7 +1679,6 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         marker: AbstractOutputNodeMarker,
         node: S::NodeAbstract,
     ) -> Result<(), OperationBuilderError> {
-        // TODO: check that any shape nodes are not free floating. maybe this should be in a GraphShapeQuery validator?
         self.push_instruction(BuilderInstruction::ExpectShapeNode(marker, node))
     }
 
@@ -1709,7 +1696,6 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         target: AbstractNodeId,
         edge: S::EdgeAbstract,
     ) -> Result<(), OperationBuilderError> {
-        // TODO:
         self.push_instruction(BuilderInstruction::ExpectShapeEdge(source, target, edge))
     }
 
@@ -1739,13 +1725,37 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         self.push_instruction(BuilderInstruction::AddBangOperation(name.into(), op, args))
     }
 
-    // TODO: for ergonomics, could take an impl Into<BuilderOpLike<S>> and blanket impl that for all S::BuiltinOperation etc.
+    // ODOT: for ergonomics, could take an impl Into<BuilderOpLike<S>> and blanket impl that for all S::BuiltinOperation etc.
+    //  ^ cannot do above right now, since From<S::BuiltinOperation> could be a conflict with From<BuilderOpLike>,
+    //    since we cannot guarantee that S::BuiltinOperation is never equal BuilderOpLike itself.
+    //    need trait negative bounds or specialization.
+    /// Issues a call to the specified operation with the given arguments.
+    ///
+    /// As opposed to [`OperationBuilder::add_named_operation`] and [`OperationBuilder::add_bang_operation`],
+    /// this does not bind potential new nodes to a name.
+    ///
+    /// Any returned nodes by the operation are hence invisible in the abstract state.
+    ///
+    /// Other abstract effects are still applied, like removed or changed nodes, and added, removed, or changed edges.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// # use grabapl::operation::builder::stack_based_builder::OperationBuilder2;
+    /// # use grabapl::prelude::{BuilderOpLike, LibBuiltinOperation, OperationContext};
+    /// # use grabapl::semantics::example::{ExampleOperation, ExampleSemantics, NodeType, NodeValue};
+    /// # let op_ctx = OperationContext::<ExampleSemantics>::new();
+    /// # let mut builder = OperationBuilder2::new(&op_ctx, 0);
+    /// builder.add_operation(BuilderOpLike::LibBuiltin(LibBuiltinOperation::AddNode {value: NodeValue::Integer(42)}), vec![]).unwrap();
+    /// let state = builder.show_state().unwrap();
+    /// assert_eq!(state.node_keys_to_aid.len(), 0);
+    /// ```
     pub fn add_operation(
         &mut self,
-        op: BuilderOpLike<S>,
+        op: impl Into<BuilderOpLike<S>>,
         args: Vec<AbstractNodeId>,
     ) -> Result<(), OperationBuilderError> {
-        self.push_instruction(BuilderInstruction::AddOperation(op, args))
+        self.push_instruction(BuilderInstruction::AddOperation(op.into(), args))
     }
 
     /// Indicate that a node should be marked in the output with the given abstract value.
@@ -1788,6 +1798,9 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         self.push_instruction(BuilderInstruction::ReturnEdge(src, dst, edge))
     }
 
+    /// Asserts that the operation being built will return a node with the given marker and abstract value.
+    ///
+    /// [`OperationBuilder::build`] will fail if the operation does not return a node with the given marker.
     pub fn expect_self_return_node(
         &mut self,
         output_marker: impl Into<AbstractOutputNodeMarker>,
@@ -1799,6 +1812,30 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         ))
     }
 
+    /// Adds a diverge operation at the current point that crashes with the given message.
+    ///
+    /// This has special support for static analysis: If one of the two branches of a (shape or regular) query diverges,
+    /// the other branch is considered to be the only branch that reaches past the query.
+    ///
+    /// In other words, the usual merge rules for branches do not apply, and the non-diverging branch
+    /// will have its abstract state directly propagated to after the [`OperationBuilder::end_query`] instruction.
+    ///
+    /// # Example
+    /// ```rust
+    /// # use grabapl::semantics::example::ExampleSemantics;
+    /// # syntax::grabapl_parse!(ExampleSemantics,
+    /// fn must_return_child(parent: int) -> (child: int) {
+    ///     if shape [child: int, parent -> child: *] {
+    ///         // `child` node is in scope here
+    ///     } else {
+    ///         diverge<"no child found">();
+    ///         // `child` is not in scope here
+    ///     }
+    ///     // `child` is in scope here, despite not existing in the abstract state at the end of the `else` branch.
+    ///     return (child: child);
+    /// }
+    /// # );
+    /// ```
     pub fn diverge(&mut self, message: impl Into<String>) -> Result<(), OperationBuilderError> {
         self.push_instruction(BuilderInstruction::Diverge(message.into()))
     }
@@ -1876,30 +1913,6 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         self.active = new_builder_stage_2;
         self.instructions.push(instruction.clone());
         Ok(())
-
-        // before proper recursion:
-        // self.instructions.push(instruction.clone());
-        // let res =self.active.consume(instruction).change_context(OperationBuilderError::NewBuilderError);
-        // if res.is_err() {
-        //    // rollback
-        //     self.instructions.pop();
-        //     self.rebuild_active_from_instructions();
-        // }
-        //
-        // res
-    }
-
-    fn build_builder_from_scratch_with_self_op(
-        &self,
-        self_op: UserDefinedOperation<S>,
-    ) -> Result<Builder<'a, S>, BuilderError> {
-        let mut builder = Builder::new(self.op_ctx, self.self_op_id);
-        builder.update_partial_self_op(self_op);
-        for instruction in &self.instructions {
-            builder.consume(instruction.clone())?;
-        }
-
-        Ok(builder)
     }
 
     fn build_builder_from_scratch_with_output_changes(
@@ -1913,15 +1926,6 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         }
 
         Ok(builder)
-    }
-
-    fn rebuild_active_from_instructions(&mut self) {
-        let instrs = std::mem::take(&mut self.instructions);
-        self.active = Builder::new(self.op_ctx, self.self_op_id);
-        for instruction in instrs {
-            self.push_instruction(instruction)
-                .expect("Rebuilding active builder from instructions should not fail");
-        }
     }
 }
 
