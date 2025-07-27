@@ -29,6 +29,24 @@ use crate::{EdgeType, NodeType, TheSemantics, TheOperation, TheQuery, IntCompari
 #[derive(Clone, Debug)]
 pub struct TheCustomSyntax;
 
+/// Helper that provides a parser for edge values from [`grabapl_syntax`](syntax)'s [`Token`] type.
+pub fn edge_value_parser<'src: 'tokens, 'tokens, I: ValueInput<'tokens, Token=Token<'src>, Span=Span>>() -> impl Parser<'tokens, I, EdgeValue, chumsky::extra::Err<chumsky::error::Rich<'tokens, Token<'src>, Span>>> + Clone {
+    let unit = just(Token::Ctrl('(')).then_ignore(just(Token::Ctrl(')'))).to(EdgeValue::Unit);
+    let specific_string = select! { Token::Str(s) => s.to_owned() }.map(EdgeValue::String);
+    let integer = select! { Token::Num(i) => i }.map(EdgeValue::Integer);
+
+    unit.or(specific_string).or(integer)
+}
+
+/// Helper that provides a parser for node values from [`grabapl_syntax`](syntax)'s [`Token`] type.
+pub fn node_value_parser<'src: 'tokens, 'tokens, I: ValueInput<'tokens, Token=Token<'src>, Span=Span>>() -> impl Parser<'tokens, I, NodeValue, chumsky::extra::Err<chumsky::error::Rich<'tokens, Token<'src>, Span>>> + Clone {
+    let int = select! { Token::Num(i) => i }.map(NodeValue::Integer);
+    let string = select! { Token::Str(s) => s.to_owned() }.map(NodeValue::String);
+
+    int.or(string)
+}
+
+
 impl CustomSyntax for TheCustomSyntax {
     /// We will directly use the semantics' node type as the syntax struct.
     type AbstractNodeType = NodeType;
@@ -101,11 +119,8 @@ impl SemanticsWithCustomSyntax for TheSemantics {
                     return Some(TheOperation::NewNode { value: NodeValue::Integer(0) });
                 };
                 let args_src = args.0;
-                // if args_src is provided, it must either be an integer, or a string.
-                let int = select! { Token::Num(i) => i };
-                let string = select! { Token::Str(s) => s.to_owned() };
-                let value_parser = int.map(NodeValue::Integer)
-                    .or(string.map(NodeValue::String));
+                // if args_src is provided, it must be a node value
+                let value_parser = node_value_parser();
                 // we reuse `syntax`'s lexer, because it's enough for our purposes.
                 let res = lex_then_parse(args_src, value_parser).ok()?;
                 Some(TheOperation::NewNode { value: res })
@@ -135,12 +150,8 @@ impl SemanticsWithCustomSyntax for TheSemantics {
                     return Some(TheOperation::NewEdge { value: EdgeValue::Unit });
                 };
                 let args_src = args.0;
-                // if args_src is provided, it must be a valid edge value, i.e., unit, "string", or int.
-                let unit = just(Token::Ctrl('(')).then_ignore(just(Token::Ctrl(')'))).to(EdgeValue::Unit);
-                let specific_string = select! { Token::Str(s) => s.to_owned() }.map(EdgeValue::String);
-                let integer = select! { Token::Num(i) => i }.map(EdgeValue::Integer);
-
-                let value_parser = unit.or(specific_string).or(integer);
+                // if args_src is provided, it must be a valid edge value
+                let value_parser = edge_value_parser();
                 let res = lex_then_parse(args_src, value_parser).ok()?;
 
                 Some(TheOperation::NewEdge { value: res })
@@ -167,11 +178,8 @@ impl SemanticsWithCustomSyntax for TheSemantics {
             "is_eq" => {
                 // expects an argument of node value to compare against.
                 let args_src = args?.0;
-                let int = select! { Token::Num(i) => i };
-                let string = select! { Token::Str(s) => s.to_owned() };
-                let value = int.map(NodeValue::Integer)
-                    .or(string.map(NodeValue::String));
-                let res = lex_then_parse(args_src, value).ok()?;
+                let value_parser = node_value_parser();
+                let res = lex_then_parse(args_src, value_parser).ok()?;
                 Some(TheQuery::IsEq { value: res })
             }
             "eq" | "equals" => {

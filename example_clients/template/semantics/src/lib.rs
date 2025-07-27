@@ -63,10 +63,13 @@
 //! These are arbitrary Rust functions (or any other language through FFI and/or interpreters) that operate on the graph.
 //!
 //! ## Builtin Operations
-//! The operations are defined by the [`BuiltinOperation`] trait, which we have implemented for the [`TheOperation`] enum.
+//! Builtin operations are defined by the [`BuiltinOperation`] trait, which we have implemented for the [`TheOperation`] enum.
 //!
 //! Builtin operations can be used to manipulate the graph, e.g., adding nodes or edges, removing them,
 //! changing their values, etc., but also for anything side-effectful, like printing a trace to the console.
+//!
+//! There is a set of generic operations that are defined in the [`LibBuiltinOperation`] enum, which can be used to
+//! perform common operations on the graph independent of the custom semantics.
 //!
 //! See the [`BuiltinOperation`] trait for more details on how to implement operations.
 //!
