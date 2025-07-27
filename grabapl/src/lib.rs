@@ -22,7 +22,7 @@
 //! [`grabapl_template_semantics`], here is an implementation of in-place bubble sort on a linked list:
 //!
 //! ```rust,ignore
-//!
+//! 
 //! ```
 //!
 //! [`grabapl_template_semantics`]: https://crates.io/crates/grabapl_template_semantics

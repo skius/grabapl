@@ -1,6 +1,7 @@
 import {Graphviz} from "@hpcc-js/wasm";
 import {ConcreteGraph, Context} from "online-syntax-js";
 import * as monaco from 'monaco-editor';
+import 'monaco-editor/esm/vs/basic-languages/rust/rust.contribution';
 import { AnsiUp } from 'ansi_up';
 import * as d3 from 'd3';
 
