@@ -1,4 +1,32 @@
-//! Grabapl docs. Todo.
+//! A library for **gra**ph-**ba**sed **p**rogramming **l**anguages with static analysis.
+//!
+//! Playground: [https://skius.github.io/grabapl/](https://skius.github.io/grabapl/)
+//!
+//! # Main Features
+//! * The program state is a single global, directed graph.
+//! * The type system is a shape-based type system (i.e., existence and absence of nodes and edges) composed
+//!   with an arbitrary client-defined type system for node and edge values.
+//!     * Nodes and edges can hold arbitrary values of arbitrary types.
+//!     * See [`grabapl_template_semantics`] for an example client.
+//! * No explicit loops, only recursion.
+//! * Statically visible nodes and edges are guaranteed to exist at runtime. No nulls.
+//! * Frontend-agnostic with a focus on intermediate abstract states:
+//!     * The fundamental building blocks of programs are "instructions" that can stem from any source.
+//!     * For example, a frontend may decide to be visual-first by visualizing intermediate states and
+//!       turning interactive actions into instructions.
+//!     * A text-based frontend is provided with [`grabapl_syntax`],
+//!       supporting a Rust-like syntax with pluggable client-defined parsing rules.
+//!
+//! # Example
+//! Using the [`grabapl_syntax`] frontend as example with the example node and edge type system from
+//! [`grabapl_template_semantics`], here is an implementation of in-place bubble sort on a linked list:
+//!
+//! ```rust,ignore
+//!
+//! ```
+//!
+//! [`grabapl_template_semantics`]: https://crates.io/crates/grabapl_template_semantics
+//! [`grabapl_syntax`]: https://crates.io/crates/grabapl_syntax
 
 extern crate core;
 
