@@ -501,7 +501,7 @@ dependencies = [
 
 [[package]]
 name = "grabapl"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "chumsky 0.10.1",
  "criterion",

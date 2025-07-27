@@ -5,9 +5,9 @@ edition = "2024"
 
 [dependencies]
 # main basic functionality
-grabapl = { path = "../../../grabapl" }
+grabapl = { workspace = true }
 # in case we want to parse a textual representation of user defined operations
-syntax = { path = "../../../syntax", package = "grabapl_syntax", version = "0.0.0" }
+syntax = { workspace = true }
 # in case we want to serialize and deserialize our operations
 serde = { version = "1.0", features = ["derive"] }
 # for logging

@@ -12,7 +12,7 @@ wasm-bindgen = "0.2"
 diplomat = "0.12.0"
 diplomat-runtime = { version = "0.12.0", features = ["log"] }
 log = "0.4"
-grabapl = { path = "../../../grabapl" }
+grabapl = { workspace = true }
 simple_semantics = { path = "../simple_semantics" }
 error-stack = "0.5.0"
 serde = { version = "1.0", features = ["derive"] }

@@ -12,9 +12,9 @@
 
 use grabapl::operation::builder::IntermediateState;
 use grabapl::prelude::*;
-use grabapl_syntax::custom_syntax::CustomSyntax;
+use ::syntax::custom_syntax::CustomSyntax;
+use ::syntax::interpreter::lex_then_parse;
 use semantics::*;
-use grabapl_syntax::interpreter::lex_then_parse;
 
 type RustOperationContext = OperationContext<TheSemantics>;
 type RustIntermediateState = IntermediateState<TheSemantics>;
@@ -84,7 +84,7 @@ mod ffi {
 
         /// Parses a source file.
         pub fn parse(src: &str) -> Box<CompileResult> {
-            let raw_res = grabapl_syntax::try_parse_to_op_ctx_and_map(src, false /* disable colored error messages - see the online_syntax demo for how to handle them */);
+            let raw_res = syntax::try_parse_to_op_ctx_and_map(src, false /* disable colored error messages - see the online_syntax demo for how to handle them */);
             let op_ctx_and_map_res = raw_res.op_ctx_and_map
                 // turn function names into owned strings
                 .map(|(op_ctx, map)| {

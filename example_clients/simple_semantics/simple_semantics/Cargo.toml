@@ -6,7 +6,7 @@ default-run = "simple_semantics"
 
 
 [dependencies]
-grabapl = { path = "../../../grabapl" }
+grabapl = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
 
 [[bin]]

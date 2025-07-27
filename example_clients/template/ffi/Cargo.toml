@@ -8,8 +8,8 @@ edition = "2024"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-grabapl = { path = "../../../grabapl" }
-grabapl_syntax = { path = "../../../syntax", package = "grabapl_syntax", version = "0.0.0" }
+grabapl = { workspace = true }
+syntax = { workspace = true }
 # we need to depend on our semantics
 semantics = { path = "../semantics", package = "grabapl_template_semantics", version = "0.0.0" }
 # for nicer error messages

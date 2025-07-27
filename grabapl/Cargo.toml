@@ -1,6 +1,6 @@
 [package]
 name = "grabapl"
-version = "0.0.0"
+version = "0.0.1"
 edition = "2024"
 license = { workspace = true }
 authors = { workspace = true }
@@ -33,7 +33,7 @@ proptest = "1.7.0"
 rand = "0.9.1"
 test-log = { version = "0.2", features = ["unstable"] }
 serde_json = "1.0"
-syntax = { path = "../syntax", package = "grabapl_syntax" }
+syntax = { path = "../syntax", package = "grabapl_syntax" } # not using the workspace dep to avoid cyclic dependencies (the missing version from this line fixes this)
 chumsky = "0.10.1"
 
 [features]
