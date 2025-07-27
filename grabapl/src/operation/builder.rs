@@ -1,3 +1,63 @@
+//! This module provides functionality related to building user defined operations.
+//!
+//! The main functionality is provided by the [`OperationBuilder`] type.
+//!
+//! This should be used as the primary backend used by frontends that want to allow end-users to create
+//! their own operations.
+//!
+//! The main method of communication is through atomic "instructions" sent to the builder.
+//! These are flat instructions: any nesting in the resulting user defined operation is a result
+//! of explicit "nesting" instructions, such as [`OperationBuilder::start_query`].
+//!
+//! You can think of these instructions as the HIR (high-level intermediate representation) of
+//! grabapl, which the builder compiles into bytecode (i.e., the final user defined operation) for the interpreter.
+//!
+//! See the [`OperationBuilder`] documentation for the available instructions.
+//!
+//! # Example
+//! Assume we want to build a text-based frontend that allows users to create their own operations.
+//!
+//! We may want to support syntax such as the following:
+//! ```rust
+//! # use grabapl::semantics::example::ExampleSemantics;
+//! # use syntax::grabapl_parse;
+//! # grabapl_parse!(ExampleSemantics,
+//! fn mark_children_as_visited(parent: int) {
+//!     if shape [child: int, parent -> child: *] {
+//!         mark_node<"visited">(child);
+//!         // we found a child, hence we should recurse to find more children
+//!         mark_children_as_visited(parent);
+//!     }
+//! }
+//! # );
+//! ```
+//!
+//! If we leverage this builder, all our frontend would need to do in order to get a finished user defined operation,
+//! is turn the above syntax example into the following sequence of instructions:
+//! 1. [`expect_parameter_node("parent", NodeType::Int)`](OperationBuilder::expect_parameter_node) - the parameter definition
+//! 2. [`start_shape_query("<generated name>")`](OperationBuilder::start_shape_query) - the start of the shape query
+//! 3. [`expect_shape_node("child", NodeType::Int)`](OperationBuilder::expect_shape_node) - the shape query expects a child node of type int
+//! 4. [`expect_shape_edge("parent", "child", EdgeType::Wildcard)`](OperationBuilder::expect_shape_edge) - the shape query expects an edge from parent to child
+//! 5. [`enter_true_branch()`](OperationBuilder::enter_true_branch) - we enter the true branch of the shape query
+//!    * Note how this is a flat instruction: We don't pass the entire true branch as argument to the method.
+//!      Instead, we _change the context_ to indicate the following instructions are part of the true branch.
+//! 6. [`add_operation(LibBuiltinOperation::MarkNode("visited"), vec!["child"])`](OperationBuilder::add_operation) - we add an operation that marks the child node as visited
+//! 7. [`add_operation(Recurse, vec!["parent"])`](OperationBuilder::add_operation) - we add an operation that recurses to find more children
+//! 8. [`end_query()`](OperationBuilder::end_query) - we end the shape query
+//!
+//! After sending these instructions to the builder we can call [`OperationBuilder::build()`](OperationBuilder::build)
+//! to get the final user defined operation that can then be added to a [`OperationContext`](crate::operation::OperationContext) and
+//! executed by the interpreter via [`run_from_concrete`](crate::operation::run_from_concrete).
+//!
+//! # Example Frontends
+//! See [`grabapl_syntax`](https://crates.io/crates/grabapl_syntax) for a text-based syntax
+//! frontend that compiles parsed ASTs into instructions for this builder.
+//! This implements our example from above.
+//!
+//! See `example_clients/simple_semantics/{simple_semantics_ffi, www}` for a basic visual editor that
+//! uses commands from the user to convert into instructions for this builder, and takes the builder's
+//! intermediate state to give visual feedback to the user.
+
 use crate::operation::builtin::LibBuiltinOperation;
 use crate::operation::marker::Marker;
 use crate::operation::query::{BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier};

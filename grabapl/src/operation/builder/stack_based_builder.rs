@@ -1567,6 +1567,12 @@ impl<'a, S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> Debug for Build
     }
 }
 
+/// Builds a user defined operation by collecting instructions and compiling them into a user defined operation.
+///
+/// At any point, the builder supports looking at the current abstract state of the operation being built via
+/// [`OperationBuilder::show_state`].
+///
+/// For more information on the whole building process, see the [module-level documentation](crate::operation::builder).
 // TODO: avoid having an explicit reference to the operation context.
 //  maybe a refcell? and when building immediately add the operation to it?
 //  maybe we could actually on-the-fly store a signature of self in the operation context for other operation builders.
@@ -1578,6 +1584,11 @@ pub struct OperationBuilder2<'a, S: Semantics> {
 }
 
 impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBuilder2<'a, S> {
+    /// Creates a new operation builder with the given operation context and self operation ID.
+    ///
+    /// The operation context is used to access other available operations.
+    ///
+    /// The self operation ID must be used to insert the operation into the operation context after building it.
     pub fn new(op_ctx: &'a OperationContext<S>, self_op_id: OperationId) -> Self {
         Self {
             instructions: Vec::new(),

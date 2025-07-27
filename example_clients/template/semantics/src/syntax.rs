@@ -152,10 +152,16 @@ impl SemanticsWithCustomSyntax for TheSemantics {
     /// *which* constant value to add. This will be passed in the `args` parameter.
     ///
     /// A user might write a function call in any of these forms:
-    /// ```rust,ignore
+    /// ```rust
+    /// # use grabapl_template_semantics::TheSemantics;
+    /// # syntax::grabapl_parse!(TheSemantics,
+    /// # fn foo(some_node: int) {
     /// add_constant<5>(some_node);
+    /// # /* ` is not a valid token in rust, hence we exclude it from actually being ran
     /// add_constant`5`(some_node);
+    /// # */
     /// add_constant%5%(some_node);
+    /// # });
     /// ```
     /// The "5" portion will be passed in the `args` parameter as a string. This function can
     /// then interpret that however it wants.
