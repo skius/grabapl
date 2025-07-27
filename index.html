@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grabapl IDE</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        }
+    </script>
+    <!-- Google Fonts for a cleaner look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Use the Inter font family */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Style for the Monaco editor scrollbars to match the dark theme */
+        .monaco-editor .scrollbar .slider {
+            background: rgba(100, 100, 100, 0.4);
+        }
+        /* Style for modal backdrop */
+        dialog::backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px);
+        }
+
+        .error-highlight {
+            background-color: rgba(255, 0, 0, 0.1);
+            border: 1px solid rgba(255, 0, 0, 0.5);
+            border-radius: 4px;
+            padding: 0.25rem;
+        }
+
+        /* 🚀 Styles for the resizable editor container */
+        #editor-resizer {
+            height: 10px;
+            background-color: #e5e7eb; /* gray-200 */
+            cursor: ns-resize;
+            transition: background-color 0.2s;
+        }
+        #editor-resizer:hover {
+            background-color: #d1d5db; /* gray-300 */
+        }
+        .dark #editor-resizer {
+            background-color: #374151; /* gray-700 */
+        }
+        .dark #editor-resizer:hover {
+            background-color: #4b5563; /* gray-600 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+
+<div class="mx-auto p-4 lg:p-8 space-y-6">
+
+    <header class="text-center relative">
+        <h1 class="text-3xl lg:text-4xl font-bold text-gray-800 dark:text-white">Grabapl Code Playground</h1>
+        <p class="text-gray-500 dark:text-gray-400 mt-1">Edit Grabapl code, see the output, and visualize state graphs.</p>
+        <!-- Theme Toggle Button -->
+        <button id="theme-toggle" class="absolute top-0 right-0 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-900 focus:ring-blue-500">
+            <!-- The 'hidden' class is removed from the dark icon so it shows by default -->
+            <svg id="theme-toggle-dark-icon" class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path></svg>
+            <svg id="theme-toggle-light-icon" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 5.05A1 1 0 003.636 6.464l.707.707a1 1 0 001.414-1.414l-.707-.707zM3 11a1 1 0 100-2H2a1 1 0 100 2h1zm7.536 2.464a1 1 0 00-1.414 1.414l.707.707a1 1 0 001.414-1.414l-.707-.707zM13.536 6.464a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707z"></path></svg>
+        </button>
+    </header>
+
+    <!-- Monaco Editor Card -->
+    <!-- 🚀 This wrapper now contains the editor and the resizer handle -->
+    <div id="editor-wrapper" class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
+        <div class="p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+            <h2 class="text-lg font-semibold">Code Editor</h2>
+        </div>
+        <!-- Monaco Editor will be initialized here -->
+        <div id="container" class="w-full" style="height: 50vh;"></div>
+        <!-- 🚀 This is the drag handle for resizing the editor -->
+        <div id="editor-resizer"></div>
+    </div>
+
+    <!-- Output Console Card -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden">
+        <div class="p-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+            <h2 class="text-lg font-semibold">Compiler Output</h2>
+        </div>
+        <!-- Error/Success messages will appear here. The text color is set by JS. -->
+        <pre id="output" class="w-full p-4 overflow-auto whitespace-pre-wrap min-h-[5rem] font-mono text-sm"></pre>
+    </div>
+
+    <!-- Graph Preview Card -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-600">
+            <h2 class="text-lg font-semibold">Graph Preview</h2>
+        </div>
+        <div class="p-4 space-y-4">
+            <div class="flex items-center space-x-3">
+                <label for="state-selector" class="font-medium">Select a state to visualize:</label>
+                <select id="state-selector" class="bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <option value="">Compile your code first</option>
+                </select>
+            </div>
+            <!-- SVG will be injected here -->
+            <div id="svg-container" class="w-full p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex justify-center items-center min-h-[250px] bg-gray-50 dark:bg-gray-700/50">
+                <p class="text-gray-500">Your state graph will appear here.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-600">
+            <h2 class="text-lg font-semibold">Dynamic Graph Builder</h2>
+        </div>
+        <div class="p-4 space-y-4">
+            <div class="p-4 border border-gray-200 dark:border-gray-700 rounded-lg space-y-3">
+                <h3 class="font-medium">Run Operation</h3>
+                <div class="flex flex-wrap items-center gap-4">
+                    <select id="operation-selector" class="bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        <option value="">Compile code first</option>
+                    </select>
+                    <div id="operation-inputs" class="flex items-center gap-2 flex-wrap">
+                    </div>
+                    <button id="add-node-input-btn" title="Add input node" class="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-800 focus:ring-blue-500">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                    </button>
+                    <button id="run-operation-btn" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-800 focus:ring-green-500">Run</button>
+                    <!-- Delete Node Button -->
+                    <button id="delete-node-btn" class="hidden ml-auto px-4 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-800 focus:ring-red-500">Delete Selected Node</button>
+                    <!-- button right-align that runs the d3 simulation for a couple ticks -->
+                    <button style="display: none" id="run-simulation-btn" class="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-800 focus:ring-yellow-500">Physically Adjust Nodes</button>
+                </div>
+            </div>
+            <div id="interactive-graph-container" class="w-full h-[60vh] border border-dashed border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden relative bg-gray-50 dark:bg-gray-900/50 cursor-grab">
+                <div class="absolute top-2 left-2 text-xs text-gray-400 dark:text-gray-500 z-10 pointer-events-none">Double-click to create a node. Click two nodes to create an edge. Drag to pan.</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<dialog id="node-modal" class="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-sm text-gray-900 dark:text-gray-100 backdrop:bg-black/50">
+    <form id="node-form" method="dialog">
+        <h3 class="text-lg font-medium mb-4">Create New Node</h3>
+        <div class="space-y-4">
+            <div>
+                <label for="node-name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Node Name (unique)</label>
+                <input type="text" id="node-name" name="node-name" required class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+            <div>
+                <label for="node-value" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Node Value</label>
+                <input type="text" id="node-value" name="node-value" required class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+            </div>
+        </div>
+        <div class="mt-6 flex justify-end space-x-3">
+            <button type="button" id="cancel-node-btn" class="px-4 py-2 rounded-md text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500">Cancel</button>
+            <button type="submit" class="px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700">Create</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="edge-modal" class="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-sm text-gray-900 dark:text-gray-100 backdrop:bg-black/50">
+    <form id="edge-form" method="dialog">
+        <h3 class="text-lg font-medium mb-4">Create New Edge</h3>
+        <div>
+            <label for="edge-value" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Edge Value</label>
+            <input type="text" id="edge-value" name="edge-value" required class="mt-1 block w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+        </div>
+        <div class="mt-6 flex justify-end space-x-3">
+            <button type="button" id="cancel-edge-btn" class="px-4 py-2 rounded-md text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500">Cancel</button>
+            <button type="submit" class="px-4 py-2 rounded-md text-white bg-blue-600 hover:bg-blue-700">Create</button>
+        </div>
+    </form>
+</dialog>
+
+<!-- Delete Confirmation Modal -->
+<dialog id="delete-confirm-modal" class="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-sm text-gray-900 dark:text-gray-100 backdrop:bg-black/50">
+    <form method="dialog">
+        <h3 class="text-lg font-medium mb-2">Confirm Deletion</h3>
+        <p class="text-gray-600 dark:text-gray-400 mb-6">Are you sure you want to delete this node and all its connected edges?</p>
+        <div class="flex justify-end space-x-3">
+            <button type="button" id="cancel-delete-btn" class="px-4 py-2 rounded-md text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500">Cancel</button>
+            <button id="confirm-delete-btn" class="px-4 py-2 rounded-md text-white bg-red-600 hover:bg-red-700">Delete</button>
+        </div>
+    </form>
+</dialog>
+
+<script src="./bootstrap.js"></script>
+
+<!-- 🚀 Script for editor resizing logic -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const resizer = document.getElementById('editor-resizer');
+        const editorContainer = document.getElementById('container');
+
+        // 🚀 Load saved height from localStorage
+        const savedHeight = localStorage.getItem('editorHeight');
+        if (savedHeight) {
+            editorContainer.style.height = savedHeight;
+        }
+
+        // We need to check if the Monaco editor instance is available.
+        // This script runs before bootstrap.js, so we'll poll for the `editor` variable.
+        let monacoEditor = null;
+        const findEditorInterval = setInterval(() => {
+            if (window.editor) {
+                monacoEditor = window.editor;
+                // If we loaded a height, we need to relayout the editor once it's available
+                if(savedHeight) {
+                    monacoEditor.layout();
+                }
+                clearInterval(findEditorInterval);
+            }
+        }, 100);
+
+        let isResizing = false;
+
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            // Add listeners to the document to capture mouse movement everywhere on the page
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', stopResizing);
+            // Prevent text selection while dragging
+            document.body.style.userSelect = 'none';
+            document.body.style.pointerEvents = 'none';
+        });
+
+        function handleMouseMove(e) {
+            if (!isResizing) return;
+
+            // Calculate new height
+            const newHeight = e.clientY - editorContainer.getBoundingClientRect().top;
+
+            // Apply new height with min/max constraints
+            if (newHeight > 100 && newHeight < window.innerHeight * 0.9) {
+                editorContainer.style.height = `${newHeight}px`;
+                // Crucially, tell the Monaco editor to relayout itself to fit the new container size
+                if (monacoEditor) {
+                    monacoEditor.layout();
+                }
+            }
+        }
+
+        function stopResizing() {
+            isResizing = false;
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', stopResizing);
+            // Re-enable text selection and pointer events
+            document.body.style.userSelect = '';
+            document.body.style.pointerEvents = '';
+
+            // 🚀 Save the new height to localStorage
+            localStorage.setItem('editorHeight', editorContainer.style.height);
+        }
+    });
+</script>
+
+</body>
+</html>
