@@ -1,7 +1,9 @@
 # grabapl
 
 <div align="center">
+
 [![Crate Badge]][Crate] [![Docs Badge]][Docs]
+
 </div>
 
 A library for **gra**ph-**ba**sed **p**rogramming **l**anguages with static analysis.
