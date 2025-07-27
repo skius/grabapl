@@ -113,7 +113,9 @@ cargo check --target wasm32-unknown-unknown
       - won't update the existing demos to be typescript
   - [x] README, document cargo.toml and grabapl relative link
   - [x] push to crates.io?
-- [ ] Document operation builder and what the function calls do
+- [x] Document operation builder and what the function calls do
+  - [ ] somehow link to lib entry point?
+- [ ] intermediate state
 - [ ] Document the semantics trait and the required associated type traits.
   - [ ] semantics
   - [ ] abstractgraph? 
