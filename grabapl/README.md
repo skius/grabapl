@@ -143,3 +143,4 @@ cargo check --target wasm32-unknown-unknown
 - [ ] publish crates as grabapl_... ?can keep subfolder names the same just change in lib
 - [ ] mdBook for main thing
   - [ ] can link to the example clients that we dont publish on crates.io
+- [ ] build.sh should also adjust the FFI folder name in templates for js bindings (gitignore and diplomat-wasm.mjs.template)

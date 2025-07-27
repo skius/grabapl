@@ -1,0 +1,17 @@
+{
+    "name": "template-ffi",
+    "version": "0.0.1",
+    "description": "Example bindings for a specific grabapl semantics",
+    "main": "./api/index.mjs",
+    "exports": {
+        ".": "./api/index.mjs"
+    },
+    "author": "Niels Saurer",
+    "dependencies": {
+    },
+    "devDependencies": {
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}

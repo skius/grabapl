@@ -1,0 +1,20 @@
+[package]
+name = "grabapl_template_ffi"
+version = "0.0.0"
+edition = "2024"
+
+[lib]
+# important for FFI, especially WASM
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+grabapl = { path = "../../../grabapl" }
+# we need to depend on our semantics
+semantics = { path = "../semantics", package = "grabapl_template_semantics" }
+# for nicer error messages
+console_error_panic_hook = "0.1.7"
+# if we wanted to call JavaScript functions from Rust
+wasm-bindgen = "0.2"
+# the main FFI toolkit we use
+diplomat = "0.12.0"
+diplomat-runtime = { version = "0.12.0", features = ["log"] }

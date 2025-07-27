@@ -540,8 +540,12 @@ dependencies = [
 name = "grabapl_template_ffi"
 version = "0.0.0"
 dependencies = [
+ "console_error_panic_hook",
+ "diplomat",
+ "diplomat-runtime",
  "grabapl",
  "grabapl_template_semantics",
+ "wasm-bindgen",
 ]
 
 [[package]]
