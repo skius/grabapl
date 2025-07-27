@@ -26,6 +26,8 @@ Docs: [https://docs.rs/grabapl/latest/grabapl/](https://docs.rs/grabapl/latest/g
       turning interactive actions into instructions.
     * A text-based frontend is provided with [`grabapl_syntax`],
       supporting a Rust-like syntax with pluggable client-defined parsing rules.
+* Builds to WebAssembly
+    * See [`grabapl_template_ffi`] for an example FFI library that exposes functionality to JavaScript.
 
 ## Example
 Using the [`grabapl_syntax`] frontend as example with the example node and edge type system from
@@ -152,6 +154,7 @@ fn hide_node(node: any) {
 ```
 
 [`grabapl_template_semantics`]: https://crates.io/crates/grabapl_template_semantics
+[`grabapl_template_ffi`]: https://crates.io/crates/grabapl_template_ffi
 [`grabapl_syntax`]: https://crates.io/crates/grabapl_syntax
 [Docs]: https://docs.rs/grabapl/latest/grabapl/
 [Crate]: https://crates.io/crates/grabapl

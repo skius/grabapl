@@ -139,11 +139,12 @@ cargo check --target wasm32-unknown-unknown
   - [ ] user defined operations, including abstract changes
   - [ ] Document the different markers in use (substmarker, graphwithsubst markers, output markers, etc)
 - [ ] Document the syntax
-- [ ] Main entrypoint README
-  - Link to that readme in the grabapl docs entrypoint
-- [ ] example template README
-- [ ] Change package.json author attributes to examples in the webpack thing
-- [ ] publish crates as grabapl_... ?can keep subfolder names the same just change in lib
+  - [ ] also explicitly document it in the README of the syntax crate. maybe have it be include_str'd into lib.rs as well.
+- [x] Main entrypoint README
+  - [x] Link to that readme in the grabapl docs entrypoint
+- [x] example template README
+- [x] Change package.json author attributes to examples in the webpack thing
+- [x] publish crates as grabapl_... ?can keep subfolder names the same just change in lib
 - [ ] mdBook for main thing
   - [ ] can link to the example clients that we dont publish on crates.io
 - [ ] build.sh should also adjust the FFI folder name in templates for js bindings (gitignore and diplomat-wasm.mjs.template)
