@@ -2,6 +2,11 @@
 name = "grabapl_template_ffi"
 version = "0.0.0"
 edition = "2024"
+license = { workspace = true }
+authors = { workspace = true }
+description = "FFI bindings for a template grabapl semantics implementation."
+categories = []
+documentation = "https://docs.rs/grabapl_template_ffi/latest/grabapl_template_ffi/"
 
 [lib]
 # important for FFI, especially WASM
