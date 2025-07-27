@@ -13,6 +13,8 @@ module.exports = {
     output: {
         path: path.resolve(__dirname, "dist"),
         filename: "bootstrap.js",
+        // NOTE: necessary for github pages, since node_modules_* files are not served.
+        chunkFilename: "include_[name].[contenthash].js",
     },
     module: {
         rules: [
