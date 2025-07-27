@@ -1585,7 +1585,7 @@ pub struct OperationBuilder2<'a, S: Semantics> {
 }
 
 impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBuilder2<'a, S> {
-    // TODO: for every instruction, specify in which context it is valid.
+    // TODO: for every instruction, specify in which context it is valid. DONE
     //  then maybe make sure the FrameStack frames above are named consistently?
 
     /// Creates a new operation builder with the given operation context and self operation ID.
