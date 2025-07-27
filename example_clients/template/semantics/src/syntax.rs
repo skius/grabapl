@@ -16,13 +16,15 @@
 //!
 //! `grabapl` uses [`chumsky`], a parser combinator library, to parse its syntax.
 
+use crate::{
+    EdgeType, EdgeValue, IntComparison, NodeType, NodeValue, TheOperation, TheQuery, TheSemantics,
+};
 use chumsky::input::ValueInput;
-use chumsky::{select, Parser};
 use chumsky::prelude::just;
+use chumsky::{Parser, select};
 use syntax::custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
-use syntax::{MacroArgs, Span, Token};
 use syntax::interpreter::lex_then_parse;
-use crate::{EdgeType, NodeType, TheSemantics, TheOperation, TheQuery, IntComparison, NodeValue, EdgeValue};
+use syntax::{MacroArgs, Span, Token};
 
 /// This type glues together the type definitions and parsing logic for our custom syntax via
 /// its implementation of [`CustomSyntax`].
@@ -30,8 +32,19 @@ use crate::{EdgeType, NodeType, TheSemantics, TheOperation, TheQuery, IntCompari
 pub struct TheCustomSyntax;
 
 /// Helper that provides a parser for edge values from [`grabapl_syntax`](syntax)'s [`Token`] type.
-pub fn edge_value_parser<'src: 'tokens, 'tokens, I: ValueInput<'tokens, Token=Token<'src>, Span=Span>>() -> impl Parser<'tokens, I, EdgeValue, chumsky::extra::Err<chumsky::error::Rich<'tokens, Token<'src>, Span>>> + Clone {
-    let unit = just(Token::Ctrl('(')).then_ignore(just(Token::Ctrl(')'))).to(EdgeValue::Unit);
+pub fn edge_value_parser<
+    'src: 'tokens,
+    'tokens,
+    I: ValueInput<'tokens, Token = Token<'src>, Span = Span>,
+>() -> impl Parser<
+    'tokens,
+    I,
+    EdgeValue,
+    chumsky::extra::Err<chumsky::error::Rich<'tokens, Token<'src>, Span>>,
+> + Clone {
+    let unit = just(Token::Ctrl('('))
+        .then_ignore(just(Token::Ctrl(')')))
+        .to(EdgeValue::Unit);
     let specific_string = select! { Token::Str(s) => s.to_owned() }.map(EdgeValue::String);
     let integer = select! { Token::Num(i) => i }.map(EdgeValue::Integer);
 
@@ -39,13 +52,21 @@ pub fn edge_value_parser<'src: 'tokens, 'tokens, I: ValueInput<'tokens, Token=To
 }
 
 /// Helper that provides a parser for node values from [`grabapl_syntax`](syntax)'s [`Token`] type.
-pub fn node_value_parser<'src: 'tokens, 'tokens, I: ValueInput<'tokens, Token=Token<'src>, Span=Span>>() -> impl Parser<'tokens, I, NodeValue, chumsky::extra::Err<chumsky::error::Rich<'tokens, Token<'src>, Span>>> + Clone {
+pub fn node_value_parser<
+    'src: 'tokens,
+    'tokens,
+    I: ValueInput<'tokens, Token = Token<'src>, Span = Span>,
+>() -> impl Parser<
+    'tokens,
+    I,
+    NodeValue,
+    chumsky::extra::Err<chumsky::error::Rich<'tokens, Token<'src>, Span>>,
+> + Clone {
     let int = select! { Token::Num(i) => i }.map(NodeValue::Integer);
     let string = select! { Token::Str(s) => s.to_owned() }.map(NodeValue::String);
 
     int.or(string)
 }
-
 
 impl CustomSyntax for TheCustomSyntax {
     /// We will directly use the semantics' node type as the syntax struct.
@@ -58,7 +79,16 @@ impl CustomSyntax for TheCustomSyntax {
     /// Our node types are straightforward: we'll support parsing `int`, `string`, and `any`.
     ///
     /// See [`CustomSyntax::get_node_type_parser`]'s documentation for more information.
-    fn get_node_type_parser<'src: 'tokens, 'tokens, I: ValueInput<'tokens, Token=Token<'src>, Span=Span>>() -> impl Parser<'tokens, I, Self::AbstractNodeType, chumsky::extra::Err<chumsky::error::Rich<'tokens, Token<'src>, Span>>> + Clone {
+    fn get_node_type_parser<
+        'src: 'tokens,
+        'tokens,
+        I: ValueInput<'tokens, Token = Token<'src>, Span = Span>,
+    >() -> impl Parser<
+        'tokens,
+        I,
+        Self::AbstractNodeType,
+        chumsky::extra::Err<chumsky::error::Rich<'tokens, Token<'src>, Span>>,
+    > + Clone {
         // we parse "int", "string", or "any"
         let int = just(Token::Ident("int")).to(NodeType::Integer);
         let string = just(Token::Ident("string")).to(NodeType::String);
@@ -77,14 +107,32 @@ impl CustomSyntax for TheCustomSyntax {
     /// - `*` or `any`: a wildcard edge type that matches any edge
     ///
     /// See [`CustomSyntax::get_edge_type_parser`]'s documentation for more information.
-    fn get_edge_type_parser<'src: 'tokens, 'tokens, I: ValueInput<'tokens, Token=Token<'src>, Span=Span>>() -> impl Parser<'tokens, I, Self::AbstractEdgeType, chumsky::extra::Err<chumsky::error::Rich<'tokens, Token<'src>, Span>>> + Clone {
-        let unit = just(Token::Ctrl('(')).then_ignore(just(Token::Ctrl(')'))).to(EdgeType::Unit);
-        let specific_string = select! { Token::Str(s) => s }.map(ToOwned::to_owned).map(EdgeType::ExactString);
+    fn get_edge_type_parser<
+        'src: 'tokens,
+        'tokens,
+        I: ValueInput<'tokens, Token = Token<'src>, Span = Span>,
+    >() -> impl Parser<
+        'tokens,
+        I,
+        Self::AbstractEdgeType,
+        chumsky::extra::Err<chumsky::error::Rich<'tokens, Token<'src>, Span>>,
+    > + Clone {
+        let unit = just(Token::Ctrl('('))
+            .then_ignore(just(Token::Ctrl(')')))
+            .to(EdgeType::Unit);
+        let specific_string = select! { Token::Str(s) => s }
+            .map(ToOwned::to_owned)
+            .map(EdgeType::ExactString);
         let any_string = just(Token::Ident("string")).to(EdgeType::String);
         let integer = just(Token::Ident("int")).to(EdgeType::Integer);
-        let wildcard = just(Token::Ident("any")).or(just(Token::Ctrl('*'))).to(EdgeType::Any);
+        let wildcard = just(Token::Ident("any"))
+            .or(just(Token::Ctrl('*')))
+            .to(EdgeType::Any);
 
-        unit.or(specific_string).or(any_string).or(integer).or(wildcard)
+        unit.or(specific_string)
+            .or(any_string)
+            .or(integer)
+            .or(wildcard)
     }
 }
 
@@ -116,7 +164,9 @@ impl SemanticsWithCustomSyntax for TheSemantics {
             "new_node" | "add_node" => {
                 // optional args. if not provided, we just return a int(0) node.
                 let Some(args) = args else {
-                    return Some(TheOperation::NewNode { value: NodeValue::Integer(0) });
+                    return Some(TheOperation::NewNode {
+                        value: NodeValue::Integer(0),
+                    });
                 };
                 let args_src = args.0;
                 // if args_src is provided, it must be a node value
@@ -125,15 +175,9 @@ impl SemanticsWithCustomSyntax for TheSemantics {
                 let res = lex_then_parse(args_src, value_parser).ok()?;
                 Some(TheOperation::NewNode { value: res })
             }
-            "remove_node" | "delete_node" => {
-                Some(TheOperation::RemoveNode)
-            }
-            "append_snd_to_fst" => {
-                Some(TheOperation::AppendSndToFst)
-            }
-            "add_snd_to_fst" => {
-                Some(TheOperation::AddSndToFst)
-            }
+            "remove_node" | "delete_node" => Some(TheOperation::RemoveNode),
+            "append_snd_to_fst" => Some(TheOperation::AppendSndToFst),
+            "add_snd_to_fst" => Some(TheOperation::AddSndToFst),
             "add_constant" => {
                 // we expect a single argument that is a number
                 let args_src = args?.0;
@@ -141,13 +185,13 @@ impl SemanticsWithCustomSyntax for TheSemantics {
                 let constant = lex_then_parse(args_src, int).ok()?;
                 Some(TheOperation::AddConstant { constant })
             }
-            "copy_value_from_to" => {
-                Some(TheOperation::CopyValueFromTo)
-            }
+            "copy_value_from_to" => Some(TheOperation::CopyValueFromTo),
             "new_edge" | "add_edge" => {
                 // optional args. if not provided, we just return a unit edge.
                 let Some(args) = args else {
-                    return Some(TheOperation::NewEdge { value: EdgeValue::Unit });
+                    return Some(TheOperation::NewEdge {
+                        value: EdgeValue::Unit,
+                    });
                 };
                 let args_src = args.0;
                 // if args_src is provided, it must be a valid edge value
@@ -156,15 +200,9 @@ impl SemanticsWithCustomSyntax for TheSemantics {
 
                 Some(TheOperation::NewEdge { value: res })
             }
-            "remove_edge" | "delete_edge" => {
-                Some(TheOperation::RemoveEdge)
-            }
-            "extract_edge_to_node" | "extract_edge" => {
-                Some(TheOperation::ExtractEdgeToNode)
-            }
-            "string_length" | "str_len" => {
-                Some(TheOperation::StringLength)
-            }
+            "remove_edge" | "delete_edge" => Some(TheOperation::RemoveEdge),
+            "extract_edge_to_node" | "extract_edge" => Some(TheOperation::ExtractEdgeToNode),
+            "string_length" | "str_len" => Some(TheOperation::StringLength),
             // anything else is not our job.
             _ => None,
         }
@@ -182,24 +220,24 @@ impl SemanticsWithCustomSyntax for TheSemantics {
                 let res = lex_then_parse(args_src, value_parser).ok()?;
                 Some(TheQuery::IsEq { value: res })
             }
-            "eq" | "equals" => {
-                Some(TheQuery::Equal)
-            }
-            "gt" | "fst_gt_snd" => {
-                Some(TheQuery::CompareInt { cmp: IntComparison::Gt })
-            }
-            "lt" | "fst_lt_snd" => {
-                Some(TheQuery::CompareInt { cmp: IntComparison::Lt })
-            }
-            "gte" | "fst_gte_snd" => {
-                Some(TheQuery::CompareInt { cmp: IntComparison::Gte })
-            }
-            "lte" | "fst_lte_snd" => {
-                Some(TheQuery::CompareInt { cmp: IntComparison::Lte })
-            }
+            "eq" | "equals" => Some(TheQuery::Equal),
+            "gt" | "fst_gt_snd" => Some(TheQuery::CompareInt {
+                cmp: IntComparison::Gt,
+            }),
+            "lt" | "fst_lt_snd" => Some(TheQuery::CompareInt {
+                cmp: IntComparison::Lt,
+            }),
+            "gte" | "fst_gte_snd" => Some(TheQuery::CompareInt {
+                cmp: IntComparison::Gte,
+            }),
+            "lte" | "fst_lte_snd" => Some(TheQuery::CompareInt {
+                cmp: IntComparison::Lte,
+            }),
             "fst_int_eq_snd" => {
                 // Note: I suppose this is not really necessary, given the `(Any, Any)` TheQuery::Equal query exists.
-                Some(TheQuery::CompareInt { cmp: IntComparison::Eq })
+                Some(TheQuery::CompareInt {
+                    cmp: IntComparison::Eq,
+                })
             }
             // anything else is not our job.
             _ => None,
@@ -207,141 +245,148 @@ impl SemanticsWithCustomSyntax for TheSemantics {
     }
 
     /// Our conversion is the identity function, because we directly parse into our semantics' types.
-    fn convert_node_type(syn_typ: <<Self as SemanticsWithCustomSyntax>::CS as CustomSyntax>::AbstractNodeType) -> Option<Self::NodeAbstract> {
+    fn convert_node_type(
+        syn_typ: <<Self as SemanticsWithCustomSyntax>::CS as CustomSyntax>::AbstractNodeType,
+    ) -> Option<Self::NodeAbstract> {
         Some(syn_typ)
     }
 
     /// Our conversion is the identity function, because we directly parse into our semantics' types.
-    fn convert_edge_type(syn_typ: <<Self as SemanticsWithCustomSyntax>::CS as CustomSyntax>::AbstractEdgeType) -> Option<Self::EdgeAbstract> {
+    fn convert_edge_type(
+        syn_typ: <<Self as SemanticsWithCustomSyntax>::CS as CustomSyntax>::AbstractEdgeType,
+    ) -> Option<Self::EdgeAbstract> {
         Some(syn_typ)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use grabapl::prelude::run_from_concrete;
-    use grabapl::Semantics;
     use super::*;
+    use grabapl::Semantics;
+    use grabapl::prelude::run_from_concrete;
 
     // we also include some semantics tests here, because it's easy
     #[test]
     fn it_parses_successfully() {
-        let res = syntax::try_parse_to_op_ctx_and_map::<TheSemantics>(stringify!(
-            fn foo(
-                /* node types */
-                x: int,
-                y: string,
-                z: any,
-                a: any,
-                b: any
-            ) [
-                /* edge types */
-                x -> y: "specific",
-                y -> z: int,
-                z -> x: string,
-                a -> b: *,
-                b -> a: (),
-                a -> x: any,
-            ] {
-
-            }
-
-            fn bar() {
-                /* functions */
-                let! new0_int = new_node();
-                let! new1_int = new_node<5>();
-                let! new2_string = new_node<"hello">();
-                let! new3_string = new_node<" world">();
-
-                remove_node(new0_int);
-                append_snd_to_fst(new2_string, new3_string);
-                if is_eq<"hello world">(new2_string) {
-
-                } else {
-                    diverge<"string not equal">();
-                }
-
-                let! two = add_node<2>();
-                add_snd_to_fst(new1_int, two);
-                add_constant<10>(new1_int);
-                if is_eq<17>(new1_int) {
-
-                } else {
-                    diverge<"int not equal">();
-                }
-
-                copy_value_from_to(new2_string, new1_int);
-                // new1_int should be a string now
-                let! str_len = string_length(new1_int);
-                if is_eq<11>(str_len) {
-
-                } else {
-                    diverge<"string length not equal">();
-                }
-
-                let! start = add_node();
-                let! end = add_node();
-                new_edge<"start to end">(start, end);
-                if shape [
-                    start -> end: "start to end",
+        let res = syntax::try_parse_to_op_ctx_and_map::<TheSemantics>(
+            stringify!(
+                fn foo(
+                    /* node types */
+                    x: int,
+                    y: string,
+                    z: any,
+                    a: any,
+                    b: any
+                ) [
+                    /* edge types */
+                    x -> y: "specific",
+                    y -> z: int,
+                    z -> x: string,
+                    a -> b: *,
+                    b -> a: (),
+                    a -> x: any,
                 ] {
 
-                } else {
-                    diverge<"shape not matched">();
                 }
 
-                remove_edge(start, end);
-                if shape [
-                    start -> end: *,
-                ] {
-                    diverge<"edge not removed">();
-                } else {
+                fn bar() {
+                    /* functions */
+                    let! new0_int = new_node();
+                    let! new1_int = new_node<5>();
+                    let! new2_string = new_node<"hello">();
+                    let! new3_string = new_node<" world">();
 
+                    remove_node(new0_int);
+                    append_snd_to_fst(new2_string, new3_string);
+                    if is_eq<"hello world">(new2_string) {
+
+                    } else {
+                        diverge<"string not equal">();
+                    }
+
+                    let! two = add_node<2>();
+                    add_snd_to_fst(new1_int, two);
+                    add_constant<10>(new1_int);
+                    if is_eq<17>(new1_int) {
+
+                    } else {
+                        diverge<"int not equal">();
+                    }
+
+                    copy_value_from_to(new2_string, new1_int);
+                    // new1_int should be a string now
+                    let! str_len = string_length(new1_int);
+                    if is_eq<11>(str_len) {
+
+                    } else {
+                        diverge<"string length not equal">();
+                    }
+
+                    let! start = add_node();
+                    let! end = add_node();
+                    new_edge<"start to end">(start, end);
+                    if shape [
+                        start -> end: "start to end",
+                    ] {
+
+                    } else {
+                        diverge<"shape not matched">();
+                    }
+
+                    remove_edge(start, end);
+                    if shape [
+                        start -> end: *,
+                    ] {
+                        diverge<"edge not removed">();
+                    } else {
+
+                    }
+
+                    add_edge<42>(start, end);
+                    let! edge_val = extract_edge_to_node(start, end);
+                    if is_eq<42>(edge_val) {
+
+                    } else {
+                        diverge<"extracted edge value not equal">();
+                    }
+
+                    /* queries */
+                    let! forty_two = new_node<42>();
+                    if eq(forty_two, edge_val) {
+                        // forty_two and edge_val should be equal
+                    } else {
+                        diverge<"forty_two not equal to edge_val">();
+                    }
+
+                    // int comparisons
+                    let! forty_one = new_node<41>();
+                    if gt(forty_two, forty_one) {
+                        // forty_two should be greater than forty_one
+                    } else {
+                        diverge<"forty_two not greater than forty_one">();
+                    }
+
+                    if lt(forty_one, forty_two) {
+                        // forty_one should be less than forty_two
+                    } else {
+                        diverge<"forty_one not less than forty_two">();
+                    }
+
+                    if lte(forty_one, forty_two) {
+                        // forty_one should be less than or equal to forty_two
+                    } else {
+                        diverge<"forty_one not less than or equal to forty_two">();
+                    }
+
+                    if gte(forty_two, forty_one) {
+                        // forty_two should be greater than or equal to forty_one
+                    } else {
+                        diverge<"forty_two not greater than or equal to forty_one">();
+                    }
                 }
-
-                add_edge<42>(start, end);
-                let! edge_val = extract_edge_to_node(start, end);
-                if is_eq<42>(edge_val) {
-
-                } else {
-                    diverge<"extracted edge value not equal">();
-                }
-
-                /* queries */
-                let! forty_two = new_node<42>();
-                if eq(forty_two, edge_val) {
-                    // forty_two and edge_val should be equal
-                } else {
-                    diverge<"forty_two not equal to edge_val">();
-                }
-
-                // int comparisons
-                let! forty_one = new_node<41>();
-                if gt(forty_two, forty_one) {
-                    // forty_two should be greater than forty_one
-                } else {
-                    diverge<"forty_two not greater than forty_one">();
-                }
-
-                if lt(forty_one, forty_two) {
-                    // forty_one should be less than forty_two
-                } else {
-                    diverge<"forty_one not less than forty_two">();
-                }
-
-                if lte(forty_one, forty_two) {
-                    // forty_one should be less than or equal to forty_two
-                } else {
-                    diverge<"forty_one not less than or equal to forty_two">();
-                }
-
-                if gte(forty_two, forty_one) {
-                    // forty_two should be greater than or equal to forty_one
-                } else {
-                    diverge<"forty_two not greater than or equal to forty_one">();
-                }
-            }
-        ), true /* color enabled for error messages*/);
+            ),
+            true, /* color enabled for error messages*/
+        );
         let (op_ctx, fn_map) = res.op_ctx_and_map.unwrap();
 
         let bar_id = fn_map["bar"];
@@ -349,6 +394,5 @@ mod tests {
         let mut g = TheSemantics::new_concrete_graph();
         let res = run_from_concrete(&mut g, &op_ctx, bar_id, &[]);
         let res = res.unwrap();
-
     }
 }

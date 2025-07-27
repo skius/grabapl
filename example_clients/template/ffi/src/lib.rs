@@ -10,10 +10,10 @@
 //!
 //! [Diplomat]: https://github.com/rust-diplomat/diplomat/
 
-use grabapl::operation::builder::IntermediateState;
-use grabapl::prelude::*;
 use ::syntax::custom_syntax::CustomSyntax;
 use ::syntax::interpreter::lex_then_parse;
+use grabapl::operation::builder::IntermediateState;
+use grabapl::prelude::*;
 use semantics::*;
 
 type RustOperationContext = OperationContext<TheSemantics>;
@@ -55,14 +55,14 @@ fn parse_edge_type(s: &str) -> Result<EdgeType, String> {
 pub mod ffi {
     use std::collections::HashMap;
     // we need to import this to use the write! macro
-    use std::fmt::Write as _;
-    use error_stack::fmt::ColorMode;
-    use grabapl::NodeKey;
-    use super::{OperationId, RustConcreteGraph};
-    use super::RustOperationContext;
-    use super::TheSemantics;
     use super::RustIntermediateState;
     use super::RustOperationBuilder;
+    use super::RustOperationContext;
+    use super::TheSemantics;
+    use super::{OperationId, RustConcreteGraph};
+    use error_stack::fmt::ColorMode;
+    use grabapl::NodeKey;
+    use std::fmt::Write as _;
 
     /// Holds a bunch of top-level functions.
     #[diplomat::opaque]
@@ -84,11 +84,16 @@ pub mod ffi {
 
         /// Parses a source file.
         pub fn parse(src: &str) -> Box<CompileResult> {
-            let raw_res = syntax::try_parse_to_op_ctx_and_map(src, false /* disable colored error messages - see the online_syntax demo for how to handle them */);
-            let op_ctx_and_map_res = raw_res.op_ctx_and_map
+            let raw_res = syntax::try_parse_to_op_ctx_and_map(
+                src,
+                false, /* disable colored error messages - see the online_syntax demo for how to handle them */
+            );
+            let op_ctx_and_map_res = raw_res
+                .op_ctx_and_map
                 // turn function names into owned strings
                 .map(|(op_ctx, map)| {
-                    let state_map = map.into_iter()
+                    let state_map = map
+                        .into_iter()
                         .map(|(k, v)| (k.into(), v))
                         .collect::<HashMap<String, _>>();
                     (op_ctx, state_map)
@@ -218,11 +223,14 @@ pub mod ffi {
             op_name: &str,
             args: &[u32],
         ) -> Result<(), Box<StringError>> {
-            let op_id = self.fn_map.get(op_name)
+            let op_id = self
+                .fn_map
+                .get(op_name)
                 .ok_or_else(|| StringError(format!("Operation '{}' not found", op_name)))?;
             let args: Vec<_> = args.iter().copied().map(NodeKey).collect();
             let res = super::run_from_concrete(&mut g.0, &self.op_ctx, *op_id, &args);
-            res.map_err(|e| Box::new(StringError(e.to_string()))).map(|_| ())
+            res.map_err(|e| Box::new(StringError(e.to_string())))
+                .map(|_| ())
         }
     }
 
@@ -243,14 +251,20 @@ pub mod ffi {
         }
 
         /// Adds an expected parameter node with the given name and type to the operation.
-        pub fn expect_parameter_node(&mut self, name: &str, node_type: &str) -> Result<(), Box<StringError>> {
-            let node_type = super::parse_node_type(node_type).map_err(|e| StringError::from_boxed(format!("Invalid node type: {}", e)))?;
-            self.0.expect_parameter_node(name, node_type).map_err(|e| StringError::from_boxed(e.to_string()))
+        pub fn expect_parameter_node(
+            &mut self,
+            name: &str,
+            node_type: &str,
+        ) -> Result<(), Box<StringError>> {
+            let node_type = super::parse_node_type(node_type)
+                .map_err(|e| StringError::from_boxed(format!("Invalid node type: {}", e)))?;
+            self.0
+                .expect_parameter_node(name, node_type)
+                .map_err(|e| StringError::from_boxed(e.to_string()))
         }
 
         // TODO: add more of the desired builder operations here. See the main `OperationBuilder` documentation.
     }
-
 
     /// Catch this in a try-catch and print it with toString().
     #[diplomat::opaque]
@@ -266,5 +280,4 @@ pub mod ffi {
             write!(out, "{}", self.0).unwrap();
         }
     }
-
 }

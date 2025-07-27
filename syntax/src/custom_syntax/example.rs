@@ -42,8 +42,6 @@ impl CustomSyntax for MyCustomSyntax {
     type AbstractNodeType = MyCustomType;
     type AbstractEdgeType = CustomEdgeType;
 
-
-
     fn get_node_type_parser<
         'src: 'tokens,
         'tokens,

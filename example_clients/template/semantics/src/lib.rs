@@ -756,7 +756,7 @@ pub enum TheQuery {
     CompareInt {
         /// Which comparison to perform.
         cmp: IntComparison,
-    }
+    },
 }
 
 /// The different ways to compare integer values.
@@ -870,9 +870,7 @@ impl BuiltinQuery for TheQuery {
             }
         }
 
-        ConcreteQueryOutput {
-            taken,
-        }
+        ConcreteQueryOutput { taken }
     }
 }
 

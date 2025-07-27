@@ -10,10 +10,8 @@ use std::fmt;
 use std::fmt::Debug;
 
 pub trait CustomSyntax: Clone + Debug + 'static {
-
     type AbstractNodeType: Clone + Debug + PartialEq;
     type AbstractEdgeType: Clone + Debug + PartialEq;
-
 
     fn get_node_type_parser<
         'src: 'tokens,

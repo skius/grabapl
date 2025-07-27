@@ -71,10 +71,7 @@ impl fmt::Display for Token<'_> {
 pub fn lexer<'src>()
 -> impl Parser<'src, &'src str, Vec<Spanned<Token<'src>>>, extra::Err<Rich<'src, char, Span>>> {
     // A parser for numbers
-    let num = text::int(10)
-        .to_slice()
-        .from_str()
-        .unwrapped();
+    let num = text::int(10).to_slice().from_str().unwrapped();
 
     // allow negative numbers
     let num = just('-')
@@ -960,7 +957,11 @@ pub struct WithLineColSpans<T> {
 
 impl<T: Display> Debug for WithLineColSpans<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "WithLineColSpans {{ value: \n{}\n, spans: {:?} }}", self.value, self.spans)
+        write!(
+            f,
+            "WithLineColSpans {{ value: \n{}\n, spans: {:?} }}",
+            self.value, self.spans
+        )
     }
 }
 

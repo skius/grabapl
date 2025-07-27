@@ -1,6 +1,6 @@
-use grabapl_template_semantics::{TheSemantics, NodeValue, NodeType, EdgeValue, EdgeType};
-use syntax::interpreter::lex_then_parse;
+use grabapl_template_semantics::{EdgeType, EdgeValue, NodeType, NodeValue, TheSemantics};
 use syntax::custom_syntax::CustomSyntax;
+use syntax::interpreter::lex_then_parse;
 
 fn parse_node_value(s: &str) -> Option<NodeValue> {
     let parser = grabapl_template_semantics::syntax::node_value_parser();
@@ -24,7 +24,7 @@ fn parse_edge_type(s: &str) -> Result<EdgeType, String> {
 
 fn node_value_to_string(value: &NodeValue) -> String {
     match value {
-        NodeValue::Integer(x) => { x.to_string() }
+        NodeValue::Integer(x) => x.to_string(),
         NodeValue::String(x) => {
             // debug, since we want surrounding quotes
             format!("{x:?}")
@@ -34,25 +34,25 @@ fn node_value_to_string(value: &NodeValue) -> String {
 
 fn edge_value_to_string(value: &EdgeValue) -> String {
     match value {
-        EdgeValue::Unit => { "()".to_string() }
+        EdgeValue::Unit => "()".to_string(),
         EdgeValue::String(x) => {
             // debug, since we want surrounding quotes
             format!("{x:?}")
         }
-        EdgeValue::Integer(x) => { x.to_string() }
+        EdgeValue::Integer(x) => x.to_string(),
     }
 }
 
 #[diplomat::bridge]
 pub mod ffi {
+    use super::NodeValue;
     use grabapl::NodeKey;
     use grabapl::graph::GraphTrait;
     use grabapl::prelude::OperationId;
-    use super::NodeValue;
+    use grabapl_template_semantics::EdgeValue;
     use std::collections::HashMap;
     use std::fmt::Write;
     use std::result::Result;
-    use grabapl_template_semantics::EdgeValue;
     use syntax::WithLineColSpans;
 
     pub struct Context {
@@ -261,21 +261,20 @@ pub mod ffi {
         }
 
         pub fn add_edge(&mut self, src: u32, dst: u32, weight: &str) {
-            self.graph.add_edge(src, dst, super::parse_edge_value(weight)
-                // if we failed a parse, assume it's just a string
-                .unwrap_or(EdgeValue::String(weight.to_string())));
+            self.graph.add_edge(
+                src,
+                dst,
+                super::parse_edge_value(weight)
+                    // if we failed a parse, assume it's just a string
+                    .unwrap_or(EdgeValue::String(weight.to_string())),
+            );
         }
 
         pub fn get_nodes(&self) -> Box<NodesIter> {
             let nodes: Vec<(u32, String)> = self
                 .graph
                 .nodes()
-                .map(|(k, v)| {
-                    (
-                        k.0,
-                        super::node_value_to_string(v),
-                    )
-                })
+                .map(|(k, v)| (k.0, super::node_value_to_string(v)))
                 .collect();
             Box::new(NodesIter(nodes.into_iter()))
         }
