@@ -471,6 +471,16 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
         &mut self,
         (rename_stmt, rename_stmt_span): Spanned<RenameStmt<'src>>,
     ) -> Result<(), SpannedInterpreterError> {
+        // assert that the new name does not exist yet
+        if self.single_node_aids.contains_key(rename_stmt.new_name.0) {
+            return Err(report!(
+                InterpreterError::CustomOwned(format!(
+                    "Node with name '{}' already exists",
+                    rename_stmt.new_name.0
+                ))
+                .with_span(rename_stmt.new_name.1)
+            ));
+        }
         let new_name = rename_stmt.new_name.0;
         let new_aid = AbstractNodeId::named(new_name);
         let old_aid = self.node_id_to_aid(rename_stmt.src.0).ok_or(report!(
