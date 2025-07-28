@@ -136,16 +136,7 @@ pub mod ffi {
                 log::error!("state does not exist in state map");
                 return;
             };
-            write!(dot, "{}", state.dot_with_aid_custom_aid_format(|aid| {
-                match aid {
-                    AbstractNodeId::ParameterMarker(p) => p.0.to_string(),
-                    AbstractNodeId::DynamicOutputMarker(AbstractOperationResultMarker::Custom(map), node) => {
-                        format!("{}.{}", map, node.0)
-                    }
-                    AbstractNodeId::Named(n) => n.0.to_string(),
-                    _ => String::new(),
-                }
-            })).unwrap();
+            write!(dot, "{}", state.dot_with_aid_with_dot_syntax()).unwrap();
         }
 
         /// Lists the available states.

@@ -1992,6 +1992,65 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
             )
         )
     }
+
+    /// Turns AIDs into "name" or "map.name".
+    pub fn dot_with_aid_with_dot_syntax(&self) -> String {
+        self.dot_with_aid_custom_aid_format(|aid| match aid {
+            AbstractNodeId::ParameterMarker(subst) => format!("{}", subst.0),
+            AbstractNodeId::DynamicOutputMarker(AbstractOperationResultMarker::Custom(marker), node_marker) => {
+                format!("{}.{}", marker, node_marker.0)
+            }
+            AbstractNodeId::Named(name) => name.0.to_string(),
+            _ => "unknown".to_string(),
+        })
+    }
+
+    /// Uses tables instead of Mrecord shapes. Uses "name" and "map.name" syntax for AIDs.
+    pub fn dot_with_aid_table_based(&self) -> String {
+        let fmt_aid = |aid: AbstractNodeId| match aid {
+            AbstractNodeId::ParameterMarker(subst) => format!("{}", subst.0),
+            AbstractNodeId::DynamicOutputMarker(AbstractOperationResultMarker::Custom(marker), node_marker) => {
+                format!("{}.{}", marker, node_marker.0)
+            }
+            AbstractNodeId::Named(name) => name.0.to_string(),
+            _ => "unknown".to_string(),
+        };
+        format!(
+            "{:?}",
+            Dot::with_attr_getters(
+                &self.graph.graph,
+                &[dot::Config::EdgeNoLabel, dot::Config::NodeNoLabel],
+                &|g, (src, target, attr)| {
+                    let dbg_attr_format = format!("{:?}", attr.edge_attr);
+                    let dbg_attr_replaced = dbg_attr_format.escape_debug();
+                    format!("label = \"{dbg_attr_replaced}\"")
+                },
+                &|g, (node, _)| {
+                    let aid = self
+                        .node_keys_to_aid
+                        .get_left(&node)
+                        .expect("NodeKey not found in node_keys_to_aid");
+                    let aid = fmt_aid(*aid);
+                    let aid_replaced = aid.escape_debug();
+                    let av = self
+                        .graph
+                        .get_node_attr(node)
+                        .expect("NodeKey not found in graph");
+                    let dbg_attr_format = format!("{:?}", av);
+                    let dbg_attr_replaced = dbg_attr_format.escape_debug();
+
+                    // format!("label = \"{aid_replaced}|{dbg_attr_replaced}\"")
+                    // format!("label = \"{dbg_attr_replaced}\", xlabel = \"{aid_replaced}\"")
+                    let table_label = format!(r#"<
+    <table style="rounded" cellpadding="5" cellspacing="0"  cellborder="0" border="1">
+        <tr><td border="1" sides="R">{aid_replaced}</td><td>{dbg_attr_replaced}</td></tr>
+    </table>
+>"#);
+                    format!(r#"shape=plaintext, margin="0" height="0" width="0" label={table_label}"#)
+                }
+            )
+        )
+    }
 }
 
 enum InterpretedInstruction<S: Semantics> {

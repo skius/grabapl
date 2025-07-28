@@ -9,7 +9,7 @@ members = [
     "syntax_macro",
     "example_clients/online_syntax/online_syntax_ffi",
     "example_clients/template/semantics",
-    "example_clients/template/ffi",
+    "example_clients/template/ffi", "example_clients/typst-plugin",
 ]
 exclude = ["playground", "wasm-game-of-life"]
 
@@ -22,8 +22,6 @@ grabapl = { path = "grabapl", version = "0.0.4" }
 syntax = { path = "syntax", package = "grabapl_syntax", version = "0.0.4" }
 
 [profile.release]
-# TODO: remove again?
-debug = true
 
 [profile.test.package.proptest]
 opt-level = 3

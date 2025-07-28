@@ -1,0 +1,19 @@
+[package]
+name = "typst-plugin"
+version = "0.1.0"
+edition = "2024"
+license.workspace = true
+authors.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wee_alloc = "0.4.5"
+wasm-minimal-protocol = "0.1.0"
+grabapl = { workspace = true }
+syntax = { workspace = true }
+grabapl_template_semantics = { path = "../template/semantics" }
+error-stack = "0.5.0"
+
+# layout-rs = "0.1.3"
