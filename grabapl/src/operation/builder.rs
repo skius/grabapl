@@ -1794,18 +1794,25 @@ impl<S: Semantics> IntermediateState<S> {
         //  I think it's a good idea to just propagate what we know for a fact _could_ be written (but in its most precise form).
         //  If instead we said "merge it with the current value", then we make it potentially join with the parameter.
         for (key, node_abstract) in operation_output.changed_abstract_values_nodes {
-            let aid = self
-                .get_aid_from_key(&key)
-                .expect("internal error: changed node not found in mapping");
+            let Ok(aid) = self.get_aid_from_key(&key) else {
+                // note: this happens because our GraphWithSubstitution operation output generation does
+                //  not skip changed nodes that were also deleted.
+                // this is not really an error, but would be nice if we could avoid by doing that.
+                log::warn!("internal error: changed node not found in mapping");
+                continue;
+            };
             self.node_may_be_written_to.insert(aid, node_abstract);
         }
         for ((source, target), edge_abstract) in operation_output.changed_abstract_values_edges {
-            let source_aid = self
-                .get_aid_from_key(&source)
-                .expect("internal error: changed edge source not found in mapping");
-            let target_aid = self
-                .get_aid_from_key(&target)
-                .expect("internal error: changed edge target not found in mapping");
+            let Ok(source_aid) = self.get_aid_from_key(&source) else {
+                // see above for why we may enter this and why it's fine
+                log::warn!("internal error: changed edge source not found in mapping");
+                continue;
+            };
+            let Ok(target_aid) = self.get_aid_from_key(&target) else {
+                log::warn!("internal error: changed edge target not found in mapping");
+                continue;
+            };
             self.edge_may_be_written_to
                 .insert((source_aid, target_aid), edge_abstract);
         }
