@@ -110,6 +110,7 @@ cargo check --target wasm32-unknown-unknown
 - [ ] make a lot more types private. eg the AST from the syntax crate.
 - [ ] single build.sh with --release option that can target a subfolder via command line arguments. or maybe just have it be in the parent folder as helper, and
        every subfolder build.sh just calls that with the appropriate args.
+- [ ] syntax web demo: switch away from cdn.tailwindcss to shipping a built version.
 
 # TODOs for handover/documentation:
 - [x] Push the petgraph subgraph_monomorphism branch to a fork and depend on that instead.
