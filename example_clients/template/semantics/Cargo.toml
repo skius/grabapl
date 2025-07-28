@@ -19,3 +19,4 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 # in case we want to support a text representation of our semantics
 chumsky = "0.10"
+derive_more = { version = "2.0.1", features = ["from", "debug"] }

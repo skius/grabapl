@@ -574,6 +574,7 @@ name = "grabapl_template_semantics"
 version = "0.0.4"
 dependencies = [
  "chumsky 0.10.1",
+ "derive_more",
  "grabapl",
  "grabapl_syntax",
  "log",

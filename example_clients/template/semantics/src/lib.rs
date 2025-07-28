@@ -155,13 +155,16 @@ impl NodeValue {
 /// The node types used in our example semantics.
 ///
 /// Also known as abstract node values.
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, derive_more::Debug, PartialEq, Eq, Default)]
 pub enum NodeType {
     /// Represents a node that holds an integer value.
+    #[debug("int")]
     Integer,
     /// Represents a node that holds a string value.
+    #[debug("string")]
     String,
     /// Represents a wildcard type that matches any node type.
+    #[debug("any")]
     #[default]
     Any,
 }
@@ -212,17 +215,22 @@ impl EdgeValue {
 /// The edge types used in our example semantics.
 ///
 /// Also known as abstract edge values.
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, derive_more::Debug, PartialEq, Eq, Default)]
 pub enum EdgeType {
     /// Represents an edge that does not carry any additional value besides presence.
+    #[debug("")]
     Unit,
     /// Represents an edge that carries a specific string value.
+    #[debug("{_0:?}")]
     ExactString(String),
     /// Represents an edge that carries any string value.
+    #[debug("string")]
     String,
     /// Represents an edge that carries an integer value.
+    #[debug("int")]
     Integer,
     /// Represents a wildcard type that matches any edge type.
+    #[debug("*")]
     #[default]
     Any,
 }

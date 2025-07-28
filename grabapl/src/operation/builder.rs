@@ -2006,7 +2006,7 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
     }
 
     /// Uses tables instead of Mrecord shapes. Uses "name" and "map.name" syntax for AIDs.
-    pub fn dot_with_aid_table_based(&self) -> String {
+    pub fn dot_with_aid_table_based_with_color_names(&self, node_av_color_name: &str, edge_str_color_name: &str) -> String {
         let fmt_aid = |aid: AbstractNodeId| match aid {
             AbstractNodeId::ParameterMarker(subst) => format!("{}", subst.0),
             AbstractNodeId::DynamicOutputMarker(AbstractOperationResultMarker::Custom(marker), node_marker) => {
@@ -2022,8 +2022,15 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
                 &[dot::Config::EdgeNoLabel, dot::Config::NodeNoLabel],
                 &|g, (src, target, attr)| {
                     let dbg_attr_format = format!("{:?}", attr.edge_attr);
+                    // color attrs below are quite the hack for typst-plugin.
+                    // TODO: move this entire function to typst plugin?
+                    let color_attr = if dbg_attr_format.contains('"') {
+                        format!(r#"fontcolor="{edge_str_color_name}""#)
+                    } else {
+                        format!(r#"fontcolor="{node_av_color_name}""#)
+                    };
                     let dbg_attr_replaced = dbg_attr_format.escape_debug();
-                    format!("label = \"{dbg_attr_replaced}\"")
+                    format!("{color_attr} label = \"{dbg_attr_replaced}\"")
                 },
                 &|g, (node, _)| {
                     let aid = self
@@ -2043,7 +2050,7 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
                     // format!("label = \"{dbg_attr_replaced}\", xlabel = \"{aid_replaced}\"")
                     let table_label = format!(r#"<
     <table style="rounded" cellpadding="5" cellspacing="0"  cellborder="0" border="1">
-        <tr><td border="1" sides="R">{aid_replaced}</td><td>{dbg_attr_replaced}</td></tr>
+        <tr><td border="1" sides="R">{aid_replaced}</td><td><font color="{node_av_color_name}">{dbg_attr_replaced}</font></td></tr>
     </table>
 >"#);
                     format!(r#"shape=plaintext, margin="0" height="0" width="0" label={table_label}"#)
