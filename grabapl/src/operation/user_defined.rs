@@ -40,7 +40,7 @@ interned_string_newtype!(
 #[derive(derive_more::Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
 #[debug("N({_0})")]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct NamedMarker(InternString);
+pub struct NamedMarker(pub InternString);
 interned_string_newtype!(NamedMarker);
 
 /// Identifies a node in the user defined operation view.

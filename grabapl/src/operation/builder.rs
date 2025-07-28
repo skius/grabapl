@@ -1952,6 +1952,39 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
             )
         )
     }
+
+    pub fn dot_with_aid_custom_aid_format(&self, fmt_aid: impl Fn(AbstractNodeId) -> String) -> String {
+        format!(
+            "{:?}",
+            Dot::with_attr_getters(
+                &self.graph.graph,
+                &[dot::Config::EdgeNoLabel, dot::Config::NodeNoLabel],
+                &|g, (src, target, attr)| {
+                    let dbg_attr_format = format!("{:?}", attr.edge_attr);
+                    let dbg_attr_replaced = dbg_attr_format.escape_debug();
+                    format!("label = \"{dbg_attr_replaced}\"")
+                },
+                &|g, (node, _)| {
+                    let aid = self
+                        .node_keys_to_aid
+                        .get_left(&node)
+                        .expect("NodeKey not found in node_keys_to_aid");
+                    let aid = fmt_aid(*aid);
+                    let aid_replaced = aid.escape_debug();
+                    let av = self
+                        .graph
+                        .get_node_attr(node)
+                        .expect("NodeKey not found in graph");
+                    let dbg_attr_format = format!("{:?}", av);
+                    let dbg_attr_replaced = dbg_attr_format.escape_debug();
+
+                    // format!("label = \"{aid_replaced}|{dbg_attr_replaced}\"")
+                    // format!("label = \"{dbg_attr_replaced}\", xlabel = \"{aid_replaced}\"")
+                    format!("shape=Mrecord, label = \"{aid_replaced}|{dbg_attr_replaced}\"")
+                }
+            )
+        )
+    }
 }
 
 enum InterpretedInstruction<S: Semantics> {
