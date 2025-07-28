@@ -13,15 +13,23 @@ if [ "$SCRIPT_DIR" != "$CUR_DIR" ]; then
   exit 1
 fi
 
+# if the --release flag was passed, use it
+RELEASE_FLAG=""
+BUILD_DIR="debug"
+if [[ "$1" == "--release" ]]; then
+  RELEASE_FLAG="--release"
+  BUILD_DIR="release"
+fi
+
 # build #[wasm_bindgen] JS imports as basic JavaScript module into `${LIB_FOLDER}/wbg`
 #wasm-pack build -t web -d "../${LIB_FOLDER}/wbg" ${FFI_FOLDER}/
 # UPDATE: wasm-pack will be archived in the future, so perform the steps manually:
 set -o xtrace
 # TODO: decide if we should use --release or not
-cargo build --lib --target wasm32-unknown-unknown -p $FFI_FOLDER --target-dir=target
+cargo build --lib --target wasm32-unknown-unknown -p $FFI_FOLDER --target-dir=target ${RELEASE_FLAG}
 mkdir -p ${LIB_FOLDER}/wbg
 # TODO would need to change debug to release here
-wasm-bindgen target/wasm32-unknown-unknown/debug/${FFI_FOLDER}.wasm --out-dir "${LIB_FOLDER}/wbg" --typescript --target web
+wasm-bindgen target/wasm32-unknown-unknown/${BUILD_DIR}/${FFI_FOLDER}.wasm --out-dir "${LIB_FOLDER}/wbg" --typescript --target web
 wasm-opt "${LIB_FOLDER}/wbg/${FFI_FOLDER}_bg.wasm" -o "${LIB_FOLDER}/wbg/${FFI_FOLDER}_bg_opt.wasm" -O
 mv "${LIB_FOLDER}/wbg/${FFI_FOLDER}_bg_opt.wasm" "${LIB_FOLDER}/wbg/${FFI_FOLDER}_bg.wasm"
 set +o xtrace
