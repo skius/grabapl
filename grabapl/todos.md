@@ -108,6 +108,8 @@ cargo check --target wasm32-unknown-unknown
     3. repeat that from sentinel until the shape query for non-fixed nodes returns nothing.
 - [ ] add support for shape node change checking for markers. Or just add a has_marker libbuiltin query.
 - [ ] make a lot more types private. eg the AST from the syntax crate.
+- [ ] single build.sh with --release option that can target a subfolder via command line arguments. or maybe just have it be in the parent folder as helper, and
+       every subfolder build.sh just calls that with the appropriate args.
 
 # TODOs for handover/documentation:
 - [x] Push the petgraph subgraph_monomorphism branch to a fork and depend on that instead.
