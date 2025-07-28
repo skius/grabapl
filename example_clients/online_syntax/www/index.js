@@ -18,12 +18,15 @@ const stateSelector = document.getElementById('state-selector');
 // --- Monaco Editor Setup ---
 const initialCode = localStorage.getItem('last_code') ||
     `// Welcome! Type your Grabapl code here.
-fn foo(x: Int) -> (result: Int) {
-    show_state(foo_state);
+// You can find a sample bubble sort implementation to copy paste here: https://crates.io/crates/grabapl
+fn foo(x: int) -> (result: int) {
+    show_state(initial_state);
     // try returning a node!
-    // let! new_node = add_node<int, 1>();
+    // let! new_node = add_node<1>();
+    // show_state(after_adding_node_state);
     // return (result: new_node);
 }`;
+// TODO: add drop down with example code snippets
 
 const editor = monaco.editor.create(document.getElementById('container'), {
     value: initialCode,
