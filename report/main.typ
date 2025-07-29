@@ -160,7 +160,8 @@
 
 
 #grabapl(
-  code-caption: "Supported syntax features", 
+  code-caption: "Supported syntax features",
+  code-label: "first-code",
 ```rust
 // Example function
 fn concat_string_siblings(
