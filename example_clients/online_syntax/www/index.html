@@ -147,6 +147,23 @@
         </div>
     </div>
 
+    <!-- Operation Trace Viewer -->
+    <div id="trace-box" class="bg-white dark:bg-gray-800 rounded-xl shadow-lg" style="display: none;">
+        <div class="p-4 border-b border-gray-200 dark:border-gray-600">
+            <h2 class="text-lg font-semibold">Operation Trace</h2>
+        </div>
+        <div class="p-4 space-y-4">
+            <div class="flex items-center justify-between">
+                <button id="prev-trace-btn" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-800 focus:ring-blue-500">Prev</button>
+                <span id="trace-step-indicator" class="text-gray-700 dark:text-gray-300"></span>
+                <button id="next-trace-btn" class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-800 focus:ring-blue-500">Next</button>
+            </div>
+            <div id="trace-graph-container" class="w-full p-4 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex justify-center items-center min-h-[250px] bg-white"> <!--bg-gray-50 dark:bg-gray-700/50 -->
+<!--                <p class="text-gray-500">The operation trace will appear here.</p>-->
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <dialog id="node-modal" class="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-sm text-gray-900 dark:text-gray-100 backdrop:bg-black/50">

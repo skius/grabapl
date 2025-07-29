@@ -300,6 +300,9 @@ let selectedSourceNode = null;
 let currentTransform = d3.zoomIdentity;
 let tempNodeCoords = { x: 0, y: 0 };
 let pendingEdge = null;
+let currentTraceDots = [];
+let currentTraceIndex = 0;
+let traceGraphviz;
 
 // --- DOM References ---
 const operationSelector = document.getElementById('operation-selector');
@@ -317,6 +320,12 @@ const edgeForm = document.getElementById('edge-form');
 const cancelEdgeBtn = document.getElementById('cancel-edge-btn');
 const edgeValueInput = document.getElementById('edge-value');
 edgeValueInput.required = false;
+
+const traceBox = document.getElementById('trace-box');
+const prevTraceBtn = document.getElementById('prev-trace-btn');
+const nextTraceBtn = document.getElementById('next-trace-btn');
+const traceStepIndicator = document.getElementById('trace-step-indicator');
+const traceGraphContainer = document.getElementById('trace-graph-container');
 
 const runSimulationBtn = document.getElementById('run-simulation-btn');
 
@@ -632,7 +641,17 @@ function executeOperation(operationName, inputNodeNames) {
 
     try {
         let res = current_res.runOperation(concreteGraph, operationName, inputKeys);
-        let traceDots = res.chainedDotTrace()
+        let traceDotsRaw = res.chainedDotTrace();
+
+        if (traceDotsRaw && traceDotsRaw.trim() !== "") {
+            currentTraceDots = traceDotsRaw.split('---').map(dot => dot.trim()).filter(dot => dot);
+            currentTraceIndex = 0;
+            traceBox.style.display = 'block';
+            renderTraceGraph();
+        } else {
+            currentTraceDots = [];
+            traceBox.style.display = 'none';
+        }
 
         const avgX = inputNodes.reduce((sum, n) => sum + (n.x || 0), 0) / inputNodes.length;
         const avgY = inputNodes.reduce((sum, n) => sum + (n.y || 0), 0) / inputNodes.length;
@@ -727,6 +746,50 @@ function executeOperation(operationName, inputNodeNames) {
     updateInteractiveGraph(); // Refresh the graph to show changes
 }
 
+function renderTraceGraph() {
+    if (currentTraceDots.length === 0) {
+        traceBox.style.display = 'none';
+        return;
+    }
+
+    traceBox.style.display = 'block';
+    const dot = currentTraceDots[currentTraceIndex];
+
+    // Apply theme adjustments to the DOT string
+    let themedDot = dot.replace(/fill="white"/g, 'fill="none"');
+    themedDot = themedDot.replace(/<text /g, '<text fill="white" ');
+    if (docElement.classList.contains('dark')) {
+        themedDot = themedDot.replace(/stroke="black"/g, 'stroke="white"');
+        themedDot = themedDot.replace(/<text fill="black"/g, '<text fill="white"');
+    } else {
+        themedDot = themedDot.replace(/stroke="white"/g, 'stroke="black"');
+        themedDot = themedDot.replace(/<text fill="white"/g, '<text fill="black"');
+    }
+
+    traceGraphviz
+        .transition(() => d3.transition().duration(500).ease(d3.easeLinear))
+        .renderDot(themedDot)
+        .on("end", function () {
+            // // adjust the svg inside trace-graph-container to be full width and height:
+            // const traceGraphSvg = document.querySelector("#trace-graph-container svg");
+            // if (traceGraphSvg) {
+            //     // traceGraphSvg.style.width = "100%";
+            //     // traceGraphSvg.style.height = "100%";
+            // }
+        });
+
+    let traceContainer = document.querySelector("#trace-graph-container");
+    // disable moving around via drag and drop
+    if (traceContainer) {
+        traceContainer.style.pointerEvents = 'none'; // Disable pointer events to prevent dragging
+    }
+
+
+    traceStepIndicator.textContent = `${currentTraceIndex + 1} / ${currentTraceDots.length}`;
+    prevTraceBtn.disabled = currentTraceIndex === 0;
+    nextTraceBtn.disabled = currentTraceIndex === currentTraceDots.length - 1;
+}
+
 
 // --- Initial Load ---
 async function main() {
@@ -739,6 +802,7 @@ async function main() {
     // Perform initial compilation
     onCodeChanged();
     initInteractiveGraph(); // 🚀
+    initTraceViewer();
 
     if (localStorage.getItem("theme")) {
         setTheme(localStorage.getItem("theme"));
@@ -751,6 +815,27 @@ async function main() {
     // add a Ctrl-S event listener to the monaco editor that immediately runs onCodeChangedInner()
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
         onCodeChangedInner();
+    });
+}
+
+function initTraceViewer() {
+    traceGraphviz = d3.select("#trace-graph-container").graphviz({
+        useWorker: false,
+        fit: true,
+    });
+
+    prevTraceBtn.addEventListener('click', () => {
+        if (currentTraceIndex > 0) {
+            currentTraceIndex--;
+            renderTraceGraph();
+        }
+    });
+
+    nextTraceBtn.addEventListener('click', () => {
+        if (currentTraceIndex < currentTraceDots.length - 1) {
+            currentTraceIndex++;
+            renderTraceGraph();
+        }
     });
 }
 
