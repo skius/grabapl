@@ -1,0 +1,57 @@
+%YAML 1.2
+---
+name: Grabapl
+file_extensions:
+  - mylang
+scope: source.mylang
+
+contexts:
+  main:
+    - include: comments
+    - match: \b(fn|let|return|if)\b
+      scope: keyword.control.mylang
+    - match: \b(int|any|string|\(\))\b
+      scope: storage.type.mylang
+    - match: \b[_a-zA-Z][_a-zA-Z0-9]*\b
+      scope: variable.other.mylang
+    - match: '"'
+      scope: punctuation.definition.string.begin.mylang
+      push: string
+    - match: '<'
+      scope: punctuation.definition.generic.begin.mylang
+      push: generic
+    - match: ->
+      scope: keyword.operator.arrow.mylang
+    - match: :=
+      scope: keyword.operator.assign.mylang
+    - match: \*
+      scope: keyword.operator.wildcard.mylang
+    - match: \b(shape)\b
+      scope: keyword.control.mylang
+
+  comments:
+    - match: '//.*$'
+      scope: comment.line.double-slash.mylang
+    - match: '#.*$'
+      scope: comment.line.number-sign.mylang
+    - match: '/\*'
+      scope: comment.block.mylang
+      push:
+        - meta_scope: comment.block.mylang
+        - match: '\*/'
+          pop: true
+
+  string:
+    - meta_scope: string.quoted.double.mylang
+    - match: '"'
+      scope: punctuation.definition.string.end.mylang
+      pop: true
+    - match: '\\.'
+      scope: constant.character.escape.mylang
+
+  generic:
+    - meta_scope: meta.generic.mylang
+    - match: '>'
+      scope: punctuation.definition.generic.end.mylang
+      pop: true
+    - include: main
