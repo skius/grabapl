@@ -459,6 +459,16 @@ function drawGrid(gridG, width, height, transform) {
     gridG.selectAll("line").attr("stroke", gridColor).attr("stroke-width", 1);
 }
 
+function handleResize() {
+    if (!interactiveGraphContainer || !svgRoot || !gridG) return;
+
+    const width = interactiveGraphContainer.clientWidth;
+    const height = interactiveGraphContainer.clientHeight;
+
+    svgRoot.attr("width", width).attr("height", height);
+    drawGrid(gridG, width, height, currentTransform);
+}
+
 function updateThemeForGraph() {
     if (!svg) return;
     const isDark = docElement.classList.contains('dark');
@@ -509,7 +519,7 @@ function initInteractiveGraph() {
     const zoomBehavior = d3.zoom().scaleExtent([0.1, 8]).on("zoom", (event) => {
         currentTransform = event.transform;
         zoomableContainer.attr("transform", currentTransform);
-        drawGrid(gridG, width, height, currentTransform);
+        drawGrid(gridG, interactiveGraphContainer.clientWidth, interactiveGraphContainer.clientHeight, currentTransform);
     });
     svgRoot.call(zoomBehavior).on("dblclick.zoom", null);
 
@@ -607,6 +617,7 @@ window.addEventListener('keydown', (e) => {
         deleteConfirmModal.showModal();
     }
 });
+window.addEventListener('resize', handleResize);
 
 
 // --- User-Adaptable Functions ---
