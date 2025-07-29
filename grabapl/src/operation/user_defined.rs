@@ -538,6 +538,7 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
                         node_aids: BiMap::from_right(node_aids),
                         graph: self.g.clone(),
                         hidden_nodes: self.arg.hidden_nodes.clone(),
+                        marker_set: self.arg.marker_set.borrow().clone(),
                     };
                     self.arg.trace.borrow_mut().push_frame(frame);
                 }

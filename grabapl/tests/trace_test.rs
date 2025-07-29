@@ -32,6 +32,7 @@ fn list_insert_by_copy(head: int, value: int) {
     } else {
         // we're at the tail
         let! new_node = add_node<int,0>();
+        mark_node<"marked">(new_node);
         copy_value_from_to(value, new_node);
         add_edge<"next">(head, new_node);
     }

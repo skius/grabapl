@@ -7,11 +7,13 @@ use crate::prelude::{AbstractNodeId, ConcreteGraph};
 use crate::{NodeKey, Semantics};
 use crate::graph::dot::DotCollector;
 use crate::graph::EdgeAttribute;
+use crate::operation::marker::MarkerSet;
 use crate::util::bimap::BiMap;
 
 pub struct TraceFrame<S: Semantics> {
     pub graph: ConcreteGraph<S>,
     pub hidden_nodes: HashSet<NodeKey>,
+    pub marker_set: MarkerSet,
     pub node_aids: BiMap<NodeKey, AbstractNodeId>,
 }
 
@@ -30,7 +32,16 @@ impl<S: Semantics<NodeConcrete: Debug, EdgeConcrete: Debug>> TraceFrame<S> {
 
         let node_get = |_g, (key, _)| {
             let value_debug = format!("{:?}", self.graph.get_node_attr(key).unwrap());
-            let value_escaped = value_debug.escape_debug();
+            let mut value_escaped = value_debug.escape_debug().to_string();
+            if let Some(markers) = self.marker_set.marked_nodes_to_markers.get(&key) {
+                // if the node has markers, append them to the value
+                let markers_inner = markers.iter()
+                    .map(|m| format!("{m:?}"))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                // escape { and } because they have semantic meaning in graphviz record shapes
+                value_escaped = format!("{value_escaped}:\\{{{markers_inner}\\}}");
+            }
             // decide between the following options:
             if let Some(node_aid) = self.node_aids.get_left(&key) {
                 // node in current frame

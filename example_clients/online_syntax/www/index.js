@@ -754,17 +754,20 @@ function renderTraceGraph() {
 
     traceBox.style.display = 'block';
     const dot = currentTraceDots[currentTraceIndex];
+    console.log("Rendering trace graph for index:", currentTraceIndex, "with DOT:\n", dot);
 
     // Apply theme adjustments to the DOT string
-    let themedDot = dot.replace(/fill="white"/g, 'fill="none"');
-    themedDot = themedDot.replace(/<text /g, '<text fill="white" ');
-    if (docElement.classList.contains('dark')) {
-        themedDot = themedDot.replace(/stroke="black"/g, 'stroke="white"');
-        themedDot = themedDot.replace(/<text fill="black"/g, '<text fill="white"');
-    } else {
-        themedDot = themedDot.replace(/stroke="white"/g, 'stroke="black"');
-        themedDot = themedDot.replace(/<text fill="white"/g, '<text fill="black"');
-    }
+    // let themedDot = dot.replace(/fill="white"/g, 'fill="none"');
+    // themedDot = themedDot.replace(/<text /g, '<text fill="white" ');
+    // if (docElement.classList.contains('dark')) {
+    //     themedDot = themedDot.replace(/stroke="black"/g, 'stroke="white"');
+    //     themedDot = themedDot.replace(/<text fill="black"/g, '<text fill="white"');
+    // } else {
+    //     themedDot = themedDot.replace(/stroke="white"/g, 'stroke="black"');
+    //     themedDot = themedDot.replace(/<text fill="white"/g, '<text fill="black"');
+    // }
+
+    let themedDot = dot;
 
     traceGraphviz
         .transition(() => d3.transition().duration(500).ease(d3.easeLinear))

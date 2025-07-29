@@ -116,11 +116,13 @@ pub struct TheSemantics;
 /// The node values used in our example semantics.
 ///
 /// Also known as concrete node values.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, derive_more::Debug, PartialEq, Eq)]
 pub enum NodeValue {
     /// Represents an integer value.
+    #[debug("{_0}")]
     Integer(i32),
     /// Represents a string value.
+    #[debug("{_0:?}")]
     String(String),
 }
 
@@ -172,14 +174,17 @@ pub enum NodeType {
 /// The edge values used in our example semantics.
 ///
 /// Also known as concrete edge values.
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, derive_more::Debug, PartialEq, Eq, Default)]
 pub enum EdgeValue {
     /// Represents the unit type, i.e., no interesting value besides presence.
     #[default]
+    #[debug("")]
     Unit,
     /// Represents a string value.
+    #[debug("{_0:?}")]
     String(String),
     /// Represents an integer value.
+    #[debug("{_0}")]
     Integer(i32),
 }
 
