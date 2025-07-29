@@ -326,6 +326,7 @@ const prevTraceBtn = document.getElementById('prev-trace-btn');
 const nextTraceBtn = document.getElementById('next-trace-btn');
 const traceStepIndicator = document.getElementById('trace-step-indicator');
 const traceGraphContainer = document.getElementById('trace-graph-container');
+let isTraceRendering = false;
 
 const runSimulationBtn = document.getElementById('run-simulation-btn');
 
@@ -780,7 +781,7 @@ function renderTraceGraph() {
     // }
 
     let themedDot = dot;
-
+    isTraceRendering = true; // Prevent further interactions during rendering
     traceGraphviz
         .transition(() => d3.transition().duration(300).ease(d3.easeLinear))
         .renderDot(themedDot)
@@ -793,6 +794,7 @@ function renderTraceGraph() {
             // }
             // scroll to the bottom of the trace box
             traceBox.scrollIntoView({ behavior: 'smooth' });
+            isTraceRendering = false; // Allow further interactions after rendering
         });
 
     let traceContainer = document.querySelector("#trace-graph-container");
@@ -842,6 +844,7 @@ function initTraceViewer() {
     });
 
     prevTraceBtn.addEventListener('click', () => {
+        if (isTraceRendering) return; // Prevent navigation while rendering
         if (currentTraceIndex > 0) {
             currentTraceIndex--;
             renderTraceGraph();
@@ -849,6 +852,7 @@ function initTraceViewer() {
     });
 
     nextTraceBtn.addEventListener('click', () => {
+        if (isTraceRendering) return; // Prevent navigation while rendering
         if (currentTraceIndex < currentTraceDots.length - 1) {
             currentTraceIndex++;
             renderTraceGraph();
@@ -857,6 +861,7 @@ function initTraceViewer() {
 
     // add left and right arrow key listeners to navigate the trace
     traceBox.addEventListener('keydown', (e) => {
+        if (isTraceRendering) return; // Prevent navigation while rendering
         if (e.key === 'ArrowLeft' && currentTraceIndex > 0) {
             currentTraceIndex--;
             renderTraceGraph();
