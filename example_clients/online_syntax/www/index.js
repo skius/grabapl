@@ -659,6 +659,7 @@ function executeOperation(operationName, inputNodeNames) {
             currentTraceIndex = 0;
             traceBox.style.display = 'block';
             renderTraceGraph();
+            traceBox.scrollIntoView({ behavior: 'smooth' });
         } else {
             currentTraceDots = [];
             traceBox.style.display = 'none';
