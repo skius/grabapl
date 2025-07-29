@@ -415,19 +415,20 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
     ) -> Result<bool, SpannedInterpreterError> {
         // check if we're calling show();
         if fn_call.0.name.0 == "show_state" {
-            let arg_ident = fn_call.0.args.get(0).ok_or(report!(
-                InterpreterError::NotFoundNodeId("show_state requires an argument".to_string())
-                    .with_span(fn_call.0.name.1)
-            ))?;
-            let as_str = arg_ident.0.single().ok_or(report!(
-                InterpreterError::Custom("needs a single node id for show_state")
-                    .with_span(arg_ident.1)
-            ))?;
+            let state_name = if let Some(arg_ident) = fn_call.0.args.get(0) {
+                let as_str = arg_ident.0.single().ok_or(report!(
+                    InterpreterError::Custom("needs a single node id for show_state")
+                        .with_span(arg_ident.1)
+                ))?;
+                as_str.to_string()
+            } else {
+                "<unnamed state>".to_string()
+            };
             let state = self
                 .builder
                 .show_state()
                 .change_context(InterpreterError::BuilderError.with_span(fn_call.0.name.1))?;
-            self.state_map.insert(as_str.to_string(), state);
+            self.state_map.insert(state_name, state);
             return Ok(true);
         }
 
