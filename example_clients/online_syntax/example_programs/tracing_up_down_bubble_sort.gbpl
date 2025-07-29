@@ -7,7 +7,7 @@ fn reverse_edges(p: int) {
 }
 
 // Jumpstarts the helper function
-fn bubble_sort_wrapper(head: int) {
+fn _bubble_sort_wrapper(head: int) {
     let! direction = add_node<0>();
     trace();
     bubble_sort(head, direction);
