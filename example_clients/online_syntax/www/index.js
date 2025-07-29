@@ -791,6 +791,8 @@ function renderTraceGraph() {
             //     // traceGraphSvg.style.width = "100%";
             //     // traceGraphSvg.style.height = "100%";
             // }
+            // scroll to the bottom of the trace box
+            traceBox.scrollIntoView({ behavior: 'smooth' });
         });
 
     let traceContainer = document.querySelector("#trace-graph-container");
@@ -848,6 +850,17 @@ function initTraceViewer() {
 
     nextTraceBtn.addEventListener('click', () => {
         if (currentTraceIndex < currentTraceDots.length - 1) {
+            currentTraceIndex++;
+            renderTraceGraph();
+        }
+    });
+
+    // add left and right arrow key listeners to navigate the trace
+    traceBox.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft' && currentTraceIndex > 0) {
+            currentTraceIndex--;
+            renderTraceGraph();
+        } else if (e.key === 'ArrowRight' && currentTraceIndex < currentTraceDots.length - 1) {
             currentTraceIndex++;
             renderTraceGraph();
         }

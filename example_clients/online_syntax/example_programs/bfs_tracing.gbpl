@@ -1,0 +1,187 @@
+ // -------- BFS with Queue --------
+/*
+Idea is just like a regular BFS algorithm:
+1. Queue of unprocessed nodes.
+2. Pop an unvisited node (with *manual* checked node references!) from the queue
+    a. Add it to the result list.
+    b. Mark it as visited.
+    c. Add all its children to the queue.
+3. Repeat until the queue is empty.
+*/
+
+
+fn bfs(start_node: int) -> (head: any) {
+    trace();
+    let! head = mk_list();
+    let! queue = mk_queue();
+    trace();
+
+    // BFS queue initialization: we start with `start_node`.
+    push_queue_by_ref(queue, start_node);
+    trace();
+
+    // need to hide start_node from the abstract graph, since otherwise we will not be able to pop it from the queue, since it is shape-hidden.
+    // (if a node is hidden from the abstract graph, that means it is *not* hidden from shape queries)
+    hide_node(start_node);
+    trace();
+
+    bfs_helper(queue, head);
+
+    // the queue is not needed anymore.
+    remove_node(queue);
+    trace();
+
+    return (head: head);
+}
+
+// BFS helper: recurses until the queue is empty.
+fn bfs_helper(queue: any, list: any) {
+    trace();
+    let! is_empty_res = queue_empty(queue);
+    if is_eq<0>(is_empty_res) {
+        // the queue is not empty.
+
+        let! attach = pop_queue(queue);
+        // now we need to shape query for `next`. Shape querying is necessary to ensure
+        // we don't get a reference to a node that is already in the abstract graph (i.e., to avoid aliasing).
+        trace();
+        if shape [
+            next: int,
+            attach -> next: "attached"
+        ] skipping ["visited"] {
+            // in addition, we can directly check if `next` is already visited, and if so, skip it!
+            trace();
+            // if it's not visited already, we add it to our BFS result list
+            list_insert_by_copy(list, next);
+            trace();
+            // then mark it as visited
+            mark_node<"visited", int>(next);
+            trace();
+            // and lastly, we need to add all children of this node to the queue
+            //  note: if we want to a void unnecessarily adding already visited children that would just get skipped in the shape query above,
+            //  we can check _at insertion time_ if the child is already visited and skip it if so.
+            insert_children_into_queue_by_ref(next, queue);
+        }
+        trace();
+        // we do some cleanup
+        remove_node(attach);
+
+        // since the queue was not empty we try again
+        bfs_helper(queue, list);
+    }
+    // cleanup
+    remove_node(is_empty_res);
+}
+
+// inserts all children of the parent node into the queue.
+fn insert_children_into_queue_by_ref(parent: int, queue: any) {
+    trace();
+    if shape [
+        child: int,
+        parent -> child: *,
+    ] /*skipping ["visited"] -- NOTE: uncommenting this is an optional optimization*/ {
+        trace();
+        push_queue_by_ref(queue, child);
+        trace();
+        // try to find more children
+        insert_children_into_queue_by_ref(parent, queue);
+    }
+}
+
+fn hide_node(node: any) {
+    let! one = add_node<1>();
+    if is_eq<0>(one) {
+        // statically 'maybe' delete the node, but in practice this is never executed.
+        remove_node(node);
+    }
+    remove_node(one);
+}
+
+// The FIFO queue
+
+fn mk_queue() -> (head: any) {
+    let! head = add_node<0>();
+    return (head: head);
+}
+
+// return value = 0: non-empty, >0: empty
+fn queue_empty(head: any) -> (is_empty: int) {
+    let! res = add_node<1>();
+    // check if the queue is empty
+    if shape [
+        next: any,
+        head -> next: *,
+    ] {
+        // set res to false by decrementing if we have a next node
+        add_constant<-1>(res);
+    }
+    return (is_empty: res);
+}
+
+// Returns a node that potentially has attached to it a value of the BFS graph.
+fn pop_queue(head: any) -> (value: int) {
+    // remove the first element from the queue
+    if shape [
+        fst: int,
+        snd: int,
+        // NOTE: in the manual version of references, named edges are crucial! since a queue element could point with "attached" to any BFS graph node.
+        head -> fst: "queue_next",
+        fst -> snd: "queue_next",
+    ] {
+        // remove the edge from head to fst and fst to snd
+        remove_edge(head, fst);
+        remove_edge(fst, snd);
+        add_edge<"queue_next">(head, snd);
+        // return fst
+        res := fst;
+    } else if shape [
+        fst: int,
+        head -> fst: "queue_next"
+    ] {
+        remove_edge(head, fst);
+        res := fst;
+    } else {
+        // if we don't match any children, we need some form of base-case result. we just create a dangling reference here.
+        let! res = add_node<-9999>();
+    }
+    return (value: res);
+}
+
+fn push_queue_by_ref(head: any, value: int) {
+    let! ref_node = add_node<0>();
+    add_edge<"attached">(ref_node, value);
+    push_queue_helper_linking(head, ref_node);
+}
+
+// links the given node to the end of the queue.
+fn push_queue_helper_linking(curr: any, node_to_insert: int) {
+    if shape [
+        next: any,
+        curr -> next: "queue_next",
+    ] {
+        push_queue_helper_linking(next, node_to_insert);
+    } else {
+        // we're at the tail of the queue
+        add_edge<"queue_next">(curr, node_to_insert);
+    }
+}
+
+fn mk_list() -> (head: any) {
+    let! head = add_node<42>();
+    return (head: head);
+}
+
+fn list_insert_by_copy(head: any, value: int) {
+    if shape [
+        child: int,
+        head -> child: *,
+    ] {
+        list_insert_by_copy(child, value);
+    } else {
+        // we're at the tail
+        let! new_node = add_node<0>();
+        copy_value_from_to(value, new_node);
+        add_edge<"next">(head, new_node);
+    }
+}
+
