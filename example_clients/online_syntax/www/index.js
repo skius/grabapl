@@ -782,7 +782,7 @@ function renderTraceGraph() {
     let themedDot = dot;
 
     traceGraphviz
-        .transition(() => d3.transition().duration(500).ease(d3.easeLinear))
+        .transition(() => d3.transition().duration(300).ease(d3.easeLinear))
         .renderDot(themedDot)
         .on("end", function () {
             // // adjust the svg inside trace-graph-container to be full width and height:
