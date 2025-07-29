@@ -23,7 +23,7 @@
 #show: grabapl-init
 
 #let grabapl_plugin = plugin("typst_plugin.wasm")
-#let type_color = "brown3"
+#let type_color = "#d73a49"
 #let edge_str_color = "forestgreen"
 #let dot_of_state(a, state_name) = str(grabapl_plugin.dot_of_state(bytes(a), bytes(state_name), bytes(type_color), bytes(edge_str_color)))
 
