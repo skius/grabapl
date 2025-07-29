@@ -1022,7 +1022,7 @@ macro_rules! grabapl_parse {
 #[macro_export]
 macro_rules! grabapl_defs {
     ($fn_name:ident, $semantics:ty, $($t:tt)*) => {
-        fn $fn_name() -> (OperationContext<$semantics>, std::collections::HashMap<&'static str, grabapl::prelude::OperationId>) {
+        fn $fn_name() -> (grabapl::prelude::OperationContext<$semantics>, std::collections::HashMap<&'static str, grabapl::prelude::OperationId>) {
             $crate::grabapl_parse!($semantics, $($t)*)
         }
     };

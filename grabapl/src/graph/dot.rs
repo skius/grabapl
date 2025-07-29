@@ -91,6 +91,13 @@ impl DotCollector {
         self.dot.push_str(&graph.shape_dot());
     }
 
+    pub fn collect_raw(&mut self, raw_dot: &str) {
+        if !self.dot.is_empty() {
+            self.dot.push_str("\n---\n");
+        }
+        self.dot.push_str(raw_dot);
+    }
+
     pub fn finalize(&self) -> String {
         self.dot.clone()
     }
