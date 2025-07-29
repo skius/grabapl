@@ -254,6 +254,9 @@ pub enum BuilderInstruction<S: Semantics> {
     /// Has a static effect: The branch is considered to never return, hence merges will always take the other branch.
     #[debug("Diverge({_0})")]
     Diverge(String),
+    /// Add the current operation's frame to the operation trace
+    #[debug("Trace")]
+    Trace
 }
 
 impl<S: Semantics> BuilderInstruction<S> {
@@ -305,6 +308,7 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Build
             Finalize => Finalize,
             SelfReturnNode(marker, node) => SelfReturnNode(marker.clone(), node.clone()),
             Diverge(msg) => Diverge(msg.clone()),
+            Trace => Trace,
         }
     }
 }

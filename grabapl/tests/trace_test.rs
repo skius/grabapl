@@ -13,7 +13,7 @@ fn children_to_list(p: int, l: int) {
     ] {
         // trace whenever we find a child
         trace();
-        insert_child_to_list(child, l);
+        list_insert_by_copy(l, child);
         children_to_list(p, l);
     }
 }
@@ -56,15 +56,8 @@ fn trace_test() {
     // run the operation
     let res = run_from_concrete(&mut g, &op_ctx, fn_names["children_to_list"], &[parent_key, list_key]).unwrap();
 
-    let trace = res.trace;
-
-    let mut dot_collector = DotCollector::new();
-    for frame in trace.frames {
-        dot_collector.collect_raw(&frame.dot());
-    }
-
-    println!("Trace DOT:\n{}", dot_collector.finalize());
+    println!("Trace DOT:\n{}", res.trace.chained_dot());
 
     // just playing around
-    assert!(false);
+    // assert!(false);
 }

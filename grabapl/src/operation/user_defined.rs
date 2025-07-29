@@ -18,6 +18,8 @@ use error_stack::{FutureExt, ResultExt, bail, report};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
+use crate::operation::trace::TraceFrame;
+use crate::util::bimap::BiMap;
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
@@ -236,6 +238,8 @@ pub enum Instruction<S: Semantics> {
     Diverge {
         crash_message: String,
     },
+    /// Pushes a trace frame to the operation trace.
+    Trace,
 }
 
 impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Instruction<S> {
@@ -256,6 +260,7 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Instr
             Instruction::Diverge { crash_message } => Instruction::Diverge {
                 crash_message: crash_message.clone(),
             },
+            Instruction::Trace => Instruction::Trace,
         }
     }
 }
@@ -526,6 +531,15 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
                 }
                 Instruction::Diverge { crash_message } => {
                     return Err(report!(OperationError::UserCrash(crash_message.clone())));
+                }
+                Instruction::Trace => {
+                    let node_aids = self.abstract_to_concrete.clone();
+                    let frame = TraceFrame {
+                        node_aids: BiMap::from_right(node_aids),
+                        graph: self.g.clone(),
+                        hidden_nodes: self.arg.hidden_nodes.clone(),
+                    };
+                    self.arg.trace.borrow_mut().push_frame(frame);
                 }
             }
         }

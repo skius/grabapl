@@ -432,6 +432,19 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             return Ok(true);
         }
 
+        if fn_call.0.name.0 == "trace" {
+            // assert no args and no macro args
+            if !fn_call.0.args.is_empty() || fn_call.0.macro_args.is_some() {
+                return Err(report!(
+                    InterpreterError::Custom("trace does not take any arguments")
+                        .with_span(fn_call.0.name.1)
+                ));
+            }
+            // start tracing
+            self.builder.trace().change_context(InterpreterError::BuilderError.with_span(fn_call.0.name.1))?;
+            return Ok(true);
+        }
+
         if fn_call.0.name.0 == "diverge" {
             // expect a string macro args
             let args = fn_call.0.macro_args;

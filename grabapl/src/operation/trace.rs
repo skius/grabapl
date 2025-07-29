@@ -5,6 +5,7 @@ use std::fmt::Debug;
 use petgraph::dot::{Config, Dot};
 use crate::prelude::{AbstractNodeId, ConcreteGraph};
 use crate::{NodeKey, Semantics};
+use crate::graph::dot::DotCollector;
 use crate::graph::EdgeAttribute;
 use crate::util::bimap::BiMap;
 
@@ -35,13 +36,13 @@ impl<S: Semantics<NodeConcrete: Debug, EdgeConcrete: Debug>> TraceFrame<S> {
                 // node in current frame
                 let aid_debug = node_aid.to_string_dot_syntax();
                 let aid_escaped = aid_debug.escape_debug();
-                format!("shape=Mrecord, label = \"{aid_escaped}|{value_escaped}\"")
+                format!("shape=Mrecord, color=\"blue\" label = \"{aid_escaped}|{value_escaped}\"")
             } else if self.hidden_nodes.contains(&key) {
                 // hidden node
-                format!("shape=fill, color=\"grey\" label = \"{value_escaped}\"")
+                format!("style=\"filled\" color=\"brown\" fillcolor=\"moccasin\" label = \"{value_escaped}\"")
             } else {
                 // pure runtime node, available for shape matching
-                format!("label = \"{value_escaped}\"")
+                format!("style=\"filled\" fillcolor=\"gray72\" label = \"{value_escaped}\"")
             }
         };
 
@@ -65,5 +66,15 @@ impl<S: Semantics> Trace<S> {
 
     pub fn push_frame(&mut self, frame: TraceFrame<S>) {
         self.frames.push(frame);
+    }
+}
+
+impl<S: Semantics<NodeConcrete: Debug, EdgeConcrete: Debug>> Trace<S> {
+    pub fn chained_dot(&self) -> String {
+        let mut dot_collector = DotCollector::new();
+        for frame in &self.frames {
+            dot_collector.collect_raw(&frame.dot());
+        }
+        dot_collector.finalize()
     }
 }

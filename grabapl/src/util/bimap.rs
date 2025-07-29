@@ -25,6 +25,38 @@ impl<L: Eq + Hash + Clone, R: Eq + Hash + Clone> BiMap<L, R> {
         this
     }
 
+    pub fn from_left(left_to_right: HashMap<L, R>) -> Self {
+        let right_to_left: HashMap<R, L> = left_to_right
+            .iter()
+            .map(|(l, r)| (r.clone(), l.clone()))
+            .collect();
+        assert_eq!(
+            left_to_right.len(),
+            right_to_left.len(),
+            "Left and right maps must have the same length"
+        );
+        BiMap {
+            left_to_right,
+            right_to_left,
+        }
+    }
+
+    pub fn from_right(right_to_left: HashMap<R, L>) -> Self {
+        let left_to_right: HashMap<L, R> = right_to_left
+            .iter()
+            .map(|(r, l)| (l.clone(), r.clone()))
+            .collect();
+        assert_eq!(
+            left_to_right.len(),
+            right_to_left.len(),
+            "Left and right maps must have the same length"
+        );
+        BiMap {
+            left_to_right,
+            right_to_left,
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.left_to_right.len()
     }

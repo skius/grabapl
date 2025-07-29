@@ -249,6 +249,12 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
                     },
                 ));
             }
+            BI::Trace => {
+                this.instructions.push((
+                    None,
+                    Instruction::Trace,
+                ));
+            }
             _ => {
                 bail_unexpected_instruction!(
                     instruction,
@@ -1961,6 +1967,12 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
     /// ```
     pub fn diverge(&mut self, message: impl Into<String>) -> Result<(), OperationBuilderError> {
         self.push_instruction(BuilderInstruction::Diverge(message.into()))
+    }
+
+    /// Adds a trace operation that will collect the runtime state of the graph
+    /// and the current operation's frame.
+    pub fn trace(&mut self) -> Result<(), OperationBuilderError> {
+        self.push_instruction(BuilderInstruction::Trace)
     }
 
     /// Builds the user defined operation from the collected instructions.
