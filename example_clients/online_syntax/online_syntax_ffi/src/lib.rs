@@ -163,7 +163,7 @@ pub mod ffi {
             g: &mut ConcreteGraph,
             op_name: &str,
             args: &[u32],
-        ) -> Result<Box<NewNodesIter>, Box<StringError>> {
+        ) -> Result<Box<RunOperationResult>, Box<StringError>> {
             let op_ctx = self
                 .result
                 .as_ref()
@@ -179,22 +179,42 @@ pub mod ffi {
                 &args.iter().copied().map(NodeKey).collect::<Vec<_>>(),
             );
             match res {
-                Ok(output) => Ok(Box::new(NewNodesIter(
-                    output
-                        .new_nodes()
-                        .into_iter()
-                        .map(|(&marker, &key)| {
-                            (
-                                key.0,
-                                marker.0.to_string(),
-                                super::node_value_to_string(g.graph.get_node_attr(key).unwrap()),
-                            )
-                        })
-                        .collect::<Vec<_>>()
-                        .into_iter(),
-                ))),
+                Ok(output) => Ok(Box::new(RunOperationResult {
+                    new_nodes: NewNodesIter(
+                        output
+                            .new_nodes()
+                            .into_iter()
+                            .map(|(&marker, &key)| {
+                                (
+                                    key.0,
+                                    marker.0.to_string(),
+                                    super::node_value_to_string(g.graph.get_node_attr(key).unwrap()),
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                            .into_iter(),
+                    ),
+                    trace: output.trace
+                })),
                 Err(e) => Err(Box::new(StringError(e.to_string()))),
             }
+        }
+    }
+
+    #[diplomat::opaque]
+    pub struct RunOperationResult {
+        new_nodes: NewNodesIter,
+        trace: grabapl::operation::trace::Trace<super::TheSemantics>,
+    }
+
+    impl RunOperationResult {
+        #[diplomat::attr(auto, iterable)]
+        pub fn to_iterable(&self) -> Box<NewNodesIter> {
+            Box::new(NewNodesIter(self.new_nodes.0.clone()))
+        }
+
+        pub fn chained_dot_trace(&self, out: &mut DiplomatWrite) {
+            write!(out, "{}", self.trace.chained_dot()).unwrap();
         }
     }
 

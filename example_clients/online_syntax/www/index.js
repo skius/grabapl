@@ -4,6 +4,7 @@ import * as monaco from 'monaco-editor';
 import 'monaco-editor/esm/vs/basic-languages/rust/rust.contribution';
 import { AnsiUp } from 'ansi_up';
 import * as d3 from 'd3';
+import {d3Graphviz} from 'd3-graphviz'
 
 // --- Initialization ---
 const ansi_up = new AnsiUp();
@@ -631,6 +632,8 @@ function executeOperation(operationName, inputNodeNames) {
 
     try {
         let res = current_res.runOperation(concreteGraph, operationName, inputKeys);
+        let traceDots = res.chainedDotTrace()
+
         const avgX = inputNodes.reduce((sum, n) => sum + (n.x || 0), 0) / inputNodes.length;
         const avgY = inputNodes.reduce((sum, n) => sum + (n.y || 0), 0) / inputNodes.length;
 

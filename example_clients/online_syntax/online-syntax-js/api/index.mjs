@@ -24,6 +24,8 @@ export { OpCtxAndFnNames } from "./OpCtxAndFnNames.mjs"
 
 export { ParseResult } from "./ParseResult.mjs"
 
+export { RunOperationResult } from "./RunOperationResult.mjs"
+
 export { StringError } from "./StringError.mjs"
 
 export { StringIter } from "./StringIter.mjs"

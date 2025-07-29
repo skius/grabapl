@@ -45,6 +45,9 @@ export interface InitOutput {
   readonly ParseResult_list_operations: (a: number) => number;
   readonly ParseResult_run_operation: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
   readonly ParseResult_destroy: (a: number) => void;
+  readonly RunOperationResult_to_iterable: (a: number) => number;
+  readonly RunOperationResult_chained_dot_trace: (a: number, b: number) => void;
+  readonly RunOperationResult_destroy: (a: number) => void;
   readonly StringError_to_string: (a: number, b: number) => void;
   readonly StringError_destroy: (a: number) => void;
   readonly StringIter_next: (a: number) => number;

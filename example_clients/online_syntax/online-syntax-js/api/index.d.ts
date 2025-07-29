@@ -26,6 +26,8 @@ export { OpCtxAndFnNames } from "./OpCtxAndFnNames"
 
 export { ParseResult } from "./ParseResult"
 
+export { RunOperationResult } from "./RunOperationResult"
+
 export { StringError } from "./StringError"
 
 export { StringIter } from "./StringIter"

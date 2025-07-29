@@ -4,7 +4,7 @@ pub mod marker;
 pub mod query;
 pub mod signature;
 pub mod user_defined;
-mod trace;
+pub mod trace;
 
 use crate::graph::EdgeAttribute;
 use crate::operation::builtin::LibBuiltinOperation;
