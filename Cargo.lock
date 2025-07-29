@@ -530,8 +530,7 @@ dependencies = [
 
 [[package]]
 name = "grabapl_temp_petgraph_crate_not_namesquatting_i_promise"
-version = "0.0.0"
-source = "git+https://github.com/skius/petgraph.git?branch=partial_isos#33d282122d772513a1ab1d19389ce7693b4efd93"
+version = "0.0.1"
 dependencies = [
  "fixedbitset",
  "hashbrown",

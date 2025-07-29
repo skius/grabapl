@@ -3,6 +3,7 @@
 use std::collections::HashSet;
 use std::fmt::Debug;
 use petgraph::dot::{Config, Dot};
+use petgraph::visit::NodeIndexable;
 use crate::prelude::{AbstractNodeId, ConcreteGraph};
 use crate::{NodeKey, Semantics};
 use crate::graph::dot::DotCollector;
@@ -56,10 +57,11 @@ impl<S: Semantics<NodeConcrete: Debug, EdgeConcrete: Debug>> TraceFrame<S> {
                 format!("style=\"filled\" fillcolor=\"gray72\" label = \"{value_escaped}\"")
             }
         };
-
-        let dot = Dot::with_attr_getters(g, &[Config::EdgeNoLabel, Config::NodeNoLabel],
-            &edge_get,
-            &node_get,
+        let index_get = |g, key: NodeKey| format!("{}", key.0);
+        let dot = Dot::with_attr_getters_and_index_getter(g, &[Config::EdgeNoLabel, Config::NodeNoLabel],
+                                                          &edge_get,
+                                                          &node_get,
+                                                          &index_get,
         );
 
         format!("{dot:?}")
