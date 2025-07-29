@@ -181,9 +181,9 @@ pub mod ffi {
             match res {
                 Ok(output) => Ok(Box::new(NewNodesIter(
                     output
-                        .new_nodes
+                        .new_nodes()
                         .into_iter()
-                        .map(|(marker, key)| {
+                        .map(|(&marker, &key)| {
                             (
                                 key.0,
                                 marker.0.to_string(),

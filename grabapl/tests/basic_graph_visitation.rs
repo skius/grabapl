@@ -511,7 +511,7 @@ fn bfs_and_dfs() {
     println!("petgraph DFS: {:?}", dfs_nodes);
 
     let res = run_from_concrete(&mut g, &op_ctx, fn_map["bfs"], &[l1]).unwrap();
-    let head_bfs = res.new_nodes[&"head".into()];
+    let head_bfs = res.key_of_output_marker("head").unwrap();
     let grabapl_bfs_list = helpers::list_to_value_vec(&g, head_bfs);
     let valid = acceptable_bfs.contains(&grabapl_bfs_list);
     println!("grabapl  BFS: {:?} - valid: {valid}", grabapl_bfs_list);
@@ -525,7 +525,7 @@ fn bfs_and_dfs() {
     );
 
     let res = run_from_concrete(&mut g, &op_ctx, fn_map["dfs"], &[l1]).unwrap();
-    let head_dfs = res.new_nodes[&"head".into()];
+    let head_dfs = res.key_of_output_marker("head").unwrap();
     let grabapl_dfs_list = helpers::list_to_value_vec(&g, head_dfs);
     let valid = acceptable_dfs.contains(&grabapl_dfs_list);
     println!("grabapl  DFS: {:?} - valid: {valid}", grabapl_dfs_list);
@@ -537,7 +537,7 @@ fn bfs_and_dfs() {
     println!("{}", g.dot());
 
     let max_height_res = run_from_concrete(&mut g, &op_ctx, fn_map["max_height"], &[l1]).unwrap();
-    let max_height_node = max_height_res.new_nodes[&"max_height".into()];
+    let max_height_node = max_height_res.new_nodes()[&"max_height".into()];
     let max_height_value = g.get_node_attr(max_height_node).unwrap();
     println!(
         "max height of the graph starting from node {:?}: {:?}",
@@ -561,7 +561,7 @@ fn bfs_and_dfs() {
     loop {
         let is_empty_res =
             run_from_concrete(&mut g, &op_ctx, fn_map["queue_empty"], &[queue_head]).unwrap();
-        let is_empty_node = is_empty_res.new_nodes[&"is_empty".into()];
+        let is_empty_node = is_empty_res.new_nodes()[&"is_empty".into()];
         let is_empty_value = g.get_node_attr(is_empty_node).unwrap();
         if is_empty_value.must_integer() == 1 {
             // queue is empty
@@ -569,7 +569,7 @@ fn bfs_and_dfs() {
         }
         let pop_res =
             run_from_concrete(&mut g, &op_ctx, fn_map["pop_queue"], &[queue_head]).unwrap();
-        let popped_value_node = pop_res.new_nodes[&"value".into()];
+        let popped_value_node = pop_res.new_nodes()[&"value".into()];
         let popped_value = g.get_node_attr(popped_value_node).unwrap();
         returned_queue.push(popped_value.must_integer());
     }
@@ -601,7 +601,7 @@ fn test_bfs(
     }
 
     let res = run_from_concrete(g, &op_ctx, fn_map["bfs"], &[start_node]).unwrap();
-    let head_bfs = res.new_nodes[&"head".into()];
+    let head_bfs = res.key_of_output_marker("head").unwrap();
     let grabapl_bfs_list = helpers::list_to_value_vec(g, head_bfs);
     assert!(
         valid_bfs_order(&grabapl_bfs_list, bfs_layers.clone()),
@@ -653,7 +653,7 @@ fn all_siblings_test() {
     g.add_edge(p2, c2, "edge".to_string());
 
     let res = run_from_concrete(&mut g, &op_ctx, op, &[p2]).unwrap();
-    let head = res.new_nodes[&"head".into()];
+    let head = res.key_of_output_marker("head").unwrap();
     let siblings_list = helpers::list_to_value_vec(&g, head);
     assert_eq!(
         siblings_list,

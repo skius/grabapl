@@ -332,7 +332,7 @@ fn test_bfs(
     }
 
     let res = run_from_concrete(g, &op_ctx, fn_map["bfs"], &[start_node]).unwrap();
-    let head_bfs = res.new_nodes[&"head".into()];
+    let head_bfs = res.key_of_output_marker("head").unwrap();
     let grabapl_bfs_list = helpers::list_to_value_vec_generic::<TestSemantics>(g, head_bfs);
     let grabapl_bfs_list = &grabapl_bfs_list[1..]; // skip the sentinel node
     assert!(

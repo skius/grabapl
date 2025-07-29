@@ -13,6 +13,8 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
+use crate::operation::trace::Trace;
+use crate::operation::user_defined::AbstractOperationResultMarker;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
 // renamed.
 
@@ -475,8 +477,8 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
     }
 }
 
-#[derive(Debug)]
-pub struct OperationArgument<'a> {
+#[derive(derive_more::Debug)]
+pub struct OperationArgument<'a, S: Semantics> {
     pub selected_input_nodes: Cow<'a, [NodeKey]>,
     /// We know this substitution statically already, since we define our parameter substitutions statically.
     /// So we can store it in this struct.
@@ -486,6 +488,8 @@ pub struct OperationArgument<'a> {
     /// abstract guarantees, since changes are not visible to outer operations.
     pub hidden_nodes: HashSet<NodeKey>,
     pub marker_set: &'a RefCell<MarkerSet>,
+    #[debug(skip)]
+    pub trace: &'a RefCell<Trace<S>>
 }
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
@@ -512,6 +516,24 @@ impl OperationOutput {
             new_nodes: HashMap::new(),
             removed_nodes: Vec::new(),
         }
+    }
+}
+
+/// The result of [`run_from_concrete`](super::super::run_from_concrete).
+pub struct ConcreteOperationOutput<S: Semantics> {
+    pub output: OperationOutput,
+    pub marker_set: MarkerSet,
+    pub trace: Trace<S>,
+}
+
+impl<S: Semantics> ConcreteOperationOutput<S> {
+    pub fn new_nodes(&self) -> &HashMap<AbstractOutputNodeMarker, NodeKey> {
+        &self.output.new_nodes
+    }
+
+    pub fn key_of_output_marker(&self, marker: impl Into<AbstractOutputNodeMarker>) -> Option<NodeKey> {
+        let marker = marker.into();
+        self.output.new_nodes.get(&marker).copied()
     }
 }
 

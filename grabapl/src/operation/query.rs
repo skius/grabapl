@@ -100,7 +100,7 @@ pub struct ConcreteShapeQueryResult {
 pub(crate) fn run_builtin_query<S: Semantics>(
     g: &mut ConcreteGraph<S>,
     query: &S::BuiltinQuery,
-    arg: OperationArgument,
+    arg: OperationArgument<S>,
 ) -> OperationResult<ConcreteQueryOutput> {
     let mut gws = GraphWithSubstitution::new(g, &arg.subst);
     let output = query.query(&mut gws);

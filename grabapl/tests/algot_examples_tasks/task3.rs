@@ -88,7 +88,7 @@ fn task3() {
 
     let root = n5;
     let res = run_from_concrete(&mut g, &op_ctx, fn_names["tree_serialize"], &[root]).unwrap();
-    let list = res.new_nodes[&"list".into()];
+    let list = res.key_of_output_marker("list").unwrap();
     let values_with_sentinel = helpers::list_to_value_vec(&g, list);
     let values = &values_with_sentinel[1..]; // skip the sentinel node
     assert_eq!(

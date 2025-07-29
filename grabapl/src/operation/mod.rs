@@ -4,6 +4,7 @@ pub mod marker;
 pub mod query;
 pub mod signature;
 pub mod user_defined;
+mod trace;
 
 use crate::graph::EdgeAttribute;
 use crate::operation::builtin::LibBuiltinOperation;
@@ -28,6 +29,8 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use thiserror::Error;
+use crate::operation::signature::parameter::ConcreteOperationOutput;
+use crate::operation::trace::Trace;
 
 pub trait BuiltinOperation: Debug {
     type S: Semantics;
@@ -272,7 +275,7 @@ pub fn run_operation<S: Semantics>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
     op_ctx: &OperationContext<S>,
     op: OperationId,
-    arg: OperationArgument,
+    arg: OperationArgument<S>,
 ) -> OperationResult<OperationOutput> {
     match op_ctx.get(op).expect("Invalid operation ID") {
         Operation::LibBuiltin(lib_builtin) => run_lib_builtin_operation::<S>(g, lib_builtin, arg),
@@ -284,7 +287,7 @@ pub fn run_operation<S: Semantics>(
 fn run_lib_builtin_operation<S: Semantics>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
     op: &LibBuiltinOperation<S>,
-    arg: OperationArgument,
+    arg: OperationArgument<S>,
 ) -> OperationResult<OperationOutput> {
     run_builtin_or_lib_builtin_operation(g, op, arg)
 }
@@ -292,7 +295,7 @@ fn run_lib_builtin_operation<S: Semantics>(
 fn run_builtin_operation<S: Semantics>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
     op: &S::BuiltinOperation,
-    arg: OperationArgument,
+    arg: OperationArgument<S>,
 ) -> OperationResult<OperationOutput> {
     run_builtin_or_lib_builtin_operation(g, op, arg)
 }
@@ -300,7 +303,7 @@ fn run_builtin_operation<S: Semantics>(
 fn run_builtin_or_lib_builtin_operation<S: Semantics, BO: BuiltinOperation<S = S>>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
     op: &BO, // LibBuiltin implements BuiltinOperation for any Semantics.
-    arg: OperationArgument,
+    arg: OperationArgument<S>,
 ) -> OperationResult<OperationOutput> {
     let mut gws = GraphWithSubstitution::new(g, &arg.subst);
     let mut concrete_data = ConcreteData {
@@ -315,7 +318,7 @@ fn run_custom_operation<S: Semantics>(
     g: &mut Graph<S::NodeConcrete, S::EdgeConcrete>,
     op_ctx: &OperationContext<S>,
     op: &UserDefinedOperation<S>,
-    arg: OperationArgument,
+    arg: OperationArgument<S>,
 ) -> OperationResult<OperationOutput> {
     let output = op.apply(op_ctx, g, arg)?;
 
@@ -327,7 +330,7 @@ pub fn run_from_concrete<S: Semantics>(
     op_ctx: &OperationContext<S>,
     op: OperationId,
     selected_inputs: &[NodeKey],
-) -> OperationResult<OperationOutput> {
+) -> OperationResult<ConcreteOperationOutput<S>> {
     // first get substitution
     let abstract_g = S::concrete_to_abstract(g);
 
@@ -353,14 +356,22 @@ pub fn run_from_concrete<S: Semantics>(
     };
     // then run the operation
     let marker_set = RefCell::new(MarkerSet::new());
+    let trace = RefCell::new(Trace::new());
     let arg = OperationArgument {
         subst,
         selected_input_nodes: selected_inputs.into(),
         hidden_nodes: HashSet::new(),
         marker_set: &marker_set,
+        trace: &trace,
     };
 
-    run_operation(g, op_ctx, op, arg)
+    let op_output = run_operation(g, op_ctx, op, arg)?;
+
+    Ok(ConcreteOperationOutput {
+        output: op_output,
+        marker_set: marker_set.into_inner(),
+        trace: trace.into_inner(),
+    })
 }
 
 pub type OperationResult<T> = error_stack::Result<T, OperationError>;

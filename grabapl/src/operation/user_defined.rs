@@ -72,6 +72,22 @@ impl AbstractNodeId {
     pub fn named(name: impl Into<NamedMarker>) -> Self {
         AbstractNodeId::Named(name.into())
     }
+
+    /// Turns single-element AIDs into their name, and dynamic output AIDs into <op_name>.<marker>.
+    ///
+    /// # Example
+    /// `AbstractNodeId::param("hello")` will return `hello`.
+    /// `AbstractNodeId::dynamic_output("op", "marker")` will return `op.marker`.
+    pub fn to_string_dot_syntax(&self) -> String {
+        match self {
+            AbstractNodeId::ParameterMarker(marker) => format!("{}", marker.0),
+            AbstractNodeId::DynamicOutputMarker(AbstractOperationResultMarker::Custom(op), node) => {
+                format!("{}.{}", op, node.0)
+            }
+            AbstractNodeId::Named(name) => format!("{}", name.0),
+            _ => "<unnamed>".to_string(),
+        }
+    }
 }
 
 impl FromStr for AbstractNodeId {
@@ -349,7 +365,7 @@ impl<S: Semantics> UserDefinedOperation<S> {
         &self,
         op_ctx: &OperationContext<S>,
         g: &mut ConcreteGraph<S>,
-        arg: OperationArgument,
+        arg: OperationArgument<S>,
     ) -> OperationResult<OperationOutput> {
         let mut runner = Runner::new(op_ctx, g, &arg);
         runner.run(&self.instructions)?;
@@ -382,7 +398,7 @@ struct Runner<'a, 'arg, S: Semantics> {
     op_ctx: &'a OperationContext<S>,
     g: &'a mut ConcreteGraph<S>,
     /// The argument with which our operation was called.
-    arg: &'a OperationArgument<'arg>,
+    arg: &'a OperationArgument<'arg, S>,
     // Note: should not store AID::Parameter nodes, those are in `arg` already.
     // TODO: ^ double check this. I'm currently violating it for ForgetAid.
     abstract_to_concrete: HashMap<AbstractNodeId, NodeKey>,
@@ -398,7 +414,7 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
     pub fn new(
         op_ctx: &'a OperationContext<S>,
         g: &'a mut ConcreteGraph<S>,
-        arg: &'a OperationArgument<'arg>,
+        arg: &'a OperationArgument<'arg, S>,
     ) -> Self {
         Runner {
             op_ctx,
@@ -571,7 +587,7 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
     fn abstract_to_concrete_arg(
         &self,
         arg: &AbstractOperationArgument,
-    ) -> OperationResult<OperationArgument<'arg>> {
+    ) -> OperationResult<OperationArgument<'arg, S>> {
         log::trace!(
             "Getting concrete arg of abstract arg: {arg:#?} previous_results: {:#?}, our operation's argument: {:#?}",
             &self.abstract_to_concrete,
@@ -619,6 +635,7 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
             subst: new_subst,
             hidden_nodes,
             marker_set: self.arg.marker_set,
+            trace: self.arg.trace,
         })
     }
 }

@@ -70,8 +70,8 @@ fn proptest_max_heap_remove() {
                 // run the max-heap removal operation
                 let op_result = run_from_concrete(&mut g, &op_ctx, max_heap_remove_id, &[sentinel]).unwrap();
                 // check if the max value node is present
-                let max_value_node = op_result.new_nodes.get(&AbstractOutputNodeMarker::from("max_value")).unwrap();
-                let max_value = g.get_node_attr(*max_value_node).unwrap();
+                let max_value_node = op_result.key_of_output_marker("max_value").unwrap();
+                let max_value = g.get_node_attr(max_value_node).unwrap();
                 assert_eq!(
                     max_value,
                     &NodeValue::Integer(expected_max_value),

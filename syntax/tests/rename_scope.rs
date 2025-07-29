@@ -43,7 +43,7 @@ fn rename_scope() {
     let res = run_from_concrete(&mut g, &op_ctx, op_id, &[p1]).unwrap();
 
     println!("Graph after execution: {:#?}", g.dot());
-    let ret_node = res.new_nodes[&"ret_node".into()];
+    let ret_node = res.key_of_output_marker("ret_node").unwrap();
     let value = g.get_node_attr(ret_node).unwrap();
     println!("Return node value {ret_node:?}: {:?}", value);
 
