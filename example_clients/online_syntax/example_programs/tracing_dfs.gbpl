@@ -1,0 +1,69 @@
+fn _dfs(start: any) -> (list: any) {
+    trace();
+    let! list = mk_list();
+    trace();
+    list_insert_by_copy(list, start);
+    trace();
+    dfs_helper(start, list);
+    trace();
+    return (list: list);
+}
+
+fn dfs_helper(curr: any, list: any) {
+    trace();
+    // repeat for children
+    if shape [
+        child: any,
+        curr -> child: *,
+    ] skipping ["visited"] {
+        trace();
+        mark_node<"visited">(child);
+        list_insert_by_copy(list, child);
+        trace();
+        // we found a child, so go down
+        dfs_helper(child, list);
+        trace();
+        // we found children, so repeat for other children of curr
+        // (but first forget child from our abstract state)
+        hide_node(child);
+        dfs_helper(curr, list);
+    }
+}
+
+fn delete_list(head: any) {
+    if shape [next: any, head -> next: *] {
+        delete_list(next);
+    }
+    remove_node(head);
+}
+
+
+fn mk_list() -> (head: any) {
+    let! head = add_node<"list">();
+    return (head: head);
+}
+
+fn list_insert_by_copy(head: any, value: any) {
+    if shape [
+        child: any,
+        head -> child: *,
+    ] {
+        list_insert_by_copy(child, value);
+    } else {
+        // we're at the tail
+        let! new_node = add_node<0>();
+        copy_value_from_to(value, new_node);
+        add_edge<"next">(head, new_node);
+    }
+}
+
+// Hides a node from the abstract state in order to release it for future dynamic shape-query matching.
+fn hide_node(node: any) {
+    let! one = add_node<1>();
+    if is_eq<0>(one) {
+        // statically 'maybe' delete the node in order to hide the node.
+        // in practice this is never executed.
+        remove_node(node);
+    }
+    remove_node(one);
+}

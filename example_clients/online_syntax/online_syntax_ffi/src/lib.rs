@@ -8,6 +8,10 @@ fn parse_node_value(s: &str) -> Option<NodeValue> {
 }
 
 fn parse_edge_value(s: &str) -> Option<EdgeValue> {
+    if s.is_empty() {
+        // special case for unit edges - unsure if we want this in the actual semantics parser
+        return Some(EdgeValue::Unit);
+    }
     let parser = grabapl_template_semantics::syntax::edge_value_parser();
     lex_then_parse(s, parser).ok()
 }

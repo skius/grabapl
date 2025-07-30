@@ -793,7 +793,7 @@ function renderTraceGraph() {
             //     // traceGraphSvg.style.height = "100%";
             // }
             // scroll to the bottom of the trace box
-            traceBox.scrollIntoView({ behavior: 'smooth' });
+            // traceBox.scrollIntoView({ behavior: 'smooth' });
             isTraceRendering = false; // Allow further interactions after rendering
         });
 
