@@ -1,5 +1,5 @@
 use crate::operation::builtin::LibBuiltinOperation;
-use crate::operation::query::{BuiltinQuery, GraphShapeQuery, run_builtin_query, run_shape_query};
+use crate::operation::query::{GraphShapeQuery, run_builtin_query, run_shape_query};
 use crate::operation::signature::OperationSignature;
 use crate::operation::signature::parameter::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument,
@@ -16,7 +16,7 @@ use crate::util::bimap::BiMap;
 use crate::util::{InternString, log};
 use crate::{NodeKey, Semantics, SubstMarker, interned_string_newtype};
 use derive_more::with_trait::From;
-use error_stack::{FutureExt, ResultExt, bail, report};
+use error_stack::{ResultExt, bail, report};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
@@ -141,6 +141,12 @@ pub struct AbstractOperationArgument {
     pub subst_to_aid: HashMap<SubstMarker, AbstractNodeId>,
 }
 
+impl Default for AbstractOperationArgument {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AbstractOperationArgument {
     pub fn new() -> Self {
         AbstractOperationArgument {
@@ -171,7 +177,7 @@ impl AbstractOperationArgument {
             .explicit_input_nodes
             .iter()
             .zip(selected_nodes.iter())
-            .map(|(subst_marker, node_key)| (subst_marker.clone(), node_key.clone()))
+            .map(|(subst_marker, node_key)| (*subst_marker, *node_key))
             .collect();
         Ok(AbstractOperationArgument {
             selected_input_nodes: selected_nodes,
@@ -276,9 +282,9 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Instr
 )]
 pub struct QueryInstructions<S: Semantics> {
     // TODO: does it make sense to rename these? true_branch and false_branch?
-    #[debug("[{}]", taken.iter().map(|(opt, inst)| format!("({opt:#?}, {:#?})", inst)).collect::<Vec<_>>().join(", "))]
+    #[debug("[{}]", taken.iter().map(|(opt, inst)| format!("({opt:#?}, {inst:#?})")).collect::<Vec<_>>().join(", "))]
     pub taken: Vec<InstructionWithResultMarker<S>>,
-    #[debug("[{}]", not_taken.iter().map(|(opt, inst)| format!("({opt:#?}, {:#?})", inst)).collect::<Vec<_>>().join(", "))]
+    #[debug("[{}]", not_taken.iter().map(|(opt, inst)| format!("({opt:#?}, {inst:#?})")).collect::<Vec<_>>().join(", "))]
     pub not_taken: Vec<InstructionWithResultMarker<S>>,
 }
 
@@ -298,6 +304,12 @@ pub type InstructionWithResultMarker<S> = (Option<AbstractOperationResultMarker>
 pub struct AbstractUserDefinedOperationOutput {
     #[serde(with = "serde_json_any_key::any_key_map")]
     pub new_nodes: HashMap<AbstractNodeId, AbstractOutputNodeMarker>,
+}
+
+impl Default for AbstractUserDefinedOperationOutput {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl AbstractUserDefinedOperationOutput {
@@ -363,7 +375,7 @@ impl<S: Semantics> UserDefinedOperation<S> {
 
     pub(crate) fn apply_abstract(
         &self,
-        op_ctx: &OperationContext<S>,
+        _op_ctx: &OperationContext<S>,
         g: &mut GraphWithSubstitution<AbstractGraph<S>>,
     ) -> OperationResult<AbstractOperationOutput<S>> {
         Ok(self.signature.output.apply_abstract(g))
@@ -459,7 +471,7 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
                         }
                     };
                     if let Some(abstract_output_id) = abstract_output_id {
-                        self.extend_abstract_mapping(abstract_output_id.clone(), output.new_nodes);
+                        self.extend_abstract_mapping(*abstract_output_id, output.new_nodes);
                         // TODO: also handle output.removed_nodes.
                     }
                 }
@@ -475,7 +487,7 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
                     self.run(next_instr)?
                 }
                 Instruction::ShapeQuery(query, arg, query_instr) => {
-                    let concrete_arg = self.abstract_to_concrete_arg(&arg)?;
+                    let concrete_arg = self.abstract_to_concrete_arg(arg)?;
                     let result = run_shape_query(
                         self.g,
                         query,
@@ -495,7 +507,7 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
                             }
                             if let Some(abstract_output_id) = abstract_output_id {
                                 self.extend_abstract_mapping(
-                                    abstract_output_id.clone(),
+                                    *abstract_output_id,
                                     query_result_map,
                                 );
                             }
@@ -626,8 +638,8 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
                 .iter()
                 .map(|(subst_marker, abstract_node_id)| {
                     Ok((
-                        subst_marker.clone(),
-                        self.aid_to_node_key(abstract_node_id.clone())
+                        *subst_marker,
+                        self.aid_to_node_key(*abstract_node_id)
                             .attach_printable_lazy(|| format!("while trying to map abstract subtitution for marker {subst_marker:?}"))?,
                     ))
                 })

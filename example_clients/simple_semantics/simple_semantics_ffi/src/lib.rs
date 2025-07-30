@@ -1,3 +1,8 @@
+// allowing everything because this is just here for historical purposes.
+// should look at template/ffi or online_syntax_ffi for a more well-structured example.
+#![allow(clippy::all)]
+#![allow(unused)]
+
 use base64::prelude::BASE64_STANDARD;
 use grabapl::Semantics;
 use grabapl::graph::dot::DotCollector;

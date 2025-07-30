@@ -399,6 +399,6 @@ mod tests {
 
         let mut g = TheSemantics::new_concrete_graph();
         let res = run_from_concrete(&mut g, &op_ctx, bar_id, &[]);
-        let res = res.unwrap();
+        let _ = res.unwrap();
     }
 }

@@ -30,6 +30,12 @@ impl<S: Semantics> Clone for OperationParameterBuilder<S> {
     }
 }
 
+impl<S: Semantics> Default for OperationParameterBuilder<S> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<S: Semantics> OperationParameterBuilder<S> {
     pub fn new() -> Self {
         OperationParameterBuilder {
@@ -61,7 +67,7 @@ impl<S: Semantics> OperationParameterBuilder<S> {
         if self.subst_to_node_keys.contains_left(&marker) {
             return Err(ParameterBuilderError::DuplicateMarker(marker));
         }
-        self.explicit_input_nodes.push(marker.clone());
+        self.explicit_input_nodes.push(marker);
         let node_key = self.parameter_graph.add_node(av);
         self.subst_to_node_keys.insert(marker, node_key);
         Ok(())

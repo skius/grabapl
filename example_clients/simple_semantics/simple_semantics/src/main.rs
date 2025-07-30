@@ -109,7 +109,7 @@ fn insert_bst_builder_test(
                             show(&op_builder);
                         }
                         // if there is none, we add it as right child
-                        op_builder.enter_false_branch();
+                        op_builder.enter_false_branch().unwrap();
                         show(&op_builder);
                         {
                             let new_node = AbstractNodeId::DynamicOutputMarker(
@@ -172,7 +172,7 @@ fn insert_bst_builder_test(
                         root_node,
                         child_id,
                         EdgePattern::Exact("left".to_string()),
-                    );
+                    ).unwrap();
                     show(&op_builder);
                     {
                         op_builder.enter_true_branch().unwrap();

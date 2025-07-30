@@ -46,6 +46,7 @@ fn example() {
 
 // See AH! for why this test is disabled. (TL;DR we need match statements)
 // #[test_log::test]
+#[allow(dead_code)]
 fn recursion_fixed_point() {
     let op_ctx = OperationContext::<IntervalSemantics>::new();
     let mut builder = OperationBuilder::new(&op_ctx, 0);

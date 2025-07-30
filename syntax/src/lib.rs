@@ -824,7 +824,7 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
 
         // Note: if we wanted to also proceed with a error-recovered AST, this filter predicate needs to be changed, and the errors would still need
         // to be propagated somehow.
-        if let Some((program, file_span)) = ast.filter(|_| errs.len() + parse_errs.len() == 0) {
+        if let Some((program, _file_span)) = ast.filter(|_| errs.len() + parse_errs.len() == 0) {
             let res = interpret::<S>(program);
             match res.op_ctx_and_map {
                 Ok((op_ctx, fns_to_ids)) => {

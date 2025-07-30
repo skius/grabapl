@@ -131,7 +131,7 @@ impl ParameterSubstitution {
             .explicit_input_nodes
             .iter()
             .zip(selected_nodes.iter())
-            .map(|(subst_marker, node_key)| (subst_marker.clone(), *node_key))
+            .map(|(subst_marker, node_key)| (*subst_marker, *node_key))
             .collect();
         Ok(ParameterSubstitution { mapping })
     }
@@ -190,9 +190,9 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         let found_key = match marker {
             NodeMarker::Subst(sm) => {
                 // If the marker is a SubstMarker, we look it up in the substitution mapping.
-                self.subst.mapping.get(&sm).copied()
+                self.subst.mapping.get(sm).copied()
             }
-            NodeMarker::New(nnm) => self.new_nodes_map.get(&nnm).copied(),
+            NodeMarker::New(nnm) => self.new_nodes_map.get(nnm).copied(),
         };
         if let Some(key) = found_key {
             if self.removed_nodes.contains(&key) {
@@ -216,8 +216,7 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
             // TODO: should we disallow re-adding a node that was deleted? if so,
             //  the above should be changed since it skips previously removed nodes
             panic!(
-                "Marker {:?} already exists in the substitution mapping",
-                marker
+                "Marker {marker:?} already exists in the substitution mapping",
             );
         }
         let node_key = self.graph.add_node(value);
@@ -399,7 +398,7 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
     ) {
         let mut new_nodes = HashMap::new();
         for (marker, node_key) in &self.new_nodes_map {
-            let Some(output_marker) = desired_node_output_names.get(&marker) else {
+            let Some(output_marker) = desired_node_output_names.get(marker) else {
                 continue;
             };
             new_nodes.insert(*output_marker, *node_key);

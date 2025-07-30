@@ -56,23 +56,24 @@ pub fn get_sample_user_defined_operation() -> UserDefinedOperation<SimpleSemanti
 
     let input_node = AbstractNodeId::param("input");
 
-    let mut instructions = vec![];
-    instructions.push((
-        Some("first_child".into()),
-        mk_builtin_instruction(BuiltinOperation::AppendChild, vec![input_node]),
-    ));
-    instructions.push((
-        Some("second_child".into()),
-        mk_builtin_instruction(BuiltinOperation::AppendChild, vec![input_node]),
-    ));
-    instructions.push((
-        Some("third_child".into()),
-        mk_builtin_instruction(BuiltinOperation::AppendChild, vec![input_node]),
-    ));
-    instructions.push((
-        Some("fourth_child".into()),
-        mk_builtin_instruction(BuiltinOperation::AppendChild, vec![input_node]),
-    ));
+    let mut instructions = vec![
+        (
+            Some("first_child".into()),
+            mk_builtin_instruction(BuiltinOperation::AppendChild, vec![input_node]),
+        ),
+        (
+            Some("second_child".into()),
+            mk_builtin_instruction(BuiltinOperation::AppendChild, vec![input_node]),
+        ),
+        (
+            Some("third_child".into()),
+            mk_builtin_instruction(BuiltinOperation::AppendChild, vec![input_node]),
+        ),
+        (
+            Some("fourth_child".into()),
+            mk_builtin_instruction(BuiltinOperation::AppendChild, vec![input_node]),
+        ),
+    ];
 
     let second_id = AbstractNodeId::DynamicOutputMarker("second_child".into(), "child".into());
     let third_id = AbstractNodeId::DynamicOutputMarker("third_child".into(), "child".into());
@@ -141,10 +142,9 @@ pub fn get_mk_n_to_0_list_user_defined_operation(
     };
 
     let input_node = AbstractNodeId::param("a");
-    let mut instructions = vec![];
 
     // If the input value is 0, we do nothing, otherwise we recurse on a new child
-    instructions.push((
+    let instructions = vec![(
         None,
         mk_builtin_query(
             BuiltinQuery::IsValueGt(0),
@@ -190,7 +190,7 @@ pub fn get_mk_n_to_0_list_user_defined_operation(
                 ],
             },
         ),
-    ));
+    )];
 
     // TODO: think about how to define the "new nodes" thing for user defined ops. In particular, how can we somehow specify
     //  the names for all recursive calls?

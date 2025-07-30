@@ -1,3 +1,7 @@
+// allowing everything because this is a WIP
+#![allow(warnings)]
+#![allow(clippy::all)]
+
 use std::num::NonZeroI32;
 
 type LocalEdgeId = u32;

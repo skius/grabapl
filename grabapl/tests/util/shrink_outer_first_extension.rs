@@ -1,3 +1,6 @@
+// used by importing into tests
+#![allow(unused)]
+
 use proptest::prelude::Strategy;
 use proptest::strategy::{Fuse, Map, NewTree, ValueTree};
 use proptest::test_runner::{Reason, TestRunner};

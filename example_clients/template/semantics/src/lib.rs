@@ -622,7 +622,7 @@ impl BuiltinOperation for TheOperation {
     fn apply(
         &self,
         g: &mut GraphWithSubstitution<ConcreteGraph<Self::S>>,
-        concrete_data: &mut ConcreteData,
+        _concrete_data: &mut ConcreteData,
     ) -> OperationOutput {
         let mut local_names_to_output_names = HashMap::new();
         match self {
@@ -791,7 +791,7 @@ impl BuiltinQuery for TheQuery {
         let mut param_builder = OperationParameterBuilder::new();
         // Note: many operations on the param_builder are fallible, but since we know our parameters are valid, we just unwrap.
         match self {
-            TheQuery::IsEq { value } => {
+            TheQuery::IsEq { .. } => {
                 // we could decide to request the value's specific type here, but taking `Any` instead
                 // potentially makes for a better user experience.
                 param_builder
@@ -806,7 +806,7 @@ impl BuiltinQuery for TheQuery {
                     .expect_explicit_input_node("second", NodeType::Any)
                     .unwrap();
             }
-            TheQuery::CompareInt { cmp } => {
+            TheQuery::CompareInt { .. } => {
                 param_builder
                     .expect_explicit_input_node("first", NodeType::Integer)
                     .unwrap();
@@ -826,7 +826,7 @@ impl BuiltinQuery for TheQuery {
     /// Our query does not modify the abstract graph, so this method does not do anything.
     ///
     /// See [`TheOperation::apply_abstract`] for more details on abstract changes.
-    fn apply_abstract(&self, g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>) {
+    fn apply_abstract(&self, _g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>) {
         // We probably want to enforce non-modifying queries across the entire language, but I have not
         // asserted that position yet.
         // So for now, this method exists.

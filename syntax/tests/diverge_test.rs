@@ -18,7 +18,7 @@ const SRC: &str = stringify!(
 
 #[test]
 fn diverge_test() {
-    let (op_ctx, _fn_map) = grabapl_syntax::parse_to_op_ctx_and_map::<TestSemantics>(SRC);
+    let (_op_ctx, _fn_map) = grabapl_syntax::parse_to_op_ctx_and_map::<TestSemantics>(SRC);
 
     // assert!(false);
 }

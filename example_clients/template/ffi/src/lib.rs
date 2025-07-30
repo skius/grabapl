@@ -10,6 +10,9 @@
 //!
 //! [Diplomat]: https://github.com/rust-diplomat/diplomat/
 
+// it's just a template - some things are unfinished
+#![allow(unused)]
+
 use ::syntax::custom_syntax::CustomSyntax;
 use ::syntax::interpreter::lex_then_parse;
 use grabapl::operation::builder::IntermediateState;

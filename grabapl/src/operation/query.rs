@@ -222,26 +222,21 @@ fn get_shape_query_substitution<S: Semantics>(
     };
 
     let opt_mapping = isos
-        .filter_map(|iso| {
-            // TODO: handle edge orderedness (factor out into separate function)
-
-            let mapping = iso
+        .map(|iso| {
+            iso
                 .iter()
                 .enumerate()
                 .filter_map(|(desired_shape_idx, &dynamic_graph_idx)| {
                     let desired_shape_node_key = desired_shape_ref.from_index(desired_shape_idx);
                     let dynamic_graph_node_key = dynamic_graph_ref.from_index(dynamic_graph_idx);
                     Some((
-                        query
+                        *query
                             .node_keys_to_shape_idents
-                            .get_left(&desired_shape_node_key)?
-                            .clone(),
+                            .get_left(&desired_shape_node_key)?,
                         dynamic_graph_node_key,
                     ))
                 })
-                .collect::<HashMap<_, _>>();
-
-            Some(mapping)
+                .collect::<HashMap<_, _>>()
         })
         .next();
 

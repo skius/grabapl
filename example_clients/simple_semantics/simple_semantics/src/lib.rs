@@ -59,7 +59,7 @@ impl ConcreteToAbstract for NodeConcreteToAbstract {
     type Concrete = i32;
     type Abstract = ();
 
-    fn concrete_to_abstract(c: &Self::Concrete) -> Self::Abstract {}
+    fn concrete_to_abstract(_: &Self::Concrete) -> Self::Abstract {}
 }
 
 impl ConcreteToAbstract for EdgeConcreteToAbstract {
@@ -135,7 +135,7 @@ impl BuiltinQueryTrait for BuiltinQuery {
         builder.build().unwrap()
     }
 
-    fn apply_abstract(&self, g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>) {
+    fn apply_abstract(&self, _g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>) {
         match self {
             BuiltinQuery::HasChild => {
                 // let parent = substitution.mapping[&0];
@@ -294,7 +294,7 @@ impl Clone for BuiltinOperation {
             BuiltinOperation::AddNode => BuiltinOperation::AddNode,
             BuiltinOperation::AppendChild => BuiltinOperation::AppendChild,
             BuiltinOperation::IndexCycle => BuiltinOperation::IndexCycle,
-            BuiltinOperation::SetValue(f) => BuiltinOperation::SetNodeValue(0), // TODO: fix?
+            BuiltinOperation::SetValue(_f) => BuiltinOperation::SetNodeValue(0), // TODO: fix?
             BuiltinOperation::AddEdge => BuiltinOperation::AddEdge,
             BuiltinOperation::SetEdgeValue(val) => BuiltinOperation::SetEdgeValue(val.clone()),
             BuiltinOperation::SetNodeValue(val) => BuiltinOperation::SetNodeValue(*val),
@@ -469,8 +469,7 @@ impl grabapl::operation::BuiltinOperation for BuiltinOperation {
                 let src = SubstMarker::from(Self::COPY_NODE_VALUE_TO_INPUT_SRC);
                 let dst = SubstMarker::from(Self::COPY_NODE_VALUE_TO_INPUT_DST);
                 // Noop as long as the abstract value is just the unit type...
-                let src_value = g.get_node_value(src).unwrap();
-                *src_value;
+                let _src_value = g.get_node_value(src).unwrap();
                 g.set_node_value(dst, ());
             }
             BuiltinOperation::Decrement => {

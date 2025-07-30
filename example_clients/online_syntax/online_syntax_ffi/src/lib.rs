@@ -1,5 +1,4 @@
-use grabapl_template_semantics::{EdgeType, EdgeValue, NodeType, NodeValue, TheSemantics};
-use syntax::custom_syntax::CustomSyntax;
+use grabapl_template_semantics::{EdgeValue, NodeValue, TheSemantics};
 use syntax::interpreter::lex_then_parse;
 
 fn parse_node_value(s: &str) -> Option<NodeValue> {
@@ -14,16 +13,6 @@ fn parse_edge_value(s: &str) -> Option<EdgeValue> {
     }
     let parser = grabapl_template_semantics::syntax::edge_value_parser();
     lex_then_parse(s, parser).ok()
-}
-
-fn parse_node_type(s: &str) -> Result<NodeType, String> {
-    let parser = grabapl_template_semantics::syntax::TheCustomSyntax::get_node_type_parser();
-    lex_then_parse(s, parser).map_err(|e| e.to_string())
-}
-
-fn parse_edge_type(s: &str) -> Result<EdgeType, String> {
-    let parser = grabapl_template_semantics::syntax::TheCustomSyntax::get_edge_type_parser();
-    lex_then_parse(s, parser).map_err(|e| e.to_string())
 }
 
 fn node_value_to_string(value: &NodeValue) -> String {
@@ -229,6 +218,7 @@ pub mod ffi {
     pub struct StringIter(std::vec::IntoIter<String>);
 
     impl StringIter {
+        #[allow(clippy::should_implement_trait)]
         #[diplomat::attr(auto, iterator)]
         pub fn next(&mut self) -> Option<Box<StringWrapper>> {
             self.0.next().map(|s| Box::new(StringWrapper(s)))
@@ -325,6 +315,7 @@ pub mod ffi {
     pub struct NodesIter(std::vec::IntoIter<(u32, String)>);
 
     impl NodesIter {
+        #[allow(clippy::should_implement_trait)]
         #[diplomat::attr(auto, iterator)]
         pub fn next(&mut self) -> Option<Box<NodeWrapper>> {
             self.0
@@ -363,6 +354,7 @@ pub mod ffi {
     pub struct EdgesIter(std::vec::IntoIter<(u32, u32, String)>);
 
     impl EdgesIter {
+        #[allow(clippy::should_implement_trait)]
         #[diplomat::attr(auto, iterator)]
         pub fn next(&mut self) -> Option<Box<EdgeWrapper>> {
             self.0
@@ -401,6 +393,7 @@ pub mod ffi {
     pub struct NewNodesIter(std::vec::IntoIter<(u32, String, String)>);
 
     impl NewNodesIter {
+        #[allow(clippy::should_implement_trait)]
         #[diplomat::attr(auto, iterator)]
         pub fn next(&mut self) -> Option<Box<NewNode>> {
             self.0.next().map(|(k, name, value)| {
@@ -443,6 +436,7 @@ pub mod ffi {
     pub struct LineColSpansIter(std::vec::IntoIter<LineColSpan>);
 
     impl LineColSpansIter {
+        #[allow(clippy::should_implement_trait)]
         #[diplomat::attr(auto, iterator)]
         pub fn next(&mut self) -> Option<LineColSpan> {
             self.0.next().map(|span| LineColSpan {

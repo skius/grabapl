@@ -1,6 +1,9 @@
 //! This file just contains a bunch of old type checked notes that I'm not sure are completely obsolete yet.
 //! Hopefully, there's no need to read this file.
 
+#![allow(clippy::all)]
+#![allow(warnings)]
+
 /*
 TODO s from old `match to pattern:
 

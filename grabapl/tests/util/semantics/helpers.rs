@@ -2,6 +2,7 @@ use crate::util::semantics::{NodeValue, TestSemantics};
 use grabapl::prelude::ConcreteGraph;
 use grabapl::{NodeKey, Semantics};
 
+#[allow(dead_code)]
 pub fn list_to_value_vec_generic<S: Semantics>(
     graph: &ConcreteGraph<S>,
     head: NodeKey,
@@ -21,6 +22,7 @@ pub fn list_to_value_vec_generic<S: Semantics>(
     values
 }
 
+#[allow(dead_code)]
 pub fn list_to_value_vec(graph: &ConcreteGraph<TestSemantics>, head: NodeKey) -> Vec<NodeValue> {
     list_to_value_vec_generic::<TestSemantics>(graph, head)
 }

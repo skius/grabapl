@@ -15,7 +15,7 @@ fn types_must_be_subtypes() {
         .expect_parameter_node("p1", NodeType::Integer)
         .unwrap();
     let p0 = AbstractNodeId::param("p0");
-    let p1 = AbstractNodeId::param("p1");
+    let _p1 = AbstractNodeId::param("p1");
     // p0 cannot be used as String, nor as Integer
     let res = builder.add_operation(
         BuilderOpLike::Builtin(TestOperation::SetTo {

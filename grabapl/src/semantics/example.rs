@@ -49,7 +49,7 @@ impl AbstractJoin for NodeJoiner {
 
     fn join(a: &Self::Abstract, b: &Self::Abstract) -> Option<Self::Abstract> {
         if a == b {
-            Some(a.clone())
+            Some(*a)
         } else if a != &NodeType::Separate && b != &NodeType::Separate {
             Some(NodeType::Object)
         } else {
@@ -187,8 +187,7 @@ impl BuiltinOperation for ExampleOperation {
             }
             ExampleOperation::SetTo {
                 op_typ,
-                target_typ,
-                value,
+                ..
             } => {
                 param_builder
                     .expect_explicit_input_node("target", *op_typ)
@@ -197,8 +196,7 @@ impl BuiltinOperation for ExampleOperation {
             ExampleOperation::SetEdgeTo {
                 node_typ,
                 param_typ: op_typ,
-                target_typ,
-                value,
+                ..
             } => {
                 param_builder
                     .expect_explicit_input_node("src", *node_typ)
@@ -216,9 +214,7 @@ impl BuiltinOperation for ExampleOperation {
             }
             ExampleOperation::AddEdge {
                 node_typ,
-                param_typ: op_typ,
-                target_typ,
-                value,
+                ..
             } => {
                 param_builder
                     .expect_explicit_input_node("src", *node_typ)
@@ -227,7 +223,7 @@ impl BuiltinOperation for ExampleOperation {
                     .expect_explicit_input_node("dst", *node_typ)
                     .unwrap();
             }
-            ExampleOperation::AddNode { node_type, value } => {}
+            ExampleOperation::AddNode { .. } => {}
             ExampleOperation::CopyValueFromTo => {
                 param_builder
                     .expect_explicit_input_node("source", NodeType::Object)
@@ -264,7 +260,7 @@ impl BuiltinOperation for ExampleOperation {
                     )
                     .unwrap();
             }
-            ExampleOperation::AddInteger(i) => {
+            ExampleOperation::AddInteger(_) => {
                 param_builder
                     .expect_explicit_input_node("target", NodeType::Integer)
                     .unwrap();
@@ -294,19 +290,15 @@ impl BuiltinOperation for ExampleOperation {
                 // No operation, so no changes to the abstract graph.
             }
             ExampleOperation::SetTo {
-                op_typ,
-                target_typ,
-                value,
+                target_typ, ..
             } => {
                 // Set the abstract value of the node to the specified type.
                 g.set_node_value(SubstMarker::from("target"), *target_typ)
                     .unwrap();
             }
             ExampleOperation::SetEdgeTo {
-                node_typ,
-                param_typ: op_typ,
                 target_typ,
-                value,
+                ..
             } => {
                 // Set the edge from source to destination with the specified type.
                 g.set_edge_value(
@@ -317,10 +309,7 @@ impl BuiltinOperation for ExampleOperation {
                 .unwrap();
             }
             ExampleOperation::AddEdge {
-                node_typ,
-                param_typ: op_typ,
-                target_typ,
-                value,
+                target_typ, ..
             } => {
                 // Add an edge from source to destination with the specified type.
                 g.add_edge(
@@ -329,23 +318,23 @@ impl BuiltinOperation for ExampleOperation {
                     target_typ.clone(),
                 );
             }
-            ExampleOperation::AddNode { node_type, value } => {
+            ExampleOperation::AddNode { node_type, .. } => {
                 // Add a new node with the specified type and value.
-                g.add_node("new", node_type.clone());
+                g.add_node("new", *node_type);
                 new_node_names.insert("new".into(), "new".into());
             }
             ExampleOperation::CopyValueFromTo => {
                 // Copy the value from one node to another.
                 let value = g.get_node_value(SubstMarker::from("source")).unwrap();
-                g.set_node_value(SubstMarker::from("destination"), value.clone())
+                g.set_node_value(SubstMarker::from("destination"), *value)
                     .unwrap();
             }
             ExampleOperation::SwapValues => {
                 // Swap the values of two nodes.
                 let value1 = g.get_node_value(SubstMarker::from("source")).unwrap();
                 let value2 = g.get_node_value(SubstMarker::from("destination")).unwrap();
-                let v1 = value1.clone();
-                let v2 = value2.clone();
+                let v1 = *value1;
+                let v2 = *value2;
                 g.set_node_value(SubstMarker::from("source"), v2).unwrap();
                 g.set_node_value(SubstMarker::from("destination"), v1)
                     .unwrap();
@@ -365,7 +354,7 @@ impl BuiltinOperation for ExampleOperation {
                 g.delete_edge(SubstMarker::from("src"), SubstMarker::from("dst"))
                     .unwrap();
             }
-            ExampleOperation::AddInteger(i) => {
+            ExampleOperation::AddInteger(_) => {
                 // no abstract changes
             }
             ExampleOperation::AModBToC => {
@@ -386,19 +375,15 @@ impl BuiltinOperation for ExampleOperation {
                 // No operation, so no changes to the concrete graph.
             }
             ExampleOperation::SetTo {
-                op_typ,
-                target_typ,
                 value,
+                ..
             } => {
                 // Set the concrete value of the node to the specified value.
                 g.set_node_value(SubstMarker::from("target"), value.clone())
                     .unwrap();
             }
             ExampleOperation::SetEdgeTo {
-                node_typ,
-                param_typ: op_typ,
-                target_typ,
-                value,
+                value,..
             } => {
                 // Set the edge from source to destination with the specified value.
                 g.set_edge_value(
@@ -409,10 +394,7 @@ impl BuiltinOperation for ExampleOperation {
                 .unwrap();
             }
             ExampleOperation::AddEdge {
-                node_typ,
-                param_typ: op_typ,
-                target_typ,
-                value,
+                value,..
             } => {
                 // Add an edge from source to destination with the specified value.
                 g.add_edge(
@@ -421,7 +403,7 @@ impl BuiltinOperation for ExampleOperation {
                     value.clone(),
                 );
             }
-            ExampleOperation::AddNode { node_type, value } => {
+            ExampleOperation::AddNode { value, .. } => {
                 // Add a new node with the specified type and value.
                 g.add_node("new", value.clone());
                 new_node_names.insert("new".into(), "new".into());
@@ -479,7 +461,8 @@ impl BuiltinOperation for ExampleOperation {
                         "expected an integer node value for AModBToC operation - type unsoundness"
                     );
                 };
-                let NodeValue::Integer(c_val) = c else {
+                // just for checking
+                let NodeValue::Integer(_) = c else {
                     panic!(
                         "expected an integer node value for AModBToC operation - type unsoundness"
                     );
@@ -543,7 +526,7 @@ impl BuiltinQuery for ExampleQuery {
         param_builder.build().unwrap()
     }
 
-    fn apply_abstract(&self, g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>) {
+    fn apply_abstract(&self, _g: &mut GraphWithSubstitution<AbstractGraph<Self::S>>) {
         // does nothing, not testing side-effect-ful queries here
     }
 
@@ -566,7 +549,7 @@ impl BuiltinQuery for ExampleQuery {
                 let value1 = g.get_node_value(SubstMarker::from("a")).unwrap();
                 let value2 = g.get_node_value(SubstMarker::from("b")).unwrap();
                 let cmp_result = match (value1, value2) {
-                    (NodeValue::Integer(a), NodeValue::Integer(b)) => a.cmp(&b),
+                    (NodeValue::Integer(a), NodeValue::Integer(b)) => a.cmp(b),
                     _ => {
                         panic!("type unsoundness: expected integers for comparison");
                     }

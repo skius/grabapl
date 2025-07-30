@@ -109,6 +109,12 @@ pub struct Graph<NodeAttr, EdgeAttr> {
     pub(crate) node_attr_map: HashMap<NodeKey, NodeAttribute<NodeAttr>>,
 }
 
+impl<NodeAttr, EdgeAttr> Default for Graph<NodeAttr, EdgeAttr> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
     pub fn new() -> Self {
         Graph {
@@ -235,6 +241,7 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
         neighbors.into_iter().map(|(_, target, _)| target).collect()
     }
 
+    #[allow(unused)]
     fn neighbors_in_ordered(&self, target: NodeKey) -> Vec<NodeKey> {
         let mut neighbors = self
             .graph
@@ -340,7 +347,7 @@ impl<NodeAttr, EdgeAttr> Graph<NodeAttr, EdgeAttr> {
     pub fn out_edges(&self, source: NodeKey) -> impl Iterator<Item = (NodeKey, &EdgeAttr)> {
         self.graph
             .edges_directed(source, Direction::Outgoing)
-            .map(|(src, target, attr)| (target, &attr.edge_attr))
+            .map(|(_src, target, attr)| (target, &attr.edge_attr))
     }
 }
 

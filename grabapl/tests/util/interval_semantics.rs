@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use grabapl::operation::query::{BuiltinQuery, ConcreteQueryOutput};
 use grabapl::operation::signature::parameter::{
     AbstractOperationOutput, GraphWithSubstitution, OperationOutput, OperationParameter,
@@ -444,9 +446,8 @@ impl BuiltinQuery for TestQuery {
             TestQuery::CmpFstSnd(ordering) => {
                 let value1 = g.get_node_value(SubstMarker::from("a")).unwrap();
                 let value2 = g.get_node_value(SubstMarker::from("b")).unwrap();
-                let cmp_result = match (value1, value2) {
-                    (NodeValue(a), NodeValue(b)) => a.cmp(b),
-                };
+                let (NodeValue(a), NodeValue(b)) = (value1, value2);
+                let cmp_result = a.cmp(b);
                 ConcreteQueryOutput {
                     taken: cmp_result == *ordering,
                 }

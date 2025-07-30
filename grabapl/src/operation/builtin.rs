@@ -81,11 +81,11 @@ impl<S: Semantics> Clone for LibBuiltinOperation<S> {
                 value: value.clone(),
             },
             LibBuiltinOperation::MarkNode { marker, param } => LibBuiltinOperation::MarkNode {
-                marker: marker.clone(),
+                marker: *marker,
                 param: param.clone(),
             },
             LibBuiltinOperation::RemoveMarker { marker } => LibBuiltinOperation::RemoveMarker {
-                marker: marker.clone(),
+                marker: *marker,
             },
         }
     }
@@ -95,8 +95,8 @@ impl<S: Semantics> LibBuiltinOperation<S> {
     pub fn parameter(&self) -> OperationParameter<S> {
         let mut param_builder = OperationParameterBuilder::new();
         match self {
-            LibBuiltinOperation::AddNode { value } => {}
-            LibBuiltinOperation::AddEdge { node_param, value } => {
+            LibBuiltinOperation::AddNode { .. } => {}
+            LibBuiltinOperation::AddEdge { node_param, .. } => {
                 param_builder
                     .expect_explicit_input_node("src", node_param.clone())
                     .unwrap();
@@ -123,17 +123,17 @@ impl<S: Semantics> LibBuiltinOperation<S> {
                     .expect_edge("src", "dst", edge_param.clone())
                     .unwrap();
             }
-            LibBuiltinOperation::SetNode { param, value } => {
+            LibBuiltinOperation::SetNode { param, .. } => {
                 param_builder
                     .expect_explicit_input_node("node", param.clone())
                     .unwrap();
             }
-            LibBuiltinOperation::MarkNode { marker, param } => {
+            LibBuiltinOperation::MarkNode { param, .. } => {
                 param_builder
                     .expect_explicit_input_node("node", param.clone())
                     .unwrap();
             }
-            LibBuiltinOperation::RemoveMarker { marker } => {
+            LibBuiltinOperation::RemoveMarker { .. } => {
                 // No parameters needed for removing a marker.
             }
         }
@@ -153,32 +153,31 @@ impl<S: Semantics> LibBuiltinOperation<S> {
                 );
                 new_node_names.insert("new".into(), "new".into());
             }
-            LibBuiltinOperation::AddEdge { node_param, value } => {
+            LibBuiltinOperation::AddEdge { value, .. } => {
                 g.add_edge(
                     SubstMarker::from("src"),
                     SubstMarker::from("dst"),
                     S::EdgeConcreteToAbstract::concrete_to_abstract(value),
                 );
             }
-            LibBuiltinOperation::RemoveNode { param } => {
+            LibBuiltinOperation::RemoveNode { .. } => {
                 g.delete_node(SubstMarker::from("node"));
             }
             LibBuiltinOperation::RemoveEdge {
-                node_param,
-                edge_param,
+                ..
             } => {
                 g.delete_edge(SubstMarker::from("src"), SubstMarker::from("dst"));
             }
-            LibBuiltinOperation::SetNode { param, value } => {
+            LibBuiltinOperation::SetNode { value, .. } => {
                 g.set_node_value(
                     SubstMarker::from("node"),
                     S::NodeConcreteToAbstract::concrete_to_abstract(value),
                 );
             }
-            LibBuiltinOperation::MarkNode { marker, param } => {
+            LibBuiltinOperation::MarkNode { .. } => {
                 // markers dont exist in abstract
             }
-            LibBuiltinOperation::RemoveMarker { marker } => {
+            LibBuiltinOperation::RemoveMarker { .. } => {
                 // markers dont exist in abstract
             }
         }
@@ -196,26 +195,24 @@ impl<S: Semantics> LibBuiltinOperation<S> {
                 g.add_node("new", value.clone());
                 new_node_names.insert("new".into(), "new".into());
             }
-            LibBuiltinOperation::AddEdge { node_param, value } => {
+            LibBuiltinOperation::AddEdge { value, .. } => {
                 g.add_edge(
                     SubstMarker::from("src"),
                     SubstMarker::from("dst"),
                     value.clone(),
                 );
             }
-            LibBuiltinOperation::RemoveNode { param } => {
+            LibBuiltinOperation::RemoveNode { .. } => {
                 g.delete_node(SubstMarker::from("node"));
             }
-            LibBuiltinOperation::RemoveEdge {
-                node_param,
-                edge_param,
+            LibBuiltinOperation::RemoveEdge { ..
             } => {
                 g.delete_edge(SubstMarker::from("src"), SubstMarker::from("dst"));
             }
-            LibBuiltinOperation::SetNode { param, value } => {
+            LibBuiltinOperation::SetNode { value, .. } => {
                 g.set_node_value(SubstMarker::from("node"), value.clone());
             }
-            LibBuiltinOperation::MarkNode { marker, param } => {
+            LibBuiltinOperation::MarkNode { marker, .. } => {
                 // mark matched node
                 let node = g.get_node_key(&NodeMarker::Subst("node".into())).unwrap();
                 concrete_data

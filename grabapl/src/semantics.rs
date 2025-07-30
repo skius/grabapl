@@ -2,13 +2,6 @@ use crate::Graph;
 use crate::graph::NodeAttribute;
 use crate::operation::BuiltinOperation;
 use crate::operation::query::BuiltinQuery;
-use petgraph::data::Build;
-// /// Returns the corresponding abstract value/type for a given concrete value.
-// pub trait ToAbstract {
-//     type Abstract;
-//
-//     fn to_abstract(&self) -> Self::Abstract;
-// }
 
 pub mod example;
 pub mod example_with_ref;
@@ -61,13 +54,11 @@ impl<M: AbstractMatcher<Abstract: Clone>> AbstractJoin for MatchJoiner<M> {
         if M::matches(a, b) {
             // a <: b, so we return b
             Some(b.clone())
+        } else if M::matches(b, a) {
+            // b <: a, so we return a
+            Some(a.clone())
         } else {
-            if M::matches(b, a) {
-                // b <: a, so we return a
-                Some(a.clone())
-            } else {
-                None
-            }
+            None
         }
     }
 }
@@ -82,7 +73,7 @@ pub trait AbstractJoin {
     /// The default implementation assumes no join exists, returning `None`.
     /// This is generally a bad idea, since at the very least equivalent types should be joined to themselves.
     // TODO: remove default implementation?
-    fn join(a: &Self::Abstract, b: &Self::Abstract) -> Option<Self::Abstract> {
+    fn join(_a: &Self::Abstract, _b: &Self::Abstract) -> Option<Self::Abstract> {
         // Default implementation returns None, meaning no join exists.
         // Note that this is probably a bit absurd, as in the very least if two nodes are equal
         // (either via Eq or via mathes(a,b) and matches(b,a)), then the join is the same node.
@@ -159,7 +150,7 @@ pub trait Semantics {
     fn concrete_to_abstract(c: &ConcreteGraph<Self>) -> AbstractGraph<Self> {
         let mut abstract_graph = Graph::new();
         for (node_key, node_concrete) in c.nodes() {
-            let node_abstract = Self::NodeConcreteToAbstract::concrete_to_abstract(&node_concrete);
+            let node_abstract = Self::NodeConcreteToAbstract::concrete_to_abstract(node_concrete);
             // TODO: make this better (don't depend on Graph internals)
             abstract_graph.graph.add_node(node_key);
             abstract_graph

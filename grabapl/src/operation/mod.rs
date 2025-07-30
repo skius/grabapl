@@ -15,7 +15,7 @@ use crate::operation::user_defined::{
     AbstractNodeId, AbstractOperationResultMarker, UserDefinedOperation,
 };
 use crate::semantics::{
-    AbstractGraph, AbstractMatcher, ConcreteGraph, ConcreteToAbstract, Semantics,
+    AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics,
 };
 use crate::util::log;
 use crate::{Graph, NodeKey, SubstMarker};
@@ -81,6 +81,12 @@ pub struct OperationContext<S: Semantics> {
     builtins: HashMap<OperationId, S::BuiltinOperation>,
     libbuiltins: HashMap<OperationId, LibBuiltinOperation<S>>,
     custom: HashMap<OperationId, UserDefinedOperation<S>>,
+}
+
+impl<S: Semantics> Default for OperationContext<S> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<S: Semantics> OperationContext<S> {
@@ -230,23 +236,21 @@ args: {selected_inputs:?}"
         }
         let param_attr = param.parameter_graph.get_node_attr(*param_node).unwrap();
         let arg_attr = g.get_node_attr(*arg_node).unwrap();
-        S::NodeMatcher::matches(arg_attr, &param_attr)
+        S::NodeMatcher::matches(arg_attr, param_attr)
     };
 
     let mut em = |param_attr_wrapper: &EdgeAttribute<S::EdgeAbstract>,
                   arg_attr_wrapper: &EdgeAttribute<S::EdgeAbstract>| {
         let param_attr = &param_attr_wrapper.edge_attr;
         let arg_attr = &arg_attr_wrapper.edge_attr;
-        S::EdgeMatcher::matches(arg_attr, &param_attr)
+        S::EdgeMatcher::matches(arg_attr, param_attr)
     };
 
     let isos = general_subgraph_monomorphisms_iter(&param_ref, &arg_ref, &mut nm, &mut em)
         .ok_or_else(return_arg_does_not_match_error_with_dbg_info)?;
 
-    isos.filter_map(|iso| {
-        // TODO: handle edge orderedness
-
-        let mapping = iso
+    isos.map(|iso| {
+        iso
             .iter()
             .enumerate()
             .map(|(param_idx, &arg_idx)| {
@@ -254,17 +258,14 @@ args: {selected_inputs:?}"
                 let arg_node_key = arg_ref.from_index(arg_idx);
                 (
                     // unwrap is ok since it was returned by param_ref.from_index
-                    param
+                    *param
                         .node_keys_to_subst
                         .get_left(&param_node_key)
-                        .unwrap()
-                        .clone(),
+                        .unwrap(),
                     arg_node_key,
                 )
             })
-            .collect::<HashMap<_, _>>();
-
-        Some(mapping)
+            .collect::<HashMap<_, _>>()
     })
     .next()
     .map(ParameterSubstitution::new)

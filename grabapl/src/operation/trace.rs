@@ -59,7 +59,7 @@ impl<S: Semantics<NodeConcrete: Debug, EdgeConcrete: Debug>> TraceFrame<S> {
                 format!("style=\"filled\" fillcolor=\"gray72\" label = \"{value_escaped}\"")
             }
         };
-        let index_get = |g, key: NodeKey| format!("{}", key.0);
+        let index_get = |_, key: NodeKey| format!("{}", key.0);
         let dot = Dot::with_attr_getters_and_index_getter(
             g,
             &[Config::EdgeNoLabel, Config::NodeNoLabel],
@@ -74,6 +74,12 @@ impl<S: Semantics<NodeConcrete: Debug, EdgeConcrete: Debug>> TraceFrame<S> {
 
 pub struct Trace<S: Semantics> {
     pub frames: Vec<TraceFrame<S>>,
+}
+
+impl<S: Semantics> Default for Trace<S> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<S: Semantics> Trace<S> {

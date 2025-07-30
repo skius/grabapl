@@ -824,7 +824,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
 
     fn interpret_return(
         &mut self,
-        (return_stmt, return_stmt_span): Spanned<ReturnStmt<'src, S::CS>>,
+        (return_stmt, _return_stmt_span): Spanned<ReturnStmt<'src, S::CS>>,
     ) -> Result<(), SpannedInterpreterError> {
         for (mapping, mapping_span) in return_stmt.mapping {
             match mapping {
@@ -929,7 +929,7 @@ where
                 .join(" ")
         })
         .map_err(InterpreterError::CustomOwned)?;
-    let tokens = tokens.into_iter().map(|(t, s)| t).collect::<Vec<_>>();
+    let tokens = tokens.into_iter().map(|(t, _)| t).collect::<Vec<_>>();
     let input = Stream::from_iter(tokens);
     parser
         .parse(input)

@@ -60,35 +60,26 @@
 
 use crate::operation::builtin::LibBuiltinOperation;
 use crate::operation::marker::Marker;
-use crate::operation::query::{BuiltinQuery, GraphShapeQuery, ShapeNodeIdentifier};
+use crate::operation::query::{BuiltinQuery, ShapeNodeIdentifier};
 use crate::operation::signature::parameter::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationParameter,
     ParameterSubstitution,
 };
-use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
-use crate::operation::signature::{AbstractSignatureNodeId, OperationSignature};
+use crate::operation::signature::{OperationSignature};
 use crate::operation::user_defined::{
-    AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker,
-    AbstractUserDefinedOperationOutput, NamedMarker, OpLikeInstruction, QueryInstructions,
-    UserDefinedOperation,
+    AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, NamedMarker, OpLikeInstruction,
 };
 use crate::operation::{Operation, OperationError, OperationResult, get_substitution};
 use crate::prelude::*;
-use crate::semantics::{AbstractGraph, AbstractMatcher};
+use crate::semantics::{AbstractGraph};
 use crate::util::bimap::BiMap;
 use crate::util::log;
 use crate::{NodeKey, Semantics, SubstMarker};
 use error_stack::{Result, ResultExt, bail, report};
 use petgraph::dot;
 use petgraph::dot::Dot;
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use std::fmt::Debug;
-use std::iter::Peekable;
-use std::marker::PhantomData;
-use std::mem;
-use std::slice::Iter;
-use thiserror::Error;
+use std::fmt::Debug;use thiserror::Error;
 
 mod programming_by_demonstration;
 pub mod stack_based_builder;
@@ -859,7 +850,7 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
                     AbstractNodeId::DynamicOutputMarker(marker, node_marker) => {
                         let op_marker = match marker {
                             AbstractOperationResultMarker::Custom(c) => c,
-                            AbstractOperationResultMarker::Implicit(num) => "<unnamed>",
+                            AbstractOperationResultMarker::Implicit(..) => "<unnamed>",
                         };
                         write!(f, "O({}, {})", op_marker, node_marker.0)
                     }
@@ -875,12 +866,12 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
             Dot::with_attr_getters(
                 &self.graph.graph,
                 &[dot::Config::EdgeNoLabel, dot::Config::NodeNoLabel],
-                &|g, (src, target, attr)| {
+                &|_, (_src, _dst, attr)| {
                     let dbg_attr_format = format!("{:?}", attr.edge_attr);
                     let dbg_attr_replaced = dbg_attr_format.escape_debug();
                     format!("label = \"{dbg_attr_replaced}\"")
                 },
-                &|g, (node, _)| {
+                &|_, (node, _)| {
                     let aid = self
                         .node_keys_to_aid
                         .get_left(&node)
@@ -909,15 +900,11 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
     ) -> String {
         format!(
             "{:?}",
-            Dot::with_attr_getters(
-                &self.graph.graph,
-                &[dot::Config::EdgeNoLabel, dot::Config::NodeNoLabel],
-                &|g, (src, target, attr)| {
+            Dot::with_attr_getters(&self.graph.graph, &[dot::Config::EdgeNoLabel, dot::Config::NodeNoLabel], &|_, (_src, _dst, attr)| {
                     let dbg_attr_format = format!("{:?}", attr.edge_attr);
                     let dbg_attr_replaced = dbg_attr_format.escape_debug();
                     format!("label = \"{dbg_attr_replaced}\"")
-                },
-                &|g, (node, _)| {
+                }, &|_, (node, _)| {
                     let aid = self
                         .node_keys_to_aid
                         .get_left(&node)
@@ -934,8 +921,7 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
                     // format!("label = \"{aid_replaced}|{dbg_attr_replaced}\"")
                     // format!("label = \"{dbg_attr_replaced}\", xlabel = \"{aid_replaced}\"")
                     format!("shape=Mrecord, label = \"{aid_replaced}|{dbg_attr_replaced}\"")
-                }
-            )
+                })
         )
     }
 
@@ -976,7 +962,7 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
             Dot::with_attr_getters(
                 &self.graph.graph,
                 &[dot::Config::EdgeNoLabel, dot::Config::NodeNoLabel],
-                &|g, (src, target, attr)| {
+                &|_, (_src, _dst, attr)| {
                     let dbg_attr_format = format!("{:?}", attr.edge_attr);
                     // color attrs below are quite the hack for typst-plugin.
                     // TODO: move this entire function to typst plugin?
@@ -988,7 +974,7 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
                     let dbg_attr_replaced = dbg_attr_format.escape_debug();
                     format!("{color_attr} label = \"{dbg_attr_replaced}\"")
                 },
-                &|g, (node, _)| {
+                &|_, (node, _)| {
                     let aid = self
                         .node_keys_to_aid
                         .get_left(&node)
@@ -1152,7 +1138,7 @@ fn merge_states_result<S: Semantics>(
     }
 
     // Now we merge the edges.
-    for (from_key_true, to_key_true, attr) in state_true.graph.graph.all_edges() {
+    for (from_key_true, to_key_true, _) in state_true.graph.graph.all_edges() {
         let from_aid = state_true
             .node_keys_to_aid
             .get_left(&from_key_true)

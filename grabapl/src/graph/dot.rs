@@ -20,14 +20,14 @@ impl<NA: Debug, EA: Debug> Graph<NA, EA> {
             Dot::with_attr_getters(
                 &self.graph,
                 &[dot::Config::EdgeNoLabel, dot::Config::NodeNoLabel],
-                &|g, (src, target, attr)| {
+                &|_, (_src, _dst, attr)| {
                     let dbg_attr_format = format!("{:?}", attr.edge_attr);
                     let dbg_attr_replaced = dbg_attr_format.escape_debug();
                     let src_order = attr.source_out_order;
                     let target_order = attr.target_in_order;
                     format!("label = \"{dbg_attr_replaced},src:{src_order},dst:{target_order}\"")
                 },
-                &|g, (node, _)| {
+                &|_, (node, _)| {
                     let node_attr = self.node_attr_map.get(&node).unwrap();
                     let dbg_attr_format = format!("{:?}", node_attr.node_attr);
                     let dbg_attr_replaced = dbg_attr_format.escape_debug();
@@ -45,7 +45,7 @@ impl<NA, EA> Graph<NA, EA> {
         for key in self.graph.nodes() {
             graph_without_edge_attrs.add_node(key);
         }
-        for (src, dst, attr) in self.graph.all_edges() {
+        for (src, dst, _) in self.graph.all_edges() {
             graph_without_edge_attrs.add_edge(src, dst, ());
         }
 
@@ -70,6 +70,12 @@ impl<NA, EA> Graph<NA, EA> {
 
 pub struct DotCollector {
     dot: String,
+}
+
+impl Default for DotCollector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DotCollector {

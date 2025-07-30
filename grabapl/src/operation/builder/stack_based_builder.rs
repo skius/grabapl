@@ -13,7 +13,6 @@ use error_stack::{ResultExt, bail, report};
 use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
-use thiserror::Error;
 
 use crate::operation::OperationContext;
 use crate::operation::marker::{Marker, SkipMarkers};
@@ -168,7 +167,7 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
 
                 let created_aids = this.handle_operation(
                     &mut builder.data,
-                    Some(temp_op_marker.clone()),
+                    Some(temp_op_marker),
                     builder_op_like,
                     args,
                 )?;
@@ -179,7 +178,7 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
                     ));
                 }
                 // now rename as well
-                let old_aid = created_aids[0].clone();
+                let old_aid = created_aids[0];
                 let _ = instruction_opt.insert(BuilderInstruction::RenameNode(old_aid, node_name));
             }
             BI::StartQuery(..) => {
@@ -271,7 +270,7 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
         // forget removed aids
         for aid in output_res.removed_aids {
             self.instructions
-                .push((None, Instruction::ForgetAid { aid: aid.clone() }));
+                .push((None, Instruction::ForgetAid { aid }));
         }
 
         Ok(output_res.new_aids)
@@ -401,7 +400,7 @@ impl<S: Semantics> BranchesFrame<S> {
             .map(|cif| cif.instructions)
             .unwrap_or_default();
         for aid in merge_result.missing_from_true {
-            true_instructions.push((None, Instruction::ForgetAid { aid: aid.clone() }));
+            true_instructions.push((None, Instruction::ForgetAid { aid }));
         }
 
         let mut false_instructions = self
@@ -409,7 +408,7 @@ impl<S: Semantics> BranchesFrame<S> {
             .map(|cif| cif.instructions)
             .unwrap_or_default();
         for aid in merge_result.missing_from_false {
-            false_instructions.push((None, Instruction::ForgetAid { aid: aid.clone() }));
+            false_instructions.push((None, Instruction::ForgetAid { aid }));
         }
 
         let query_instructions = QueryInstructions {
@@ -465,7 +464,7 @@ impl<S: Semantics> QueryFrame<S> {
                 Ok((frame, branches_frame))
             }
             _ => Err(report!(OperationBuilderError::UnexpectedInstruction))
-                .attach_printable_lazy(|| format!("Expected StartQuery, got: {:?}", instruction)),
+                .attach_printable_lazy(|| format!("Expected StartQuery, got: {instruction:?}")),
         }
     }
 
@@ -537,7 +536,7 @@ impl<S: Semantics> WrapperReturnFrame<S> {
 
     pub fn consume(
         builder: &mut Builder<S>,
-        instruction_opt: &mut Option<BuilderInstruction<S>>,
+        _instruction_opt: &mut Option<BuilderInstruction<S>>,
     ) -> Result<(), OperationBuilderError> {
         let _: WrapperReturnFrame<S> = builder.stack.expect_pop();
         // We need to create the ReturnFrame from the current state and the return stack.
@@ -748,7 +747,7 @@ impl<S: Semantics> ReturnFrame<S> {
                 let Some(output_marker) = self.get_return_node_marker(aid) else {
                     bail!(OperationBuilderError::NotFoundReturnNode(*aid));
                 };
-                Ok(AbstractSignatureNodeId::NewNode(output_marker.clone()))
+                Ok(AbstractSignatureNodeId::NewNode(output_marker))
             }
         }
     }
@@ -867,7 +866,7 @@ impl<S: Semantics> BuildingShapeQueryFrame<S> {
 
     fn into_built_shape_query_frame(
         self,
-        builder: &mut Builder<S>,
+        _builder: &mut Builder<S>,
     ) -> Result<(BuiltShapeQueryFrame<S>, BranchesFrame<S>), OperationBuilderError> {
         // We build the parameter and the initial state
 
@@ -1034,16 +1033,9 @@ impl<S: Semantics> FrameStack<S> {
         self.frames.push(frame.into());
     }
 
-    pub fn pop(&mut self) -> Option<Frame<S>> {
-        self.frames.pop()
-    }
 
     pub fn last(&self) -> Option<&Frame<S>> {
         self.frames.last()
-    }
-
-    pub fn last_mut(&mut self) -> Option<&mut Frame<S>> {
-        self.frames.last_mut()
     }
 
     pub fn top_is<'a, F>(&'a self) -> bool
@@ -1052,7 +1044,7 @@ impl<S: Semantics> FrameStack<S> {
         F: 'a,
         &'a Frame<S>: TryInto<&'a F>,
     {
-        self.frames.last().map_or(false, |f| f.try_into().is_ok())
+        self.frames.last().is_some_and(|f| f.try_into().is_ok())
     }
 
     #[track_caller]
@@ -1088,7 +1080,8 @@ impl<S: Semantics> FrameStack<S> {
         let mut path = vec![];
         for frame in &self.frames {
             match frame {
-                Frame::Query(query_frame) => {
+                Frame::Query(_query_frame) => {
+                    // TODO: require BuiltinQuery::name() function?
                     path.push(QueryPath::Query("<unnamed query>".to_string()));
                 }
                 Frame::Branches(branches_frame) => {
@@ -1193,6 +1186,7 @@ impl<'a, S: Semantics> BuilderData<'a, S> {
                     .new_nodes
                     .insert(output_marker, av);
             }
+            // TODO: support SelfReturnEdge
             _ => {
                 // do nothing
                 let _ = instruction_opt.insert(instruction);
@@ -1411,7 +1405,7 @@ fn populate_signature_changes<S: Semantics>(
         .right_values()
         .filter_map(|aid| {
             if let AbstractNodeId::ParameterMarker(subst) = aid {
-                Some(subst.clone())
+                Some(*subst)
             } else {
                 None
             }
@@ -1449,7 +1443,7 @@ fn populate_signature_changes<S: Semantics>(
             AbstractNodeId::ParameterMarker(target_subst),
         ) = (source_aid, target_aid)
         {
-            current_edges.insert((source_subst.clone(), target_subst.clone()));
+            current_edges.insert((*source_subst, *target_subst));
         }
     }
 
@@ -1537,7 +1531,7 @@ impl<'a, S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> Debug for Build
                 write!(f, "ReturnFrame: {}", state.dot_with_aid())
             }
             BuilderShowData::Other(data) => {
-                write!(f, "Other: {}", data)
+                write!(f, "Other: {data}")
             }
         }
     }
@@ -1956,7 +1950,7 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
     ) -> Result<(), OperationBuilderError> {
         self.__push_instruction(instruction.clone())
             .attach_printable_lazy(
-                move || format!("Failed to push instruction: {:?}", instruction,),
+                move || format!("Failed to push instruction: {instruction:?}"),
             )
     }
 
@@ -1965,12 +1959,9 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         instruction: BuilderInstruction<S>,
     ) -> Result<(), OperationBuilderError> {
         let mut new_builder_stage_1 = self.active.clone();
-        let res = new_builder_stage_1.consume(instruction.clone());
-        if res.is_err() {
-            // We have not modified our state, so we can just early-exit.
-            return res;
-        }
-        // we know that running the instruction once did not fail. However, in presence of recursion,
+        // We have not modified our state, so we can just early-exit in case of error:
+        new_builder_stage_1.consume(instruction.clone())?;
+        // now, we know that running the instruction once did not fail. However, in presence of recursion,
         // it may fail only once a prior recursive call 'sees' the new instruction.
 
         let new_builder_stage_1_before_build = new_builder_stage_1.clone();
@@ -2048,7 +2039,7 @@ impl<
             BuilderShowData::QueryFrame(state) => Ok(state.clone()),
             BuilderShowData::BranchesFrame {
                 true_state,
-                false_state,
+                ..
             } => {
                 // we only take the true state, since we only have a branchesframe on top right after a start_query instruction.
                 Ok(true_state.clone())
@@ -2058,8 +2049,7 @@ impl<
             BuilderShowData::Other(_) => Err(report!(OperationBuilderError::Oneoff("error showing state")))
                 .attach_printable_lazy(|| {
                     format!(
-                        "Expected to receive data with intermediate state, got: {:?}",
-                        inner
+                        "Expected to receive data with intermediate state, got: {inner:?}"
                     )
                 }),
         }?;
@@ -2072,7 +2062,7 @@ impl<
 
     pub fn format_state(&self) -> String {
         let inner = self.active.show();
-        format!("{:?}", inner)
+        format!("{inner:?}")
     }
 }
 
