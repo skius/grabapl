@@ -164,7 +164,7 @@ impl<S: Semantics> BuilderOpLike<S> {
             BuilderOpLike::FromOperationId(id) => {
                 let op = op_ctx
                     .get(*id)
-                    .ok_or_else(|| OperationBuilderError::NotFoundOperationId(*id))?;
+                    .ok_or(OperationBuilderError::NotFoundOperationId(*id))?;
                 AbstractOperation::Op(op)
             }
             BuilderOpLike::Recurse => AbstractOperation::Partial(partial_self_signature),
@@ -172,7 +172,7 @@ impl<S: Semantics> BuilderOpLike<S> {
         Ok(op)
     }
 
-    fn to_op_like_instruction(self, self_op_id: OperationId) -> OpLikeInstruction<S> {
+    fn into_op_like_instruction(self, self_op_id: OperationId) -> OpLikeInstruction<S> {
         match self {
             BuilderOpLike::Builtin(op) => OpLikeInstruction::Builtin(op),
             BuilderOpLike::LibBuiltin(op) => OpLikeInstruction::LibBuiltin(op),
@@ -264,11 +264,8 @@ impl<S: Semantics> BuilderInstruction<S> {
     /// instructions.
     fn can_break_body(&self) -> bool {
         use BuilderInstruction::*;
-        match self {
-            EnterTrueBranch | EnterFalseBranch | EndQuery | ReturnNode(..) | ReturnEdge(..)
-            | Finalize => true,
-            _ => false,
-        }
+        matches!(self, EnterTrueBranch | EnterFalseBranch | EndQuery | ReturnNode(..) | ReturnEdge(..)
+            | Finalize)
     }
 }
 

@@ -280,7 +280,7 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
             .interpret_op(builder_data.op_ctx, output_name, op, args)
             .change_context(BuilderError::OutsideError)?;
 
-        let op_like_instr = op_like.to_op_like_instruction(builder_data.self_op_id);
+        let op_like_instr = op_like.into_op_like_instruction(builder_data.self_op_id);
 
         self.instructions.push((
             output_name,
