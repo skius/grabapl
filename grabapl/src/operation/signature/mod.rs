@@ -56,8 +56,7 @@ pub struct OperationSignature<S: Semantics> {
 impl<S: Semantics> PartialEq for OperationSignature<S> {
     fn eq(&self, other: &Self) -> bool {
         // (self.name == other.name || true) && // todo: define if equality is a requirement for names
-            self.parameter == other.parameter
-            && self.output.is_subtype_of(&other.output)
+        self.parameter == other.parameter && self.output.is_subtype_of(&other.output)
     }
 }
 

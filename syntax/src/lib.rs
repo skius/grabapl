@@ -507,10 +507,7 @@ where
         )
         .then_ignore(just(Token::Ctrl(']')))
         .or_not()
-        .map(|opt| {
-            opt.map(SkipMarkers::new)
-                .unwrap_or_default()
-        })
+        .map(|opt| opt.map(SkipMarkers::new).unwrap_or_default())
         .boxed()
         .labelled("skipping markers");
 
@@ -558,8 +555,6 @@ where
                 .map_with(|opt, e| opt.unwrap_or((Block { statements: vec![] }, e.span())))
                 .labelled("else")
                 .boxed();
-
-            
 
             // TODO: continue with entire if else statements.
             just(Token::If)
@@ -696,8 +691,6 @@ where
             .labelled("statement")
             .boxed();
 
-        
-
         spanned_stmt
             .repeated()
             .collect()
@@ -754,8 +747,6 @@ where
         )
         .boxed()
         .labelled("function definition");
-
-    
 
     fn_def
         .map_with(|fn_def, e| (fn_def, e.span()))

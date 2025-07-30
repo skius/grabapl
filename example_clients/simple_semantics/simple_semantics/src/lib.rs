@@ -59,9 +59,7 @@ impl ConcreteToAbstract for NodeConcreteToAbstract {
     type Concrete = i32;
     type Abstract = ();
 
-    fn concrete_to_abstract(c: &Self::Concrete) -> Self::Abstract {
-        
-    }
+    fn concrete_to_abstract(c: &Self::Concrete) -> Self::Abstract {}
 }
 
 impl ConcreteToAbstract for EdgeConcreteToAbstract {

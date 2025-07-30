@@ -157,12 +157,11 @@ impl SemanticsWithCustomSyntax for ExampleWithRefSemantics {
             MyCustomType::Custom(custom) => {
                 if custom.name.to_lowercase() == "ref"
                     && let [field] = custom.fields.as_slice()
-                        && field.name.to_lowercase() == "inner"
-                    {
-                        let inner_typ =
-                            ExampleWithRefSemantics::convert_node_type(field.typ.clone())?;
-                        return Some(NodeType::Ref(Box::new(inner_typ)));
-                    }
+                    && field.name.to_lowercase() == "inner"
+                {
+                    let inner_typ = ExampleWithRefSemantics::convert_node_type(field.typ.clone())?;
+                    return Some(NodeType::Ref(Box::new(inner_typ)));
+                }
                 None
             }
         }

@@ -104,9 +104,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                         c.bench_with_input(
                             BenchmarkId::new(
                                 "query",
-                                format!(
-                                    "{qkind},gidx:{graph_input_idx},p:{partial},ga:{gen_all}"
-                                ),
+                                format!("{qkind},gidx:{graph_input_idx},p:{partial},ga:{gen_all}"),
                             ),
                             &(&qg, qi, graph_input_idx, partial, gen_all),
                             |b, &(qg, qi, graph_input_idx, partial, gen_all)| {

@@ -46,10 +46,7 @@ fn get_abstract_value_changing_operation() -> UserDefinedOperation<TestSemantics
         .unwrap();
     let p0 = AbstractNodeId::ParameterMarker("p0".into());
     builder
-        .start_query(
-            TestQuery::ValueEqualTo(NodeValue::Integer(0)),
-            vec![p0],
-        )
+        .start_query(TestQuery::ValueEqualTo(NodeValue::Integer(0)), vec![p0])
         .unwrap();
     builder.enter_true_branch().unwrap();
     builder
@@ -312,11 +309,7 @@ fn new_node_from_both_branches_is_visible_for_regular_query() {
     let state_before = builder.show_state().unwrap();
     // Add an operation that creates a new node in both branches
     builder
-        .add_named_operation(
-            "helper".into(),
-            BuilderOpLike::FromOperationId(0),
-            vec![p0],
-        )
+        .add_named_operation("helper".into(), BuilderOpLike::FromOperationId(0), vec![p0])
         .unwrap();
     let state_after = builder.show_state().unwrap();
     let num_before = state_before.graph.nodes().count();
@@ -442,11 +435,7 @@ fn return_node_partially_from_shape_query_fails() {
         .unwrap();
     let state_before = builder.show_state().unwrap();
     builder
-        .add_named_operation(
-            "helper".into(),
-            BuilderOpLike::FromOperationId(0),
-            vec![p0],
-        )
+        .add_named_operation("helper".into(), BuilderOpLike::FromOperationId(0), vec![p0])
         .unwrap();
     let state_after = builder.show_state().unwrap();
     let aids_before = state_before

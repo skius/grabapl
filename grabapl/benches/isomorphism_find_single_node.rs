@@ -94,12 +94,7 @@ impl<'a> GetAdjacencyMatrix for OneNodeReindexedGraph<'a> {
         self.g.adjacency_matrix()
     }
 
-    fn is_adjacent(
-        &self,
-        matrix: &Self::AdjMatrix,
-        a: Self::NodeId,
-        b: Self::NodeId,
-    ) -> bool {
+    fn is_adjacent(&self, matrix: &Self::AdjMatrix, a: Self::NodeId, b: Self::NodeId) -> bool {
         <G as GetAdjacencyMatrix>::is_adjacent(self.g, matrix, a, b)
     }
 }

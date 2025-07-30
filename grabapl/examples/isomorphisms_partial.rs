@@ -94,9 +94,7 @@ fn main() {
         for partial in [false, true] {
             for gen_all in [true] {
                 for graph_input_idx in [99] {
-                    println!(
-                        "Running: {qkind},gidx:{graph_input_idx},p:{partial},ga:{gen_all}"
-                    );
+                    println!("Running: {qkind},gidx:{graph_input_idx},p:{partial},ga:{gen_all}");
                     // Generate the data graph. It is a complete graph, except for the input node which only has the desired amount of children.
                     // That means the number of expected output mappings should just be the number of permutations on 3 children.
 

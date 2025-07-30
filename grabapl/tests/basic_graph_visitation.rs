@@ -465,13 +465,17 @@ fn bfs_and_dfs() {
             .collect::<Vec<_>>()
     };
 
-    let acceptable_bfs = [gen_vec(&g, &[l1, l2_1, l2_2, l3_1, l3_2, l4, l5]),
+    let acceptable_bfs = [
+        gen_vec(&g, &[l1, l2_1, l2_2, l3_1, l3_2, l4, l5]),
         gen_vec(&g, &[l1, l2_1, l2_2, l3_2, l3_1, l4, l5]),
         gen_vec(&g, &[l1, l2_2, l2_1, l3_1, l3_2, l4, l5]),
-        gen_vec(&g, &[l1, l2_2, l2_1, l3_2, l3_1, l4, l5])];
+        gen_vec(&g, &[l1, l2_2, l2_1, l3_2, l3_1, l4, l5]),
+    ];
 
-    let acceptable_dfs = [gen_vec(&g, &[l1, l2_1, l3_1, l4, l5, l3_2, l2_2]),
-        gen_vec(&g, &[l1, l2_2, l3_2, l2_1, l3_1, l4, l5])];
+    let acceptable_dfs = [
+        gen_vec(&g, &[l1, l2_1, l3_1, l4, l5, l3_2, l2_2]),
+        gen_vec(&g, &[l1, l2_2, l3_2, l2_1, l3_1, l4, l5]),
+    ];
 
     let bfs_layers = bfs_layers(&g, l1);
 
@@ -535,9 +539,7 @@ fn bfs_and_dfs() {
     let max_height_res = run_from_concrete(&mut g, &op_ctx, fn_map["max_height"], &[l1]).unwrap();
     let max_height_node = max_height_res.new_nodes()[&"max_height".into()];
     let max_height_value = g.get_node_attr(max_height_node).unwrap();
-    println!(
-        "max height of the graph starting from node {l1:?}: {max_height_value:?}"
-    );
+    println!("max height of the graph starting from node {l1:?}: {max_height_value:?}");
 
     // queue test
     let queue_head = g.add_node(NodeValue::Integer(next_i()));

@@ -172,9 +172,10 @@ pub mod ffi {
                 .result
                 .as_ref()
                 .map_err(|e| Box::new(StringError(e.value.clone())))?;
-            let op_id = op_ctx.fn_names.get(op_name).ok_or_else(|| {
-                Box::new(StringError(format!("Operation '{op_name}' not found")))
-            })?;
+            let op_id = op_ctx
+                .fn_names
+                .get(op_name)
+                .ok_or_else(|| Box::new(StringError(format!("Operation '{op_name}' not found"))))?;
 
             let res = grabapl::prelude::run_from_concrete(
                 &mut g.graph,
