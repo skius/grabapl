@@ -84,9 +84,9 @@ impl<S: Semantics> Clone for LibBuiltinOperation<S> {
                 marker: *marker,
                 param: param.clone(),
             },
-            LibBuiltinOperation::RemoveMarker { marker } => LibBuiltinOperation::RemoveMarker {
-                marker: *marker,
-            },
+            LibBuiltinOperation::RemoveMarker { marker } => {
+                LibBuiltinOperation::RemoveMarker { marker: *marker }
+            }
         }
     }
 }
@@ -163,9 +163,7 @@ impl<S: Semantics> LibBuiltinOperation<S> {
             LibBuiltinOperation::RemoveNode { .. } => {
                 g.delete_node(SubstMarker::from("node"));
             }
-            LibBuiltinOperation::RemoveEdge {
-                ..
-            } => {
+            LibBuiltinOperation::RemoveEdge { .. } => {
                 g.delete_edge(SubstMarker::from("src"), SubstMarker::from("dst"));
             }
             LibBuiltinOperation::SetNode { value, .. } => {
@@ -205,8 +203,7 @@ impl<S: Semantics> LibBuiltinOperation<S> {
             LibBuiltinOperation::RemoveNode { .. } => {
                 g.delete_node(SubstMarker::from("node"));
             }
-            LibBuiltinOperation::RemoveEdge { ..
-            } => {
+            LibBuiltinOperation::RemoveEdge { .. } => {
                 g.delete_edge(SubstMarker::from("src"), SubstMarker::from("dst"));
             }
             LibBuiltinOperation::SetNode { value, .. } => {

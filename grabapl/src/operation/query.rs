@@ -223,8 +223,7 @@ fn get_shape_query_substitution<S: Semantics>(
 
     let opt_mapping = isos
         .map(|iso| {
-            iso
-                .iter()
+            iso.iter()
                 .enumerate()
                 .filter_map(|(desired_shape_idx, &dynamic_graph_idx)| {
                     let desired_shape_node_key = desired_shape_ref.from_index(desired_shape_idx);

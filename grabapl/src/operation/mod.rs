@@ -14,9 +14,7 @@ use crate::operation::trace::Trace;
 use crate::operation::user_defined::{
     AbstractNodeId, AbstractOperationResultMarker, UserDefinedOperation,
 };
-use crate::semantics::{
-    AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics,
-};
+use crate::semantics::{AbstractGraph, AbstractMatcher, ConcreteGraph, Semantics};
 use crate::util::log;
 use crate::{Graph, NodeKey, SubstMarker};
 use error_stack::ResultExt;
@@ -250,18 +248,14 @@ args: {selected_inputs:?}"
         .ok_or_else(return_arg_does_not_match_error_with_dbg_info)?;
 
     isos.map(|iso| {
-        iso
-            .iter()
+        iso.iter()
             .enumerate()
             .map(|(param_idx, &arg_idx)| {
                 let param_node_key = param_ref.from_index(param_idx);
                 let arg_node_key = arg_ref.from_index(arg_idx);
                 (
                     // unwrap is ok since it was returned by param_ref.from_index
-                    *param
-                        .node_keys_to_subst
-                        .get_left(&param_node_key)
-                        .unwrap(),
+                    *param.node_keys_to_subst.get_left(&param_node_key).unwrap(),
                     arg_node_key,
                 )
             })

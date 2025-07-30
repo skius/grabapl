@@ -67,11 +67,12 @@ use crate::operation::signature::parameter::{
 };
 use crate::operation::signature::{AbstractSignatureNodeId, OperationSignature};
 use crate::operation::user_defined::{
-    AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, NamedMarker, OpLikeInstruction,
+    AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, NamedMarker,
+    OpLikeInstruction,
 };
 use crate::operation::{Operation, OperationError, OperationResult, get_substitution};
 use crate::prelude::*;
-use crate::semantics::{AbstractGraph};
+use crate::semantics::AbstractGraph;
 use crate::util::bimap::BiMap;
 use crate::util::log;
 use crate::{NodeKey, Semantics, SubstMarker};
@@ -79,7 +80,8 @@ use error_stack::{Result, ResultExt, bail, report};
 use petgraph::dot;
 use petgraph::dot::Dot;
 use std::collections::{HashMap, HashSet};
-use std::fmt::Debug;use thiserror::Error;
+use std::fmt::Debug;
+use thiserror::Error;
 
 mod programming_by_demonstration;
 pub mod stack_based_builder;
@@ -235,7 +237,11 @@ pub enum BuilderInstruction<S: Semantics> {
     SelfReturnNode(AbstractOutputNodeMarker, S::NodeAbstract),
     /// Asserts that the current operation will return an edge with the given abstract value.
     #[debug("SelfReturnEdge({_0:?}, {_1:?}, ???)")]
-    SelfReturnEdge(AbstractSignatureNodeId, AbstractSignatureNodeId, S::EdgeAbstract),
+    SelfReturnEdge(
+        AbstractSignatureNodeId,
+        AbstractSignatureNodeId,
+        S::EdgeAbstract,
+    ),
     /// Diverge with a crash message.
     /// Has a static effect: The branch is considered to never return, hence merges will always take the other branch.
     #[debug("Diverge({_0})")]
@@ -377,7 +383,7 @@ pub enum OperationBuilderError {
     #[error("{0}")]
     Oneoff(&'static str),
     #[error("Shape node already exists: {}", _0.0)]
-    ShapeNodeAlreadyExists(ShapeNodeIdentifier)
+    ShapeNodeAlreadyExists(ShapeNodeIdentifier),
 }
 
 // type alias to switch between implementations globally
@@ -904,11 +910,15 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
     ) -> String {
         format!(
             "{:?}",
-            Dot::with_attr_getters(&self.graph.graph, &[dot::Config::EdgeNoLabel, dot::Config::NodeNoLabel], &|_, (_src, _dst, attr)| {
+            Dot::with_attr_getters(
+                &self.graph.graph,
+                &[dot::Config::EdgeNoLabel, dot::Config::NodeNoLabel],
+                &|_, (_src, _dst, attr)| {
                     let dbg_attr_format = format!("{:?}", attr.edge_attr);
                     let dbg_attr_replaced = dbg_attr_format.escape_debug();
                     format!("label = \"{dbg_attr_replaced}\"")
-                }, &|_, (node, _)| {
+                },
+                &|_, (node, _)| {
                     let aid = self
                         .node_keys_to_aid
                         .get_left(&node)
@@ -925,7 +935,8 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
                     // format!("label = \"{aid_replaced}|{dbg_attr_replaced}\"")
                     // format!("label = \"{dbg_attr_replaced}\", xlabel = \"{aid_replaced}\"")
                     format!("shape=Mrecord, label = \"{aid_replaced}|{dbg_attr_replaced}\"")
-                })
+                }
+            )
         )
     }
 

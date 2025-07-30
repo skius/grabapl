@@ -215,9 +215,7 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         if self.get_node_key(&NodeMarker::New(marker)).is_some() {
             // TODO: should we disallow re-adding a node that was deleted? if so,
             //  the above should be changed since it skips previously removed nodes
-            panic!(
-                "Marker {marker:?} already exists in the substitution mapping",
-            );
+            panic!("Marker {marker:?} already exists in the substitution mapping",);
         }
         let node_key = self.graph.add_node(value);
         self.new_nodes.push(node_key);

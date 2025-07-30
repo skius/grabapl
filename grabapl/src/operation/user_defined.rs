@@ -506,10 +506,7 @@ impl<'a, 'arg, S: Semantics> Runner<'a, 'arg, S> {
                                 query_result_map.insert(output_marker, node_key);
                             }
                             if let Some(abstract_output_id) = abstract_output_id {
-                                self.extend_abstract_mapping(
-                                    *abstract_output_id,
-                                    query_result_map,
-                                );
+                                self.extend_abstract_mapping(*abstract_output_id, query_result_map);
                             }
 
                             &query_instr.taken

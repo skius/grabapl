@@ -185,10 +185,7 @@ impl BuiltinOperation for ExampleOperation {
                     .expect_explicit_input_node("input", NodeType::Object)
                     .unwrap();
             }
-            ExampleOperation::SetTo {
-                op_typ,
-                ..
-            } => {
+            ExampleOperation::SetTo { op_typ, .. } => {
                 param_builder
                     .expect_explicit_input_node("target", *op_typ)
                     .unwrap();
@@ -212,10 +209,7 @@ impl BuiltinOperation for ExampleOperation {
                     )
                     .unwrap();
             }
-            ExampleOperation::AddEdge {
-                node_typ,
-                ..
-            } => {
+            ExampleOperation::AddEdge { node_typ, .. } => {
                 param_builder
                     .expect_explicit_input_node("src", *node_typ)
                     .unwrap();
@@ -289,17 +283,12 @@ impl BuiltinOperation for ExampleOperation {
             ExampleOperation::NoOp => {
                 // No operation, so no changes to the abstract graph.
             }
-            ExampleOperation::SetTo {
-                target_typ, ..
-            } => {
+            ExampleOperation::SetTo { target_typ, .. } => {
                 // Set the abstract value of the node to the specified type.
                 g.set_node_value(SubstMarker::from("target"), *target_typ)
                     .unwrap();
             }
-            ExampleOperation::SetEdgeTo {
-                target_typ,
-                ..
-            } => {
+            ExampleOperation::SetEdgeTo { target_typ, .. } => {
                 // Set the edge from source to destination with the specified type.
                 g.set_edge_value(
                     SubstMarker::from("src"),
@@ -308,9 +297,7 @@ impl BuiltinOperation for ExampleOperation {
                 )
                 .unwrap();
             }
-            ExampleOperation::AddEdge {
-                target_typ, ..
-            } => {
+            ExampleOperation::AddEdge { target_typ, .. } => {
                 // Add an edge from source to destination with the specified type.
                 g.add_edge(
                     SubstMarker::from("src"),
@@ -374,17 +361,12 @@ impl BuiltinOperation for ExampleOperation {
             ExampleOperation::NoOp => {
                 // No operation, so no changes to the concrete graph.
             }
-            ExampleOperation::SetTo {
-                value,
-                ..
-            } => {
+            ExampleOperation::SetTo { value, .. } => {
                 // Set the concrete value of the node to the specified value.
                 g.set_node_value(SubstMarker::from("target"), value.clone())
                     .unwrap();
             }
-            ExampleOperation::SetEdgeTo {
-                value,..
-            } => {
+            ExampleOperation::SetEdgeTo { value, .. } => {
                 // Set the edge from source to destination with the specified value.
                 g.set_edge_value(
                     SubstMarker::from("src"),
@@ -393,9 +375,7 @@ impl BuiltinOperation for ExampleOperation {
                 )
                 .unwrap();
             }
-            ExampleOperation::AddEdge {
-                value,..
-            } => {
+            ExampleOperation::AddEdge { value, .. } => {
                 // Add an edge from source to destination with the specified value.
                 g.add_edge(
                     SubstMarker::from("src"),

@@ -9,11 +9,11 @@ use chumsky::prelude::*;
 use error_stack::{Report, Result, ResultExt, report};
 use grabapl::operation::builder::IntermediateState;
 use grabapl::operation::marker::SkipMarkers;
+use grabapl::operation::signature::AbstractSignatureNodeId;
+use grabapl::operation::signature::parameter::AbstractOutputNodeMarker;
 use grabapl::prelude::*;
 use std::collections::HashMap;
 use thiserror::Error;
-use grabapl::operation::signature::AbstractSignatureNodeId;
-use grabapl::operation::signature::parameter::AbstractOutputNodeMarker;
 
 pub fn parse_abstract_node_type<S: SemanticsWithCustomSyntax>(
     src: &str,
@@ -323,11 +323,10 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                 FnImplicitParam::Edge(edge_sig) => {
                     let src = edge_sig.src.0;
                     let dst = edge_sig.dst.0;
-                    let typ =
-                        S::convert_edge_type(edge_sig.edge_type.0.clone()).ok_or(report!(
-                            InterpreterError::InvalidType(format!("{:?}", edge_sig.edge_type.0))
-                                .with_span(edge_sig.edge_type.1)
-                        ))?;
+                    let typ = S::convert_edge_type(edge_sig.edge_type.0.clone()).ok_or(report!(
+                        InterpreterError::InvalidType(format!("{:?}", edge_sig.edge_type.0))
+                            .with_span(edge_sig.edge_type.1)
+                    ))?;
                     // we need to compute ourselves what src and dst are wrt the signature, are they:
                     // 1. referring to parameter nodes?
                     // 2. or referring to other output nodes?
@@ -872,19 +871,17 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                         .return_node(aid, ret_name_str.into(), ret_ty.clone())
                         .change_context(InterpreterError::BuilderError.with_span(mapping_span))?;
                 }
-                ReturnStmtMapping::Edge { src, dst, edge_type } => {
-                    let src_aid = self
-                        .node_id_to_aid(src.0)
-                        .ok_or(report!(
-                            InterpreterError::NotFoundNodeId(format!("{:?}", src.0))
-                                .with_span(src.1)
-                        ))?;
-                    let dst_aid = self
-                        .node_id_to_aid(dst.0)
-                        .ok_or(report!(
-                            InterpreterError::NotFoundNodeId(format!("{:?}", dst.0))
-                                .with_span(dst.1)
-                        ))?;
+                ReturnStmtMapping::Edge {
+                    src,
+                    dst,
+                    edge_type,
+                } => {
+                    let src_aid = self.node_id_to_aid(src.0).ok_or(report!(
+                        InterpreterError::NotFoundNodeId(format!("{:?}", src.0)).with_span(src.1)
+                    ))?;
+                    let dst_aid = self.node_id_to_aid(dst.0).ok_or(report!(
+                        InterpreterError::NotFoundNodeId(format!("{:?}", dst.0)).with_span(dst.1)
+                    ))?;
                     let edge_type = S::convert_edge_type(edge_type.0.clone()).ok_or(report!(
                         InterpreterError::InvalidType(format!("{:?}", edge_type.0))
                             .with_span(edge_type.1)

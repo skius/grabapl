@@ -4,7 +4,11 @@ use crate::operation::builder::{
 };
 use crate::operation::signature::parameter::{AbstractOutputNodeMarker, OperationParameter};
 use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
-use crate::operation::user_defined::{AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, AbstractUserDefinedOperationOutput, Instruction, InstructionWithResultMarker, NamedMarker, QueryInstructions, UserDefinedOperation};
+use crate::operation::user_defined::{
+    AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker,
+    AbstractUserDefinedOperationOutput, Instruction, InstructionWithResultMarker, NamedMarker,
+    QueryInstructions, UserDefinedOperation,
+};
 use crate::prelude::*;
 use crate::{NodeKey, Semantics, SubstMarker};
 use derive_more::From;
@@ -204,8 +208,7 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
                     bail!(OperationBuilderError::CannotRenameParameterNode(old_aid));
                 }
                 let new_aid = AbstractNodeId::named(new_name);
-                this.current_state
-                    .rename_aid(old_aid, new_aid)?;
+                this.current_state.rename_aid(old_aid, new_aid)?;
 
                 this.instructions.push((
                     None,
@@ -257,9 +260,9 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
     ) -> Result<Vec<AbstractNodeId>, OperationBuilderError> {
         let op = op_like
             .as_abstract_operation(builder_data.op_ctx, &builder_data.expected_self_signature)?;
-        let (abstract_arg, output_res) = self
-            .current_state
-            .interpret_op(builder_data.op_ctx, output_name, op, args)?;
+        let (abstract_arg, output_res) =
+            self.current_state
+                .interpret_op(builder_data.op_ctx, output_name, op, args)?;
 
         let op_like_instr = op_like.into_op_like_instruction(builder_data.self_op_id);
 
@@ -391,8 +394,7 @@ impl<S: Semantics> BranchesFrame<S> {
             .as_ref()
             .map(|cif| &cif.current_state)
             .unwrap_or(default_false_state);
-        let merge_result =
-            merge_states_result(true_branch_state_ref, false_branch_state_ref);
+        let merge_result = merge_states_result(true_branch_state_ref, false_branch_state_ref);
 
         // take into account the missing AIDs from the branches, and insert ForgetAid instructions
         let mut true_instructions = self
@@ -447,8 +449,7 @@ impl<S: Semantics> QueryFrame<S> {
                 let mut before_branches_state = outer_state.clone();
                 // TODO: decide if queries should be allowed to modify the state.
                 //  (maybe they should even be allowed to provide different states on true and false?)
-                let abstract_arg = before_branches_state
-                    .interpret_builtin_query(&query, args)?;
+                let abstract_arg = before_branches_state.interpret_builtin_query(&query, args)?;
 
                 let frame = QueryFrame {
                     query,
@@ -631,7 +632,9 @@ impl<S: Semantics> ReturnFrame<S> {
             bail!(OperationBuilderError::NotFoundAid(aid));
         }
         if self.get_return_node_marker(&aid).is_some() {
-            bail!(OperationBuilderError::Oneoff("already returned this return node"));
+            bail!(OperationBuilderError::Oneoff(
+                "already returned this return node"
+            ));
         }
         // if we have already asserted that we return a node with this marker, it must be the same type.
         if let Some(expected_av) = data
@@ -682,9 +685,7 @@ impl<S: Semantics> ReturnFrame<S> {
             bail!(OperationBuilderError::NotFoundReturnEdge(src, dst));
         }
         if self.return_edges.contains(&(src, dst)) {
-            bail!(OperationBuilderError::Oneoff(
-                "already returned this edge"
-            ));
+            bail!(OperationBuilderError::Oneoff("already returned this edge"));
         }
         if !self.last_state().contains_aid(&src) {
             bail!(OperationBuilderError::NotFoundReturnEdgeSource(src));
@@ -739,7 +740,10 @@ impl<S: Semantics> ReturnFrame<S> {
         Ok(())
     }
 
-    fn aid_to_sig_id(&self, aid: &AbstractNodeId) -> Result<AbstractSignatureNodeId, OperationBuilderError> {
+    fn aid_to_sig_id(
+        &self,
+        aid: &AbstractNodeId,
+    ) -> Result<AbstractSignatureNodeId, OperationBuilderError> {
         match *aid {
             AbstractNodeId::ParameterMarker(s) => Ok(AbstractSignatureNodeId::ExistingNode(s)),
             AbstractNodeId::DynamicOutputMarker(_, _) | AbstractNodeId::Named(..) => {
@@ -829,12 +833,10 @@ impl<S: Semantics> BuildingShapeQueryFrame<S> {
                     .insert(this.true_branch_state.get_key_from_aid(&aid)?, sni);
             }
             BI::ExpectShapeNodeChange(aid, new_av) => {
-                this.true_branch_state
-                    .set_node_av(aid, new_av)?;
+                this.true_branch_state.set_node_av(aid, new_av)?;
             }
             BI::ExpectShapeEdge(src, dst, edge) => {
-                this.true_branch_state
-                    .add_edge(src, dst, edge, true)?;
+                this.true_branch_state.add_edge(src, dst, edge, true)?;
             }
             BI::SkipMarker(marker) => {
                 this.skip_markers.skip(marker);
@@ -1032,7 +1034,6 @@ impl<S: Semantics> FrameStack<S> {
         log::trace!("Pushing frame: {:?}", std::any::type_name::<T>());
         self.frames.push(frame.into());
     }
-
 
     pub fn last(&self) -> Option<&Frame<S>> {
         self.frames.last()
@@ -1271,7 +1272,10 @@ impl<'a, S: Semantics> Builder<'a, S> {
         self.data.expected_self_signature.output = expected_self_output_changes;
     }
 
-    pub fn consume(&mut self, instruction: BuilderInstruction<S>) -> Result<(), OperationBuilderError> {
+    pub fn consume(
+        &mut self,
+        instruction: BuilderInstruction<S>,
+    ) -> Result<(), OperationBuilderError> {
         let mut instruction_opt = Some(instruction);
 
         // first check if we have a global instruction that needs to be consumed
@@ -1926,7 +1930,11 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         dst: impl Into<AbstractSignatureNodeId>,
         edge: S::EdgeAbstract,
     ) -> Result<(), OperationBuilderError> {
-        self.push_instruction(BuilderInstruction::SelfReturnEdge(src.into(), dst.into(), edge))
+        self.push_instruction(BuilderInstruction::SelfReturnEdge(
+            src.into(),
+            dst.into(),
+            edge,
+        ))
     }
 
     /// Adds a diverge operation at the current point that crashes with the given message.
@@ -1974,9 +1982,7 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         instruction: BuilderInstruction<S>,
     ) -> Result<(), OperationBuilderError> {
         self.__push_instruction(instruction.clone())
-            .attach_printable_lazy(
-                move || format!("Failed to push instruction: {instruction:?}"),
-            )
+            .attach_printable_lazy(move || format!("Failed to push instruction: {instruction:?}"))
     }
 
     fn __push_instruction(
@@ -1990,9 +1996,7 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         // it may fail only once a prior recursive call 'sees' the new instruction.
 
         let new_builder_stage_1_before_build = new_builder_stage_1.clone();
-        let new_output_changes = match new_builder_stage_1
-            .build_partial_op()
-        {
+        let new_output_changes = match new_builder_stage_1.build_partial_op() {
             Ok(op) => op,
             Err(e) => {
                 // we failed to _build_. This does not mean the instruction is invalid, but rather that
@@ -2015,10 +2019,9 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
             }
         };
         // now that we have the new self op, let's try the instruction again.
-        let mut new_builder_stage_2 = self
-            .build_builder_from_scratch_with_output_changes(new_output_changes)?;
-        new_builder_stage_2
-            .consume(instruction.clone())?;
+        let mut new_builder_stage_2 =
+            self.build_builder_from_scratch_with_output_changes(new_output_changes)?;
+        new_builder_stage_2.consume(instruction.clone())?;
         // TODO: add test that checks if maybe we change semantics by replaying all instructions with a different self op?
         // at this point we know the building worked, so we can safely update our active builder.
         // TODO: would be nice if we had an Eq constraint on BuiltinOperations, so that we could check that the result of building the stage 2 UDOp
@@ -2062,21 +2065,18 @@ impl<
             }
             BuilderShowData::CollectingInstructions(state) => Ok(state.clone()),
             BuilderShowData::QueryFrame(state) => Ok(state.clone()),
-            BuilderShowData::BranchesFrame {
-                true_state,
-                ..
-            } => {
+            BuilderShowData::BranchesFrame { true_state, .. } => {
                 // we only take the true state, since we only have a branchesframe on top right after a start_query instruction.
                 Ok(true_state.clone())
             }
             BuilderShowData::ShapeQueryFrame(state) => Ok(state.clone()),
             BuilderShowData::ReturnFrame(state) => Ok(state.clone()),
-            BuilderShowData::Other(_) => Err(report!(OperationBuilderError::Oneoff("error showing state")))
-                .attach_printable_lazy(|| {
-                    format!(
-                        "Expected to receive data with intermediate state, got: {inner:?}"
-                    )
-                }),
+            BuilderShowData::Other(_) => Err(report!(OperationBuilderError::Oneoff(
+                "error showing state"
+            )))
+            .attach_printable_lazy(|| {
+                format!("Expected to receive data with intermediate state, got: {inner:?}")
+            }),
         }?;
 
         // TODO: we could improve this now, since we actually have a full, current view of the stack.

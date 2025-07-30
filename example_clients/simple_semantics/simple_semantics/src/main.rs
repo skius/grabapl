@@ -168,11 +168,13 @@ fn insert_bst_builder_test(
                     let child_id = AbstractNodeId::DynamicOutputMarker(left_query, child);
                     op_builder.expect_shape_node(child, ()).unwrap();
                     show(&op_builder);
-                    op_builder.expect_shape_edge(
-                        root_node,
-                        child_id,
-                        EdgePattern::Exact("left".to_string()),
-                    ).unwrap();
+                    op_builder
+                        .expect_shape_edge(
+                            root_node,
+                            child_id,
+                            EdgePattern::Exact("left".to_string()),
+                        )
+                        .unwrap();
                     show(&op_builder);
                     {
                         op_builder.enter_true_branch().unwrap();
