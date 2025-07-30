@@ -1047,11 +1047,11 @@ struct MergeStatesResult<S: Semantics> {
 /// Also, abstract type merging is fallible, so if two nodes are incompatible with each other, they don't appear in the resulting state.
 ///
 /// # Example:
-/// 1. Initial state is `P(0)|String`
-/// 2. We branch:
-/// 2a. True branch ends with graph `P(0)|String -> O(c1)|String -> O(c2)|String`
-/// 2b. False branch ends with graph `P(0)|String -> O(c1)|Integer -> O(c3)|Object`
-/// 3. The resulting state will be `P(0)|String -> O(c1)|Object`
+///  1. Initial state is `P(0)|String`
+///  2. We branch:
+///      1. True branch ends with graph `P(0)|String -> O(c1)|String -> O(c2)|String`
+///      2. False branch ends with graph `P(0)|String -> O(c1)|Integer -> O(c3)|Object`
+///  3. The resulting state will be `P(0)|String -> O(c1)|Object`
 ///
 /// Note how the second added node from the true branch is not present *with the same name* in the false branch, and
 /// therefore is not present in the resulting state. Same for `O(c3)` from the false branch.
