@@ -77,3 +77,42 @@ fn recursion_fixed_point() {
     let op = builder.build().unwrap();
     println!("Built operation: {:#?}", op.signature.output);
 }
+
+#[test_log::test]
+fn recursion_fixed_point_using_shape_queries() {
+    let op_ctx = OperationContext::<IntervalSemantics>::new();
+    let mut builder = OperationBuilder::new(&op_ctx, 0);
+    builder
+        .expect_parameter_node("p0", NodeType::new(0, 100))
+        .unwrap();
+    let p0 = AbstractNodeId::param("p0");
+    // now we check if p0 is 100, if not, we add 1 to it and repeat
+    builder
+        .start_shape_query("q")
+        .unwrap();
+
+    // expect a change of p0 to 0..99
+    builder
+        .expect_shape_node_change(p0, NodeType::new(0, 99))
+        .unwrap();
+
+    builder.enter_true_branch().unwrap();
+    builder
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::AddInteger(1)),
+            vec![p0],
+        )
+        .unwrap();
+    // recurse
+    builder
+        .add_operation(BuilderOpLike::Recurse, vec![p0])
+        .unwrap();
+    builder.enter_false_branch().unwrap();
+    // if p0 is 100, we do nothing
+
+    let op = builder.build().unwrap();
+    println!("Built operation: {:#?}", op.signature.output);
+    // ^ result is that p0 gets a 'maybe_written' of [1, 100]
+    // ah, even if it would get a maybe_written of [100,100], the caller would still have to join its knowledge and the new knowledge,
+    // since it is a *maybe* written, and that requires joining.
+}
