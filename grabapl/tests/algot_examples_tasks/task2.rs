@@ -280,10 +280,10 @@ fn proptest_max_heap_remove_heap() {
     let mut op_ctx = OperationContext::<TestSemantics>::new();
     populate_max_heap_remove_op(&mut op_ctx);
 
-    eprintln!(
-        "serialized_op_ctx:\n{}",
-        serde_json::to_string_pretty(&op_ctx).unwrap()
-    );
+    // eprintln!(
+    //     "serialized_op_ctx:\n{}",
+    //     serde_json::to_string_pretty(&op_ctx).unwrap()
+    // );
 
     proptest!(
         Config::with_cases(10),
