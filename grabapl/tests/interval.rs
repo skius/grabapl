@@ -87,9 +87,7 @@ fn recursion_fixed_point_using_shape_queries() {
         .unwrap();
     let p0 = AbstractNodeId::param("p0");
     // now we check if p0 is 100, if not, we add 1 to it and repeat
-    builder
-        .start_shape_query("q")
-        .unwrap();
+    builder.start_shape_query("q").unwrap();
 
     // expect a change of p0 to 0..99
     builder
