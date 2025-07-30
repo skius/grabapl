@@ -3,12 +3,14 @@ pub mod builtin;
 pub mod marker;
 pub mod query;
 pub mod signature;
-pub mod user_defined;
 pub mod trace;
+pub mod user_defined;
 
 use crate::graph::EdgeAttribute;
 use crate::operation::builtin::LibBuiltinOperation;
 use crate::operation::marker::MarkerSet;
+use crate::operation::signature::parameter::ConcreteOperationOutput;
+use crate::operation::trace::Trace;
 use crate::operation::user_defined::{
     AbstractNodeId, AbstractOperationResultMarker, UserDefinedOperation,
 };
@@ -29,8 +31,6 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use thiserror::Error;
-use crate::operation::signature::parameter::ConcreteOperationOutput;
-use crate::operation::trace::Trace;
 
 pub trait BuiltinOperation: Debug {
     type S: Semantics;

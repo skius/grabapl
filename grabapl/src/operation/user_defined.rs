@@ -5,12 +5,14 @@ use crate::operation::signature::parameter::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationArgument,
     OperationOutput, OperationParameter, ParameterSubstitution,
 };
+use crate::operation::trace::TraceFrame;
 use crate::operation::{
     OperationError, OperationResult, run_builtin_operation, run_lib_builtin_operation,
     run_operation,
 };
 use crate::prelude::*;
 use crate::semantics::{AbstractGraph, ConcreteGraph};
+use crate::util::bimap::BiMap;
 use crate::util::{InternString, log};
 use crate::{NodeKey, Semantics, SubstMarker, interned_string_newtype};
 use derive_more::with_trait::From;
@@ -18,8 +20,6 @@ use error_stack::{FutureExt, ResultExt, bail, report};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
-use crate::operation::trace::TraceFrame;
-use crate::util::bimap::BiMap;
 
 /// These represent the _abstract_ (guaranteed) shape changes of an operation, bundled together.
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
@@ -83,7 +83,10 @@ impl AbstractNodeId {
     pub fn to_string_dot_syntax(&self) -> String {
         match self {
             AbstractNodeId::ParameterMarker(marker) => format!("{}", marker.0),
-            AbstractNodeId::DynamicOutputMarker(AbstractOperationResultMarker::Custom(op), node) => {
+            AbstractNodeId::DynamicOutputMarker(
+                AbstractOperationResultMarker::Custom(op),
+                node,
+            ) => {
                 format!("{}.{}", op, node.0)
             }
             AbstractNodeId::Named(name) => format!("{}", name.0),

@@ -1,14 +1,14 @@
 //! Functionality related to tracing operations at runtime.
 
+use crate::graph::EdgeAttribute;
+use crate::graph::dot::DotCollector;
+use crate::operation::marker::MarkerSet;
+use crate::prelude::{AbstractNodeId, ConcreteGraph};
+use crate::util::bimap::BiMap;
+use crate::{NodeKey, Semantics};
+use petgraph::dot::{Config, Dot};
 use std::collections::HashSet;
 use std::fmt::Debug;
-use petgraph::dot::{Config, Dot};
-use crate::prelude::{AbstractNodeId, ConcreteGraph};
-use crate::{NodeKey, Semantics};
-use crate::graph::dot::DotCollector;
-use crate::graph::EdgeAttribute;
-use crate::operation::marker::MarkerSet;
-use crate::util::bimap::BiMap;
 
 pub struct TraceFrame<S: Semantics> {
     pub graph: ConcreteGraph<S>,
@@ -35,7 +35,8 @@ impl<S: Semantics<NodeConcrete: Debug, EdgeConcrete: Debug>> TraceFrame<S> {
             let mut value_escaped = value_debug.escape_debug().to_string();
             if let Some(markers) = self.marker_set.marked_nodes_to_markers.get(&key) {
                 // if the node has markers, append them to the value
-                let markers_inner = markers.iter()
+                let markers_inner = markers
+                    .iter()
                     .map(|m| format!("{m:?}"))
                     .collect::<Vec<_>>()
                     .join(",");
@@ -50,17 +51,21 @@ impl<S: Semantics<NodeConcrete: Debug, EdgeConcrete: Debug>> TraceFrame<S> {
                 format!("shape=Mrecord, color=\"blue\" label = \"{aid_escaped}|{value_escaped}\"")
             } else if self.hidden_nodes.contains(&key) {
                 // hidden node
-                format!("style=\"filled\" color=\"brown\" fillcolor=\"moccasin\" label = \"{value_escaped}\"")
+                format!(
+                    "style=\"filled\" color=\"brown\" fillcolor=\"moccasin\" label = \"{value_escaped}\""
+                )
             } else {
                 // pure runtime node, available for shape matching
                 format!("style=\"filled\" fillcolor=\"gray72\" label = \"{value_escaped}\"")
             }
         };
         let index_get = |g, key: NodeKey| format!("{}", key.0);
-        let dot = Dot::with_attr_getters_and_index_getter(g, &[Config::EdgeNoLabel, Config::NodeNoLabel],
-                                                          &edge_get,
-                                                          &node_get,
-                                                          &index_get,
+        let dot = Dot::with_attr_getters_and_index_getter(
+            g,
+            &[Config::EdgeNoLabel, Config::NodeNoLabel],
+            &edge_get,
+            &node_get,
+            &index_get,
         );
 
         format!("{dot:?}")

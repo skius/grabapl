@@ -8,7 +8,12 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 initiate_protocol!();
 
 #[wasm_func]
-pub fn dot_of_state(src: &[u8], state_name: &[u8], node_av_color: &[u8], edge_str_color: &[u8]) -> Result<Vec<u8>, String> {
+pub fn dot_of_state(
+    src: &[u8],
+    state_name: &[u8],
+    node_av_color: &[u8],
+    edge_str_color: &[u8],
+) -> Result<Vec<u8>, String> {
     error_stack::Report::set_color_mode(ColorMode::None);
 
     let node_av_color = String::from_utf8_lossy(node_av_color);
@@ -17,12 +22,17 @@ pub fn dot_of_state(src: &[u8], state_name: &[u8], node_av_color: &[u8], edge_st
     let state_name = String::from_utf8_lossy(state_name);
 
     let src_str = String::from_utf8_lossy(src);
-    let res = syntax::try_parse_to_op_ctx_and_map::<grabapl_template_semantics::TheSemantics>(src_str.as_ref(), false);
+    let res = syntax::try_parse_to_op_ctx_and_map::<grabapl_template_semantics::TheSemantics>(
+        src_str.as_ref(),
+        false,
+    );
     if let Err(err) = res.op_ctx_and_map {
         return Err(format!("Failed to parse source: {}", err.value));
     }
     let res = res.state_map;
-    let state = res.get(state_name.as_ref()).ok_or_else(|| format!("state {state_name} found in the operation context"))?;
+    let state = res
+        .get(state_name.as_ref())
+        .ok_or_else(|| format!("state {state_name} found in the operation context"))?;
     let dot = state.dot_with_aid_table_based_with_color_names(&node_av_color, &edge_str_color);
 
     Ok(dot.into_bytes())

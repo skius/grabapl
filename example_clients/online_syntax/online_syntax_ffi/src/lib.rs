@@ -52,12 +52,12 @@ pub mod ffi {
     use super::NodeValue;
     use grabapl::NodeKey;
     use grabapl::graph::GraphTrait;
-    use grabapl::prelude::{OperationId};
+    use grabapl::prelude::OperationId;
     use grabapl_template_semantics::EdgeValue;
     use std::collections::HashMap;
     use std::fmt::Write;
     use std::result::Result;
-    
+
     use syntax::WithLineColSpans;
 
     pub struct Context {
@@ -192,13 +192,15 @@ pub mod ffi {
                                 (
                                     key.0,
                                     marker.0.to_string(),
-                                    super::node_value_to_string(g.graph.get_node_attr(key).unwrap()),
+                                    super::node_value_to_string(
+                                        g.graph.get_node_attr(key).unwrap(),
+                                    ),
                                 )
                             })
                             .collect::<Vec<_>>()
                             .into_iter(),
                     ),
-                    trace: output.trace
+                    trace: output.trace,
                 })),
                 Err(e) => Err(Box::new(StringError(e.to_string()))),
             }

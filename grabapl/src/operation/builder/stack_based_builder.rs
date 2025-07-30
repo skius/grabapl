@@ -250,10 +250,7 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
                 ));
             }
             BI::Trace => {
-                this.instructions.push((
-                    None,
-                    Instruction::Trace,
-                ));
+                this.instructions.push((None, Instruction::Trace));
             }
             _ => {
                 bail_unexpected_instruction!(

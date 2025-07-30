@@ -1,6 +1,6 @@
 mod util;
 
-use grabapl::prelude::{run_from_concrete, ConcreteGraph};
+use grabapl::prelude::{ConcreteGraph, run_from_concrete};
 use syntax::grabapl_defs;
 use util::semantics::*;
 
@@ -54,7 +54,13 @@ fn trace_test() {
     }
 
     // run the operation
-    let res = run_from_concrete(&mut g, &op_ctx, fn_names["children_to_list"], &[parent_key, list_key]).unwrap();
+    let res = run_from_concrete(
+        &mut g,
+        &op_ctx,
+        fn_names["children_to_list"],
+        &[parent_key, list_key],
+    )
+    .unwrap();
 
     println!("Trace DOT:\n{}", res.trace.chained_dot());
 

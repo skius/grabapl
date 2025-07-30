@@ -1,5 +1,6 @@
 use crate::graph::GraphTrait;
 use crate::operation::marker::MarkerSet;
+use crate::operation::trace::Trace;
 use crate::operation::{OperationError, OperationResult};
 use crate::semantics::AbstractGraph;
 use crate::util::bimap::BiMap;
@@ -13,7 +14,6 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
-use crate::operation::trace::Trace;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
 // renamed.
 
@@ -488,7 +488,7 @@ pub struct OperationArgument<'a, S: Semantics> {
     pub hidden_nodes: HashSet<NodeKey>,
     pub marker_set: &'a RefCell<MarkerSet>,
     #[debug(skip)]
-    pub trace: &'a RefCell<Trace<S>>
+    pub trace: &'a RefCell<Trace<S>>,
 }
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From)]
@@ -530,7 +530,10 @@ impl<S: Semantics> ConcreteOperationOutput<S> {
         &self.output.new_nodes
     }
 
-    pub fn key_of_output_marker(&self, marker: impl Into<AbstractOutputNodeMarker>) -> Option<NodeKey> {
+    pub fn key_of_output_marker(
+        &self,
+        marker: impl Into<AbstractOutputNodeMarker>,
+    ) -> Option<NodeKey> {
         let marker = marker.into();
         self.output.new_nodes.get(&marker).copied()
     }

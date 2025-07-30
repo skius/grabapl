@@ -256,7 +256,7 @@ pub enum BuilderInstruction<S: Semantics> {
     Diverge(String),
     /// Add the current operation's frame to the operation trace
     #[debug("Trace")]
-    Trace
+    Trace,
 }
 
 impl<S: Semantics> BuilderInstruction<S> {
@@ -1964,7 +1964,10 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
         )
     }
 
-    pub fn dot_with_aid_custom_aid_format(&self, fmt_aid: impl Fn(AbstractNodeId) -> String) -> String {
+    pub fn dot_with_aid_custom_aid_format(
+        &self,
+        fmt_aid: impl Fn(AbstractNodeId) -> String,
+    ) -> String {
         format!(
             "{:?}",
             Dot::with_attr_getters(
@@ -2001,7 +2004,10 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
     pub fn dot_with_aid_with_dot_syntax(&self) -> String {
         self.dot_with_aid_custom_aid_format(|aid| match aid {
             AbstractNodeId::ParameterMarker(subst) => format!("{}", subst.0),
-            AbstractNodeId::DynamicOutputMarker(AbstractOperationResultMarker::Custom(marker), node_marker) => {
+            AbstractNodeId::DynamicOutputMarker(
+                AbstractOperationResultMarker::Custom(marker),
+                node_marker,
+            ) => {
                 format!("{}.{}", marker, node_marker.0)
             }
             AbstractNodeId::Named(name) => name.0.to_string(),
@@ -2010,10 +2016,17 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
     }
 
     /// Uses tables instead of Mrecord shapes. Uses "name" and "map.name" syntax for AIDs.
-    pub fn dot_with_aid_table_based_with_color_names(&self, node_av_color_name: &str, edge_str_color_name: &str) -> String {
+    pub fn dot_with_aid_table_based_with_color_names(
+        &self,
+        node_av_color_name: &str,
+        edge_str_color_name: &str,
+    ) -> String {
         let fmt_aid = |aid: AbstractNodeId| match aid {
             AbstractNodeId::ParameterMarker(subst) => format!("{}", subst.0),
-            AbstractNodeId::DynamicOutputMarker(AbstractOperationResultMarker::Custom(marker), node_marker) => {
+            AbstractNodeId::DynamicOutputMarker(
+                AbstractOperationResultMarker::Custom(marker),
+                node_marker,
+            ) => {
                 format!("{}.{}", marker, node_marker.0)
             }
             AbstractNodeId::Named(name) => name.0.to_string(),
@@ -2052,12 +2065,16 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
 
                     // format!("label = \"{aid_replaced}|{dbg_attr_replaced}\"")
                     // format!("label = \"{dbg_attr_replaced}\", xlabel = \"{aid_replaced}\"")
-                    let table_label = format!(r#"<
+                    let table_label = format!(
+                        r#"<
     <table style="rounded" cellpadding="5" cellspacing="0"  cellborder="0" border="1">
         <tr><td border="1" sides="R">{aid_replaced}</td><td><font color="{node_av_color_name}">{dbg_attr_replaced}</font></td></tr>
     </table>
->"#);
-                    format!(r#"shape=plaintext, margin="0" height="0" width="0" label={table_label}"#)
+>"#
+                    );
+                    format!(
+                        r#"shape=plaintext, margin="0" height="0" width="0" label={table_label}"#
+                    )
                 }
             )
         )
