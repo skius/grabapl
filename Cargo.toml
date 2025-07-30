@@ -5,10 +5,10 @@ members = [
     "example_clients/simple_semantics/simple_semantics",
     "example_clients/simple_semantics/simple_semantics_ffi",
     "syntax",
-    "syntax_macro",
     "example_clients/online_syntax/online_syntax_ffi",
     "example_clients/template/semantics",
-    "example_clients/template/ffi", "example_clients/typst-plugin",
+    "example_clients/template/ffi", 
+    "example_clients/typst-plugin",
 ]
 exclude = ["playground", "wasm-game-of-life"]
 

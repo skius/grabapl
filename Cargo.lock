@@ -531,6 +531,8 @@ dependencies = [
 [[package]]
 name = "grabapl_temp_petgraph_crate_not_namesquatting_i_promise"
 version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f4cfb0e1a1ceafffb52e743671f228bd82b37d5de29a42be23f9895befaaf352"
 dependencies = [
  "fixedbitset",
  "hashbrown",
@@ -1257,17 +1259,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
-]
-
-[[package]]
-name = "syntax_macro"
-version = "0.1.0"
-dependencies = [
- "grabapl_syntax",
- "proc-macro2",
- "quote",
- "serde_json",
- "syn",
 ]
 
 [[package]]
