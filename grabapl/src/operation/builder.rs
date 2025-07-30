@@ -724,6 +724,16 @@ impl<S: Semantics> IntermediateState<S> {
                 new_aids.push(aid);
             } else {
                 // we don't keep track of it, so better remove it from the graph
+                // NOTE: this bit determines if a AddOperation (i.e., unnamed)
+                // will keep the returned nodes in scope in order to statically allow
+                // matching to other operation calls.
+                // realistically, this should also affect whether they are hidden or not
+                // TODO: define this better^
+                // addendum: The counterpart (whether they are shape-hidden or not)
+                // is defined in the user defined runner; it checks for a op name and only then adds
+                // them to the local binding, which effectively shape-hides them.
+                // so as of now it's true: unnamed calls don't give you access to the returned nodes
+                // statically, and in turn it also doesn't shape-hide them dynamically.
                 self.graph.remove_node(node_key);
             }
         }
