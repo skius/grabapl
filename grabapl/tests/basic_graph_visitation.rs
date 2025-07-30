@@ -465,17 +465,13 @@ fn bfs_and_dfs() {
             .collect::<Vec<_>>()
     };
 
-    let acceptable_bfs = vec![
-        gen_vec(&g, &[l1, l2_1, l2_2, l3_1, l3_2, l4, l5]),
+    let acceptable_bfs = [gen_vec(&g, &[l1, l2_1, l2_2, l3_1, l3_2, l4, l5]),
         gen_vec(&g, &[l1, l2_1, l2_2, l3_2, l3_1, l4, l5]),
         gen_vec(&g, &[l1, l2_2, l2_1, l3_1, l3_2, l4, l5]),
-        gen_vec(&g, &[l1, l2_2, l2_1, l3_2, l3_1, l4, l5]),
-    ];
+        gen_vec(&g, &[l1, l2_2, l2_1, l3_2, l3_1, l4, l5])];
 
-    let acceptable_dfs = vec![
-        gen_vec(&g, &[l1, l2_1, l3_1, l4, l5, l3_2, l2_2]),
-        gen_vec(&g, &[l1, l2_2, l3_2, l2_1, l3_1, l4, l5]),
-    ];
+    let acceptable_dfs = [gen_vec(&g, &[l1, l2_1, l3_1, l4, l5, l3_2, l2_2]),
+        gen_vec(&g, &[l1, l2_2, l3_2, l2_1, l3_1, l4, l5])];
 
     let bfs_layers = bfs_layers(&g, l1);
 
@@ -495,7 +491,7 @@ fn bfs_and_dfs() {
         valid_bfs_order(&bfs_nodes, bfs_layers.clone()),
         "petgraph BFS result does not match the BFS layers"
     );
-    println!("petgraph BFS: {:?}", bfs_nodes);
+    println!("petgraph BFS: {bfs_nodes:?}");
 
     let mut dfs = petgraph::visit::Dfs::new(g.inner_graph(), l1);
     let mut dfs_nodes = vec![];
@@ -508,13 +504,13 @@ fn bfs_and_dfs() {
         acceptable_dfs.contains(&dfs_nodes),
         "petgraph DFS result does not match any of the acceptable results"
     );
-    println!("petgraph DFS: {:?}", dfs_nodes);
+    println!("petgraph DFS: {dfs_nodes:?}");
 
     let res = run_from_concrete(&mut g, &op_ctx, fn_map["bfs"], &[l1]).unwrap();
     let head_bfs = res.key_of_output_marker("head").unwrap();
     let grabapl_bfs_list = helpers::list_to_value_vec(&g, head_bfs);
     let valid = acceptable_bfs.contains(&grabapl_bfs_list);
-    println!("grabapl  BFS: {:?} - valid: {valid}", grabapl_bfs_list);
+    println!("grabapl  BFS: {grabapl_bfs_list:?} - valid: {valid}");
     assert!(
         valid,
         "grabapl BFS result does not match any of the acceptable results"
@@ -528,7 +524,7 @@ fn bfs_and_dfs() {
     let head_dfs = res.key_of_output_marker("head").unwrap();
     let grabapl_dfs_list = helpers::list_to_value_vec(&g, head_dfs);
     let valid = acceptable_dfs.contains(&grabapl_dfs_list);
-    println!("grabapl  DFS: {:?} - valid: {valid}", grabapl_dfs_list);
+    println!("grabapl  DFS: {grabapl_dfs_list:?} - valid: {valid}");
     assert!(
         valid,
         "grabapl DFS result does not match any of the acceptable results"
@@ -540,8 +536,7 @@ fn bfs_and_dfs() {
     let max_height_node = max_height_res.new_nodes()[&"max_height".into()];
     let max_height_value = g.get_node_attr(max_height_node).unwrap();
     println!(
-        "max height of the graph starting from node {:?}: {:?}",
-        l1, max_height_value
+        "max height of the graph starting from node {l1:?}: {max_height_value:?}"
     );
 
     // queue test
@@ -600,7 +595,7 @@ fn test_bfs(
         );
     }
 
-    let res = run_from_concrete(g, &op_ctx, fn_map["bfs"], &[start_node]).unwrap();
+    let res = run_from_concrete(g, op_ctx, fn_map["bfs"], &[start_node]).unwrap();
     let head_bfs = res.key_of_output_marker("head").unwrap();
     let grabapl_bfs_list = helpers::list_to_value_vec(g, head_bfs);
     assert!(
@@ -662,8 +657,7 @@ fn all_siblings_test() {
             NodeValue::Integer(1),
             NodeValue::Integer(2)
         ],
-        "Expected siblings list to contain 1 and 2, got: {:?}",
-        siblings_list
+        "Expected siblings list to contain 1 and 2, got: {siblings_list:?}"
     );
 }
 

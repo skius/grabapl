@@ -148,7 +148,7 @@ fn sort_using_grabapl(
 #[test_log::test]
 fn bubble_sort_proptest() {
     let (op_ctx, fn_map) = get_ops();
-    let bubble_sort_op_id = fn_map.get("bubble_sort_wrapper").unwrap().clone();
+    let bubble_sort_op_id = *fn_map.get("bubble_sort_wrapper").unwrap();
 
     proptest!(
         Config { cases: 10, max_shrink_iters: 100, ..Config::default() },
@@ -159,7 +159,7 @@ fn bubble_sort_proptest() {
             // sort using std
             let mut std_sorted = input.clone();
             std_sorted.sort_unstable();
-            assert_eq!(grabapl_sorted, std_sorted, "grabapl sorting did not match std sorting for input: {:?}, grabapl_sorted: {:?}, std_sorted: {:?}", input, grabapl_sorted, std_sorted);
+            assert_eq!(grabapl_sorted, std_sorted, "grabapl sorting did not match std sorting for input: {input:?}, grabapl_sorted: {grabapl_sorted:?}, std_sorted: {std_sorted:?}");
         }
     );
 }

@@ -36,11 +36,11 @@ impl<'a> GraphBase for OneNodeReindexedGraph<'a> {
 }
 
 impl<'a> NodeIndexable for OneNodeReindexedGraph<'a> {
-    fn node_bound(self: &Self) -> usize {
+    fn node_bound(&self) -> usize {
         self.g.node_bound()
     }
 
-    fn to_index(self: &Self, a: Self::NodeId) -> usize {
+    fn to_index(&self, a: Self::NodeId) -> usize {
         let real_idx = self.g.to_index(a);
         match real_idx {
             i if i == self.input_node_original => self.input_node_relabelled,
@@ -49,7 +49,7 @@ impl<'a> NodeIndexable for OneNodeReindexedGraph<'a> {
         }
     }
 
-    fn from_index(self: &Self, i: usize) -> Self::NodeId {
+    fn from_index(&self, i: usize) -> Self::NodeId {
         match i {
             i if i == self.input_node_relabelled => self.g.from_index(self.input_node_original),
             i if i == self.input_node_original => self.g.from_index(self.input_node_relabelled),
@@ -59,7 +59,7 @@ impl<'a> NodeIndexable for OneNodeReindexedGraph<'a> {
 }
 
 impl<'a> NodeCount for OneNodeReindexedGraph<'a> {
-    fn node_count(self: &Self) -> usize {
+    fn node_count(&self) -> usize {
         self.g.node_count()
     }
 }
@@ -67,7 +67,7 @@ impl<'a> NodeCount for OneNodeReindexedGraph<'a> {
 impl<'a> NodeCompactIndexable for OneNodeReindexedGraph<'a> {}
 
 impl<'a> EdgeCount for OneNodeReindexedGraph<'a> {
-    fn edge_count(self: &Self) -> usize {
+    fn edge_count(&self) -> usize {
         self.g.edge_count()
     }
 }
@@ -78,11 +78,11 @@ impl<'a> Data for OneNodeReindexedGraph<'a> {
 }
 
 impl<'a> DataMap for OneNodeReindexedGraph<'a> {
-    fn node_weight(self: &Self, a: Self::NodeId) -> Option<&Self::NodeWeight> {
+    fn node_weight(&self, a: Self::NodeId) -> Option<&Self::NodeWeight> {
         self.g.node_weight(a)
     }
 
-    fn edge_weight(self: &Self, a: Self::EdgeId) -> Option<&Self::EdgeWeight> {
+    fn edge_weight(&self, a: Self::EdgeId) -> Option<&Self::EdgeWeight> {
         <G as DataMap>::edge_weight(self.g, a)
     }
 }
@@ -90,12 +90,12 @@ impl<'a> DataMap for OneNodeReindexedGraph<'a> {
 impl<'a> GetAdjacencyMatrix for OneNodeReindexedGraph<'a> {
     type AdjMatrix = <G as GetAdjacencyMatrix>::AdjMatrix;
 
-    fn adjacency_matrix(self: &Self) -> Self::AdjMatrix {
+    fn adjacency_matrix(&self) -> Self::AdjMatrix {
         self.g.adjacency_matrix()
     }
 
     fn is_adjacent(
-        self: &Self,
+        &self,
         matrix: &Self::AdjMatrix,
         a: Self::NodeId,
         b: Self::NodeId,
@@ -192,7 +192,7 @@ fn match_with_input_mapping<'a>(
     let mut isos = isos.unwrap();
     if gen_all {
         let all = isos.collect::<Vec<_>>();
-        assert!(all.len() > 0);
+        assert!(!all.is_empty());
         black_box(all);
     } else {
         let first = isos.next().unwrap();
@@ -272,7 +272,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             c.bench_with_input(
                 BenchmarkId::new(
                     "match_three_children_high_query_input",
-                    format!("{:?}", input),
+                    format!("{input:?}"),
                 ),
                 &input,
                 |b, (gen_all, i)| {

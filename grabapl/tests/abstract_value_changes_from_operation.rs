@@ -21,7 +21,7 @@ fn no_modifications_dont_change_abstract_value() {
     let a = AbstractNodeId::ParameterMarker("a".into());
     let state_before = builder.show_state().unwrap();
     builder
-        .add_operation(BuilderOpLike::Builtin(TestOperation::NoOp), vec![a.clone()])
+        .add_operation(BuilderOpLike::Builtin(TestOperation::NoOp), vec![a])
         .unwrap();
     let state_after = builder.show_state().unwrap();
 
@@ -48,7 +48,7 @@ fn get_abstract_value_changing_operation() -> UserDefinedOperation<TestSemantics
     builder
         .start_query(
             TestQuery::ValueEqualTo(NodeValue::Integer(0)),
-            vec![p0.clone()],
+            vec![p0],
         )
         .unwrap();
     builder.enter_true_branch().unwrap();
@@ -59,7 +59,7 @@ fn get_abstract_value_changing_operation() -> UserDefinedOperation<TestSemantics
                 target_typ: NodeType::String,
                 value: NodeValue::String("Changed".to_string()),
             }),
-            vec![p0.clone()],
+            vec![p0],
         )
         .unwrap();
     builder.enter_false_branch().unwrap();
@@ -70,7 +70,7 @@ fn get_abstract_value_changing_operation() -> UserDefinedOperation<TestSemantics
                 target_typ: NodeType::Integer,
                 value: NodeValue::Integer(42),
             }),
-            vec![p0.clone()],
+            vec![p0],
         )
         .unwrap();
     builder.end_query().unwrap();
@@ -113,7 +113,7 @@ fn modifications_change_abstract_value_even_if_same_internal_type_for_custom() {
 
     // Add an operation that changes the abstract value
     builder
-        .add_operation(BuilderOpLike::FromOperationId(0), vec![a.clone()])
+        .add_operation(BuilderOpLike::FromOperationId(0), vec![a])
         .unwrap();
 
     let state_after = builder.show_state().unwrap();
@@ -152,7 +152,7 @@ fn modifications_change_abstract_value_even_if_same_internal_type_for_builtin() 
                 target_typ: NodeType::Object,
                 value: NodeValue::String("Changed".to_string()),
             }),
-            vec![a.clone()],
+            vec![a],
         )
         .unwrap();
 
@@ -186,7 +186,7 @@ fn modifications_change_abstract_value_even_if_same_internal_type_for_custom_wit
 
     // Add an operation that changes the abstract value
     builder
-        .add_operation(BuilderOpLike::FromOperationId(0), vec![a.clone()])
+        .add_operation(BuilderOpLike::FromOperationId(0), vec![a])
         .unwrap();
 
     let state_after = builder.show_state().unwrap();
@@ -315,7 +315,7 @@ fn new_node_from_both_branches_is_visible_for_regular_query() {
         .add_named_operation(
             "helper".into(),
             BuilderOpLike::FromOperationId(0),
-            vec![p0.clone()],
+            vec![p0],
         )
         .unwrap();
     let state_after = builder.show_state().unwrap();
@@ -333,7 +333,7 @@ fn new_node_from_both_branches_is_visible_for_regular_query() {
     builder
         .add_operation(
             BuilderOpLike::Builtin(TestOperation::CopyValueFromTo),
-            vec![returned_node, p0.clone()],
+            vec![returned_node, p0],
         )
         .unwrap();
     let operation = builder.build().unwrap();
@@ -357,9 +357,9 @@ fn new_node_from_both_branches_is_invisible_for_shape_query() {
     let mut builder = OperationBuilder::new(&op_ctx, 1);
     let input_marker = SubstMarker::from("input");
     builder
-        .expect_parameter_node(input_marker.clone(), NodeType::Integer)
+        .expect_parameter_node(input_marker, NodeType::Integer)
         .unwrap();
-    let input_aid = AbstractNodeId::ParameterMarker(input_marker.clone());
+    let input_aid = AbstractNodeId::ParameterMarker(input_marker);
     let state_before = builder.show_state().unwrap();
     // Add an operation that creates a new node in both branches
     builder
@@ -400,7 +400,7 @@ fn return_node_partially_from_shape_query_fails() {
             .unwrap();
         let child_aid = AbstractNodeId::dynamic_output("child", "new");
         builder
-            .expect_shape_edge(p0, child_aid.clone(), EdgeType::Exact("child".to_string()))
+            .expect_shape_edge(p0, child_aid, EdgeType::Exact("child".to_string()))
             .unwrap();
         builder.enter_false_branch().unwrap();
         // if we don't have a child node, create one
@@ -445,7 +445,7 @@ fn return_node_partially_from_shape_query_fails() {
         .add_named_operation(
             "helper".into(),
             BuilderOpLike::FromOperationId(0),
-            vec![p0.clone()],
+            vec![p0],
         )
         .unwrap();
     let state_after = builder.show_state().unwrap();
@@ -642,7 +642,7 @@ fn builder_infers_correct_signatures() {
         .unwrap();
     // return n0
     builder
-        .return_node(n0.clone(), "new".into(), NodeType::String)
+        .return_node(n0, "new".into(), NodeType::String)
         .unwrap();
     // return p0->c1 edge
     builder
@@ -728,8 +728,8 @@ fn builder_infers_correct_signatures() {
     assert_deleted_and_changed_nodes_and_edges!(
         signature,
         HashMap::from([
-            (SubstMarker::from("p0").into(), NodeType::Integer),
-            (SubstMarker::from("c1").into(), NodeType::String)
+            (SubstMarker::from("p0"), NodeType::Integer),
+            (SubstMarker::from("c1"), NodeType::String)
         ])
     );
 
@@ -752,8 +752,8 @@ fn builder_infers_correct_signatures() {
     assert_deleted_and_changed_nodes_and_edges!(
         signature,
         HashMap::from([
-            (SubstMarker::from("p0").into(), NodeType::Integer),
-            (SubstMarker::from("c1").into(), NodeType::String)
+            (SubstMarker::from("p0"), NodeType::Integer),
+            (SubstMarker::from("c1"), NodeType::String)
         ])
     );
 }
@@ -970,7 +970,7 @@ fn shape_query_doesnt_match_nodes_for_which_handles_exist() {
             .unwrap();
         let child_aid = AbstractNodeId::dynamic_output("q", "child");
         builder
-            .expect_shape_edge(p0.clone(), child_aid.clone(), EdgeType::Wildcard)
+            .expect_shape_edge(p0, child_aid, EdgeType::Wildcard)
             .unwrap();
         builder.enter_true_branch().unwrap();
         // if we have a child, set it to "I'm a string"
@@ -1123,7 +1123,7 @@ fn may_writes_remember_previous_abstract_value() {
                     param: NodeType::Object,
                     value: NodeValue::String("Changed".to_string()),
                 }),
-                vec![p0.clone()],
+                vec![p0],
             )
             .unwrap();
         builder.end_query().unwrap();
@@ -1365,7 +1365,7 @@ fn rename_nodes_and_merge_test() {
     );
     // assert that we cannot return these nodes
     // UPDATE: we're allowed to return shape query nodes now
-    let res = builder.return_node(b_aid.clone(), "b".into(), NodeType::Object);
+    let res = builder.return_node(b_aid, "b".into(), NodeType::Object);
     // assert!(
     //     res.is_err(),
     //     "Expected to not be able to return a renamed node that partially comes from a shape query",
@@ -1403,7 +1403,7 @@ fn shape_query_allows_refinement_of_existing_nodes_and_edges() {
                 param: NodeType::Object,
                 value: NodeValue::String("has child".to_string()),
             }),
-            vec![p0.clone()],
+            vec![p0],
         )
         .unwrap();
     builder.end_query().unwrap();
@@ -1421,7 +1421,7 @@ fn shape_query_allows_refinement_of_existing_nodes_and_edges() {
                 param: NodeType::Object,
                 value: NodeValue::String("was integer".to_string()),
             }),
-            vec![p1.clone()],
+            vec![p1],
         )
         .unwrap();
 
@@ -1472,7 +1472,7 @@ fn shape_query_av_refinement_works_in_branch_merge() {
                 param: NodeType::Object,
                 value: NodeValue::Integer(42),
             }),
-            vec![p0.clone()],
+            vec![p0],
         )
         .unwrap();
     builder.end_query().unwrap();
@@ -1538,7 +1538,7 @@ fn delete_node_deletes_all_incident_edges_in_signature() {
         let signature = op.signature();
         assert_eq!(
             signature.output.maybe_deleted_nodes,
-            HashSet::from([SubstMarker::from("p0").into()]),
+            HashSet::from([SubstMarker::from("p0")]),
             "Expected the operation to delete p0"
         );
         op
@@ -1593,7 +1593,7 @@ fn delete_node_after_writing_to_it() {
                 param: NodeType::Object,
                 value: NodeValue::String("Hello".to_string()),
             }),
-            vec![p0.clone()],
+            vec![p0],
         )
         .unwrap();
     // delete it
@@ -1610,7 +1610,7 @@ fn delete_node_after_writing_to_it() {
     let signature = op.signature();
     assert_eq!(
         signature.output.maybe_deleted_nodes,
-        HashSet::from([SubstMarker::from("p0").into()]),
+        HashSet::from([SubstMarker::from("p0")]),
         "Expected the operation to delete p0"
     );
     // TODO: decide if this should be inside the signature or not.
@@ -1620,7 +1620,7 @@ fn delete_node_after_writing_to_it() {
     // TODO: do this!
     assert_eq!(
         signature.output.maybe_changed_nodes,
-        HashMap::from([(SubstMarker::from("p0").into(), NodeType::String)]),
+        HashMap::from([(SubstMarker::from("p0"), NodeType::String)]),
         "Expected the operation to change p0 to Object before deleting it"
     );
 }
@@ -1647,7 +1647,7 @@ fn new_builder_test() {
         ))
         .unwrap();
     let show_data = builder.show();
-    println!("{:?}", show_data);
+    println!("{show_data:?}");
 
     builder
         .consume(BI::RenameNode(
@@ -1656,10 +1656,10 @@ fn new_builder_test() {
         ))
         .unwrap();
     let show_data = builder.show();
-    println!("{:?}", show_data);
+    println!("{show_data:?}");
 
     let res = builder.consume(BI::ExpectParameterNode("p0".into(), NodeType::Object));
-    println!("{:?}", res);
+    println!("{res:?}");
 
     // assert!(false);
 }

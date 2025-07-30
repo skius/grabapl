@@ -233,7 +233,7 @@ impl<'src, S: SemanticsWithCustomSyntax> Interpreter<'src, S> {
         let res = interpreter.interpret_fn_def(fn_def);
         // get the state maps before returning an error
         self.state_map.extend(interpreter.state_map);
-        let _ = res?;
+        res?;
 
         builder
             .build()
@@ -415,7 +415,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
     ) -> Result<bool, SpannedInterpreterError> {
         // check if we're calling show();
         if fn_call.0.name.0 == "show_state" {
-            let state_name = if let Some(arg_ident) = fn_call.0.args.get(0) {
+            let state_name = if let Some(arg_ident) = fn_call.0.args.first() {
                 let as_str = arg_ident.0.single().ok_or(report!(
                     InterpreterError::Custom("needs a single node id for show_state")
                         .with_span(arg_ident.1)
@@ -588,7 +588,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                     .into_iter()
                     .map(|(arg, arg_span)| {
                         self.node_id_to_aid(arg).ok_or(report!(
-                            InterpreterError::NotFoundNodeId(format!("{:?}", arg))
+                            InterpreterError::NotFoundNodeId(format!("{arg:?}"))
                                 .with_span(arg_span)
                         ))
                     })
@@ -676,14 +676,14 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                         .node_id_to_aid(src)
                         .or_else(|| Some(AbstractNodeId::dynamic_output(marker, src.single()?)))
                         .ok_or(report!(
-                            InterpreterError::NotFoundNodeId(format!("{:?}", src))
+                            InterpreterError::NotFoundNodeId(format!("{src:?}"))
                                 .with_span(edge_param.src.1)
                         ))?;
                     let dst_aid = self
                         .node_id_to_aid(dst)
                         .or_else(|| Some(AbstractNodeId::dynamic_output(marker, dst.single()?)))
                         .ok_or(report!(
-                            InterpreterError::NotFoundNodeId(format!("{:?}", dst))
+                            InterpreterError::NotFoundNodeId(format!("{dst:?}"))
                                 .with_span(edge_param.dst.1)
                         ))?;
 
@@ -809,7 +809,7 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
             .into_iter()
             .map(|(arg, span)| {
                 self.node_id_to_aid(arg).ok_or(report!(
-                    InterpreterError::NotFoundNodeId(format!("{:?}", arg)).with_span(span)
+                    InterpreterError::NotFoundNodeId(format!("{arg:?}")).with_span(span)
                 ))
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -930,7 +930,7 @@ where
         })
         .map_err(InterpreterError::CustomOwned)?;
     let tokens = tokens.into_iter().map(|(t, s)| t).collect::<Vec<_>>();
-    let input = Stream::from_iter(tokens.into_iter());
+    let input = Stream::from_iter(tokens);
     parser
         .parse(input)
         .into_result()

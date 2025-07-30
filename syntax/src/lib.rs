@@ -46,14 +46,14 @@ pub enum Token<'src> {
 impl fmt::Display for Token<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Token::Bool(b) => write!(f, "{}", b),
-            Token::Num(n) => write!(f, "{}", n),
-            Token::Str(s) => write!(f, "\"{}\"", s),
+            Token::Bool(b) => write!(f, "{b}"),
+            Token::Num(n) => write!(f, "{n}"),
+            Token::Str(s) => write!(f, "\"{s}\""),
             // Token::Op(op) => write!(f, "{}", op),
             Token::Arrow => write!(f, "->"),
             Token::ColonEq => write!(f, ":="),
-            Token::Ctrl(c) => write!(f, "{}", c),
-            Token::Ident(i) => write!(f, "{}", i),
+            Token::Ctrl(c) => write!(f, "{c}"),
+            Token::Ident(i) => write!(f, "{i}"),
             Token::Fn => write!(f, "fn"),
             Token::Return => write!(f, "return"),
             Token::Let => write!(f, "let"),
@@ -61,7 +61,7 @@ impl fmt::Display for Token<'_> {
             Token::If => write!(f, "if"),
             Token::Else => write!(f, "else"),
             Token::Shape => write!(f, "shape"),
-            Token::MacroArgs(s) => write!(f, "`{}`", s),
+            Token::MacroArgs(s) => write!(f, "`{s}`"),
             // Token::NodeType(s) => write!(f, "{}", s),
         }
     }
@@ -74,7 +74,7 @@ pub fn lexer<'src>()
 
     // allow negative numbers
     let num = just('-')
-        .ignore_then(num.clone())
+        .ignore_then(num)
         .map(|num: i32| -num)
         .or(num)
         .map(|num: i32| Token::Num(num))
@@ -231,7 +231,7 @@ impl<'src> NodeId<'src> {
         match self {
             NodeId::Single(name) => name,
             _ => {
-                panic!("NodeId must be a single node, but was: {:?}", self);
+                panic!("NodeId must be a single node, but was: {self:?}");
             }
         }
     }
@@ -508,8 +508,8 @@ where
         .then_ignore(just(Token::Ctrl(']')))
         .or_not()
         .map(|opt| {
-            opt.map(|marker_names| SkipMarkers::new(marker_names))
-                .unwrap_or(SkipMarkers::default())
+            opt.map(SkipMarkers::new)
+                .unwrap_or_default()
         })
         .boxed()
         .labelled("skipping markers");
@@ -559,7 +559,10 @@ where
                 .labelled("else")
                 .boxed();
 
-            let if_stmt = just(Token::If)
+            
+
+            // TODO: continue with entire if else statements.
+            just(Token::If)
                 .ignore_then(spanned_if_cond)
                 .then_ignore(just(Token::Ctrl('{')))
                 .then(block.clone().map_with(|block, e| (block, e.span())))
@@ -577,10 +580,7 @@ where
                 })
                 .map(Statement::If)
                 .labelled("if statement")
-                .boxed();
-
-            // TODO: continue with entire if else statements.
-            if_stmt
+                .boxed()
         });
 
         let spanned_if_stmt = if_stmt
@@ -696,14 +696,14 @@ where
             .labelled("statement")
             .boxed();
 
-        let block_many_stmts = spanned_stmt
+        
+
+        spanned_stmt
             .repeated()
             .collect()
             .map(|stmts| Block { statements: stmts })
             .labelled("block")
-            .boxed();
-
-        block_many_stmts
+            .boxed()
     });
 
     let fn_return_signature = fn_implicit_params.clone();
@@ -755,7 +755,9 @@ where
         .boxed()
         .labelled("function definition");
 
-    let program = fn_def
+    
+
+    fn_def
         .map_with(|fn_def, e| (fn_def, e.span()))
         .repeated()
         .collect::<Vec<_>>()
@@ -780,18 +782,16 @@ where
                 e.span(),
             )
         })
-        .labelled("program");
-
-    program
+        .labelled("program")
 }
 
 /// Important syntax note: mutually recursive functions are not supported.
 /// Function definitions must be ordered in reverse C/C++ order, i.e.,
 /// if function `foo` calls `bar`, then `bar` must be defined after `foo` in the source.
 // TODO: rework this function. terrible.
-pub fn parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
-    src: &'src str,
-) -> (OperationContext<S>, HashMap<&'src str, OperationId>) {
+pub fn parse_to_op_ctx_and_map<S: SemanticsWithCustomSyntax>(
+    src: &str,
+) -> (OperationContext<S>, HashMap<&str, OperationId>) {
     match try_parse_to_op_ctx_and_map::<S>(src, true).op_ctx_and_map {
         Ok((op_ctx, fn_map)) => (op_ctx, fn_map),
         Err(WithLineColSpans { value: output, .. }) => {
@@ -843,7 +843,7 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
                     };
                 }
                 Err(e) => {
-                    let detailed_message = format!("{:?}", e);
+                    let detailed_message = format!("{e:?}");
                     let error_span = e.current_context().span;
 
                     let line_col_span = span_into_line_col_start_and_line_col_end(&error_span, src);
@@ -915,7 +915,7 @@ pub fn try_parse_to_op_ctx_and_map<'src, S: SemanticsWithCustomSyntax>(
                 .map(|e| e.map_token(|tok| tok.to_string())),
         )
         .for_each(|e| {
-            line_col_spans.push(span_into_line_col_start_and_line_col_end(&e.span(), src));
+            line_col_spans.push(span_into_line_col_start_and_line_col_end(e.span(), src));
             Report::build(ReportKind::Error, (filename.clone(), e.span().into_range()))
                 .with_config(
                     ariadne::Config::new()

@@ -266,21 +266,21 @@ impl BuiltinOperation for TestOperation {
             }
             TestOperation::AddNode { node_type, value } => {
                 // Add a new node with the specified type and value.
-                g.add_node("new", node_type.clone());
+                g.add_node("new", *node_type);
                 new_node_names.insert("new".into(), "new".into());
             }
             TestOperation::CopyValueFromTo => {
                 // Copy the value from one node to another.
                 let value = g.get_node_value(SubstMarker::from("source")).unwrap();
-                g.set_node_value(SubstMarker::from("destination"), value.clone())
+                g.set_node_value(SubstMarker::from("destination"), *value)
                     .unwrap();
             }
             TestOperation::SwapValues => {
                 // Swap the values of two nodes.
                 let value1 = g.get_node_value(SubstMarker::from("source")).unwrap();
                 let value2 = g.get_node_value(SubstMarker::from("destination")).unwrap();
-                let v1 = value1.clone();
-                let v2 = value2.clone();
+                let v1 = *value1;
+                let v2 = *value2;
                 g.set_node_value(SubstMarker::from("source"), v2).unwrap();
                 g.set_node_value(SubstMarker::from("destination"), v1)
                     .unwrap();
@@ -331,7 +331,7 @@ impl BuiltinOperation for TestOperation {
                 value,
             } => {
                 // Set the concrete value of the node to the specified value.
-                g.set_node_value(SubstMarker::from("target"), value.clone())
+                g.set_node_value(SubstMarker::from("target"), *value)
                     .unwrap();
             }
             TestOperation::AddEdge { node_typ } => {
@@ -344,21 +344,21 @@ impl BuiltinOperation for TestOperation {
             }
             TestOperation::AddNode { node_type, value } => {
                 // Add a new node with the specified type and value.
-                g.add_node("new", value.clone());
+                g.add_node("new", *value);
                 new_node_names.insert("new".into(), "new".into());
             }
             TestOperation::CopyValueFromTo => {
                 // Copy the value from one node to another.
                 let value = g.get_node_value(SubstMarker::from("source")).unwrap();
-                g.set_node_value(SubstMarker::from("destination"), value.clone())
+                g.set_node_value(SubstMarker::from("destination"), *value)
                     .unwrap();
             }
             TestOperation::SwapValues => {
                 // Swap the values of two nodes.
                 let value1 = g.get_node_value(SubstMarker::from("source")).unwrap();
                 let value2 = g.get_node_value(SubstMarker::from("destination")).unwrap();
-                let v1 = value1.clone();
-                let v2 = value2.clone();
+                let v1 = *value1;
+                let v2 = *value2;
                 g.set_node_value(SubstMarker::from("source"), v2).unwrap();
                 g.set_node_value(SubstMarker::from("destination"), v1)
                     .unwrap();
@@ -445,7 +445,7 @@ impl BuiltinQuery for TestQuery {
                 let value1 = g.get_node_value(SubstMarker::from("a")).unwrap();
                 let value2 = g.get_node_value(SubstMarker::from("b")).unwrap();
                 let cmp_result = match (value1, value2) {
-                    (NodeValue(a), NodeValue(b)) => a.cmp(&b),
+                    (NodeValue(a), NodeValue(b)) => a.cmp(b),
                 };
                 ConcreteQueryOutput {
                     taken: cmp_result == *ordering,

@@ -105,8 +105,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                             BenchmarkId::new(
                                 "query",
                                 format!(
-                                    "{},gidx:{},p:{},ga:{}",
-                                    qkind, graph_input_idx, partial, gen_all
+                                    "{qkind},gidx:{graph_input_idx},p:{partial},ga:{gen_all}"
                                 ),
                             ),
                             &(&qg, qi, graph_input_idx, partial, gen_all),
@@ -130,11 +129,9 @@ fn criterion_benchmark(c: &mut Criterion) {
                                                     // 0 has children 1,2,3
                                                     continue;
                                                 }
-                                            } else {
-                                                if j > 2 {
-                                                    // non 0 has children 0,1,2
-                                                    continue;
-                                                }
+                                            } else if j > 2 {
+                                                // non 0 has children 0,1,2
+                                                continue;
                                             }
                                         }
                                         g.add_edge(i, j, ());

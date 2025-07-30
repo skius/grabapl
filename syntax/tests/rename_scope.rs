@@ -2,7 +2,7 @@ use grabapl::Semantics;
 use grabapl::prelude::run_from_concrete;
 use grabapl::semantics::example::{ExampleSemantics as TestSemantics, NodeValue};
 
-const SRC: &'static str = stringify!(
+const SRC: &str = stringify!(
     fn test(
         p1: int
     ) [
@@ -45,7 +45,7 @@ fn rename_scope() {
     println!("Graph after execution: {:#?}", g.dot());
     let ret_node = res.key_of_output_marker("ret_node").unwrap();
     let value = g.get_node_attr(ret_node).unwrap();
-    println!("Return node value {ret_node:?}: {:?}", value);
+    println!("Return node value {ret_node:?}: {value:?}");
 
     // assert!(false);
 }

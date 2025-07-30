@@ -126,7 +126,7 @@ pub mod ffi {
         /// Adds a new node to the concrete graph with the given value and returns its key.
         pub fn add_node(&mut self, value: &str) -> Result<u32, Box<StringError>> {
             let node_value = super::parse_node_value(value)
-                .ok_or_else(|| StringError::from_boxed(format!("Invalid node value: {}", value)))?;
+                .ok_or_else(|| StringError::from_boxed(format!("Invalid node value: {value}")))?;
             let node_key = self.0.add_node(node_value);
             Ok(node_key.0)
         }
@@ -139,7 +139,7 @@ pub mod ffi {
             value: &str,
         ) -> Result<(), Box<StringError>> {
             let edge_value = super::parse_edge_value(value)
-                .ok_or_else(|| StringError::from_boxed(format!("Invalid edge value: {}", value)))?;
+                .ok_or_else(|| StringError::from_boxed(format!("Invalid edge value: {value}")))?;
             let from_key = NodeKey(from);
             let to_key = NodeKey(to);
             self.0.add_edge(from_key, to_key, edge_value);
@@ -226,7 +226,7 @@ pub mod ffi {
             let op_id = self
                 .fn_map
                 .get(op_name)
-                .ok_or_else(|| StringError(format!("Operation '{}' not found", op_name)))?;
+                .ok_or_else(|| StringError(format!("Operation '{op_name}' not found")))?;
             let args: Vec<_> = args.iter().copied().map(NodeKey).collect();
             let res = super::run_from_concrete(&mut g.0, &self.op_ctx, *op_id, &args);
             res.map_err(|e| Box::new(StringError(e.to_string())))
@@ -257,7 +257,7 @@ pub mod ffi {
             node_type: &str,
         ) -> Result<(), Box<StringError>> {
             let node_type = super::parse_node_type(node_type)
-                .map_err(|e| StringError::from_boxed(format!("Invalid node type: {}", e)))?;
+                .map_err(|e| StringError::from_boxed(format!("Invalid node type: {e}")))?;
             self.0
                 .expect_parameter_node(name, node_type)
                 .map_err(|e| StringError::from_boxed(e.to_string()))

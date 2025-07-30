@@ -409,7 +409,7 @@ fn bubble_sort() {
     let v1 = g.get_node_attr(e1).unwrap().must_integer();
     let v2 = g.get_node_attr(e2).unwrap().must_integer();
     let v3 = g.get_node_attr(e3).unwrap().must_integer();
-    assert!(vec![v0, v1, v2, v3].is_sorted())
+    assert!([v0, v1, v2, v3].is_sorted())
 }
 
 fn get_op_ctx_with_bubble_sort_for_proptest() -> (OperationContext<TestSemantics>, OperationId) {
@@ -484,6 +484,6 @@ proptest! {
         // sort using std
         let mut std_sorted = input.clone();
         std_sorted.sort_unstable();
-        assert_eq!(grabapl_sorted, std_sorted, "grabapl sorting did not match std sorting for input: {:?}, grabapl_sorted: {:?}, std_sorted: {:?}", input, grabapl_sorted, std_sorted);
+        assert_eq!(grabapl_sorted, std_sorted, "grabapl sorting did not match std sorting for input: {input:?}, grabapl_sorted: {grabapl_sorted:?}, std_sorted: {std_sorted:?}");
     }
 }

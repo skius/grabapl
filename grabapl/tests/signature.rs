@@ -116,8 +116,7 @@ fn invisible_node_not_deleted() {
     assert_eq!(
         aids,
         HashSet::new(),
-        "state should not have any visible AIDs, found aids: {:?}",
-        aids
+        "state should not have any visible AIDs, found aids: {aids:?}"
     );
 
     // check the signature

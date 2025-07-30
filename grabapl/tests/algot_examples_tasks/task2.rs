@@ -28,7 +28,7 @@ fn populate_max_heap_remove_op(op_ctx: &mut OperationContext<TestSemantics>) {
     // otherwise it calls the helper operation which takes the root of the current heap and the
     // out-param for the max value.
 
-    let mut builder = OperationBuilder::new(&op_ctx, MAX_HEAP_REMOVE_ID);
+    let mut builder = OperationBuilder::new(op_ctx, MAX_HEAP_REMOVE_ID);
     builder
         .expect_parameter_node("sentinel", NodeType::Object)
         .unwrap();
@@ -74,7 +74,7 @@ fn populate_max_heap_remove_op(op_ctx: &mut OperationContext<TestSemantics>) {
 }
 
 fn populate_max_heap_remove_helper_op(op_ctx: &mut OperationContext<TestSemantics>) {
-    let mut builder = OperationBuilder::new(&op_ctx, MAX_HEAP_REMOVE_HELPER_ID);
+    let mut builder = OperationBuilder::new(op_ctx, MAX_HEAP_REMOVE_HELPER_ID);
     builder
         .expect_parameter_node("root", NodeType::Integer)
         .unwrap();
@@ -261,9 +261,7 @@ fn mk_heap_from_values(values: &[i32]) -> (ConcreteGraph<TestSemantics>, NodeKey
             };
             assert!(
                 parent_val >= val,
-                "Max heap property violated: parent value {} is not greater than or equal to child value {}",
-                parent_val,
-                val
+                "Max heap property violated: parent value {parent_val} is not greater than or equal to child value {val}"
             );
             g.add_edge(parent_node, node, "blah".to_string());
         }
@@ -309,9 +307,7 @@ fn proptest_max_heap_remove_heap() {
                 assert_eq!(
                     max_value,
                     &NodeValue::Integer(expected_max_value),
-                    "Expected max value node to have value {}, but got {:?}",
-                    expected_max_value,
-                    max_value
+                    "Expected max value node to have value {expected_max_value}, but got {max_value:?}"
                 );
             }
 

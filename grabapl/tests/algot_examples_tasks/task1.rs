@@ -99,7 +99,7 @@ fn proptest_gcd() {
 
     proptest!(|(a in 0..1000, b in 0..1000)| {
         let expected_gcd = gcd(a, b);
-        assert!(expected_gcd == 0 || a % expected_gcd == 0 && b % expected_gcd == 0, "GCD of {} and {} should divide both", a, b);
+        assert!(expected_gcd == 0 || a % expected_gcd == 0 && b % expected_gcd == 0, "GCD of {a} and {b} should divide both");
         let mut g = TestSemantics::new_concrete_graph();
         let a_key = g.add_node(NodeValue::Integer(a));
         let b_key = g.add_node(NodeValue::Integer(b));
@@ -109,6 +109,6 @@ fn proptest_gcd() {
         let ret_value = g.get_node_attr(ret_key);
         assert!(ret_value.is_some(), "Result node should have a value");
         let ret_value = ret_value.unwrap();
-        assert_eq!(ret_value, &NodeValue::Integer(expected_gcd), "Expected GCD of {} and {} to be {}, but got {:?}", a, b, expected_gcd, ret_value);
+        assert_eq!(ret_value, &NodeValue::Integer(expected_gcd), "Expected GCD of {a} and {b} to be {expected_gcd}, but got {ret_value:?}");
     });
 }

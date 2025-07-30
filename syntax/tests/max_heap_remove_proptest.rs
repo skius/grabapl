@@ -26,9 +26,7 @@ fn mk_heap_from_values(values: &[i32]) -> (ConcreteGraph<TestSemantics>, NodeKey
             };
             assert!(
                 parent_val >= val,
-                "Max heap property violated: parent value {} is not greater than or equal to child value {}",
-                parent_val,
-                val
+                "Max heap property violated: parent value {parent_val} is not greater than or equal to child value {val}"
             );
             g.add_edge(parent_node, node, "blah".to_string());
         }
@@ -74,9 +72,7 @@ fn proptest_max_heap_remove() {
                 assert_eq!(
                     max_value,
                     &NodeValue::Integer(expected_max_value),
-                    "Expected max value node to have value {}, but got {:?}",
-                    expected_max_value,
-                    max_value
+                    "Expected max value node to have value {expected_max_value}, but got {max_value:?}"
                 );
             }
 

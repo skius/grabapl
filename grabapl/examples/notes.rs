@@ -85,7 +85,7 @@ impl<P> PatternWrapper<P> {
     }
 
     pub fn get_marker(&self) -> SubstMarker {
-        self.marker.clone()
+        self.marker
     }
 
     pub fn get_kind(&self) -> &PatternKind {

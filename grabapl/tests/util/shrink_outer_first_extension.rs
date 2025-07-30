@@ -185,8 +185,7 @@ where
                 self.current = Fuse::new(v);
                 self.complicate_regen_remaining = self.runner.config().cases;
                 return true;
-            } else {
-            }
+            } 
         }
 
         if self.current.complicate() {

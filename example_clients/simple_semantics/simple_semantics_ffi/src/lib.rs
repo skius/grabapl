@@ -91,10 +91,10 @@ mod ffi {
             match self.0.get(op_id) {
                 Some(RustOperation::Custom(custom)) => {
                     let serialized = serde_json::to_string_pretty(custom).unwrap();
-                    write!(write, "{}", serialized).unwrap();
+                    write!(write, "{serialized}").unwrap();
                 }
                 _ => {
-                    log::error!("not a custom operation id {}", op_id);
+                    log::error!("not a custom operation id {op_id}");
                 }
             }
         }
@@ -106,10 +106,10 @@ mod ffi {
                     let serialized = rmp_serde::to_vec(custom).unwrap();
                     // b64 encode
                     let b64 = BASE64_STANDARD.encode(serialized);
-                    write!(write, "{}", b64).unwrap();
+                    write!(write, "{b64}").unwrap();
                 }
                 _ => {
-                    log::error!("not a custom operation id {}", op_id);
+                    log::error!("not a custom operation id {op_id}");
                 }
             }
         }
@@ -151,7 +151,7 @@ mod ffi {
         pub fn say_hi(&self) {
             let x = prompt("hi");
             if x == "panic" {
-                panic!("test {}", x);
+                panic!("test {x}");
             }
             log::error!("doing thing {:?}", self.0.get_node_attr(0.into()));
         }
@@ -262,7 +262,7 @@ mod ffi {
             av: &EdgeAbstract,
         ) -> Result<(), Box<OperationBuilderError>> {
             self.0
-                .expect_shape_edge(src.0.clone(), dst.0.clone(), av.0.clone())
+                .expect_shape_edge(src.0, dst.0, av.0.clone())
                 .map_err(|e| Box::new(OperationBuilderError(e)))
         }
 
@@ -297,7 +297,7 @@ mod ffi {
             new_name: &str,
         ) -> Result<(), Box<OperationBuilderError>> {
             self.0
-                .rename_node(aid.0.clone(), new_name)
+                .rename_node(aid.0, new_name)
                 .map_err(|e| Box::new(OperationBuilderError(e)))
         }
 
@@ -307,7 +307,7 @@ mod ffi {
                 .map(|s| Box::new(IntermediateState(s)))
                 .map_err(|e| {
                     // TODO: remove log. should not be necessary...
-                    log::error!("{:?}", e);
+                    log::error!("{e:?}");
                     Box::new(OperationBuilderError(e))
                 })
         }
@@ -340,16 +340,15 @@ mod ffi {
             // TODO: sort this to have a stable debug output
             let aids: Vec<RustAbstractNodeId> =
                 self.0.node_keys_to_aid.right_values().cloned().collect();
-            write!(dw, "Available AIDs: {:#?}", aids).unwrap();
+            write!(dw, "Available AIDs: {aids:#?}").unwrap();
         }
 
         pub fn query_context(&self, dw: &mut DiplomatWrite) {
             let last = self.0.query_path.last();
             if let Some(grabapl::operation::builder::QueryPath::Query(name)) = last {
-                write!(
+                writeln!(
                     dw,
-                    "Currently designing query: {}. Enter true or false branch to proceed.\n",
-                    name
+                    "Currently designing query: {name}. Enter true or false branch to proceed."
                 )
                 .unwrap();
             }
@@ -439,7 +438,7 @@ mod ffi {
         }
 
         pub fn push(&mut self, arg: &AbstractNodeId) {
-            self.0.push(arg.0.clone());
+            self.0.push(arg.0);
         }
     }
 

@@ -117,7 +117,7 @@ impl CustomSyntax for MyCustomSyntax {
                     } else {
                         Err(Rich::custom(
                             e.span(),
-                            format!("Unsupported generic type: {}", args),
+                            format!("Unsupported generic type: {args}"),
                         ))
                     }
                 })
@@ -222,14 +222,14 @@ fn add_node_args_parser<'src>()
         let toks = crate::lexer().parse(src).into_result().map_err(|errs| {
             Rich::custom(
                 e.span(),
-                format!("Failed to parse arguments: {}, errs: {:?}", src, errs),
+                format!("Failed to parse arguments: {src}, errs: {errs:?}"),
             )
         })?;
 
         let node_typ_parser =
             MyCustomSyntax::get_node_type_parser().try_map_with(|custom_typ, e| {
                 ExampleSemantics::convert_node_type(custom_typ)
-                    .ok_or_else(|| Rich::custom(e.span(), format!("node type not supported")))
+                    .ok_or_else(|| Rich::custom(e.span(), "node type not supported".to_string()))
             });
         // let node_value_parser = select! {
         //     Token::Num(num) => NodeValue::Integer(num),
@@ -266,7 +266,7 @@ fn add_node_args_parser<'src>()
             .map_err(|errs| {
                 Rich::custom(
                     e.span(),
-                    format!("Failed to parse arguments: {}, errs: {:?}", src, errs),
+                    format!("Failed to parse arguments: {src}, errs: {errs:?}"),
                 )
             })
     })
@@ -293,7 +293,7 @@ impl SemanticsWithCustomSyntax for ExampleSemantics {
                 let args = args?;
                 let args_src = args.0;
                 // must parse string
-                let str_src = args_src.trim_matches(&['"']).to_string();
+                let str_src = args_src.trim_matches(['"']).to_string();
                 Some(ExampleOperation::AddEdge {
                     node_typ: NodeType::Object,
                     param_typ: EdgeType::Wildcard,

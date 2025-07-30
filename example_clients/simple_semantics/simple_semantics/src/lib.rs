@@ -60,7 +60,7 @@ impl ConcreteToAbstract for NodeConcreteToAbstract {
     type Abstract = ();
 
     fn concrete_to_abstract(c: &Self::Concrete) -> Self::Abstract {
-        ()
+        
     }
 }
 
@@ -279,8 +279,8 @@ impl Debug for BuiltinOperation {
             BuiltinOperation::IndexCycle => write!(f, "IndexCycle"),
             BuiltinOperation::SetValue(_) => write!(f, "SetValue"),
             BuiltinOperation::AddEdge => write!(f, "AddEdge"),
-            BuiltinOperation::SetEdgeValue(val) => write!(f, "SetEdgeValue({})", val),
-            BuiltinOperation::SetNodeValue(val) => write!(f, "SetNodeValue({})", val),
+            BuiltinOperation::SetEdgeValue(val) => write!(f, "SetEdgeValue({val})"),
+            BuiltinOperation::SetNodeValue(val) => write!(f, "SetNodeValue({val})"),
             BuiltinOperation::CopyNodeValueTo => write!(f, "CopyNodeValueTo"),
             BuiltinOperation::Decrement => write!(f, "Decrement"),
             BuiltinOperation::Increment => write!(f, "Increment"),
@@ -430,12 +430,12 @@ impl grabapl::operation::BuiltinOperation for BuiltinOperation {
         let mut new_nodes = HashMap::new();
         match self {
             BuiltinOperation::AddNode => {
-                const NEW_NODE: &'static str = "new";
+                const NEW_NODE: &str = "new";
                 g.add_node(NEW_NODE, ());
                 new_nodes.insert(NEW_NODE.into(), "new".into());
             }
             BuiltinOperation::AppendChild => {
-                const CHILD: &'static str = "child";
+                const CHILD: &str = "child";
                 g.add_node(CHILD, ());
                 // TODO: this EdgePattern is weird.
                 //  On the one hand, we know for a fact this is an exact "" that will be added, so in type-theory, we correctly add the most precise type (Exact instead of Wildcard)
@@ -472,7 +472,8 @@ impl grabapl::operation::BuiltinOperation for BuiltinOperation {
                 let dst = SubstMarker::from(Self::COPY_NODE_VALUE_TO_INPUT_DST);
                 // Noop as long as the abstract value is just the unit type...
                 let src_value = g.get_node_value(src).unwrap();
-                g.set_node_value(dst, *src_value);
+                *src_value;
+                g.set_node_value(dst, ());
             }
             BuiltinOperation::Decrement => {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
@@ -498,12 +499,12 @@ impl grabapl::operation::BuiltinOperation for BuiltinOperation {
         let mut new_nodes = HashMap::new();
         match self {
             BuiltinOperation::AddNode => {
-                const NEW_NODE: &'static str = "new";
+                const NEW_NODE: &str = "new";
                 g.add_node(NEW_NODE, 0);
                 new_nodes.insert(NEW_NODE.into(), "new".into());
             }
             BuiltinOperation::AppendChild => {
-                const CHILD: &'static str = "child";
+                const CHILD: &str = "child";
                 g.add_node(CHILD, 0);
                 g.add_edge(
                     SubstMarker::from(Self::APPEND_CHILD_INPUT),
@@ -546,12 +547,12 @@ impl grabapl::operation::BuiltinOperation for BuiltinOperation {
             }
             BuiltinOperation::Decrement => {
                 let a = SubstMarker::from(Self::DECREMENT_INPUT);
-                let val = g.get_node_value(a.clone()).unwrap();
+                let val = g.get_node_value(a).unwrap();
                 g.set_node_value(a, val - 1);
             }
             BuiltinOperation::Increment => {
                 let a = SubstMarker::from(Self::INCREMENT_INPUT);
-                let val = g.get_node_value(a.clone()).unwrap();
+                let val = g.get_node_value(a).unwrap();
                 g.set_node_value(a, val + 1);
             }
             BuiltinOperation::DeleteNode => {
@@ -562,7 +563,7 @@ impl grabapl::operation::BuiltinOperation for BuiltinOperation {
                 let fst = SubstMarker::from(Self::SET_SND_TO_MAX_OF_FST_SND_INPUT_FST);
                 let snd = SubstMarker::from(Self::SET_SND_TO_MAX_OF_FST_SND_INPUT_SND);
                 let fst_value = g.get_node_value(fst).unwrap();
-                let snd_value = g.get_node_value(snd.clone()).unwrap();
+                let snd_value = g.get_node_value(snd).unwrap();
                 let max_value = std::cmp::max(*fst_value, *snd_value);
                 g.set_node_value(snd, max_value);
             }

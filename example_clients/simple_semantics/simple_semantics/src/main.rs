@@ -33,7 +33,7 @@ fn insert_bst_builder_test(
                 vec![node_to_insert],
             )
             .unwrap();
-        show(&op_builder);
+        show(op_builder);
     };
 
     op_builder

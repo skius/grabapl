@@ -1,6 +1,6 @@
 use grabapl::semantics::example::ExampleSemantics as TestSemantics;
 
-const SRC: &'static str = stringify!(
+const SRC: &str = stringify!(
     fn test(
         p1: int
     ) {

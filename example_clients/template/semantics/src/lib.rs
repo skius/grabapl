@@ -644,13 +644,11 @@ impl BuiltinOperation for TheOperation {
                 if let (NodeValue::String(first), NodeValue::String(second)) =
                     (first_value, second_value)
                 {
-                    let new_value = format!("{}{}", first, second);
+                    let new_value = format!("{first}{second}");
                     g.set_node_value(SubstMarker::from("first"), NodeValue::String(new_value));
                 } else {
                     log::error!(
-                        "AppendSndToFst: expected both nodes to be strings, but got {:?} and {:?}",
-                        first_value,
-                        second_value
+                        "AppendSndToFst: expected both nodes to be strings, but got {first_value:?} and {second_value:?}"
                     );
                 }
             }
@@ -665,9 +663,7 @@ impl BuiltinOperation for TheOperation {
                     g.set_node_value(SubstMarker::from("first"), NodeValue::Integer(new_value));
                 } else {
                     log::error!(
-                        "AddSndToFst: expected both nodes to be integers, but got {:?} and {:?}",
-                        first_value,
-                        second_value
+                        "AddSndToFst: expected both nodes to be integers, but got {first_value:?} and {second_value:?}"
                     );
                 }
             }
@@ -679,8 +675,7 @@ impl BuiltinOperation for TheOperation {
                     g.set_node_value(SubstMarker::from("input"), NodeValue::Integer(new_value));
                 } else {
                     log::error!(
-                        "AddConstant: expected input node to be an integer, but got {:?}",
-                        input_value
+                        "AddConstant: expected input node to be an integer, but got {input_value:?}"
                     );
                 }
             }
@@ -723,8 +718,7 @@ impl BuiltinOperation for TheOperation {
                     s.len() as i32 // convert to i32
                 } else {
                     log::error!(
-                        "StringLength: expected input node to be a string, but got {:?}",
-                        input_value
+                        "StringLength: expected input node to be a string, but got {input_value:?}"
                     );
                     // note: we would be fine to panic and crash here. The static guarantees of grabapl
                     // are enough to ensure that this operation is only called on a string node.
@@ -874,9 +868,7 @@ impl BuiltinQuery for TheQuery {
                     };
                 } else {
                     log::error!(
-                        "CompareInt: expected both nodes to be integers, but got {:?} and {:?}",
-                        first_value,
-                        second_value
+                        "CompareInt: expected both nodes to be integers, but got {first_value:?} and {second_value:?}"
                     );
                     // again, would be fine to crash here, since we should never enter this.
                 }
