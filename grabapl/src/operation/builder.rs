@@ -65,7 +65,7 @@ use crate::operation::signature::parameter::{
     AbstractOperationOutput, AbstractOutputNodeMarker, GraphWithSubstitution, OperationParameter,
     ParameterSubstitution,
 };
-use crate::operation::signature::{OperationSignature};
+use crate::operation::signature::{AbstractSignatureNodeId, OperationSignature};
 use crate::operation::user_defined::{
     AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, NamedMarker, OpLikeInstruction,
 };
@@ -233,6 +233,9 @@ pub enum BuilderInstruction<S: Semantics> {
     /// Asserts that the current operation will return a node with the given abstract value and name.
     #[debug("SelfReturnNode({_0:?}, ???)")]
     SelfReturnNode(AbstractOutputNodeMarker, S::NodeAbstract),
+    /// Asserts that the current operation will return an edge with the given abstract value.
+    #[debug("SelfReturnEdge({_0:?}, {_1:?}, ???)")]
+    SelfReturnEdge(AbstractSignatureNodeId, AbstractSignatureNodeId, S::EdgeAbstract),
     /// Diverge with a crash message.
     /// Has a static effect: The branch is considered to never return, hence merges will always take the other branch.
     #[debug("Diverge({_0})")]
@@ -288,6 +291,7 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Build
             RenameNode(old_aid, new_name) => RenameNode(*old_aid, *new_name),
             Finalize => Finalize,
             SelfReturnNode(marker, node) => SelfReturnNode(*marker, node.clone()),
+            SelfReturnEdge(src, dst, edge) => SelfReturnEdge(*src, *dst, edge.clone()),
             Diverge(msg) => Diverge(msg.clone()),
             Trace => Trace,
         }

@@ -12,6 +12,8 @@ use grabapl::operation::marker::SkipMarkers;
 use grabapl::prelude::*;
 use std::collections::HashMap;
 use thiserror::Error;
+use grabapl::operation::signature::AbstractSignatureNodeId;
+use grabapl::operation::signature::parameter::AbstractOutputNodeMarker;
 
 pub fn parse_abstract_node_type<S: SemanticsWithCustomSyntax>(
     src: &str,
@@ -319,7 +321,32 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                         )?;
                 }
                 FnImplicitParam::Edge(edge_sig) => {
-                    todo!("Edge return signatures are not yet supported in the OperationBuilder");
+                    let src = edge_sig.src.0;
+                    let dst = edge_sig.dst.0;
+                    let typ =
+                        S::convert_edge_type(edge_sig.edge_type.0.clone()).ok_or(report!(
+                            InterpreterError::InvalidType(format!("{:?}", edge_sig.edge_type.0))
+                                .with_span(edge_sig.edge_type.1)
+                        ))?;
+                    // we need to compute ourselves what src and dst are wrt the signature, are they:
+                    // 1. referring to parameter nodes?
+                    // 2. or referring to other output nodes?
+                    let sig_id_of = |node: &str| -> AbstractSignatureNodeId {
+                        if self.return_marker_to_av.contains_key(node) {
+                            AbstractOutputNodeMarker::from(node).into()
+                        } else {
+                            // if it's not a return node, it must be a parameter node.
+                            // we could check ourselves if this exists, but the builder will do that for us too.
+                            SubstMarker::from(node).into()
+                        }
+                    };
+                    let src_sig_id = sig_id_of(src);
+                    let dst_sig_id = sig_id_of(dst);
+                    self.builder
+                        .expect_self_return_edge(src_sig_id, dst_sig_id, typ)
+                        .change_context(
+                            InterpreterError::BuilderError.with_span(return_sig_span),
+                        )?;
                 }
             }
         }
@@ -845,8 +872,26 @@ impl<'src, 'a, 'op_ctx, S: SemanticsWithCustomSyntax> FnInterpreter<'src, 'a, 'o
                         .return_node(aid, ret_name_str.into(), ret_ty.clone())
                         .change_context(InterpreterError::BuilderError.with_span(mapping_span))?;
                 }
-                ReturnStmtMapping::Edge { .. } => {
-                    todo!("Edge return mappings are not yet supported in the OperationBuilder");
+                ReturnStmtMapping::Edge { src, dst, edge_type } => {
+                    let src_aid = self
+                        .node_id_to_aid(src.0)
+                        .ok_or(report!(
+                            InterpreterError::NotFoundNodeId(format!("{:?}", src.0))
+                                .with_span(src.1)
+                        ))?;
+                    let dst_aid = self
+                        .node_id_to_aid(dst.0)
+                        .ok_or(report!(
+                            InterpreterError::NotFoundNodeId(format!("{:?}", dst.0))
+                                .with_span(dst.1)
+                        ))?;
+                    let edge_type = S::convert_edge_type(edge_type.0.clone()).ok_or(report!(
+                        InterpreterError::InvalidType(format!("{:?}", edge_type.0))
+                            .with_span(edge_type.1)
+                    ))?;
+                    self.builder
+                        .return_edge(src_aid, dst_aid, edge_type)
+                        .change_context(InterpreterError::BuilderError.with_span(mapping_span))?;
                 }
             }
         }

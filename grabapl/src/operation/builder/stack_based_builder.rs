@@ -1186,7 +1186,12 @@ impl<'a, S: Semantics> BuilderData<'a, S> {
                     .new_nodes
                     .insert(output_marker, av);
             }
-            // TODO: support SelfReturnEdge
+            BI::SelfReturnEdge(src, dst, av) => {
+                self.expected_self_signature
+                    .output
+                    .new_edges
+                    .insert((src, dst), av);
+            }
             _ => {
                 // do nothing
                 let _ = instruction_opt.insert(instruction);
@@ -1348,7 +1353,12 @@ impl<'a, S: Semantics> Builder<'a, S> {
         // validate the operation against the expected self signature
         if op.signature.output.new_nodes != expected_signature.output.new_nodes {
             bail!(OperationBuilderError::Oneoff(
-                "operation signature does not match stated signature"
+                "operation signature does not match stated signature: different returned nodes"
+            ));
+        }
+        if op.signature.output.new_edges != expected_signature.output.new_edges {
+            bail!(OperationBuilderError::Oneoff(
+                "operation signature does not match stated signature: different returned edges"
             ));
         }
 
@@ -1892,7 +1902,8 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
 
     /// Asserts that the operation being built will return a node with the given marker and abstract value.
     ///
-    /// [`OperationBuilder::build`] will fail if the operation does not return a node with the given marker.
+    /// [`OperationBuilder::build`] will fail if the operation does not return a node with the given marker
+    /// and abstract value.
     pub fn expect_self_return_node(
         &mut self,
         output_marker: impl Into<AbstractOutputNodeMarker>,
@@ -1902,6 +1913,20 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
             output_marker.into(),
             node,
         ))
+    }
+
+    /// Asserts that the operation being built will return an edge between the given source and target nodes
+    /// with the given abstract value.
+    ///
+    /// [`OperationBuilder::build`] will fail if the operation does not return an edge with the given source and target nodes
+    /// and abstract value.
+    pub fn expect_self_return_edge(
+        &mut self,
+        src: impl Into<AbstractSignatureNodeId>,
+        dst: impl Into<AbstractSignatureNodeId>,
+        edge: S::EdgeAbstract,
+    ) -> Result<(), OperationBuilderError> {
+        self.push_instruction(BuilderInstruction::SelfReturnEdge(src.into(), dst.into(), edge))
     }
 
     /// Adds a diverge operation at the current point that crashes with the given message.
