@@ -72,9 +72,7 @@ use crate::operation::user_defined::{
     AbstractUserDefinedOperationOutput, NamedMarker, OpLikeInstruction, QueryInstructions,
     UserDefinedOperation,
 };
-use crate::operation::{
-    Operation, OperationError, OperationResult, get_substitution,
-};
+use crate::operation::{Operation, OperationError, OperationResult, get_substitution};
 use crate::prelude::*;
 use crate::semantics::{AbstractGraph, AbstractMatcher};
 use crate::util::bimap::BiMap;
@@ -264,8 +262,15 @@ impl<S: Semantics> BuilderInstruction<S> {
     /// instructions.
     fn can_break_body(&self) -> bool {
         use BuilderInstruction::*;
-        matches!(self, EnterTrueBranch | EnterFalseBranch | EndQuery | ReturnNode(..) | ReturnEdge(..)
-            | Finalize)
+        matches!(
+            self,
+            EnterTrueBranch
+                | EnterFalseBranch
+                | EndQuery
+                | ReturnNode(..)
+                | ReturnEdge(..)
+                | Finalize
+        )
     }
 }
 
@@ -290,16 +295,10 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Build
             }
             SkipMarker(marker) => SkipMarker(*marker),
             SkipAllMarkers => SkipAllMarkers,
-            AddNamedOperation(name, op, args) => {
-                AddNamedOperation(*name, op.clone(), args.clone())
-            }
-            AddBangOperation(name, op, args) => {
-                AddBangOperation(*name, op.clone(), args.clone())
-            }
+            AddNamedOperation(name, op, args) => AddNamedOperation(*name, op.clone(), args.clone()),
+            AddBangOperation(name, op, args) => AddBangOperation(*name, op.clone(), args.clone()),
             AddOperation(op, args) => AddOperation(op.clone(), args.clone()),
-            ReturnNode(aid, output_marker, node) => {
-                ReturnNode(*aid, *output_marker, node.clone())
-            }
+            ReturnNode(aid, output_marker, node) => ReturnNode(*aid, *output_marker, node.clone()),
             ReturnEdge(src, dst, edge) => ReturnEdge(*src, *dst, edge.clone()),
             RenameNode(old_aid, new_name) => RenameNode(*old_aid, *new_name),
             Finalize => Finalize,
@@ -1366,9 +1365,7 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                 BuilderInstruction::ReturnNode(aid, output_marker, node) => {
                     iter.next();
                     if return_nodes.contains_key(aid) {
-                        bail!(OperationBuilderError::AlreadySelectedReturnNode(
-                            *aid,
-                        ));
+                        bail!(OperationBuilderError::AlreadySelectedReturnNode(*aid,));
                     }
                     return_nodes.insert(*aid, (*output_marker, node.clone()));
                 }
@@ -1376,8 +1373,7 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     iter.next();
                     if return_edges.contains_key(&(*source, *target)) {
                         bail!(OperationBuilderError::AlreadySelectedReturnEdge(
-                            *source,
-                            *target,
+                            *source, *target,
                         ));
                     }
                     return_edges.insert((*source, *target), edge.clone());
@@ -2228,8 +2224,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                 .current_state
                 .edge_av_of_aid(&source_aid, &target_aid)
                 .ok_or(OperationBuilderError::NotFoundReturnEdge(
-                    source_aid,
-                    target_aid,
+                    source_aid, target_aid,
                 ))?;
             if !S::EdgeMatcher::matches(inferred_edge_av, &edge_abstract) {
                 bail!(OperationBuilderError::InvalidReturnEdgeType(
@@ -2660,11 +2655,8 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
 
                     // now update the state for the true branch.
                     let state_key = self.current_state.graph.add_node(av);
-                    let aid =
-                        AbstractNodeId::DynamicOutputMarker(gsq_op_marker, marker);
-                    self.current_state
-                        .node_keys_to_aid
-                        .insert(state_key, aid);
+                    let aid = AbstractNodeId::DynamicOutputMarker(gsq_op_marker, marker);
+                    self.current_state.node_keys_to_aid.insert(state_key, aid);
                     self.current_state
                         .node_may_originate_from_shape_query
                         .insert(aid);
@@ -2905,11 +2897,8 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
 
                     // now update the state for the true branch.
                     let state_key = self.current_state.graph.add_node(av);
-                    let aid =
-                        AbstractNodeId::DynamicOutputMarker(gsq_op_marker, marker);
-                    self.current_state
-                        .node_keys_to_aid
-                        .insert(state_key, aid);
+                    let aid = AbstractNodeId::DynamicOutputMarker(gsq_op_marker, marker);
+                    self.current_state.node_keys_to_aid.insert(state_key, aid);
                     self.current_state
                         .node_may_originate_from_shape_query
                         .insert(aid);
@@ -3041,9 +3030,7 @@ fn get_state_for_path<S: Semantics>(
                     }
                     IntermediateStatePath::EnterTrue | IntermediateStatePath::EnterFalse => {
                         // this should not happen
-                        panic!(
-                            "internal error: unexpected path element: {path_element:?}"
-                        );
+                        panic!("internal error: unexpected path element: {path_element:?}");
                     }
                     IntermediateStatePath::StartQuery(..) => {
                         if let InterpretedInstruction::Query(query_instructions) =

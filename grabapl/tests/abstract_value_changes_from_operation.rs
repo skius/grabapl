@@ -1,7 +1,7 @@
 use grabapl::operation::builder::{BuilderOpLike, OperationBuilder, stack_based_builder};
 use grabapl::operation::builtin::LibBuiltinOperation;
-use grabapl::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
 use grabapl::operation::run_from_concrete;
+use grabapl::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
 use grabapl::prelude::*;
 use grabapl::semantics::ConcreteGraph;
 use std::collections::{HashMap, HashSet};
