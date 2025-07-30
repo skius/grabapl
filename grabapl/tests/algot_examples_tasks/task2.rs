@@ -1,6 +1,5 @@
 use super::semantics::*;
 use grabapl::graph::GraphTrait;
-use grabapl::operation::signature::parameter::AbstractOutputNodeMarker;
 use grabapl::prelude::*;
 use proptest::proptest;
 use proptest::test_runner::Config;

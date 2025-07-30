@@ -3,7 +3,6 @@
 use std::collections::HashSet;
 use std::fmt::Debug;
 use petgraph::dot::{Config, Dot};
-use petgraph::visit::NodeIndexable;
 use crate::prelude::{AbstractNodeId, ConcreteGraph};
 use crate::{NodeKey, Semantics};
 use crate::graph::dot::DotCollector;

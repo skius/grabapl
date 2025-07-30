@@ -14,7 +14,6 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 use crate::operation::trace::Trace;
-use crate::operation::user_defined::AbstractOperationResultMarker;
 // TODO: rename/move these structs and file. 'pattern.rs' is an outdated term.
 // renamed.
 

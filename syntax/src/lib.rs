@@ -9,7 +9,6 @@ use custom_syntax::{CustomSyntax, SemanticsWithCustomSyntax};
 use grabapl::operation::marker::SkipMarkers;
 use grabapl::prelude::{OperationContext, OperationId};
 use std::collections::{HashMap, HashSet};
-use std::error::Error;
 use std::fmt;
 use std::fmt::{Debug, Display};
 use std::io::BufWriter;

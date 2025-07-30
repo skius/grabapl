@@ -1,13 +1,10 @@
 mod util;
 
-use grabapl::operation::builder::{BuilderOpLike, OperationBuilder};
 use grabapl::operation::run_from_concrete;
-use grabapl::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
 use grabapl::prelude::*;
 use grabapl::semantics::example_with_ref::{ExampleWithRefSemantics, NodeValue};
 use proptest::proptest;
 use proptest::test_runner::Config;
-use std::cmp::Ordering::Greater;
 syntax::grabapl_defs!(get_ops, ExampleWithRefSemantics,
 // Better bubble sort implementation
 /*

@@ -58,7 +58,7 @@ pub mod ffi {
     use super::RustIntermediateState;
     use super::RustOperationBuilder;
     use super::RustOperationContext;
-    use super::TheSemantics;
+    
     use super::{OperationId, RustConcreteGraph};
     use error_stack::fmt::ColorMode;
     use grabapl::NodeKey;

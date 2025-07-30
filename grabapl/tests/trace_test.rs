@@ -1,6 +1,5 @@
 mod util;
 
-use grabapl::graph::dot::DotCollector;
 use grabapl::prelude::{run_from_concrete, ConcreteGraph};
 use syntax::grabapl_defs;
 use util::semantics::*;

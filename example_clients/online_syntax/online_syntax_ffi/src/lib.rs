@@ -52,12 +52,12 @@ pub mod ffi {
     use super::NodeValue;
     use grabapl::NodeKey;
     use grabapl::graph::GraphTrait;
-    use grabapl::prelude::{AbstractNodeId, OperationId};
+    use grabapl::prelude::{OperationId};
     use grabapl_template_semantics::EdgeValue;
     use std::collections::HashMap;
     use std::fmt::Write;
     use std::result::Result;
-    use grabapl::operation::user_defined::AbstractOperationResultMarker;
+    
     use syntax::WithLineColSpans;
 
     pub struct Context {

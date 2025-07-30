@@ -1,5 +1,4 @@
 use grabapl::graph::GraphTrait;
-use grabapl::operation::signature::parameter::AbstractOutputNodeMarker;
 use grabapl::prelude::{ConcreteGraph, run_from_concrete};
 use grabapl::semantics::example::{ExampleSemantics as TestSemantics, NodeValue};
 use grabapl::{NodeKey, Semantics};

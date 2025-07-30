@@ -6,7 +6,6 @@ use chumsky::error::Rich;
 use chumsky::input::ValueInput;
 use chumsky::{Parser, extra};
 use grabapl::Semantics;
-use std::fmt;
 use std::fmt::Debug;
 
 pub trait CustomSyntax: Clone + Debug + 'static {

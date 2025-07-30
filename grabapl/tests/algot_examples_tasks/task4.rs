@@ -4,7 +4,6 @@
 //! f uses an auxiliary function aux.
 
 use crate::util::semantics::*;
-use grabapl::prelude::*;
 use syntax::grabapl_defs;
 
 grabapl_defs!(get_ops, TestSemantics,
