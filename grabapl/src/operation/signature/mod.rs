@@ -55,8 +55,8 @@ pub struct OperationSignature<S: Semantics> {
 
 impl<S: Semantics> PartialEq for OperationSignature<S> {
     fn eq(&self, other: &Self) -> bool {
-        (self.name == other.name || true) // todo: define if equality is a requirement for names
-            && self.parameter == other.parameter
+        // (self.name == other.name || true) && // todo: define if equality is a requirement for names
+            self.parameter == other.parameter
             && self.output.is_subtype_of(&other.output)
     }
 }
@@ -136,6 +136,12 @@ impl<S: Semantics> Clone for AbstractOutputChanges<S> {
             maybe_deleted_nodes: self.maybe_deleted_nodes.clone(),
             maybe_deleted_edges: self.maybe_deleted_edges.clone(),
         }
+    }
+}
+
+impl<S: Semantics> Default for AbstractOutputChanges<S> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -239,8 +245,8 @@ impl<S: Semantics> AbstractOutputChanges<S> {
         // handle new nodes
         for (name, av) in &self.new_nodes {
             let nnm = g.new_node_marker();
-            g.add_node(nnm.clone(), av.clone());
-            output_names.insert(nnm, name.clone());
+            g.add_node(nnm, av.clone());
+            output_names.insert(nnm, *name);
         }
 
         let sig_id_to_node_marker = |sig_id: AbstractSignatureNodeId| {
