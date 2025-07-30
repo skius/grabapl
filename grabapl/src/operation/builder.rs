@@ -374,9 +374,15 @@ pub enum OperationBuilderError {
     CannotRenameParameterNode(AbstractNodeId),
     #[error("Invalid parameter")]
     InvalidParameter,
-    // just for testing of the explicit stack-based builder
-    #[error("New builder error")]
-    NewBuilderError,
+    #[error("Unexpected instruction")]
+    UnexpectedInstruction,
+    #[error("Failed to build operation parameter")]
+    ParameterBuildError,
+    // TODO: maybe have enum variants for these
+    #[error("{0}")]
+    Oneoff(&'static str),
+    #[error("Shape node already exists: {}", _0.0)]
+    ShapeNodeAlreadyExists(ShapeNodeIdentifier)
 }
 
 // type alias to switch between implementations globally

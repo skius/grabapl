@@ -37,7 +37,7 @@ pub struct ConcreteQueryOutput {
 
 #[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, From, Into)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct ShapeNodeIdentifier(InternString);
+pub struct ShapeNodeIdentifier(pub InternString);
 interned_string_newtype!(ShapeNodeIdentifier);
 
 #[cfg_attr(

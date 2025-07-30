@@ -30,30 +30,19 @@ use error_stack::Result;
 
 macro_rules! bail_unexpected_instruction {
     ($i:expr, $i_opt:expr, $frame:literal) => {
-        let err = Err(report!(BuilderError::UnexpectedInstruction))
+        let err = Err(report!(OperationBuilderError::UnexpectedInstruction))
             .attach_printable_lazy(|| format!("Unexpected instruction in {}: {:?}", $frame, $i));
         let _ = $i_opt.insert($i);
         return err;
     };
 }
 
-// TODO: turn this into a struct with a boolean `recoverable`.
+// TODO: turn the error type into a struct with a boolean `recoverable`.
 //  That field would indicate whether the error can be recovered from by pushing more instructions or not.
 //  For example, an incomplete parameter graph (i.e., disconnected context nodes) would have that flag set.
 //  Then, in the builder's push_instruction method, we would only "best-effort-continue" if the error is recoverable.
 //  Actually - does that make sense? The frames don't know we're pushing arbitrary "Finalize" instructions
 //  just to get a partial operation. But it might work anyway.
-#[derive(Debug, Error)]
-pub enum BuilderError {
-    #[error("Unexpected instruction")]
-    UnexpectedInstruction,
-    #[error("Failed to build operation parameter")]
-    ParameterBuildError,
-    #[error("Failed with outer error")]
-    OutsideError,
-    #[error("todo: {0}")]
-    NeedsSpecificVariant(&'static str),
-}
 
 struct BuildingParameterFrame<S: Semantics> {
     parameter_builder: OperationParameterBuilder<S>,
@@ -79,7 +68,7 @@ impl<S: Semantics> BuildingParameterFrame<S> {
     fn consume(
         builder: &mut Builder<S>,
         instruction_opt: &mut Option<BuilderInstruction<S>>,
-    ) -> Result<(), BuilderError> {
+    ) -> Result<(), OperationBuilderError> {
         use BuilderInstruction as BI;
 
         let this: &mut BuildingParameterFrame<S> = builder.stack.expect_mut();
@@ -90,17 +79,17 @@ impl<S: Semantics> BuildingParameterFrame<S> {
             BI::ExpectParameterNode(marker, av) => {
                 this.parameter_builder
                     .expect_explicit_input_node(marker, av)
-                    .change_context(BuilderError::ParameterBuildError)?;
+                    .change_context(OperationBuilderError::ParameterBuildError)?;
             }
             BI::ExpectContextNode(marker, av) => {
                 this.parameter_builder
                     .expect_context_node(marker, av)
-                    .change_context(BuilderError::ParameterBuildError)?;
+                    .change_context(OperationBuilderError::ParameterBuildError)?;
             }
             BI::ExpectParameterEdge(src, dst, edge) => {
                 this.parameter_builder
                     .expect_edge(src, dst, edge)
-                    .change_context(BuilderError::ParameterBuildError)?;
+                    .change_context(OperationBuilderError::ParameterBuildError)?;
             }
             _ => {
                 // The user has decided that they're done building the parameter by sending a different instruction
@@ -111,10 +100,10 @@ impl<S: Semantics> BuildingParameterFrame<S> {
                 let parameter = this
                     .parameter_builder
                     .build()
-                    .change_context(BuilderError::ParameterBuildError)?;
+                    .change_context(OperationBuilderError::ParameterBuildError)?;
                 parameter
                     .check_validity()
-                    .change_context(BuilderError::ParameterBuildError)?;
+                    .change_context(OperationBuilderError::ParameterBuildError)?;
                 let frame = CollectingInstructionsFrame::from_param(&parameter);
                 builder.data.built.parameter = Some(parameter.clone());
                 builder.data.expected_self_signature.parameter = parameter.clone();
@@ -160,7 +149,7 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
     pub fn consume(
         builder: &mut Builder<S>,
         instruction_opt: &mut Option<BuilderInstruction<S>>,
-    ) -> Result<(), BuilderError> {
+    ) -> Result<(), OperationBuilderError> {
         use BuilderInstruction as BI;
 
         let this: &mut CollectingInstructionsFrame<S> = builder.stack.expect_mut();
@@ -185,7 +174,7 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
                 )?;
 
                 if created_aids.len() != 1 {
-                    bail!(BuilderError::NeedsSpecificVariant(
+                    bail!(OperationBuilderError::Oneoff(
                         "bang operations must create exactly one node"
                     ));
                 }
@@ -213,14 +202,11 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
             BI::RenameNode(old_aid, new_name) => {
                 // don't allow renaming ParameterMarker nodes
                 if let AbstractNodeId::ParameterMarker(_) = old_aid {
-                    bail!(BuilderError::NeedsSpecificVariant(
-                        "cannot rename parameter"
-                    ));
+                    bail!(OperationBuilderError::CannotRenameParameterNode(old_aid));
                 }
                 let new_aid = AbstractNodeId::named(new_name);
                 this.current_state
-                    .rename_aid(old_aid, new_aid)
-                    .change_context(BuilderError::OutsideError)?;
+                    .rename_aid(old_aid, new_aid)?;
 
                 this.instructions.push((
                     None,
@@ -269,14 +255,12 @@ impl<S: Semantics> CollectingInstructionsFrame<S> {
         output_name: Option<AbstractOperationResultMarker>,
         op_like: BuilderOpLike<S>,
         args: Vec<AbstractNodeId>,
-    ) -> Result<Vec<AbstractNodeId>, BuilderError> {
+    ) -> Result<Vec<AbstractNodeId>, OperationBuilderError> {
         let op = op_like
-            .as_abstract_operation(builder_data.op_ctx, &builder_data.expected_self_signature)
-            .change_context(BuilderError::OutsideError)?;
+            .as_abstract_operation(builder_data.op_ctx, &builder_data.expected_self_signature)?;
         let (abstract_arg, output_res) = self
             .current_state
-            .interpret_op(builder_data.op_ctx, output_name, op, args)
-            .change_context(BuilderError::OutsideError)?;
+            .interpret_op(builder_data.op_ctx, output_name, op, args)?;
 
         let op_like_instr = op_like.into_op_like_instruction(builder_data.self_op_id);
 
@@ -331,7 +315,7 @@ impl<S: Semantics> BranchesFrame<S> {
     pub fn consume(
         builder: &mut Builder<S>,
         instruction_opt: &mut Option<BuilderInstruction<S>>,
-    ) -> Result<(), BuilderError> {
+    ) -> Result<(), OperationBuilderError> {
         use BuilderInstruction as BI;
 
         let this: &mut BranchesFrame<S> = builder.stack.expect_mut();
@@ -360,9 +344,7 @@ impl<S: Semantics> BranchesFrame<S> {
         match instruction {
             BI::EnterTrueBranch => {
                 if this.true_branch.is_some() {
-                    bail!(BuilderError::NeedsSpecificVariant(
-                        "true branch already entered"
-                    ));
+                    bail!(OperationBuilderError::AlreadyVisitedBranch(true));
                 }
                 // We enter the true branch
                 let true_frame =
@@ -372,9 +354,7 @@ impl<S: Semantics> BranchesFrame<S> {
             }
             BI::EnterFalseBranch => {
                 if this.false_branch.is_some() {
-                    bail!(BuilderError::NeedsSpecificVariant(
-                        "false branch already entered"
-                    ));
+                    bail!(OperationBuilderError::AlreadyVisitedBranch(false));
                 }
                 // We enter the false branch
                 let false_frame = CollectingInstructionsFrame::from_state(
@@ -401,7 +381,7 @@ impl<S: Semantics> BranchesFrame<S> {
         self,
         default_true_state: &IntermediateState<S>,
         default_false_state: &IntermediateState<S>,
-    ) -> Result<(IntermediateState<S>, QueryInstructions<S>), BuilderError> {
+    ) -> Result<(IntermediateState<S>, QueryInstructions<S>), OperationBuilderError> {
         let true_branch_state_ref = self
             .true_branch
             .as_ref()
@@ -460,7 +440,7 @@ impl<S: Semantics> QueryFrame<S> {
     pub fn new(
         outer_state: &IntermediateState<S>,
         instruction: BuilderInstruction<S>,
-    ) -> Result<(Self, BranchesFrame<S>), BuilderError> {
+    ) -> Result<(Self, BranchesFrame<S>), OperationBuilderError> {
         use BuilderInstruction as BI;
 
         match instruction {
@@ -469,8 +449,7 @@ impl<S: Semantics> QueryFrame<S> {
                 // TODO: decide if queries should be allowed to modify the state.
                 //  (maybe they should even be allowed to provide different states on true and false?)
                 let abstract_arg = before_branches_state
-                    .interpret_builtin_query(&query, args)
-                    .change_context(BuilderError::OutsideError)?;
+                    .interpret_builtin_query(&query, args)?;
 
                 let frame = QueryFrame {
                     query,
@@ -485,7 +464,7 @@ impl<S: Semantics> QueryFrame<S> {
 
                 Ok((frame, branches_frame))
             }
-            _ => Err(report!(BuilderError::UnexpectedInstruction))
+            _ => Err(report!(OperationBuilderError::UnexpectedInstruction))
                 .attach_printable_lazy(|| format!("Expected StartQuery, got: {:?}", instruction)),
         }
     }
@@ -493,7 +472,7 @@ impl<S: Semantics> QueryFrame<S> {
     pub fn consume(
         builder: &mut Builder<S>,
         instruction_opt: &mut Option<BuilderInstruction<S>>,
-    ) -> Result<(), BuilderError> {
+    ) -> Result<(), OperationBuilderError> {
         use BuilderInstruction as BI;
 
         let instruction = instruction_opt.take().unwrap();
@@ -514,7 +493,7 @@ impl<S: Semantics> QueryFrame<S> {
         Ok(())
     }
 
-    fn handle_query_end(self, builder: &mut Builder<S>) -> Result<(), BuilderError> {
+    fn handle_query_end(self, builder: &mut Builder<S>) -> Result<(), OperationBuilderError> {
         // we need to handle everything that happens at the end of a query frame - i.e., merging states
         let branches_frame: BranchesFrame<S> = builder.return_stack.expect_pop();
 
@@ -559,7 +538,7 @@ impl<S: Semantics> WrapperReturnFrame<S> {
     pub fn consume(
         builder: &mut Builder<S>,
         instruction_opt: &mut Option<BuilderInstruction<S>>,
-    ) -> Result<(), BuilderError> {
+    ) -> Result<(), OperationBuilderError> {
         let _: WrapperReturnFrame<S> = builder.stack.expect_pop();
         // We need to create the ReturnFrame from the current state and the return stack.
         let instr_frame: CollectingInstructionsFrame<S> = builder.return_stack.expect_pop();
@@ -608,7 +587,7 @@ impl<S: Semantics> ReturnFrame<S> {
     pub fn consume(
         builder: &mut Builder<S>,
         instruction_opt: &mut Option<BuilderInstruction<S>>,
-    ) -> Result<(), BuilderError> {
+    ) -> Result<(), OperationBuilderError> {
         use BuilderInstruction as BI;
 
         let this: &mut ReturnFrame<S> = builder.stack.expect_mut();
@@ -645,19 +624,15 @@ impl<S: Semantics> ReturnFrame<S> {
         output_marker: AbstractOutputNodeMarker,
         av: S::NodeAbstract,
         data: &BuilderData<S>,
-    ) -> Result<(), BuilderError> {
+    ) -> Result<(), OperationBuilderError> {
         if let AbstractNodeId::ParameterMarker(_) = aid {
-            bail!(BuilderError::NeedsSpecificVariant(
-                "cannot return parameter node"
-            ));
+            bail!(OperationBuilderError::CannotReturnParameter(aid));
         }
         if !self.last_state().contains_aid(&aid) {
-            bail!(BuilderError::NeedsSpecificVariant("aid not found"));
+            bail!(OperationBuilderError::NotFoundAid(aid));
         }
         if self.get_return_node_marker(&aid).is_some() {
-            bail!(BuilderError::NeedsSpecificVariant(
-                "return node already exists"
-            ));
+            bail!(OperationBuilderError::Oneoff("already returned this return node"));
         }
         // if we have already asserted that we return a node with this marker, it must be the same type.
         if let Some(expected_av) = data
@@ -667,8 +642,8 @@ impl<S: Semantics> ReturnFrame<S> {
             .get(&output_marker)
         {
             if expected_av != &av {
-                bail!(BuilderError::NeedsSpecificVariant(
-                    "trying to return node with type different from expected return type"
+                bail!(OperationBuilderError::Oneoff(
+                    "trying to return node with type different from stated return type"
                 ));
             }
         }
@@ -676,9 +651,7 @@ impl<S: Semantics> ReturnFrame<S> {
         // if the user wants to return the node as an `av`, `av` must be a supertype of the inferred type
         let inferred_av = self.last_state().node_av_of_aid(&aid).unwrap();
         if !S::NodeMatcher::matches(inferred_av, &av) {
-            bail!(BuilderError::NeedsSpecificVariant(
-                "cannot return node with incompatible abstract value"
-            ));
+            bail!(OperationBuilderError::InvalidReturnNodeType(aid));
         }
         // TODO: I think we can comment this and actually allow returning nodes that originate from a shape query.
         //  Reason: an invariant of the abstract graph is that there is at most one abstract handle to any given node at any point.
@@ -705,20 +678,20 @@ impl<S: Semantics> ReturnFrame<S> {
         dst: AbstractNodeId,
         av: S::EdgeAbstract,
         data: &BuilderData<S>,
-    ) -> Result<(), BuilderError> {
+    ) -> Result<(), OperationBuilderError> {
         if !self.last_state().contains_edge(&src, &dst) {
-            bail!(BuilderError::NeedsSpecificVariant("edge not found"));
+            bail!(OperationBuilderError::NotFoundReturnEdge(src, dst));
         }
         if self.return_edges.contains(&(src, dst)) {
-            bail!(BuilderError::NeedsSpecificVariant(
-                "return edge already exists"
+            bail!(OperationBuilderError::Oneoff(
+                "already returned this edge"
             ));
         }
         if !self.last_state().contains_aid(&src) {
-            bail!(BuilderError::NeedsSpecificVariant("src aid not found"));
+            bail!(OperationBuilderError::NotFoundReturnEdgeSource(src));
         }
         if !self.last_state().contains_aid(&dst) {
-            bail!(BuilderError::NeedsSpecificVariant("dst aid not found"));
+            bail!(OperationBuilderError::NotFoundReturnEdgeTarget(dst));
         }
 
         let src_sig_id = self
@@ -736,8 +709,8 @@ impl<S: Semantics> ReturnFrame<S> {
             .get(&(src_sig_id, dst_sig_id))
         {
             if expected_av != &av {
-                bail!(BuilderError::NeedsSpecificVariant(
-                    "trying to return edge with type different from expected return type"
+                bail!(OperationBuilderError::Oneoff(
+                    "trying to return edge with type different from stated return type"
                 ));
             }
         }
@@ -745,9 +718,7 @@ impl<S: Semantics> ReturnFrame<S> {
         // if the user wants to return the edge as an `av`, `av` must be a supertype of the inferred type
         let inferred_av = self.last_state().edge_av_of_aid(&src, &dst).unwrap();
         if !S::EdgeMatcher::matches(inferred_av, &av) {
-            bail!(BuilderError::NeedsSpecificVariant(
-                "cannot return edge with incompatible abstract value"
-            ));
+            bail!(OperationBuilderError::InvalidReturnEdgeType(src, dst));
         }
         // TODO: remove this check. see the comment in `include_return_node`.
         // if self
@@ -769,13 +740,13 @@ impl<S: Semantics> ReturnFrame<S> {
         Ok(())
     }
 
-    fn aid_to_sig_id(&self, aid: &AbstractNodeId) -> Result<AbstractSignatureNodeId, BuilderError> {
+    fn aid_to_sig_id(&self, aid: &AbstractNodeId) -> Result<AbstractSignatureNodeId, OperationBuilderError> {
         match *aid {
             AbstractNodeId::ParameterMarker(s) => Ok(AbstractSignatureNodeId::ExistingNode(s)),
             AbstractNodeId::DynamicOutputMarker(_, _) | AbstractNodeId::Named(..) => {
                 // we must be returning this node if we want to return an incident edge.
                 let Some(output_marker) = self.get_return_node_marker(aid) else {
-                    bail!(BuilderError::NeedsSpecificVariant("node not returned"));
+                    bail!(OperationBuilderError::NotFoundReturnNode(*aid));
                 };
                 Ok(AbstractSignatureNodeId::NewNode(output_marker.clone()))
             }
@@ -839,7 +810,7 @@ impl<S: Semantics> BuildingShapeQueryFrame<S> {
     pub fn consume(
         builder: &mut Builder<S>,
         instruction_opt: &mut Option<BuilderInstruction<S>>,
-    ) -> Result<(), BuilderError> {
+    ) -> Result<(), OperationBuilderError> {
         use BuilderInstruction as BI;
 
         let this: &mut BuildingShapeQueryFrame<S> = builder.stack.expect_mut();
@@ -851,24 +822,20 @@ impl<S: Semantics> BuildingShapeQueryFrame<S> {
                 let sni: ShapeNodeIdentifier = marker.0.into();
                 // return error if we already encountered this key before
                 if this.gsq_node_keys_to_shape_idents.contains_right(&sni) {
-                    bail!(BuilderError::NeedsSpecificVariant(
-                        "shape node already exists"
-                    ));
+                    bail!(OperationBuilderError::ShapeNodeAlreadyExists(sni));
                 }
 
                 this.true_branch_state.add_node(aid, av, true);
                 this.gsq_node_keys_to_shape_idents
-                    .insert(this.true_branch_state.get_key_from_aid(&aid).unwrap(), sni);
+                    .insert(this.true_branch_state.get_key_from_aid(&aid)?, sni);
             }
             BI::ExpectShapeNodeChange(aid, new_av) => {
                 this.true_branch_state
-                    .set_node_av(aid, new_av)
-                    .change_context(BuilderError::OutsideError)?;
+                    .set_node_av(aid, new_av)?;
             }
             BI::ExpectShapeEdge(src, dst, edge) => {
                 this.true_branch_state
-                    .add_edge(src, dst, edge, true)
-                    .change_context(BuilderError::OutsideError)?;
+                    .add_edge(src, dst, edge, true)?;
             }
             BI::SkipMarker(marker) => {
                 this.skip_markers.skip(marker);
@@ -901,7 +868,7 @@ impl<S: Semantics> BuildingShapeQueryFrame<S> {
     fn into_built_shape_query_frame(
         self,
         builder: &mut Builder<S>,
-    ) -> Result<(BuiltShapeQueryFrame<S>, BranchesFrame<S>), BuilderError> {
+    ) -> Result<(BuiltShapeQueryFrame<S>, BranchesFrame<S>), OperationBuilderError> {
         // We build the parameter and the initial state
 
         // TODO: check validity, i.e., no free floating shape nodes, etc.
@@ -969,7 +936,7 @@ impl<S: Semantics> BuiltShapeQueryFrame<S> {
     pub fn consume(
         builder: &mut Builder<S>,
         instruction_opt: &mut Option<BuilderInstruction<S>>,
-    ) -> Result<(), BuilderError> {
+    ) -> Result<(), OperationBuilderError> {
         use BuilderInstruction as BI;
 
         let instruction = instruction_opt.take().unwrap();
@@ -987,7 +954,7 @@ impl<S: Semantics> BuiltShapeQueryFrame<S> {
         Ok(())
     }
 
-    fn handle_shape_query_end(self, builder: &mut Builder<S>) -> Result<(), BuilderError> {
+    fn handle_shape_query_end(self, builder: &mut Builder<S>) -> Result<(), OperationBuilderError> {
         // we need to handle everything that happens at the end of a query frame - i.e., merging states
 
         let branches_frame: BranchesFrame<S> = builder.return_stack.expect_pop();
@@ -1215,7 +1182,7 @@ impl<'a, S: Semantics> BuilderData<'a, S> {
     pub fn consume_global(
         &mut self,
         instruction_opt: &mut Option<BuilderInstruction<S>>,
-    ) -> Result<(), BuilderError> {
+    ) -> Result<(), OperationBuilderError> {
         use BuilderInstruction as BI;
 
         let instruction = instruction_opt.take().unwrap();
@@ -1305,7 +1272,7 @@ impl<'a, S: Semantics> Builder<'a, S> {
         self.data.expected_self_signature.output = expected_self_output_changes;
     }
 
-    pub fn consume(&mut self, instruction: BuilderInstruction<S>) -> Result<(), BuilderError> {
+    pub fn consume(&mut self, instruction: BuilderInstruction<S>) -> Result<(), OperationBuilderError> {
         let mut instruction_opt = Some(instruction);
 
         // first check if we have a global instruction that needs to be consumed
@@ -1357,7 +1324,7 @@ impl<'a, S: Semantics> Builder<'a, S> {
     }
 
     /// Builds the current self output changes for purposes of restarting the builder with this new information.
-    fn build_partial_op(mut self) -> Result<AbstractOutputChanges<S>, BuilderError> {
+    fn build_partial_op(mut self) -> Result<AbstractOutputChanges<S>, OperationBuilderError> {
         // first, keep the expected changes
         let expected_self_signature = std::mem::replace(
             &mut self.data.expected_self_signature,
@@ -1376,7 +1343,7 @@ impl<'a, S: Semantics> Builder<'a, S> {
         Ok(merged_changes)
     }
 
-    fn build(mut self) -> Result<UserDefinedOperation<S>, BuilderError> {
+    fn build(mut self) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
         // first, keep the expected changes. these are not needed in build_unvalidated.
         // (ugly - should split the struct)
         let expected_signature = std::mem::replace(
@@ -1386,8 +1353,8 @@ impl<'a, S: Semantics> Builder<'a, S> {
         let op = self.build_unvalidated()?;
         // validate the operation against the expected self signature
         if op.signature.output.new_nodes != expected_signature.output.new_nodes {
-            bail!(BuilderError::NeedsSpecificVariant(
-                "operation signature does not match expected signature"
+            bail!(OperationBuilderError::Oneoff(
+                "operation signature does not match stated signature"
             ));
         }
 
@@ -1397,7 +1364,7 @@ impl<'a, S: Semantics> Builder<'a, S> {
     }
 
     /// Builds the current operation but does not perform any final validity checks.
-    fn build_unvalidated(mut self) -> Result<UserDefinedOperation<S>, BuilderError> {
+    fn build_unvalidated(mut self) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
         // this is a bit of a hack. it just works because all nested frames right now can be ended with Finalize.
         // we can 'define' the Finalize message to be just that, though.
         while self.stack.frames.len() > 1 {
@@ -1980,8 +1947,7 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
     /// Builds the user defined operation from the collected instructions.
     pub fn build(&mut self) -> Result<UserDefinedOperation<S>, OperationBuilderError> {
         // build on a clone
-        let res = self.active.clone().build();
-        res.change_context(OperationBuilderError::NewBuilderError)
+        self.active.clone().build()
     }
 
     fn push_instruction(
@@ -2002,7 +1968,7 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         let res = new_builder_stage_1.consume(instruction.clone());
         if res.is_err() {
             // We have not modified our state, so we can just early-exit.
-            return res.change_context(OperationBuilderError::NewBuilderError);
+            return res;
         }
         // we know that running the instruction once did not fail. However, in presence of recursion,
         // it may fail only once a prior recursive call 'sees' the new instruction.
@@ -2010,7 +1976,6 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         let new_builder_stage_1_before_build = new_builder_stage_1.clone();
         let new_output_changes = match new_builder_stage_1
             .build_partial_op()
-            .change_context(OperationBuilderError::NewBuilderError)
         {
             Ok(op) => op,
             Err(e) => {
@@ -2035,11 +2000,9 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         };
         // now that we have the new self op, let's try the instruction again.
         let mut new_builder_stage_2 = self
-            .build_builder_from_scratch_with_output_changes(new_output_changes)
-            .change_context(OperationBuilderError::NewBuilderError)?;
+            .build_builder_from_scratch_with_output_changes(new_output_changes)?;
         new_builder_stage_2
-            .consume(instruction.clone())
-            .change_context(OperationBuilderError::NewBuilderError)?;
+            .consume(instruction.clone())?;
         // TODO: add test that checks if maybe we change semantics by replaying all instructions with a different self op?
         // at this point we know the building worked, so we can safely update our active builder.
         // TODO: would be nice if we had an Eq constraint on BuiltinOperations, so that we could check that the result of building the stage 2 UDOp
@@ -2053,7 +2016,7 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
     fn build_builder_from_scratch_with_output_changes(
         &self,
         self_output_changes: AbstractOutputChanges<S>,
-    ) -> Result<Builder<'a, S>, BuilderError> {
+    ) -> Result<Builder<'a, S>, OperationBuilderError> {
         let mut builder = Builder::new(self.op_ctx, self.self_op_id);
         builder.update_expected_self_output_changes(self_output_changes);
         for instruction in &self.instructions {
@@ -2092,7 +2055,7 @@ impl<
             }
             BuilderShowData::ShapeQueryFrame(state) => Ok(state.clone()),
             BuilderShowData::ReturnFrame(state) => Ok(state.clone()),
-            BuilderShowData::Other(_) => Err(report!(OperationBuilderError::NewBuilderError))
+            BuilderShowData::Other(_) => Err(report!(OperationBuilderError::Oneoff("error showing state")))
                 .attach_printable_lazy(|| {
                     format!(
                         "Expected to receive data with intermediate state, got: {:?}",
@@ -2124,7 +2087,7 @@ impl<
 fn merge_abstract_output_changes<S: Semantics>(
     a: &AbstractOutputChanges<S>,
     b: &AbstractOutputChanges<S>,
-) -> Result<AbstractOutputChanges<S>, BuilderError> {
+) -> Result<AbstractOutputChanges<S>, OperationBuilderError> {
     let mut result = AbstractOutputChanges::new();
     // merge new nodes
     for (marker, av) in &a.new_nodes {
@@ -2141,8 +2104,8 @@ fn merge_abstract_output_changes<S: Semantics>(
 
             // if the marker already eixsts, it must be the same.
             if existing_av != av {
-                bail!(BuilderError::NeedsSpecificVariant(
-                    "Mismatch in expected and actual returned nodes",
+                bail!(OperationBuilderError::Oneoff(
+                    "Mismatch in stated return node type and actual returned node type",
                 ));
             }
         } else {
@@ -2165,8 +2128,8 @@ fn merge_abstract_output_changes<S: Semantics>(
 
             // if the edge already exists, it must be the same.
             if existing_av != av {
-                bail!(BuilderError::NeedsSpecificVariant(
-                    "Mismatch in expected and actual returned edges",
+                bail!(OperationBuilderError::Oneoff(
+                    "Mismatch in expected return edge type and actual returned edge type",
                 ));
             }
         } else {
@@ -2198,7 +2161,7 @@ fn merge_abstract_output_changes<S: Semantics>(
         if let Some(existing_av) = result.maybe_changed_nodes.get(marker) {
             // if the marker already exists, we join the AVs
             let joined_av =
-                S::NodeJoin::join(existing_av, av).ok_or(BuilderError::NeedsSpecificVariant(
+                S::NodeJoin::join(existing_av, av).ok_or(OperationBuilderError::Oneoff(
                     "Need to be able to join two different maybe_changed AVs",
                 ))?;
             result.maybe_changed_nodes.insert(*marker, joined_av);
@@ -2245,7 +2208,7 @@ fn merge_abstract_output_changes<S: Semantics>(
         if let Some(existing_av) = result.maybe_changed_edges.get(&(*src, *dst)) {
             // if the edge already exists, we join the AVs
             let joined_av =
-                S::EdgeJoin::join(existing_av, av).ok_or(BuilderError::NeedsSpecificVariant(
+                S::EdgeJoin::join(existing_av, av).ok_or(OperationBuilderError::Oneoff(
                     "Need to be able to join two different maybe_changed AVs",
                 ))?;
             result.maybe_changed_edges.insert((*src, *dst), joined_av);
