@@ -157,7 +157,7 @@ impl BuiltinQueryTrait for BuiltinQuery {
                 // ));
                 // TODO: how to handle this? probably not needed.
             }
-            BuiltinQuery::IsValueGt(val) => {
+            BuiltinQuery::IsValueGt(_val) => {
                 // No abstract changes if the value is equal, since our type system cannot represent exact values.
             }
             _ => {
@@ -462,7 +462,7 @@ impl grabapl::operation::BuiltinOperation for BuiltinOperation {
                 let dst = SubstMarker::from(Self::SET_EDGE_VALUE_INPUT_DST);
                 g.set_edge_value(src, dst, EdgePattern::Exact(val.clone()));
             }
-            BuiltinOperation::SetNodeValue(val) => {
+            BuiltinOperation::SetNodeValue(_val) => {
                 // Nothing happens abstractly. Dynamically values change, but the abstract graph stays.
             }
             BuiltinOperation::CopyNodeValueTo => {

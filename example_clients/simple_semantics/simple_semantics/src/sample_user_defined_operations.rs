@@ -215,7 +215,7 @@ pub fn get_count_list_len_user_defined_operation(
         .unwrap();
     param_builder.expect_explicit_input_node("acc", ()).unwrap();
     let param = param_builder.build().unwrap();
-    let mk_operation_instruction = |op_id: OperationId, args: Vec<AbstractNodeId>| {
+    let _mk_operation_instruction = |op_id: OperationId, args: Vec<AbstractNodeId>| {
         mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
     };
     let mk_self_operation_instruction = |args: Vec<AbstractNodeId>| {
@@ -291,7 +291,7 @@ pub fn get_insert_bst_user_defined_operation(
         .expect_explicit_input_node("value", ())
         .unwrap();
     let param = param_builder.build().unwrap();
-    let mk_operation_instruction = |op_id: OperationId, args: Vec<AbstractNodeId>| {
+    let _mk_operation_instruction = |op_id: OperationId, args: Vec<AbstractNodeId>| {
         mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
     };
     let mk_self_operation_instruction = |args: Vec<AbstractNodeId>| {
@@ -440,7 +440,7 @@ pub fn get_labeled_edges_insert_bst_user_defined_operation(
         .expect_explicit_input_node("value", ())
         .unwrap();
     let param = param_builder.build().unwrap();
-    let mk_operation_instruction = |op_id: OperationId, args: Vec<AbstractNodeId>| {
+    let _mk_operation_instruction = |op_id: OperationId, args: Vec<AbstractNodeId>| {
         mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
     };
     let mk_self_operation_instruction = |args: Vec<AbstractNodeId>| {
@@ -724,7 +724,7 @@ pub fn get_node_heights_user_defined_operation(
         .expect_explicit_input_node("root", ())
         .unwrap();
     let param = param_builder.build().unwrap();
-    let mk_operation_instruction = |op_id: OperationId, args: Vec<AbstractNodeId>| {
+    let _mk_operation_instruction = |op_id: OperationId, args: Vec<AbstractNodeId>| {
         mk_operation_instruction(op_id, &op_ctx.get(op_id).unwrap().parameter(), args)
     };
     let mk_self_operation_instruction = |args: Vec<AbstractNodeId>| {
