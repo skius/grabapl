@@ -10,9 +10,7 @@ Locally:
 
 For deployment:
 ```bash
-rm dist/* && npm run build
-rm ~/eth/msc-thesis/playground/grabapl-github-io/*
-cp dist/* ~/eth/msc-thesis/playground/grabapl-github-io/
+./build-demo-and-push.sh
 ```
 
 Then, in that repo, commit and push. (in gh-pages branch)
