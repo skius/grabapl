@@ -23,8 +23,11 @@ fn dfs_helper(curr: any, list: any) {
         // we found a child, so go down
         dfs_helper(child, list);
         trace();
-        // we found children, so repeat for other children of curr
-        // (but first forget child from our abstract state)
+        // we found children, so recurse to find other children of curr
+        // (this is the "visit all children" pattern which is used
+        //  in place of an explicit loop)
+        // but first forget child from our abstract state
+        // (this is optional. we do it to make the trace prettier)
         hide_node(child);
         dfs_helper(curr, list);
     }
