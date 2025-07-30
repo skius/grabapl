@@ -273,37 +273,37 @@ impl<S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>> Clone for Build
     fn clone(&self) -> Self {
         use BuilderInstruction::*;
         match self {
-            ExpectParameterNode(marker, node) => ExpectParameterNode(marker.clone(), node.clone()),
-            ExpectContextNode(marker, node) => ExpectContextNode(marker.clone(), node.clone()),
+            ExpectParameterNode(marker, node) => ExpectParameterNode(*marker, node.clone()),
+            ExpectContextNode(marker, node) => ExpectContextNode(*marker, node.clone()),
             ExpectParameterEdge(source_marker, target_marker, edge) => {
-                ExpectParameterEdge(source_marker.clone(), target_marker.clone(), edge.clone())
+                ExpectParameterEdge(*source_marker, *target_marker, edge.clone())
             }
             StartQuery(query, args) => StartQuery(query.clone(), args.clone()),
             EnterTrueBranch => EnterTrueBranch,
             EnterFalseBranch => EnterFalseBranch,
-            StartShapeQuery(op_marker) => StartShapeQuery(op_marker.clone()),
+            StartShapeQuery(op_marker) => StartShapeQuery(*op_marker),
             EndQuery => EndQuery,
-            ExpectShapeNode(marker, node) => ExpectShapeNode(marker.clone(), node.clone()),
-            ExpectShapeNodeChange(aid, node) => ExpectShapeNodeChange(aid.clone(), node.clone()),
+            ExpectShapeNode(marker, node) => ExpectShapeNode(*marker, node.clone()),
+            ExpectShapeNodeChange(aid, node) => ExpectShapeNodeChange(*aid, node.clone()),
             ExpectShapeEdge(source, target, edge) => {
-                ExpectShapeEdge(source.clone(), target.clone(), edge.clone())
+                ExpectShapeEdge(*source, *target, edge.clone())
             }
-            SkipMarker(marker) => SkipMarker(marker.clone()),
+            SkipMarker(marker) => SkipMarker(*marker),
             SkipAllMarkers => SkipAllMarkers,
             AddNamedOperation(name, op, args) => {
-                AddNamedOperation(name.clone(), op.clone(), args.clone())
+                AddNamedOperation(*name, op.clone(), args.clone())
             }
             AddBangOperation(name, op, args) => {
-                AddBangOperation(name.clone(), op.clone(), args.clone())
+                AddBangOperation(*name, op.clone(), args.clone())
             }
             AddOperation(op, args) => AddOperation(op.clone(), args.clone()),
             ReturnNode(aid, output_marker, node) => {
-                ReturnNode(aid.clone(), output_marker.clone(), node.clone())
+                ReturnNode(*aid, *output_marker, node.clone())
             }
-            ReturnEdge(src, dst, edge) => ReturnEdge(src.clone(), dst.clone(), edge.clone()),
-            RenameNode(old_aid, new_name) => RenameNode(old_aid.clone(), new_name.clone()),
+            ReturnEdge(src, dst, edge) => ReturnEdge(*src, *dst, edge.clone()),
+            RenameNode(old_aid, new_name) => RenameNode(*old_aid, *new_name),
             Finalize => Finalize,
-            SelfReturnNode(marker, node) => SelfReturnNode(marker.clone(), node.clone()),
+            SelfReturnNode(marker, node) => SelfReturnNode(*marker, node.clone()),
             Diverge(msg) => Diverge(msg.clone()),
             Trace => Trace,
         }
@@ -738,7 +738,7 @@ impl<
         )
         .expect("internal error: Failed to get intermediate state for path");
 
-        let query_path = get_query_path_for_path::<S>(&mut path.iter().peekable().cloned());
+        let query_path = get_query_path_for_path(&mut path.iter().peekable().cloned());
         // TODO: make this prettier. should be automatically computed.
         intermediate_state.query_path = query_path;
 
@@ -820,12 +820,12 @@ enum IntermediateOpLike<S: Semantics> {
 
 #[derive(derive_more::Debug)]
 struct IntermediateQueryInstructions<S: Semantics> {
-    #[debug("[{}]", true_branch.iter().map(|(opt, inst)| format!("({opt:#?}, {:#?})", inst)).collect::<Vec<_>>().join(", "))]
+    #[debug("[{}]", true_branch.iter().map(|(opt, inst)| format!("({opt:#?}, {inst:#?})", )).collect::<Vec<_>>().join(", "))]
     true_branch: Vec<(
         Option<AbstractOperationResultMarker>,
         IntermediateInstruction<S>,
     )>,
-    #[debug("[{}]", false_branch.iter().map(|(opt, inst)| format!("({opt:#?}, {:#?})", inst)).collect::<Vec<_>>().join(", "))]
+    #[debug("[{}]", false_branch.iter().map(|(opt, inst)| format!("({opt:#?}, {inst:#?})", )).collect::<Vec<_>>().join(", "))]
     false_branch: Vec<(
         Option<AbstractOperationResultMarker>,
         IntermediateInstruction<S>,
@@ -1073,7 +1073,7 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
             | BuilderInstruction::AddOperation(oplike, args) => {
                 let name =
                     if let BuilderInstruction::AddNamedOperation(name, _, _) = next_instruction {
-                        Some(name.clone())
+                        Some(*name)
                     } else {
                         None
                     };
@@ -1087,7 +1087,7 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                         IntermediateOpLike::LibBuiltin(lib_builtin_op.clone(), args.clone())
                     }
                     BuilderOpLike::FromOperationId(op_id) => {
-                        IntermediateOpLike::Operation(op_id.clone(), args.clone())
+                        IntermediateOpLike::Operation(*op_id, args.clone())
                     }
                     BuilderOpLike::Recurse => IntermediateOpLike::Recurse(args.clone()),
                 };
@@ -1116,13 +1116,13 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     ))));
                 // Start a new shape query state
                 let (is_finished, gsq_instructions, branch_instructions) =
-                    self.build_shape_query(iter, op_marker.clone())?;
+                    self.build_shape_query(iter, *op_marker)?;
                 // Ok((Some(*op_marker), UDInstruction::ShapeQuery()))
                 Ok((
-                    Some(op_marker.clone()), // NOTE: this marker is needed as well for the _concrete_ execution
+                    Some(*op_marker), // NOTE: this marker is needed as well for the _concrete_ execution
                     IntermediateInstruction::GraphShapeQuery {
                         is_finished,
-                        marker: op_marker.clone(),
+                        marker: *op_marker,
                         graph_instructions: gsq_instructions,
                         query_instructions: branch_instructions,
                     },
@@ -1222,14 +1222,14 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     // gsq.shape_idents_to_node_keys.insert(shape_node_ident, key);
 
                     gsq_instructions.push(GraphShapeQueryInstruction::ExpectShapeNode(
-                        marker.clone(),
+                        *marker,
                         abstract_value.clone(),
                     ));
                 }
                 BuilderInstruction::ExpectShapeNodeChange(aid, new_av) => {
                     iter.next();
                     gsq_instructions.push(GraphShapeQueryInstruction::ExpectShapeNodeChange(
-                        aid.clone(),
+                        *aid,
                         new_av.clone(),
                     ));
                 }
@@ -1239,8 +1239,8 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     //  an actual `Graph`.
                     // So we just follow a deferred approach by just passing along the instructions
                     gsq_instructions.push(GraphShapeQueryInstruction::ExpectShapeEdge(
-                        source.clone(),
-                        target.clone(),
+                        *source,
+                        *target,
                         abstract_value.clone(),
                     ));
                 }
@@ -1367,20 +1367,20 @@ impl<'a, S: Semantics<BuiltinOperation: Clone, BuiltinQuery: Clone>>
                     iter.next();
                     if return_nodes.contains_key(aid) {
                         bail!(OperationBuilderError::AlreadySelectedReturnNode(
-                            aid.clone(),
+                            *aid,
                         ));
                     }
-                    return_nodes.insert(aid.clone(), (output_marker.clone(), node.clone()));
+                    return_nodes.insert(*aid, (*output_marker, node.clone()));
                 }
                 BuilderInstruction::ReturnEdge(source, target, edge) => {
                     iter.next();
-                    if return_edges.contains_key(&(source.clone(), target.clone())) {
+                    if return_edges.contains_key(&(*source, *target)) {
                         bail!(OperationBuilderError::AlreadySelectedReturnEdge(
-                            source.clone(),
-                            target.clone(),
+                            *source,
+                            *target,
                         ));
                     }
-                    return_edges.insert((source.clone(), target.clone()), edge.clone());
+                    return_edges.insert((*source, *target), edge.clone());
                 }
 
                 _ => break,
@@ -1785,7 +1785,7 @@ impl<S: Semantics> IntermediateState<S> {
         let mut removed_aids = Vec::new();
         for node_key in &operation_output.removed_nodes {
             // remove the node from the mapping
-            if let Some(removed_aid) = self.node_keys_to_aid.remove_left(&node_key) {
+            if let Some(removed_aid) = self.node_keys_to_aid.remove_left(node_key) {
                 removed_aids.push(removed_aid);
             }
         }
@@ -1834,13 +1834,13 @@ impl<S: Semantics> IntermediateState<S> {
             .map(|aid| self.get_key_from_aid(aid))
             .collect::<Result<Vec<_>, _>>()
             .change_context(OperationBuilderError::SelectedInputsNotFoundAid)?;
-        let subst = get_substitution(&self.graph, &param, &selected_inputs)
+        let subst = get_substitution(&self.graph, param, &selected_inputs)
             .change_context(OperationBuilderError::SubstitutionErrorNew)?;
         let subst_to_aid = subst.mapping.iter().map(|(subst, key)| {
             let aid = self.get_aid_from_key(key)
                 .change_context(OperationBuilderError::InternalError("node key should be in mapping, because all node keys from the abstract graph should be in the mapping"))
                 .unwrap();
-            (subst.clone(), aid)
+            (*subst, aid)
         }).collect();
 
         let abstract_arg = AbstractOperationArgument {
@@ -1879,7 +1879,7 @@ impl<S: Semantics> IntermediateState<S> {
         let mut aid_args = Vec::new();
         let mut subst_to_aid = HashMap::new();
         for key in all_node_keys {
-            let subst = SubstMarker::from(format!("{:?}", key));
+            let subst = SubstMarker::from(format!("{key:?}"));
             node_keys_to_subst.insert(key, subst);
             explicit_input_nodes.push(subst);
             // collect the AID for this key
@@ -1920,7 +1920,7 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
                         write!(f, "O({}, {})", op_marker, node_marker.0)
                     }
                     AbstractNodeId::Named(name) => {
-                        write!(f, "{:?}", name)
+                        write!(f, "{name:?}")
                     }
                 }
             }
@@ -1950,7 +1950,7 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
                         .graph
                         .get_node_attr(node)
                         .expect("NodeKey not found in graph");
-                    let dbg_attr_format = format!("{:?}", av);
+                    let dbg_attr_format = format!("{av:?}");
                     let dbg_attr_replaced = dbg_attr_format.escape_debug();
 
                     // format!("label = \"{aid_replaced}|{dbg_attr_replaced}\"")
@@ -1986,7 +1986,7 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
                         .graph
                         .get_node_attr(node)
                         .expect("NodeKey not found in graph");
-                    let dbg_attr_format = format!("{:?}", av);
+                    let dbg_attr_format = format!("{av:?}");
                     let dbg_attr_replaced = dbg_attr_format.escape_debug();
 
                     // format!("label = \"{aid_replaced}|{dbg_attr_replaced}\"")
@@ -2057,7 +2057,7 @@ impl<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug>> IntermediateState<S
                         .graph
                         .get_node_attr(node)
                         .expect("NodeKey not found in graph");
-                    let dbg_attr_format = format!("{:?}", av);
+                    let dbg_attr_format = format!("{av:?}");
                     let dbg_attr_replaced = dbg_attr_format.escape_debug();
 
                     // format!("label = \"{aid_replaced}|{dbg_attr_replaced}\"")
@@ -2180,7 +2180,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             let inferred_av = self
                 .current_state
                 .node_av_of_aid(&aid)
-                .ok_or(OperationBuilderError::NotFoundReturnNode(aid.clone()))?;
+                .ok_or(OperationBuilderError::NotFoundReturnNode(aid))?;
             if !S::NodeMatcher::matches(inferred_av, &node_abstract) {
                 bail!(OperationBuilderError::InvalidReturnNodeType(aid));
             }
@@ -2207,9 +2207,9 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                 AbstractNodeId::DynamicOutputMarker(_, _) | AbstractNodeId::Named(..) => {
                     // we must be returning this node if we want to return an incident edge.
                     let Some(output_marker) = ud_output.new_nodes.get(aid) else {
-                        bail!(OperationBuilderError::NotFoundReturnNode(aid.clone()));
+                        bail!(OperationBuilderError::NotFoundReturnNode(*aid));
                     };
-                    Ok(AbstractSignatureNodeId::NewNode(output_marker.clone()))
+                    Ok(AbstractSignatureNodeId::NewNode(*output_marker))
                 }
             }
         };
@@ -2228,8 +2228,8 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                 .current_state
                 .edge_av_of_aid(&source_aid, &target_aid)
                 .ok_or(OperationBuilderError::NotFoundReturnEdge(
-                    source_aid.clone(),
-                    target_aid.clone(),
+                    source_aid,
+                    target_aid,
                 ))?;
             if !S::EdgeMatcher::matches(inferred_edge_av, &edge_abstract) {
                 bail!(OperationBuilderError::InvalidReturnEdgeType(
@@ -2269,7 +2269,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             .right_values()
             .filter_map(|aid| {
                 if let AbstractNodeId::ParameterMarker(subst) = aid {
-                    Some(subst.clone())
+                    Some(*subst)
                 } else {
                     None
                 }
@@ -2307,7 +2307,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                 AbstractNodeId::ParameterMarker(target_subst),
             ) = (source_aid, target_aid)
             {
-                current_edges.insert((source_subst.clone(), target_subst.clone()));
+                current_edges.insert((*source_subst, *target_subst));
             }
         }
 
@@ -2358,8 +2358,8 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         let mut interpreted_instructions = Vec::new();
         for (marker, instruction) in intermediate_instructions {
             let (ud_instruction, interpreted_instruction) =
-                self.interpret_single_instruction(marker.clone(), instruction)?;
-            ud_instructions.push((marker.clone(), ud_instruction));
+                self.interpret_single_instruction(marker, instruction)?;
+            ud_instructions.push((marker, ud_instruction));
             interpreted_instructions.push((
                 marker,
                 InterpretedInstructionWithState {
@@ -2379,7 +2379,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
         match instruction {
             IntermediateInstruction::OpLike(oplike) => Ok((
                 self.interpret_op_like(marker, oplike)
-                    .attach_printable_lazy(|| format!("Failed OpLike"))?,
+                    .attach_printable_lazy(|| "Failed OpLike".to_string())?,
                 InterpretedInstruction::OpLike,
             )),
             IntermediateInstruction::BuiltinQuery(query, args, query_instructions) => {
@@ -2480,7 +2480,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                 // Hack: pretend the partial user defined operation is the full operation.
                 // TODO: remove this hack. Make it so only explicit changes via ExpectRecursionChange... instructions are allowed.
                 //  (note: it's also unsound for now, since changes _after_ the recursion call are ignored. -- actually, not quite. see tests)
-                let op = Operation::Custom(&self.partial_self_user_defined_op);
+                let op = Operation::Custom(self.partial_self_user_defined_op);
 
                 let abstract_arg = self
                     .interpret_op(marker, op, args)
@@ -2502,7 +2502,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
     ) -> Result<AbstractOperationArgument, OperationBuilderError> {
         self.current_state
             .interpret_op(
-                &self.op_ctx,
+                self.op_ctx,
                 marker,
                 AbstractOperation::from_operation(op),
                 args,
@@ -2653,7 +2653,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             match instruction {
                 GraphShapeQueryInstruction::ExpectShapeNode(marker, av) => {
                     let key = expected_graph.add_node(av.clone());
-                    let shape_node_ident = marker.0.clone().into();
+                    let shape_node_ident = marker.0.into();
                     // TODO: insert is panicking and therefore we should return an error instead here.
                     // TODO: make bimap::insert fallible? return a must_use Option<()>?
                     node_keys_to_shape_idents.insert(key, shape_node_ident);
@@ -2661,17 +2661,17 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                     // now update the state for the true branch.
                     let state_key = self.current_state.graph.add_node(av);
                     let aid =
-                        AbstractNodeId::DynamicOutputMarker(gsq_op_marker.clone(), marker.clone());
+                        AbstractNodeId::DynamicOutputMarker(gsq_op_marker, marker);
                     self.current_state
                         .node_keys_to_aid
-                        .insert(state_key, aid.clone());
+                        .insert(state_key, aid);
                     self.current_state
                         .node_may_originate_from_shape_query
-                        .insert(aid.clone());
+                        .insert(aid);
                 }
                 GraphShapeQueryInstruction::ExpectShapeNodeChange(aid, av) => {
                     // set the expected av
-                    let key = self.get_current_key_from_aid(aid.clone())?;
+                    let key = self.get_current_key_from_aid(aid)?;
                     expected_graph.set_node_attr(key, av.clone());
 
                     // now update the state for the true branch.
@@ -2681,8 +2681,8 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                     self.current_state.graph.set_node_attr(state_key, av);
                 }
                 GraphShapeQueryInstruction::ExpectShapeEdge(src, target, av) => {
-                    let src_key = self.get_current_key_from_aid(src.clone())?;
-                    let target_key = self.get_current_key_from_aid(target.clone())?;
+                    let src_key = self.get_current_key_from_aid(src)?;
+                    let target_key = self.get_current_key_from_aid(target)?;
                     expected_graph.add_edge(src_key, target_key, av.clone());
 
                     // now update the state for the true branch.
@@ -2697,7 +2697,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                         .add_edge(state_src_key, state_target_key, av);
                     self.current_state
                         .edge_may_originate_from_shape_query
-                        .insert((src.clone(), target.clone()));
+                        .insert((src, target));
                 }
             }
         }
@@ -2791,9 +2791,9 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                     "node should not be in param",
                 ))?;
             // we need to push in the same sequence as expected in explicit_input_nodes
-            abstract_args.push(aid.clone());
-            arg_aid_to_param_subst.insert(aid.clone(), subst_marker.clone());
-            arg_aid_to_node_keys.insert(aid.clone(), key);
+            abstract_args.push(aid);
+            arg_aid_to_param_subst.insert(aid, subst_marker);
+            arg_aid_to_node_keys.insert(aid, key);
             Ok(())
         };
 
@@ -2898,7 +2898,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
             match instruction {
                 GraphShapeQueryInstruction::ExpectShapeNode(marker, av) => {
                     let key = expected_graph.add_node(av.clone());
-                    let shape_node_ident = marker.0.clone().into();
+                    let shape_node_ident = marker.0.into();
                     // TODO: insert is panicking and therefore we should return an error instead here.
                     // TODO: make bimap::insert fallible? return a must_use Option<()>?
                     node_keys_to_shape_idents.insert(key, shape_node_ident);
@@ -2906,17 +2906,17 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                     // now update the state for the true branch.
                     let state_key = self.current_state.graph.add_node(av);
                     let aid =
-                        AbstractNodeId::DynamicOutputMarker(gsq_op_marker.clone(), marker.clone());
+                        AbstractNodeId::DynamicOutputMarker(gsq_op_marker, marker);
                     self.current_state
                         .node_keys_to_aid
-                        .insert(state_key, aid.clone());
+                        .insert(state_key, aid);
                     self.current_state
                         .node_may_originate_from_shape_query
-                        .insert(aid.clone());
+                        .insert(aid);
                 }
                 GraphShapeQueryInstruction::ExpectShapeNodeChange(aid, av) => {
                     // set the expected av
-                    let key = aid_to_node_key_hack!(aid.clone())?;
+                    let key = aid_to_node_key_hack!(aid)?;
                     expected_graph.set_node_attr(key, av.clone());
 
                     // now update the state for the true branch.
@@ -2926,8 +2926,8 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                     self.current_state.graph.set_node_attr(state_key, av);
                 }
                 GraphShapeQueryInstruction::ExpectShapeEdge(src, target, av) => {
-                    let src_key = aid_to_node_key_hack!(src.clone())?;
-                    let target_key = aid_to_node_key_hack!(target.clone())?;
+                    let src_key = aid_to_node_key_hack!(src)?;
+                    let target_key = aid_to_node_key_hack!(target)?;
                     expected_graph.add_edge(src_key, target_key, av.clone());
 
                     // now update the state for the true branch.
@@ -2942,7 +2942,7 @@ impl<'a, S: Semantics> IntermediateInterpreter<'a, S> {
                         .add_edge(state_src_key, state_target_key, av);
                     self.current_state
                         .edge_may_originate_from_shape_query
-                        .insert((src.clone(), target.clone()));
+                        .insert((src, target));
                 }
             }
         }
@@ -3042,8 +3042,7 @@ fn get_state_for_path<S: Semantics>(
                     IntermediateStatePath::EnterTrue | IntermediateStatePath::EnterFalse => {
                         // this should not happen
                         panic!(
-                            "internal error: unexpected path element: {:?}",
-                            path_element
+                            "internal error: unexpected path element: {path_element:?}"
                         );
                     }
                     IntermediateStatePath::StartQuery(..) => {
@@ -3059,7 +3058,7 @@ fn get_state_for_path<S: Semantics>(
                                 Some(IntermediateStatePath::EnterTrue) => {
                                     // we are entering the true branch, so we need to check the true branch instructions
                                     return get_state_for_path(
-                                        &current_state,
+                                        current_state,
                                         &query_instructions.true_branch,
                                         path,
                                     );
@@ -3068,7 +3067,7 @@ fn get_state_for_path<S: Semantics>(
                                     // we are entering the false branch, so we need to check the false branch instructions
                                     current_state = &query_instructions.initial_state_false_branch;
                                     return get_state_for_path(
-                                        &current_state,
+                                        current_state,
                                         &query_instructions.false_branch,
                                         path,
                                     );
@@ -3091,7 +3090,7 @@ fn get_state_for_path<S: Semantics>(
     Some(current_state.clone())
 }
 
-fn get_query_path_for_path<S: Semantics>(
+fn get_query_path_for_path(
     path: &mut impl Iterator<Item = IntermediateStatePath>,
 ) -> Vec<QueryPath> {
     let mut query_path = Vec::new();
@@ -3190,7 +3189,7 @@ fn merge_states_result<S: Semantics>(
     // First, collect all AIDs that are present in both states.
     for aid in state_true.node_keys_to_aid.right_values() {
         if state_false.node_keys_to_aid.contains_right(aid) {
-            common_aids.insert(aid.clone());
+            common_aids.insert(*aid);
         }
     }
 
@@ -3223,7 +3222,7 @@ fn merge_states_result<S: Semantics>(
 
         // Add the merged node to the new state.
         let new_key = new_state.graph.add_node(merged_av);
-        new_state.node_keys_to_aid.insert(new_key, aid.clone());
+        new_state.node_keys_to_aid.insert(new_key, aid);
         // Keep track of the node originating from a shape query...
         if state_true
             .node_may_originate_from_shape_query
@@ -3304,7 +3303,7 @@ fn merge_states_result<S: Semantics>(
             .graph
             .add_edge(*from_key_merged, *to_key_merged, merged_av);
         // Keep track of the edge originating from a shape query.
-        let edge = (from_aid.clone(), to_aid.clone());
+        let edge = (*from_aid, *to_aid);
         if state_true
             .edge_may_originate_from_shape_query
             .contains(&edge)
@@ -3317,11 +3316,11 @@ fn merge_states_result<S: Semantics>(
 
         let written_av_true = state_true
             .edge_may_be_written_to
-            .get(&(from_aid.clone(), to_aid.clone()))
+            .get(&(*from_aid, *to_aid))
             .cloned();
         let written_av_false = state_false
             .edge_may_be_written_to
-            .get(&(from_aid.clone(), to_aid.clone()))
+            .get(&(*from_aid, *to_aid))
             .cloned();
         let merged_written_av = match (written_av_true, written_av_false) {
             (Some(av_true), Some(av_false)) => {
@@ -3348,7 +3347,7 @@ fn merge_states_result<S: Semantics>(
         if let Some(merged_av) = merged_written_av {
             new_state
                 .edge_may_be_written_to
-                .insert((from_aid.clone(), to_aid.clone()), merged_av);
+                .insert((*from_aid, *to_aid), merged_av);
         }
 
         // TODO: edge orders need to be handled here.
