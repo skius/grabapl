@@ -1841,6 +1841,8 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
     /// this does not bind potential new nodes to a name.
     ///
     /// Any returned nodes by the operation are hence invisible in the abstract state.
+    /// So, if you do not bind the result of, e.g., an `add_child` operation, you will not be allowed
+    /// to call a succeeding operation that requires the child node statically.
     ///
     /// Other abstract effects are still applied, like removed or changed nodes, and added, removed, or changed edges.
     ///
