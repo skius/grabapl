@@ -1,8 +1,7 @@
 use grabapl::operation::builder::{BuilderOpLike, OperationBuilder, stack_based_builder};
 use grabapl::operation::builtin::LibBuiltinOperation;
-use grabapl::operation::query::BuiltinQuery;
 use grabapl::operation::user_defined::{AbstractNodeId, UserDefinedOperation};
-use grabapl::operation::{BuiltinOperation, run_from_concrete};
+use grabapl::operation::run_from_concrete;
 use grabapl::prelude::*;
 use grabapl::semantics::ConcreteGraph;
 use std::collections::{HashMap, HashSet};
@@ -257,7 +256,7 @@ fn get_custom_op_new_node_in_shape_query_branches() -> UserDefinedOperation<Test
     builder
         .expect_parameter_node("p0", NodeType::Object)
         .unwrap();
-    let p0 = AbstractNodeId::param("p0");
+    let _p0 = AbstractNodeId::param("p0");
 
     // Start a query that will create a new node in both branches
     builder.start_shape_query("new").unwrap();
@@ -1542,7 +1541,7 @@ fn delete_node_deletes_all_incident_edges_in_signature() {
     builder
         .expect_parameter_node("p1", NodeType::Object)
         .unwrap();
-    let p0 = AbstractNodeId::param("p0");
+    let _p0 = AbstractNodeId::param("p0");
     let p1 = AbstractNodeId::param("p1");
     builder
         .expect_parameter_edge("p0", "p1", EdgeType::Wildcard)

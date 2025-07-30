@@ -73,14 +73,14 @@ use crate::operation::user_defined::{
     UserDefinedOperation,
 };
 use crate::operation::{
-    BuiltinOperation, Operation, OperationError, OperationResult, get_substitution,
+    Operation, OperationError, OperationResult, get_substitution,
 };
 use crate::prelude::*;
 use crate::semantics::{AbstractGraph, AbstractMatcher};
 use crate::util::bimap::BiMap;
 use crate::util::log;
 use crate::{NodeKey, Semantics, SubstMarker};
-use error_stack::{FutureExt, Result, ResultExt, bail, report};
+use error_stack::{Result, ResultExt, bail, report};
 use petgraph::dot;
 use petgraph::dot::Dot;
 use std::cell::RefCell;

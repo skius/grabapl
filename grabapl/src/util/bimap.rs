@@ -9,6 +9,12 @@ pub struct BiMap<L: Hash + Eq, R: Hash + Eq> {
     right_to_left: HashMap<R, L>,
 }
 
+impl<L: Eq + Hash + Clone, R: Eq + Hash + Clone> Default for BiMap<L, R> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<L: Eq + Hash + Clone, R: Eq + Hash + Clone> BiMap<L, R> {
     pub fn new() -> Self {
         BiMap {
@@ -58,7 +64,16 @@ impl<L: Eq + Hash + Clone, R: Eq + Hash + Clone> BiMap<L, R> {
     }
 
     pub fn len(&self) -> usize {
+        debug_assert_eq!(
+            self.left_to_right.len(),
+            self.right_to_left.len(),
+            "Left and right maps must have the same length"
+        );
         self.left_to_right.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.left_to_right.is_empty() && self.right_to_left.is_empty()
     }
 
     pub fn into_inner(self) -> (HashMap<L, R>, HashMap<R, L>) {
