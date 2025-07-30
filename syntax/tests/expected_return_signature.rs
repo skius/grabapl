@@ -1,5 +1,5 @@
-use grabapl::prelude::run_from_concrete;
 use grabapl::Semantics;
+use grabapl::prelude::run_from_concrete;
 use grabapl::semantics::example::ExampleSemantics;
 
 #[test_log::test]
