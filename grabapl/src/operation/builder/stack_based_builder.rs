@@ -1,14 +1,10 @@
 use crate::operation::builder::{
     BuilderInstruction, BuilderOpLike, IntermediateState, OperationBuilderError, QueryPath,
-    UDInstructionsWithMarker, merge_states_result,
+    merge_states_result,
 };
 use crate::operation::signature::parameter::{AbstractOutputNodeMarker, OperationParameter};
 use crate::operation::signature::parameterbuilder::OperationParameterBuilder;
-use crate::operation::user_defined::{
-    AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker,
-    AbstractUserDefinedOperationOutput, Instruction, NamedMarker, QueryInstructions,
-    UserDefinedOperation,
-};
+use crate::operation::user_defined::{AbstractNodeId, AbstractOperationArgument, AbstractOperationResultMarker, AbstractUserDefinedOperationOutput, Instruction, InstructionWithResultMarker, NamedMarker, QueryInstructions, UserDefinedOperation};
 use crate::prelude::*;
 use crate::{NodeKey, Semantics, SubstMarker};
 use derive_more::From;
@@ -29,6 +25,8 @@ use crate::semantics::{AbstractJoin, AbstractMatcher};
 use crate::util::bimap::BiMap;
 use crate::util::log;
 use error_stack::Result;
+
+// TODO: give overview of how the stack based builder works.
 
 macro_rules! bail_unexpected_instruction {
     ($i:expr, $i_opt:expr, $frame:literal) => {
@@ -129,7 +127,7 @@ impl<S: Semantics> BuildingParameterFrame<S> {
 }
 
 struct CollectingInstructionsFrame<S: Semantics> {
-    instructions: UDInstructionsWithMarker<S>,
+    instructions: Vec<InstructionWithResultMarker<S>>,
     current_state: IntermediateState<S>,
 }
 
@@ -415,7 +413,7 @@ impl<S: Semantics> BranchesFrame<S> {
             .map(|cif| &cif.current_state)
             .unwrap_or(default_false_state);
         let merge_result =
-            merge_states_result(false, true_branch_state_ref, false_branch_state_ref);
+            merge_states_result(true_branch_state_ref, false_branch_state_ref);
 
         // take into account the missing AIDs from the branches, and insert ForgetAid instructions
         let mut true_instructions = self
@@ -468,6 +466,8 @@ impl<S: Semantics> QueryFrame<S> {
         match instruction {
             BI::StartQuery(query, args) => {
                 let mut before_branches_state = outer_state.clone();
+                // TODO: decide if queries should be allowed to modify the state.
+                //  (maybe they should even be allowed to provide different states on true and false?)
                 let abstract_arg = before_branches_state
                     .interpret_builtin_query(&query, args)
                     .change_context(BuilderError::OutsideError)?;
@@ -499,6 +499,9 @@ impl<S: Semantics> QueryFrame<S> {
         let instruction = instruction_opt.take().unwrap();
         match instruction {
             BI::EndQuery | BI::Finalize => {
+                // TODO: decide if BI::Finalize should be allowed to end a query in the context of
+                // building a final operation, or if explicit endquery operations are required.
+
                 // We finish the query, and give the outer frame all our information.
                 let query_frame: QueryFrame<S> = builder.stack.expect_pop();
                 query_frame.handle_query_end(builder)?;
@@ -1387,6 +1390,8 @@ impl<'a, S: Semantics> Builder<'a, S> {
                 "operation signature does not match expected signature"
             ));
         }
+
+        // TODO: do we need more validity checks?
 
         Ok(op)
     }
