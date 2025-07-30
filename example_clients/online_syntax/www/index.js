@@ -1,7 +1,9 @@
 import {Graphviz} from "@hpcc-js/wasm";
 import {ConcreteGraph, Context} from "online-syntax-js";
-import * as monaco from 'monaco-editor';
-import 'monaco-editor/esm/vs/basic-languages/rust/rust.contribution';
+// import * as monaco from 'monaco-editor';
+// import this to only import the features we requested from webpack.config.js:
+import * as monaco from 'monaco-editor/esm/vs/editor/editor.api';
+// import 'monaco-editor/esm/vs/basic-languages/rust/rust.contribution';
 import { AnsiUp } from 'ansi_up';
 import * as d3 from 'd3';
 import {d3Graphviz} from 'd3-graphviz'
