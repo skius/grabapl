@@ -1,0 +1,69 @@
+// The outer loop of bubble sort.
+// Starts bubble-up loops until every element is at its final position.
+fn _bubble_sort(head: int) {
+    trace();
+    // we loop until there are no more unfixed next nodes
+    if shape [
+        next: int,
+        head -> next: *,
+    ] skipping ["fixed"] {
+        trace();
+        // we found a next node
+        // start a chain of bubbling up (this is starts the inner loop)
+        bubble_sort_helper(head);
+        // once that's done, repeat (this is the outer loop)
+        // note: need to hide `next` from _our_ abstract state, so that the
+        // recursive call's shape query can match it again.
+        hide_node(next);
+        trace();
+        _bubble_sort(head);
+    }
+    trace();
+    // marker not necessary anymore
+    remove_marker<"fixed">();
+    trace();
+}
+
+// The inner loop of bubble sort.
+// bubbles up the maximum element to the last position.
+fn bubble_sort_helper(curr: int) [next: int, curr -> next: *] {
+    trace();
+    // first swap the current pair into order
+    if fst_gt_snd(curr, next) {
+        swap_values(curr, next);
+        trace();
+    }
+    // then check for children
+    if shape [
+        next_next: int,
+        next -> next_next: *,
+    ] skipping ["fixed"] {
+        trace();
+        // continue bubbling
+        bubble_sort_helper(next);
+    } else {
+        trace();
+        // `next` has no child, hence it is the last node.
+        // by bubble sort's invariant, that means it will stay at this position.
+        mark_node<"fixed">(next);
+    }
+}
+
+fn swap_values(a: int, b: int) {
+    let! temp = add_node<0>();
+    copy_value_from_to(a, temp);
+    copy_value_from_to(b, a);
+    copy_value_from_to(temp, b);
+    remove_node(temp);
+}
+
+// Hides a node from the abstract state in order to release it for future dynamic shape-query matching.
+fn hide_node(node: any) {
+    let! one = add_node<1>();
+    if is_eq<0>(one) {
+        // statically 'maybe' delete the node in order to hide the node.
+        // in practice this is never executed.
+        remove_node(node);
+    }
+    remove_node(one);
+}

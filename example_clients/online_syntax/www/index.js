@@ -845,6 +845,13 @@ function initTraceViewer() {
         fit: true,
     });
 
+    // add child to traceGraphContainer to provide some buffer
+    if (traceGraphContainer) {
+        let divChild = document.createElement('div');
+        divChild.className = "h-[100vh] bg-white";
+        traceGraphContainer.appendChild(divChild);
+    }
+
     prevTraceBtn.addEventListener('click', () => {
         if (isTraceRendering) return; // Prevent navigation while rendering
         if (currentTraceIndex > 0) {
