@@ -102,7 +102,7 @@ A version of bubble sort that goes up-and-down ([source program](https://github.
 
 DFS ([source program](https://github.com/skius/grabapl/blob/main/example_clients/online_syntax/example_programs/tracing_dfs.gbpl)):
 
-HERE
+<https://github.com/user-attachments/assets/812704c1-f35a-4f6d-80b4-122a7dfc4a27>
 
 A very convoluted looking BFS due to the need for queues with node references, which I implemented as a linked list of
 "pointer" nodes that simply point to the pointee node via an edge ([source program](https://github.com/skius/grabapl/blob/main/example_clients/online_syntax/example_programs/bfs_tracing.gbpl)):
