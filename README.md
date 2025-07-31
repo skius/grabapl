@@ -97,7 +97,8 @@ See below for the full animated trace of bubble sort ([source program](https://g
 
 #### More Traces
 A version of bubble sort that goes up-and-down ([source program](https://github.com/skius/grabapl/blob/main/example_clients/online_syntax/example_programs/tracing_up_down_bubble_sort.gbpl)):
-HERE
+
+<https://github.com/user-attachments/assets/38cbaaa2-75aa-407e-b595-88996f17c501>
 
 DFS ([source program](https://github.com/skius/grabapl/blob/main/example_clients/online_syntax/example_programs/tracing_dfs.gbpl)):
 
