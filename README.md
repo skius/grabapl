@@ -66,6 +66,10 @@ The text-based frontend in the <a href="https://skius.github.io/grabapl/playgrou
 is just a parser that turns the parsed AST into messages for the builder. See the
 [`grabapl_syntax`](https://crates.io/crates/grabapl_syntax/) crate for more details.
 
+Here is an example of a visualized abstract state of a bubble sort operation:
+
+![Bubble Sort Abstract State](docs/src/assets/bubble_sort_abstract_state.png)
+
 ### Visualizable Runtime Execution Tracing
 The executor supports tracing the runtime execution of a program via snapshots.
 
