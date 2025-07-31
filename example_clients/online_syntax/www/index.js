@@ -303,6 +303,7 @@ let currentTransform = d3.zoomIdentity;
 let tempNodeCoords = { x: 0, y: 0 };
 let pendingEdge = null;
 let currentTraceDots = [];
+let rawCurrentTraceDots = [];
 let currentTraceIndex = 0;
 let traceGraphviz;
 
@@ -350,6 +351,23 @@ autoCompileInput.addEventListener('change', (e) => {
     }
     MS_BETWEEN_CODE_CHANGES = newValue;
     localStorage.setItem('auto_compile_timeout', newValue);
+});
+
+// --- skip duplicate traces input
+const skipDuplicateTracesInput = document.getElementById('skip-duplicate-traces');
+// it's a check button
+skipDuplicateTracesInput.addEventListener('change', (e) => {
+    const skipDuplicates = e.target.checked;
+    localStorage.setItem('skip_duplicate_traces', skipDuplicates);
+    // change the label text accordingly
+    if (skipDuplicates) {
+        currentTraceDots = rawCurrentTraceDots.filter((dot, index, arr) => index === 0 || dot !== arr[index - 1]);
+    } else {
+        currentTraceDots = rawCurrentTraceDots; // Reset to raw if unchecked
+    }
+    currentTraceIndex = Math.min(currentTraceIndex, currentTraceDots.length - 1); // dont go out of bounds
+    // render the trace graph again
+    renderTraceGraph();
 });
 
 /**
@@ -531,8 +549,8 @@ function initInteractiveGraph() {
     simulation = d3.forceSimulation(interactiveNodes)
         .force("link", d3.forceLink(interactiveEdges).id(d => d.id).distance(150).strength(0.6))
         .force("charge", d3.forceManyBody().strength(-800))
-        .force("positionX", d3.forceX(100))
-        .force("positionY", d3.forceY(100));
+        .force("positionX", d3.forceX(300))
+        .force("positionY", d3.forceY(300));
 
     updateThemeForGraph();
 }
@@ -659,9 +677,14 @@ function executeOperation(operationName, inputNodeNames) {
 
         if (traceDotsRaw && traceDotsRaw.trim() !== "") {
             currentTraceDots = traceDotsRaw.split('---').map(dot => dot.trim()).filter(dot => dot);
+            rawCurrentTraceDots = currentTraceDots; // Keep the raw trace dots for reference
+            if (skipDuplicateTracesInput.checked) {
+                // deduplicate consecutive identical trace dots
+                currentTraceDots = currentTraceDots.filter((dot, index, arr) => index === 0 || dot !== arr[index - 1]);
+            }
             // deduplicate consecutive identical trace dots
-            // TODO: decide if we really want to dedup
-            currentTraceDots = currentTraceDots.filter((dot, index, arr) => index === 0 || dot !== arr[index - 1]);
+            // note: we're deduping now with skipDuplicateTracesInput
+            // currentTraceDots = currentTraceDots.filter((dot, index, arr) => index === 0 || dot !== arr[index - 1]);
             currentTraceIndex = 0;
             traceBox.style.display = 'block';
             renderTraceGraph();
@@ -823,11 +846,6 @@ async function main() {
     outputPre.innerText = "Loading Graphviz WASM module...";
     graphviz = await Graphviz.load();
 
-    // Perform initial compilation
-    onCodeChanged();
-    initInteractiveGraph(); // 🚀
-    initTraceViewer();
-
     if (localStorage.getItem("theme")) {
         setTheme(localStorage.getItem("theme"));
     }
@@ -835,11 +853,56 @@ async function main() {
         MS_BETWEEN_CODE_CHANGES = parseInt(localStorage.getItem("auto_compile_timeout"), 10);
         autoCompileInput.value = MS_BETWEEN_CODE_CHANGES;
     }
+    if (localStorage.getItem("skip_duplicate_traces")) {
+        skipDuplicateTracesInput.checked = localStorage.getItem("skip_duplicate_traces") === 'true';
+    }
+
+    // Perform initial compilation
+    onCodeChanged();
+    initInteractiveGraph(); // 🚀
+    initTraceViewer();
 
     // add a Ctrl-S event listener to the monaco editor that immediately runs onCodeChangedInner()
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
         onCodeChangedInner();
     });
+}
+
+/// Advances the current trace index by respecting the value of
+function advanceTrace() {
+    currentTraceIndex++;
+    return;
+    // note: we're handling with rawCurrentTraceDots now
+    // let doSkip = skipDuplicateTracesInput.checked;
+    // if (doSkip) {
+    //     // skip to the next unique trace dot
+    //     while (currentTraceIndex < currentTraceDots.length - 1 && currentTraceDots[currentTraceIndex] === currentTraceDots[currentTraceIndex + 1]) {
+    //         currentTraceIndex++;
+    //     }
+    // } else {
+    //     // just increment the index
+    //     if (currentTraceIndex < currentTraceDots.length - 1) {
+    //         currentTraceIndex++;
+    //     }
+    // }
+}
+
+function previousTrace() {
+    currentTraceIndex--;
+    return;
+    // note: we're handling with rawCurrentTraceDots now
+    // let doSkip = skipDuplicateTracesInput.checked;
+    // if (doSkip) {
+    //     // skip to the previous unique trace dot
+    //     while (currentTraceIndex > 0 && currentTraceDots[currentTraceIndex] === currentTraceDots[currentTraceIndex - 1]) {
+    //         currentTraceIndex--;
+    //     }
+    // } else {
+    //     // just decrement the index
+    //     if (currentTraceIndex > 0) {
+    //         currentTraceIndex--;
+    //     }
+    // }
 }
 
 function initTraceViewer() {
@@ -858,7 +921,7 @@ function initTraceViewer() {
     prevTraceBtn.addEventListener('click', () => {
         if (isTraceRendering) return; // Prevent navigation while rendering
         if (currentTraceIndex > 0) {
-            currentTraceIndex--;
+            previousTrace();
             renderTraceGraph();
         }
     });
@@ -866,7 +929,7 @@ function initTraceViewer() {
     nextTraceBtn.addEventListener('click', () => {
         if (isTraceRendering) return; // Prevent navigation while rendering
         if (currentTraceIndex < currentTraceDots.length - 1) {
-            currentTraceIndex++;
+            advanceTrace();
             renderTraceGraph();
         }
     });
@@ -875,10 +938,10 @@ function initTraceViewer() {
     traceBox.addEventListener('keydown', (e) => {
         if (isTraceRendering) return; // Prevent navigation while rendering
         if (e.key === 'ArrowLeft' && currentTraceIndex > 0) {
-            currentTraceIndex--;
+            previousTrace();
             renderTraceGraph();
         } else if (e.key === 'ArrowRight' && currentTraceIndex < currentTraceDots.length - 1) {
-            currentTraceIndex++;
+            advanceTrace();
             renderTraceGraph();
         }
     });
