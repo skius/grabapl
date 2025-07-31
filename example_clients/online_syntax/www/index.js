@@ -21,7 +21,9 @@ const stateSelector = document.getElementById('state-selector');
 // --- Monaco Editor Setup ---
 const initialCode = localStorage.getItem('last_code') ||
     `// Welcome! Type your Grabapl code here.
-// You can find a sample bubble sort implementation to copy paste here: https://crates.io/crates/grabapl
+// You can find example programs here: https://github.com/skius/grabapl/tree/main/example_clients/online_syntax/example_programs
+// Maybe try "tracing_normal_bubble_sort_variant_b.gbpl"?
+
 fn foo(x: int) -> (result: int) {
     show_state(initial_state);
     // try returning a node!
