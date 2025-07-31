@@ -83,3 +83,7 @@ This is what the <a href="https://skius.github.io/grabapl/playground/" target="_
 when running a program with `trace()` instructions.
 See below for the full animated trace of bubble sort ([source program](https://github.com/skius/grabapl/blob/main/example_clients/online_syntax/example_programs/tracing_normal_bubble_sort_variant_b.gbpl)):
 
+
+
+<https://github.com/user-attachments/assets/05301f5c-f7a1-4001-bf23-e8f0739ffa96>
+
