@@ -659,6 +659,9 @@ function executeOperation(operationName, inputNodeNames) {
 
         if (traceDotsRaw && traceDotsRaw.trim() !== "") {
             currentTraceDots = traceDotsRaw.split('---').map(dot => dot.trim()).filter(dot => dot);
+            // deduplicate consecutive identical trace dots
+            // TODO: decide if we really want to dedup
+            currentTraceDots = currentTraceDots.filter((dot, index, arr) => index === 0 || dot !== arr[index - 1]);
             currentTraceIndex = 0;
             traceBox.style.display = 'block';
             renderTraceGraph();
