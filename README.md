@@ -95,3 +95,15 @@ See below for the full animated trace of bubble sort ([source program](https://g
 
 <https://github.com/user-attachments/assets/05301f5c-f7a1-4001-bf23-e8f0739ffa96>
 
+#### More Traces
+A version of bubble sort that goes up-and-down ([source program](https://github.com/skius/grabapl/blob/main/example_clients/online_syntax/example_programs/tracing_up_down_bubble_sort.gbpl)):
+HERE
+
+DFS ([source program](https://github.com/skius/grabapl/blob/main/example_clients/online_syntax/example_programs/tracing_dfs.gbpl)):
+
+HERE
+
+A very convoluted looking BFS due to the need for queues with node references, which I implemented as a linked list of
+"pointer" nodes that simply point to the pointee node via an edge ([source program](https://github.com/skius/grabapl/blob/main/example_clients/online_syntax/example_programs/bfs_tracing.gbpl)):
+
+HERE
