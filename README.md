@@ -10,6 +10,7 @@ static guarantees.
   values being of the expected types.
     * No explicit loops: recursion only.
 * **First-class node markers**: No more explicit `visited` or `seen` sets!
+* **WebAssembly**: Grabapl can be compiled to WebAssembly.
 * **Ships with a fully-fledged example online IDE**:
     * <a href="https://skius.github.io/grabapl/playground/" target="_blank">Playground</a>
     * Interactive, visual runtime graph editor to create inputs for the program
@@ -22,6 +23,9 @@ static guarantees.
         * Useful error messages
 
 See [https://crates.io/crates/grabapl](https://crates.io/crates/grabapl) for more information.
+
+An example client is documented at [`grabapl_template_semantics`](https://crates.io/crates/grabapl_template_semantics).
+This is the one used for the online playground.
 
 ## Features
 ### Graph-based state and operations
