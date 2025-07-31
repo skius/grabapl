@@ -1,3 +1,4 @@
 # Summary
-
-- [Chapter 1](./chapter_1.md)
+- [Introduction](./README.md)
+- [Core](./core/README.md)
+  - [Core Semantics](./core/core-semantics.md)
