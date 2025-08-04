@@ -1,0 +1,262 @@
+fn _dijkstra(start: any) {
+    trace();
+    let! heap = mk_min_heap();
+    trace();
+    let! start_cost = add_node<0>();
+    min_heap_insert(heap, start_cost, start);
+    hide_node(start);
+    let! list = mk_list();
+    trace();
+    // the heap is primed now, let's start
+    dijkstra_loop(heap, list);
+    remove_node(heap);
+}
+
+fn dijkstra_loop(heap: any, out_list: any) {
+    // check if we still have heap elts
+    let! empty = is_empty(heap);
+    if is_eq<0>(empty) {
+        // we still have heap elements
+        let! min_dist = min_heap_extract(heap);
+        if shape [
+            pointee: any,
+            min_dist -> pointee: "attached",
+        ] skipping ["visited"] {
+            mark_node<"visited">(pointee);
+            // add this node to final list
+            insert_list_with_dist_by_copy(out_list, pointee, min_dist);
+            // now go through all children of pointee and add them to the heap with cost min_dist + edge_weight
+            dijkstra_insert_children(heap, min_dist, pointee);
+        }
+        remove_node(min_dist);
+        // recurse
+        dijkstra_loop(heap, out_list);
+    }
+    remove_node(empty);
+}
+
+fn dijkstra_insert_children(heap: any, parent_dist: int, parent: any) {
+    if shape [
+        child: any,
+        parent -> child: int,
+    ] {
+        let! edge_weight = extract_edge_to_node(parent, child);
+        // add parent_dist to edge_weight
+        add_snd_to_fst(edge_weight, parent_dist);
+        // insert child
+        min_heap_insert(heap, edge_weight, child);
+        // recurse since we had children
+        dijkstra_insert_children(heap, parent_dist, parent);
+    }
+}
+
+fn insert_list_with_dist_by_copy(list: any, elt: any, dist: int) {
+    let! dist_copy = add_node();
+    let! elt_copy = add_node();
+    copy_value_from_to(dist, dist_copy);
+    copy_value_from_to(elt, elt_copy);
+    // just a holder
+    let! list_elt = add_node<"">();
+    add_edge<"total distance">(list_elt, dist_copy);
+    add_edge<"node">(list_elt, elt_copy);
+    list_insert_by_ref(list, list_elt);
+}
+
+fn sort_with_min_heap(start: int) {
+    let! heap = mk_min_heap();
+    trace();
+    sort_helper(start, heap);
+    trace();
+    hide_node(start);
+    let! target = mk_list();
+    trace();
+    loop_extract(target, heap);
+    trace();
+}
+
+fn loop_extract(target: any, heap: any) {
+    trace();
+    let! empty = is_empty(heap);
+    if is_eq<0>(empty) {
+
+        let! res = min_heap_extract(heap);
+    trace();
+        if shape [
+            pointee: int,
+            res -> pointee: "attached",
+        ] {
+    trace();
+            list_insert_by_copy(target, pointee);
+            remove_node(pointee);
+    trace();
+        }
+        remove_node(res);
+    trace();
+        loop_extract(target, heap);
+    }
+    remove_node(empty);
+}
+
+fn sort_helper(curr: int, heap: any) {
+    trace();
+    let! cost = add_node();
+    trace();
+    copy_value_from_to(curr, cost);
+    trace();
+    min_heap_insert(heap, cost, curr);
+    trace();
+    if shape [
+        next: int,
+        curr -> next: *,
+    ] {
+    trace();
+        sort_helper(next, heap);
+    }
+}
+
+// == MIN HEAP ==
+/*
+
+Represented as a linked list. Extract-min is O(n).
+
+*/
+
+fn mk_min_heap() -> (head: any) {
+    let! head = add_node<"heap head">();
+    return (head: head);
+}
+
+fn is_empty(heap: any) -> (result: int) {
+    if shape [first: int, heap -> first: "heap_next"] {
+        let! res = add_node<0>();
+    } else {
+        let! res = add_node<1>();
+    }
+    return (result: res);
+}
+
+// Will use cost. content is inserted by-reference.
+fn min_heap_insert(heap: any, cost: int, content: any) {
+    add_edge<"attached">(cost, content);
+    if shape [
+        fst: int,
+        heap -> fst: "heap_next"
+    ] {
+        remove_edge(heap, fst);
+        add_edge<"heap_next">(heap, cost);
+        add_edge<"heap_next">(cost, fst);
+    } else {
+        add_edge<"heap_next">(heap, cost);
+    }
+    hide_node(cost);
+}
+
+// returns cost which points to the inserted node via 'attached'
+fn min_heap_extract(heap: any) -> (elt: int) {
+    if shape [
+        fst: int,
+        heap -> fst: "heap_next",
+    ] {
+        let! curr_min = add_node<9999999>();
+        min_heap_extract_helper(fst, curr_min);
+        hide_node(fst);
+    } else {
+        diverge<"min heap was empty">();
+    }
+    // curr_min has an 'attached' node. but the linked list still contains the other element. we now delete that other element
+    if shape [
+        pointee: any,
+        curr_min -> pointee: "attached",
+        delete_me: int,
+        // the mere fact that it is still attached is what we use to find the node to be deleted (delete_me)
+        delete_me -> pointee: "attached",
+    ] {
+        // we need to be careful to handle every case where we need to "splice out" the returned node.
+        if shape [
+            heap -> delete_me: "heap_next",
+            next: int,
+            delete_me -> next: "heap_next",
+        ] {
+            remove_node(delete_me);
+            add_edge<"heap_next">(heap, next);
+        } else if shape [
+            before: int,
+            after: int,
+            before -> delete_me: "heap_next",
+            delete_me -> after: "heap_next",
+        ] {
+            remove_node(delete_me);
+            add_edge<"heap_next">(before, after);
+        } else {
+            remove_node(delete_me);
+        }
+    }
+    return (elt: curr_min);
+}
+
+fn min_heap_extract_helper(node: int, curr_min: int) {
+    if lt(node, curr_min) {
+        // node < curr_min, so we found a new min
+        copy_value_from_to(node, curr_min);
+        also_attach(node, curr_min);
+    }
+    if shape [
+        next: int,
+        node -> next: "heap_next",
+    ] {
+        min_heap_extract_helper(next, curr_min);
+    }
+}
+
+fn also_attach(current_ref: int, new_ref_target: int) {
+    // first delete the existing edge of new_ref_target
+    if shape [
+        old_pointee: any,
+        new_ref_target -> old_pointee: "attached"
+    ] {
+        delete_edge(new_ref_target, old_pointee);
+    }
+    if shape [
+        pointee: any,
+        current_ref -> pointee: "attached"
+    ] {
+        add_edge<"attached">(new_ref_target, pointee);
+    }
+}
+
+// == END MIN HEAP ==
+
+// Hides a node from the abstract state in order to release it for future dynamic shape-query matching.
+fn hide_node(node: any) {
+    let! one = add_node<1>();
+    if is_eq<0>(one) {
+        // statically 'maybe' delete the node in order to hide the node.
+        // in practice this is never executed.
+        remove_node(node);
+    }
+    remove_node(one);
+}
+
+fn mk_list() -> (head: any) {
+    let! head = add_node<"list head">();
+    return (head: head);
+}
+
+fn list_insert_by_copy(head: any, value: any) {
+    let! copy = add_node();
+    copy_value_from_to(value, copy);
+    list_insert_by_ref(head, copy);
+}
+
+fn list_insert_by_ref(head: any, value: any) {
+    if shape [
+        child: any,
+        head -> child: "list_next",
+    ] {
+        list_insert_by_ref(child, value);
+    } else {
+        // we're at the tail
+        add_edge<"list_next">(head, value);
+        // hide_node(value);
+    }
+}
