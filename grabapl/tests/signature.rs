@@ -152,7 +152,7 @@ fn signature_visualizability() {
     fn foo(a: int, x: string) [
             c1: any,
             c2: any,
-            a -> c1: "blub",
+            a -> c1: *,
             a -> c2: "child2"
         ] -> (result: string)
         {
@@ -176,5 +176,4 @@ fn signature_visualizability() {
 
     eprintln!("signature: {:#?}", sig.output);
 
-    panic!();
 }

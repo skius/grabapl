@@ -757,6 +757,12 @@ impl<S: Semantics> IntermediateState<S> {
                 log::warn!("internal error: changed node not found in mapping");
                 continue;
             };
+            // NOTE: we assume here that the *operation output* already merges the abstract value.
+            // if this was not the case, we would be overwriting any existing maybe_writes here.
+            // overwriting is only fine because we know the operation output merged the abstract values.
+            // See `maybe_set_node_value`.
+            // This structure is useful because operations (i.e., builtins) that know for a fact that
+            // they write a specific abstract value can use this to be more precise.
             self.node_may_be_written_to.insert(aid, node_abstract);
         }
         for ((source, target), edge_abstract) in operation_output.changed_abstract_values_edges {

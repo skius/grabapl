@@ -593,7 +593,7 @@ fn builder_infers_correct_signatures() {
             vec![],
         )
         .unwrap();
-    // create new edge p0->c1
+    // overwrite edge value p0->c1
     builder
         .add_operation(
             BuilderOpLike::Builtin(TestOperation::AddEdge {
@@ -707,7 +707,7 @@ fn builder_infers_correct_signatures() {
                         SubstMarker::from("p0").into(),
                         SubstMarker::from("c1").into()
                     ),
-                    EdgeType::Exact("p0->c1".to_string())
+                    EdgeType::Exact("new_edge".to_string())
                 )]),
                 "Expected edge p0->c1 to be changed to 'new_edge'"
             );

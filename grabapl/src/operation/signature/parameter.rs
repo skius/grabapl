@@ -233,6 +233,8 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         removed_value
     }
 
+    /// Adds an edge between two nodes identified by their markers.
+    /// If the edge already exists, it updates the edge's value and returns the old value
     pub fn add_edge(
         &mut self,
         src_marker: impl Into<NodeMarker>,
@@ -243,8 +245,16 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         let dst_marker = dst_marker.into();
         let src_key = self.get_node_key(&src_marker)?;
         let dst_key = self.get_node_key(&dst_marker)?;
-        self.new_edges.push((src_key, dst_key));
-        self.graph.add_edge(src_key, dst_key, value)
+
+        let res = self.graph.add_edge(src_key, dst_key, value.clone());
+        if res.is_some() {
+            // an edge existed, hence this call changed the edge value
+            self.changed_edge_av.insert((src_key, dst_key), value);
+        } else {
+            // this is a new edge
+            self.new_edges.push((src_key, dst_key));
+        }
+        res
     }
 
     pub fn delete_edge(
