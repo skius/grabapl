@@ -159,8 +159,9 @@ fn signature_visualizability() {
             let! result = add_node<"result">();
             copy_value_from_to(result, a);
             delete_node(c2);
+            add_edge<5>(a, x);
             add_edge<"the only child">(a, c1);
-            return (result: result);
+            return (result: result, a -> x: int,);
         }
     );
 
@@ -174,6 +175,7 @@ fn signature_visualizability() {
     eprintln!("Input Graph:\n{}", input_graph);
     eprintln!("Output Graph:\n{}", output_graph);
 
-    eprintln!("signature: {:#?}", sig.output);
+    // eprintln!("signature: {:#?}", sig.output);
 
+    // panic!();
 }

@@ -97,17 +97,49 @@ pub fn visualize_signature<S: Semantics<NodeAbstract: Debug, EdgeAbstract: Debug
     let node_label = |g: &_, (key, _)| {
         let marker = new_node_key_bimap.get_left(&key).unwrap();
         let output = node_outputs.get(marker).unwrap();
-        let output = format!("{output:?}");
-        let output = format!("{}", output.escape_debug());
-        format!("label = \"{}: {}\"", marker.0, output)
+        // let output = format!("{output:?}");
+        // let output = format!("{}", output.escape_debug());
+        // format!("label = \"{}: {}\"", marker.0, output)
+        match output {
+            Output::Unchanged => {
+                format!("label = \"{}\"", marker.0)
+            }
+            Output::MaybeDeleted => {
+                format!("style=\"dashed\", label = \"{}\", color=\"red\", fontcolor=\"red\"", marker.0)
+            }
+            Output::MaybeWritten(av) => {
+                let av = format!("{av:?}");
+                let av = format!("{}", av.escape_debug());
+                format!("label = \"{} 🡐 {}\", color=\"blue\", fontcolor=\"blue\"", marker.0, av)
+            }
+            Output::New(av) => {
+                let av = format!("{av:?}");
+                let av = format!("{}", av.escape_debug());
+                format!("shape=\"hexagon\", label = \"{}: {}\", color=\"green\", fontcolor=\"green\"", marker.0, av)
+            }
+        }
+
     };
     let edge_label = |_, (src, dst, attr): (_, _, &EdgeAttribute<_>)| {
         let out = edge_outputs.get(&(src, dst)).unwrap();
-        let out = format!("{out:?}");
-        let out = format!("{}", out.escape_debug());
-        // let attr = format!("{:?}", attr.edge_attr);
-        // let attr = format!("{}", attr.escape_debug());
-        format!("label = \"{out}\"")
+        match out {
+            Output::Unchanged => {
+                "".to_string()
+            }
+            Output::MaybeDeleted => {
+                "style=\"dashed\", color=\"red\", fontcolor=\"red\"".to_string()
+            }
+            Output::MaybeWritten(av) => {
+                let av = format!("{av:?}");
+                let av = format!("{}", av.escape_debug());
+                format!("label = \"🡐 {}\", color=\"blue\", fontcolor=\"blue\"", av)
+            }
+            Output::New(av) => {
+                let av = format!("{av:?}");
+                let av = format!("{}", av.escape_debug());
+                format!("label = \"{}\", color=\"green\", fontcolor=\"green\"", av)
+            }
+        }
     };
     let output_dot = Dot::with_attr_getters(g,
                                      &[Config::NodeNoLabel, Config::EdgeNoLabel],
