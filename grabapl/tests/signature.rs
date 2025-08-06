@@ -2,6 +2,8 @@ mod util;
 
 use grabapl::prelude::*;
 use std::collections::HashSet;
+use grabapl::util::signature_visualizer::visualize_signature;
+use grabapl_template_semantics::TheSemantics;
 use util::semantics::*;
 
 #[test_log::test]
@@ -141,4 +143,38 @@ fn invisible_node_not_deleted() {
     //  However, this necessitates that we don't unconditionally delete nodes in the concrete,
     //  for which the signature says that it is `maybe_deleted`. ==> just add a test to document it a bit.
     // (we did this^)
+}
+
+
+#[test_log::test]
+fn signature_visualizability() {
+    let (op_ctx, fn_names) = syntax::grabapl_parse!(grabapl_template_semantics::TheSemantics,
+    fn foo(a: int, x: string) [
+            c1: any,
+            c2: any,
+            a -> c1: "blub",
+            a -> c2: "child2"
+        ] -> (result: string)
+        {
+            let! result = add_node<"result">();
+            copy_value_from_to(result, a);
+            delete_node(c2);
+            add_edge<"the only child">(a, c1);
+            return (result: result);
+        }
+    );
+
+    let op = op_ctx.get(fn_names["foo"]).unwrap();
+    let user_defined_op = match op {
+        Operation::Custom(op) => op,
+        _ => panic!("Expected a user-defined operation"),
+    };
+    let sig = user_defined_op.signature.clone();
+    let (input_graph, output_graph) = visualize_signature(&sig);
+    eprintln!("Input Graph:\n{}", input_graph);
+    eprintln!("Output Graph:\n{}", output_graph);
+
+    eprintln!("signature: {:#?}", sig.output);
+
+    panic!();
 }

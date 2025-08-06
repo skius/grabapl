@@ -5,6 +5,7 @@ use std::fmt::Display;
 use std::ops::Deref;
 
 pub mod bimap;
+pub mod signature_visualizer;
 
 // newtype necessary for to Serialize/Deserialize support.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Copy, From)]

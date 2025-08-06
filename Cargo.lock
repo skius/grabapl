@@ -501,6 +501,7 @@ dependencies = [
  "error-stack",
  "grabapl_syntax",
  "grabapl_temp_petgraph_crate_not_namesquatting_i_promise",
+ "grabapl_template_semantics",
  "internment",
  "log",
  "proptest",

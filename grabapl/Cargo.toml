@@ -35,6 +35,7 @@ test-log = { version = "0.2", features = ["unstable"] }
 serde_json = "1.0"
 syntax = { path = "../syntax", package = "grabapl_syntax" } # not using the workspace dep to avoid cyclic dependencies (the missing version from this line fixes this)
 chumsky = "0.10.1"
+grabapl_template_semantics = { path = "../example_clients/template/semantics" }
 
 [features]
 default = ["log", "serde"]
