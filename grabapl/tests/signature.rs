@@ -146,6 +146,54 @@ fn invisible_node_not_deleted() {
 }
 
 
+
+#[test_log::test]
+fn writing_unjoinable_node_to_param() {
+    // if a parameter node receives un-joinable types in two branches, then the merge
+    // cannot display that node.
+    // in such a state, it is unclear what should happen.
+    // Note for practical purposes: since this is confusing, a semantics should probably not allow
+    // writing incompatible node types. i.e., if int and string are unjoinable, then a p: int should not
+    // be allowed to be set to a string value.
+
+    let mut op_ctx = OperationContext::<TestSemantics>::new();
+    let mut builder = OperationBuilder::new(&op_ctx, 0);
+    // expect a parameter node
+    builder
+        .expect_parameter_node("p0", NodeType::String)
+        .unwrap();
+    let p0 = AbstractNodeId::param("p0");
+    // set the string to an unjoinable separate
+    builder
+        .add_operation(
+            BuilderOpLike::Builtin(TestOperation::SetTo {
+                op_typ: NodeType::String,
+                target_typ: NodeType::Separate,
+                value: NodeValue::String("hello".to_string()), // Separate has no clear values, let's just pick String.
+            }),
+            vec![p0],
+        )
+        .unwrap();
+    // check the state
+    let state = builder.show_state().unwrap();
+    let aids: HashSet<AbstractNodeId> = state.node_keys_to_aid.right_values().copied().collect();
+
+    let op = builder.build().unwrap();
+    op_ctx.add_custom_operation(0, op);
+
+    let mut builder = OperationBuilder::new(&op_ctx, 0);
+    builder
+        .expect_parameter_node("p0", NodeType::String)
+        .unwrap();
+    let p0 = AbstractNodeId::param("p0");
+    // call op0
+    builder.add_operation(BuilderOpLike::FromOperationId(0), vec![p0]).unwrap();
+    let state = builder.show_state().unwrap();
+    // TODO: add assert test.
+    panic!("{}", state.dot_with_aid_with_dot_syntax())
+
+}
+
 #[test_log::test]
 fn signature_visualizability() {
     let (op_ctx, fn_names) = syntax::grabapl_parse!(grabapl_template_semantics::TheSemantics,
