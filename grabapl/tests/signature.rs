@@ -148,13 +148,15 @@ fn invisible_node_not_deleted() {
 
 
 #[test_log::test]
-fn writing_unjoinable_node_to_param() {
+fn writing_unjoinable_av_to_param() {
     // if a parameter node receives un-joinable types in two branches, then the merge
     // cannot display that node.
     // in such a state, it is unclear what should happen.
     // Note for practical purposes: since this is confusing, a semantics should probably not allow
     // writing incompatible node types. i.e., if int and string are unjoinable, then a p: int should not
     // be allowed to be set to a string value.
+    // OR: we do what we do inside an op when merging states, which is hiding the node.
+    // let's do that.
 
     let mut op_ctx = OperationContext::<TestSemantics>::new();
     let mut builder = OperationBuilder::new(&op_ctx, 0);
@@ -163,6 +165,17 @@ fn writing_unjoinable_node_to_param() {
         .expect_parameter_node("p0", NodeType::String)
         .unwrap();
     let p0 = AbstractNodeId::param("p0");
+
+    // expect an edge
+    builder
+        .expect_parameter_node("a0", NodeType::String)
+        .unwrap();
+    let a0 = AbstractNodeId::param("a0");
+    builder
+        .expect_parameter_node("a1", NodeType::String)
+        .unwrap();
+    let a1 = AbstractNodeId::param("a1");
+    builder.expect_parameter_edge("a0", "a1", EdgeType::Wildcard).unwrap();
     // set the string to an unjoinable separate
     builder
         .add_operation(
@@ -174,10 +187,16 @@ fn writing_unjoinable_node_to_param() {
             vec![p0],
         )
         .unwrap();
-    // check the state
-    let state = builder.show_state().unwrap();
-    let aids: HashSet<AbstractNodeId> = state.node_keys_to_aid.right_values().copied().collect();
-
+    // set the edge to an unjoinable separate
+    builder.add_operation(
+        BuilderOpLike::Builtin(TestOperation::SetEdgeTo {
+            node_typ: NodeType::Object,
+            value: "something".to_string(), // we don't care about this
+            target_typ: EdgeType::Separate,
+            param_typ: EdgeType::Wildcard,
+        }),
+        vec![a0, a1],
+    ).unwrap();
     let op = builder.build().unwrap();
     op_ctx.add_custom_operation(0, op);
 
@@ -186,12 +205,30 @@ fn writing_unjoinable_node_to_param() {
         .expect_parameter_node("p0", NodeType::String)
         .unwrap();
     let p0 = AbstractNodeId::param("p0");
+    // expect an edge
+    builder
+        .expect_parameter_node("a0", NodeType::String)
+        .unwrap();
+    let a0 = AbstractNodeId::param("a0");
+    builder
+        .expect_parameter_node("a1", NodeType::String)
+        .unwrap();
+    let a1 = AbstractNodeId::param("a1");
+    builder.expect_parameter_edge("a0", "a1", EdgeType::Wildcard).unwrap();
     // call op0
-    builder.add_operation(BuilderOpLike::FromOperationId(0), vec![p0]).unwrap();
-    let state = builder.show_state().unwrap();
-    // TODO: add assert test.
-    panic!("{}", state.dot_with_aid_with_dot_syntax())
+    builder.add_operation(BuilderOpLike::FromOperationId(0), vec![p0, a0, a1]).unwrap();
 
+
+    // Now assert that neither p0 (which would be join(string, separate), nor a0->a1 (which would be join(any, separate)
+    // still exists.
+    let state = builder.show_state().unwrap();
+    let aids: HashSet<_> = state.node_keys_to_aid.right_values().copied().collect();
+    assert_eq!(
+        aids,
+        HashSet::from([a0, a1]),
+        "state should not stil contain p0"
+    );
+    assert!(state.edge_av_of_aid(&a0, &a1).is_none(), "edge between a0 and a1 should not be visible anymore")
 }
 
 #[test_log::test]

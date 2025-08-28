@@ -275,6 +275,14 @@ impl<S: Semantics> AbstractOutputChanges<S> {
         // handle changed nodes
         for (subst, av) in &self.maybe_changed_nodes {
             let node_marker = NodeMarker::Subst(*subst);
+            // Note: It could be that the node received an unjoinable write with the current value.
+            // In this case, just like when merging IntermediateStates, we hide the node.
+            // See tests/signature.rs/writing_unjoinable_av_to_param
+            let old_av = g.get_node_value(node_marker).unwrap();
+            if S::NodeJoin::join(old_av, av).is_none() {
+                g.delete_node(node_marker);
+                continue;
+            }
             g.maybe_set_node_value(node_marker, av.clone(), S::NodeJoin::join)
                 .unwrap();
         }
@@ -282,6 +290,14 @@ impl<S: Semantics> AbstractOutputChanges<S> {
         for ((src, dst), av) in &self.maybe_changed_edges {
             let src_marker = NodeMarker::Subst(*src);
             let dst_marker = NodeMarker::Subst(*dst);
+            // Note: It could be that the edge received an unjoinable write with the current value.
+            // In this case, just like when merging IntermediateStates, we hide the edge.
+            // See tests/signature.rs/writing_unjoinable_av_to_param
+            let old_av = g.get_edge_value(src_marker, dst_marker).unwrap();
+            if S::EdgeJoin::join(old_av, av).is_none() {
+                g.delete_edge(src_marker, dst_marker);
+                continue;
+            }
             g.maybe_set_edge_value(src_marker, dst_marker, av.clone(), S::EdgeJoin::join)
                 .unwrap();
         }

@@ -170,6 +170,9 @@ pub struct GraphWithSubstitution<'a, G: GraphTrait> {
     changed_edge_av: HashMap<(NodeKey, NodeKey), G::EdgeAttr>,
 }
 
+// TODO: in this entire trait, the Option<> return types are kind of confusing.
+//  a full rework is probably in order.
+
 impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<'a, G> {
     pub fn new(graph: &'a mut G, subst: &'a ParameterSubstitution) -> Self {
         GraphWithSubstitution {
@@ -321,7 +324,11 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
                 //  `int` type, `str` type, no join. Function takes `str`, maybe-writes `int` to it.
                 //  at the call-site of the outer operation, we must now join (i.e., this function) the `int` and `str` types.
                 //  This is something that makes sense, and should be supported.
-                .expect("must be able to join. TODO: think about if this requirement makes sense");
+                // UPDATE: Fixed in test signature.rs/writing_unjoinable_av_to_param.
+                //  We now hide such instances (both nodes and edges), instead of crashing.
+                // TODO: We could now update this to take the merged value (which exists at callsite due to the check)
+                //  instead of `maybe_written_av` and `join`. Would potentially clean things up.
+                .expect("caller must ensure the join exists, and handle the invalid case manually.");
             // merged_av is the new value we want to set.
             self.graph.set_node_attr(node_key, merged_av)
         } else {
@@ -379,7 +386,7 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         let src_key = self.get_node_key(&src_marker)?;
         let dst_key = self.get_node_key(&dst_marker)?;
         if let Some(old_av) = self.graph.get_edge_attr((src_key, dst_key)) {
-            // only remember that we maybe wrote "maybe_writte_av".
+            // only remember that we maybe wrote "maybe_written_av".
             self.changed_edge_av
                 .insert((src_key, dst_key), maybe_written_av.clone());
             // Merge the current AV with the new value.

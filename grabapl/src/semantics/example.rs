@@ -65,6 +65,7 @@ impl AbstractJoin for EdgeJoiner {
 
     fn join(a: &Self::Abstract, b: &Self::Abstract) -> Option<Self::Abstract> {
         match (a, b) {
+            (EdgeType::Separate, _) | (_, EdgeType::Separate) => (a == b).then_some(EdgeType::Separate),
             (EdgeType::Exact(a), EdgeType::Exact(b)) if a == b => Some(EdgeType::Exact(a.clone())),
             _ => Some(EdgeType::Wildcard),
         }
@@ -138,6 +139,7 @@ impl NodeValue {
 pub enum EdgeType {
     Wildcard,
     Exact(String),
+    Separate,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
