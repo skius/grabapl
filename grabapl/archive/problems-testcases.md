@@ -571,8 +571,41 @@ Guessing, but each call should take around log2(heap size) query calls, so in to
 around sum(1, 2000, log2(i)) ~ 19000 method calls.
 
 
+## Edges maybe-writes of out of scope edges
+Because edges are uniquely defined by their endpoints, all edges between parameter nodes, even if not existing in the parameter, must be returned as maybe-writes.
+The reason for this is the following:
 
+```rust
+fn unsound1(a: int, b: int)[a -> b: "hello"] {
+    ruin(a, b);
+    show_state(); // still shows hello
+}
 
+fn ruin(a: int, b: int)
+    // [a->b: string] // if this is added, above correctly shows 'string'. But without this, the connection between the two edges is not made. The write from this function is dropped.
+    {
+    add_edge<"bye">(a,b);
+}
+```
+
+A consequence of this is that shape queries, even if read-only, could break _arbitrary edges_ of outer operations.
+The problem is that _even a new edge_ causes problems, i.e., it's *not limited to modifications of existing ones*.
+
+The current implementation of shape queries is safe, because no matched node is visible in an outer parameter.
+
+The same goes for deleting edges!
+```rust
+fn unsound2(a: int, b: int)[a -> b: "hello"] {
+    ruin2(a, b);
+    show_state();
+}
+
+fn ruin2(a: int, b: int)
+    [a->b: string]
+    {
+    remove_edge(a,b);
+}
+```
 
 
 
