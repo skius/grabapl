@@ -448,6 +448,10 @@ pub struct IntermediateState<S: Semantics> {
     /// The most generic abstract type that may be written to each edge, if any.
     pub edge_may_be_written_to: HashMap<(AbstractNodeId, AbstractNodeId), S::EdgeAbstract>,
 
+    /// Edges that may have been deleted at some point.
+    /// This is necessary to track, because this may be an edge that is _not_ in our scope right now.
+    pub edges_maybe_deleted: HashSet<(SubstMarker, SubstMarker)>,
+
     // TODO: make query path
     // TODO: should probably remove query_path from the state struct, and add it to a final returned StateWithQueryPath struct?
     pub query_path: Vec<QueryPath>,
@@ -468,6 +472,7 @@ impl<S: Semantics> Clone for IntermediateState<S> {
             edge_may_originate_from_shape_query: self.edge_may_originate_from_shape_query.clone(),
             node_may_be_written_to: self.node_may_be_written_to.clone(),
             edge_may_be_written_to: self.edge_may_be_written_to.clone(),
+            edges_maybe_deleted: self.edges_maybe_deleted.clone(),
             query_path: self.query_path.clone(),
             op_marker_counter: self.op_marker_counter,
             has_diverged: self.has_diverged,
@@ -484,6 +489,7 @@ impl<S: Semantics> IntermediateState<S> {
             edge_may_originate_from_shape_query: HashSet::new(),
             node_may_be_written_to: HashMap::new(),
             edge_may_be_written_to: HashMap::new(),
+            edges_maybe_deleted: HashSet::new(),
             query_path: Vec::new(),
             op_marker_counter: 50000,
             has_diverged: false,
@@ -507,6 +513,7 @@ impl<S: Semantics> IntermediateState<S> {
             edge_may_originate_from_shape_query: HashSet::new(),
             node_may_be_written_to: HashMap::new(),
             edge_may_be_written_to: HashMap::new(),
+            edges_maybe_deleted: HashSet::new(),
             query_path: Vec::new(),
             op_marker_counter: 50000,
             has_diverged: false,
@@ -768,6 +775,9 @@ impl<S: Semantics> IntermediateState<S> {
         for ((source, target), edge_abstract) in operation_output.changed_abstract_values_edges {
             let Ok(source_aid) = self.get_aid_from_key(&source) else {
                 // see above for why we may enter this and why it's fine
+                // update: there's another reason why it's fine as well:
+                // edges may be changed even if they don't exist in the calling abstract graph, because they might be
+                // in-scope of some outer abstract graph.
                 log::warn!("internal error: changed edge source not found in mapping");
                 continue;
             };
@@ -777,6 +787,27 @@ impl<S: Semantics> IntermediateState<S> {
             };
             self.edge_may_be_written_to
                 .insert((source_aid, target_aid), edge_abstract);
+        }
+
+        for (removed_source, removed_target) in &operation_output.removed_edges {
+            let Ok(removed_source_aid) = self.get_aid_from_key(removed_source) else {
+                log::warn!("internal error: removed edge source not found in mapping");
+                continue;
+            };
+            let AbstractNodeId::ParameterMarker(src) = removed_source_aid else {
+                log::info!("removed edge source is not a parameter marker");
+                continue;
+            };
+            let Ok(removed_target_aid) = self.get_aid_from_key(removed_target) else {
+                log::warn!("internal error: removed edge target not found in mapping");
+                continue;
+            };
+            let AbstractNodeId::ParameterMarker(dst) = removed_target_aid else {
+                log::info!("removed edge target is not a parameter marker");
+                continue;
+            };
+            self.edges_maybe_deleted
+                .insert((src, dst));
         }
 
         Ok(IntermediateStateAbstractOutputResult {
@@ -1264,6 +1295,14 @@ fn merge_states_result<S: Semantics>(
                 .insert((*from_aid, *to_aid), merged_av);
         }
     }
+
+    // merge the 'maybe deleted edges' sets
+    new_state.edges_maybe_deleted = state_true
+        .edges_maybe_deleted
+        .union(&state_false.edges_maybe_deleted)
+        .copied()
+        .collect();
+
 
     // which AIDs are actually present in the merged state, taking into account everything (names, type join)
     let final_merged_state_aids = new_state

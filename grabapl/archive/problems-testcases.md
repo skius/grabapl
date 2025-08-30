@@ -601,7 +601,56 @@ fn unsound2(a: int, b: int)[a -> b: "hello"] {
 }
 
 fn ruin2(a: int, b: int)
-    [a->b: string]
+   //  [a->b: string]
+    {
+    remove_edge(a,b);
+}
+```
+
+TODO: add the above two to test cases. Also with wrapping, eg:
+```rust
+fn unsound2(a: int, b: int)[a -> b: "hello"] {
+    ruinwrap(a, b);
+    show_state(a2); // still shows hello
+}
+
+fn ruinwrap(a: int, b: int) {
+    ruin(a, b);
+}
+
+fn unsound1(a: int, b: int)[a -> b: "hello"] {
+    ruin(a, b);
+    show_state(); // still shows hello
+}
+
+fn ruin(a: int, b: int)
+    // [a->b: string] // if this is added, above correctly shows 'string'. But without this, the connection between the two edges is not made. The write from this function is dropped.
+    {
+    add_edge<"bye">(a,b);
+}
+
+fn unsound3(a: int, b: int)[a -> b: "hello"] {
+    ruin3(a, b);
+    show_state(a3);
+}
+
+fn ruin3(a: int, b: int)
+    // [a->b: string]
+    {
+    remove_edge(a,b);
+}
+
+fn unsound4(a: int, b: int)[a -> b: "hello"] {
+    ruin4wrap(a, b);
+    show_state(a4);
+}
+
+fn ruin4wrap(a: int, b: int){
+    ruin4(a, b);
+}
+
+fn ruin4(a: int, b: int)
+    // [a->b: string]
     {
     remove_edge(a,b);
 }

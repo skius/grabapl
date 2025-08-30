@@ -1464,6 +1464,11 @@ fn populate_signature_changes<S: Semantics>(
     // deleted edges are those that were in the initial substitution but not in the current state
     let deleted_edges: HashSet<_> = initial_edges.difference(&current_edges).cloned().collect();
     signature.output.maybe_deleted_edges = deleted_edges;
+    // however, if we additionally know some edges that were deleted, we also add those
+    signature
+        .output
+        .maybe_deleted_edges
+        .extend(last_state.edges_maybe_deleted.iter());
 
     // changed nodes and edges must be kept track of during the interpretation, including calls to child operations.
 

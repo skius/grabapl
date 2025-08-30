@@ -249,10 +249,15 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         let src_key = self.get_node_key(&src_marker)?;
         let dst_key = self.get_node_key(&dst_marker)?;
 
+        // NOTE: the edge might be in an outer scope.
+        // hence we must unconditionally add this as a 'changed edge av'.
+        self.changed_edge_av.insert((src_key, dst_key), value.clone());
+
         let res = self.graph.add_edge(src_key, dst_key, value.clone());
         if res.is_some() {
             // an edge existed, hence this call changed the edge value
-            self.changed_edge_av.insert((src_key, dst_key), value);
+            // self.changed_edge_av.insert((src_key, dst_key), value);
+            // -- update: see above
         } else {
             // this is a new edge
             self.new_edges.push((src_key, dst_key));
@@ -271,8 +276,12 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         let dst_key = self.get_node_key(&dst_marker)?;
         let removed_value = self.graph.delete_edge(src_key, dst_key);
         if removed_value.is_some() {
-            self.removed_edges.push((src_key, dst_key));
+            // self.removed_edges.push((src_key, dst_key));
+            // update: see below
         }
+        // NOTE: the edge might be in an outer scope.
+        // hence we must unconditionally mark its deletion
+        self.removed_edges.push((src_key, dst_key));
         removed_value
     }
 
@@ -403,6 +412,21 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
             None
         }
     }
+    
+    /// If there is no edge in the current graph but we want to store the information anyway
+    pub fn indicate_maybe_edge_change(
+        &mut self,
+        src_marker: impl Into<NodeMarker>,
+        dst_marker: impl Into<NodeMarker>,
+        maybe_written_av: G::EdgeAttr,
+    ) {
+        let src_marker = src_marker.into();
+        let dst_marker = dst_marker.into();
+        let src_key = self.get_node_key(&src_marker).expect("source node must exist");
+        let dst_key = self.get_node_key(&dst_marker).expect("destination node must exist");
+        self.changed_edge_av
+            .insert((src_key, dst_key), maybe_written_av);
+    }
 
     fn get_new_nodes_and_edges_from_desired_names(
         &self,
@@ -443,6 +467,7 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
             self.get_new_nodes_and_edges_from_desired_names(&desired_node_output_names);
 
         // Only report changed av's for nodes and edges that are params
+        // ^UPDATE: no! edges can not be params, but still affect outer scopes!
         // TODO: make sure the changed_av_nodes/edges skip deleted nodes/edges.
         let existing_nodes: HashSet<NodeKey> = self.subst.mapping.values().cloned().collect();
         let mut existing_edges = HashSet::new();
@@ -457,9 +482,10 @@ impl<'a, G: GraphTrait<NodeAttr: Clone, EdgeAttr: Clone>> GraphWithSubstitution<
         }
         let mut changed_abstract_edges = HashMap::new();
         for (&(src, dst), edge_av) in &self.changed_edge_av {
-            if existing_edges.contains(&(src, dst)) {
+            // UPDATE: always include changed edges, since they can affect outer scopes even if they are new edges.
+            // if existing_edges.contains(&(src, dst)) {
                 changed_abstract_edges.insert((src, dst), edge_av.clone());
-            }
+            // }
         }
 
         AbstractOperationOutput {
