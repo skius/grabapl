@@ -2029,6 +2029,9 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
         let mut new_builder_stage_2 =
             self.build_builder_from_scratch_with_output_changes(new_output_changes)?;
         new_builder_stage_2.consume(instruction.clone())?;
+        // TODO: try fixed point solving until new_output_changes does not change anymore according to
+        //  identical_via_subtype
+
         // TODO: add test that checks if maybe we change semantics by replaying all instructions with a different self op?
         // at this point we know the building worked, so we can safely update our active builder.
         // TODO: would be nice if we had an Eq constraint on BuiltinOperations, so that we could check that the result of building the stage 2 UDOp

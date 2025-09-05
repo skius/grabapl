@@ -156,6 +156,10 @@ impl<S: Semantics> AbstractOutputChanges<S> {
         }
     }
 
+    pub fn identical_via_subtype(&self, other: &Self) -> bool {
+        self.is_subtype_of(other) && other.is_subtype_of(self)
+    }
+
     /// Returns `true` if `self` can be used wherever `other` is expected, i.e., `self <: other`.
     pub fn is_subtype_of(&self, other: &Self) -> bool {
         // All new nodes and edges from other must be present in self, with a subtype of their
