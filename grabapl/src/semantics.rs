@@ -28,6 +28,14 @@ pub trait AbstractMatcher {
     /// In other words, it checks if `argument` is a subtype of `parameter`.
     // TODO: rename "arg_matches_param"?
     fn matches(argument: &Self::Abstract, parameter: &Self::Abstract) -> bool;
+
+    // TODO: move to Semantics trait directly.
+    //  this is a workaround to allow debug printing of abstract types without
+    //  requiring Debug on the Abstract type itself.
+    fn debug_hack(av: &Self::Abstract) -> String {
+        // panic!("not implemented debug_hack")
+        "<debug_hack not implemented>".to_string()
+    }
 }
 
 /// A basic AbstractJoin that can join a type and a supertype into the supertype.

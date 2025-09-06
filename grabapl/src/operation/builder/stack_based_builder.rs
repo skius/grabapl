@@ -2025,6 +2025,56 @@ impl<'a, S: Semantics<BuiltinQuery: Clone, BuiltinOperation: Clone>> OperationBu
                 return Ok(());
             }
         };
+
+        let mut prev_output_changes = new_output_changes.clone();
+        let mut next_stage = self.build_builder_from_scratch_with_output_changes(prev_output_changes.clone())?;
+        next_stage.consume(instruction.clone())?;
+        let mut next_output_changes = next_stage.clone().build_partial_op()?;
+
+        // if !prev_output_changes.identical_via_subtype(&next_output_changes) {
+        //     // this is a limitation for soundness reasons.
+        //     // we only allow single-iteration fixed points to pass
+        //     log::error!("did not reach fixed point signature after one iteration");
+        //     log::error!("prev output changes: {}", prev_output_changes.debug_string());
+        //     log::error!("next output changes: {}", next_output_changes.debug_string());
+        //     return Err(report!(OperationBuilderError::Oneoff(
+        //         "Did not reach fixed point signature after one iteration."
+        //     )));
+        // }
+
+        // run 10 iterations of fixed point solving.
+        // note that the only domain that requires fixed point solving is the structure, i.e.,
+        // having multiple nodes/edges that may all be affected.
+        // the client abstract domain cannot require fixed point solving,
+        // because recursive type changes of a node cannot affect future changes to that node.
+        // it is only possible that a recursive function call now matches different nodes/edges
+        // due ot that type change.
+        // hence we need at most as many iterations as there are structural elements in the parameter.
+        // we limit to 10 iterations to avoid infinite loops in case of bugs.
+        let mut iters = 0;
+        while !prev_output_changes.identical_via_subtype(&next_output_changes) {
+            if iters > 10 {
+                log::error!("did not reach fixed point signature after 10 iterations");
+                log::error!("prev output changes: {}", prev_output_changes.debug_string());
+                log::error!("next output changes: {}", next_output_changes.debug_string());
+                return Err(report!(OperationBuilderError::Oneoff(
+                    "Did not reach fixed point signature after 10 iterations."
+                )));
+            }
+            iters += 1;
+
+            prev_output_changes = next_output_changes;
+            next_stage = self.build_builder_from_scratch_with_output_changes(prev_output_changes.clone())?;
+            next_stage.consume(instruction.clone())?;
+            next_output_changes = next_stage.clone().build_partial_op()?;
+
+            // println!("iterating to fixed point: {} -> {}", prev_output_changes.debug_string(), next_output_changes.debug_string());
+        }
+
+        self.active = next_stage;
+        self.instructions.push(instruction.clone());
+        return Ok(());
+
         // now that we have the new self op, let's try the instruction again.
         let mut new_builder_stage_2 =
             self.build_builder_from_scratch_with_output_changes(new_output_changes)?;

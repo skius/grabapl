@@ -8,6 +8,7 @@ use crate::util::bimap::BiMap;
 use derive_more::From;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use crate::util::log;
 
 pub mod parameter;
 pub mod parameterbuilder;
@@ -156,8 +157,48 @@ impl<S: Semantics> AbstractOutputChanges<S> {
         }
     }
 
+    pub fn debug_string(&self) -> String {
+        #[derive(Debug)]
+        #[allow(dead_code)]
+        struct DebugOutputChanges {
+            new_nodes: HashMap<AbstractOutputNodeMarker, String>,
+            new_edges: HashMap<AbstractSignatureEdgeId, String>,
+            maybe_changed_nodes: HashMap<SubstMarker, String>,
+            maybe_changed_edges: HashMap<ParameterEdgeId, String>,
+            maybe_deleted_nodes: HashSet<SubstMarker>,
+            maybe_deleted_edges: HashSet<ParameterEdgeId>,
+        }
+
+        format!(
+            "{:?}",
+            DebugOutputChanges {
+                new_nodes: self.new_nodes.iter().map(|(k, v)| (*k, S::NodeMatcher::debug_hack(v))).collect(),
+                new_edges: self.new_edges.iter().map(|(k, v)| (*k, S::EdgeMatcher::debug_hack(v))).collect(),
+                maybe_changed_nodes: self.maybe_changed_nodes.iter().map(|(k, v)| (*k, S::NodeMatcher::debug_hack(v))).collect(),
+                maybe_changed_edges: self.maybe_changed_edges.iter().map(|(k, v)| (*k, S::EdgeMatcher::debug_hack(v))).collect(),
+                maybe_deleted_nodes: self.maybe_deleted_nodes.clone(),
+                maybe_deleted_edges: self.maybe_deleted_edges.clone(),
+            }
+        )
+
+        // format!("{:?}, {:?}, {:?}, {:?}, {:?}, {:?}",
+        //     self.new_nodes.keys(),
+        //     self.new_edges.keys(),
+        //     self.maybe_changed_nodes.keys(),
+        //     self.maybe_changed_edges.keys(),
+        //     self.maybe_deleted_nodes,
+        //     self.maybe_deleted_edges,
+        // )
+    }
+
     pub fn identical_via_subtype(&self, other: &Self) -> bool {
-        self.is_subtype_of(other) && other.is_subtype_of(self)
+        // log::info!("Checking self <: other");
+        let self_to_other = self.is_subtype_of(other);
+        if !self_to_other {
+            return false;
+        }
+        // log::info!("Checking other <: self");
+        other.is_subtype_of(self)
     }
 
     /// Returns `true` if `self` can be used wherever `other` is expected, i.e., `self <: other`.
@@ -169,11 +210,13 @@ impl<S: Semantics> AbstractOutputChanges<S> {
                 if !S::NodeMatcher::matches(self_type, other_type) {
                     // New node is not a subtype.
                     // Any caller working with the assumption of `other` would assume an incorrect type.
+                    log::info!("New node type mismatch for {marker:?}");
                     return false;
                 }
             } else {
                 // Missing new node
                 // Any caller working with the assumption of `other` would incorrectly assume that this node exists and crash.
+                log::info!("Missing new node for {marker:?}");
                 return false;
             }
         }
@@ -182,11 +225,13 @@ impl<S: Semantics> AbstractOutputChanges<S> {
                 if !S::EdgeMatcher::matches(self_type, other_type) {
                     // New edge is not a subtype.
                     // Any caller working with the assumption of `other` would assume an incorrect type.
+                    log::info!("New edge type mismatch for {edge_id:?}");
                     return false;
                 }
             } else {
                 // Missing new edge.
                 // Any caller working with the assumption of `other` would incorrectly assume that this edge exists and crash.
+                log::info!("Missing new edge for {edge_id:?}");
                 return false;
             }
         }
@@ -198,11 +243,16 @@ impl<S: Semantics> AbstractOutputChanges<S> {
                 if !S::NodeMatcher::matches(self_type, other_type) {
                     // Changed node is not a subtype of the one in `other`.
                     // Any caller working with the assumption of `other` would assume an incorrect type.
+                    log::info!("Changed node type mismatch for {marker:?}, self: {}, other: {}",
+                        S::NodeMatcher::debug_hack(self_type),
+                    S::NodeMatcher::debug_hack(other_type));
                     return false;
                 }
             } else {
                 // Missing changed node.
                 // `self` would change values unbeknownst to any caller working with the assumption of `other`.
+                log::info!("Missing changed node for {marker:?} to type {}",
+                    S::NodeMatcher::debug_hack(self_type));
                 return false;
             }
         }
@@ -211,11 +261,13 @@ impl<S: Semantics> AbstractOutputChanges<S> {
                 if !S::EdgeMatcher::matches(self_type, other_type) {
                     // Changed edge is not a subtype of the one in `other`.
                     // Any caller working with the assumption of `other` would assume an incorrect type.
+                    log::info!("Changed edge type mismatch for {edge_id:?}");
                     return false;
                 }
             } else {
                 // Missing changed edge.
                 // `self` would change values unbeknownst to any caller working with the assumption of `other`.
+                log::info!("Missing changed edge for {edge_id:?}");
                 return false;
             }
         }
@@ -225,6 +277,7 @@ impl<S: Semantics> AbstractOutputChanges<S> {
             if !other.maybe_deleted_nodes.contains(marker) {
                 // `self` would delete a node that `other` expects to be present.
                 // Any caller working with the assumption of `other` would assume this node exists and crash.
+                log::info!("Deleted node missing in other for {marker:?}");
                 return false;
             }
         }
@@ -232,6 +285,7 @@ impl<S: Semantics> AbstractOutputChanges<S> {
             if !other.maybe_deleted_edges.contains(edge_id) {
                 // `self` would delete an edge that `other` expects to be present.
                 // Any caller working with the assumption of `other` would assume this edge exists and crash.
+                log::info!("Deleted edge missing in other for {edge_id:?}");
                 return false;
             }
         }

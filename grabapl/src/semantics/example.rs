@@ -28,6 +28,10 @@ impl AbstractMatcher for NodeMatcher {
             _ => argument == parameter,
         }
     }
+
+    fn debug_hack(av: &Self::Abstract) -> String {
+        format!("{av:?}")
+    }
 }
 
 pub struct EdgeMatcher;
@@ -35,11 +39,19 @@ impl AbstractMatcher for EdgeMatcher {
     type Abstract = EdgeType;
 
     fn matches(argument: &Self::Abstract, parameter: &Self::Abstract) -> bool {
+        if argument == &EdgeType::Separate || parameter == &EdgeType::Separate {
+            // if either is Separate, they can only match themselves.
+            return argument == parameter;
+        }
         match (argument, parameter) {
             (_, EdgeType::Wildcard) => true,
             (EdgeType::Exact(a), EdgeType::Exact(b)) => a == b,
             _ => false,
         }
+    }
+
+    fn debug_hack(av: &Self::Abstract) -> String {
+        format!("{av:?}")
     }
 }
 
