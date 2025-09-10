@@ -129,7 +129,11 @@ pub mod ffi {
                 log::error!("state does not exist in state map");
                 return;
             };
-            write!(dot, "{}", state.dot_with_aid_with_dot_syntax()).unwrap();
+            // just for presentation
+            let type_color = "#d73a49";
+            let edge_str_color = "forestgreen";
+            // log::error!("test new");
+            write!(dot, "{}", state.dot_with_aid_table_based_with_color_names(type_color, edge_str_color)).unwrap();
         }
 
         /// Lists the available states.

@@ -91,9 +91,10 @@ function renderGraph(dotString) {
     }
     try {
         let svg = graphviz.dot(dotString);
+        // console.log(svg)
         // replace fill="white" with fill="none" to avoid white background
-        svg = svg.replace(/fill="white"/g, 'fill="none"');
-        svg = svg.replace(/<text /g, '<text fill="white" ');
+        // svg = svg.replace(/fill="white"/g, 'fill="none"');
+        // svg = svg.replace(/<text /g, '<text fill="white" ');
         // if theme is dark, set 'stroke="black"' to 'stroke="white"'
         if (docElement.classList.contains('dark')) {
             svg = svg.replace(/stroke="black"/g, 'stroke="white"');
@@ -285,7 +286,9 @@ editor.onDidChangeModelContent(() => {
 // Listen for changes in the state selector dropdown
 stateSelector.addEventListener('change', (e) => {
     if (current_res && e.target.value) {
-        renderGraph(current_res.dotOfState(e.target.value));
+        let dot = current_res.dotOfState(e.target.value);
+        // console.log(dot);
+        renderGraph(dot);
     }
 });
 themeToggleBtn.addEventListener('click', () => {
