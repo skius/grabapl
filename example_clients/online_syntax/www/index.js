@@ -748,7 +748,8 @@ function executeOperation(operationName, inputNodeNames) {
 
             let existingNode = interactiveNodes.find(n => n.nodeKey === key);
             if (!existingNode) {
-                addNode(key, key, value);
+                let keyAsName = `${key}`;
+                addNode(key, keyAsName, value);
             } else {
                 existingNode.value = value; // Update value if it exists
                 newInteractiveNodes.push(existingNode); // Keep existing nodes
